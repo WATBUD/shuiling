@@ -1,3 +1,7 @@
 [gd_scene format=3 uid="uid://b5ij470erm3np"]
 
-[node name="Node3D" type="Node3D" unique_id=826723277]
+[ext_resource type="Script" uid="uid://8heouwjhur1n" path="res://scripts/World.cs" id="1_world"]
+
+[node name="GameWorld" type="Node3D" unique_id=826723277]
+transform = Transform3D(0.7022554, 0.4600902, 0.5432813, -0.54801947, 0.8364657, 0, -0.4544361, -0.2977287, 0.8395508, 0, 0, 0)
+script = ExtResource("1_world")
