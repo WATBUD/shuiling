@@ -3,6 +3,24 @@ using System.Collections.Generic;
 
 public partial class World : Node3D
 {
+	private static readonly string[] NpcNames =
+	{
+		"村莊守衛",
+		"巡邏獵人",
+		"旅途商人",
+		"森林採集者",
+		"修練學徒",
+	};
+
+	private static readonly string[] MonsterNames =
+	{
+		"野生史萊姆",
+		"紅角獸",
+		"荒野獵手",
+		"洞穴狼",
+		"毒牙小鬼",
+	};
+
 	[Export] public float MapSize { get; set; } = 150.0f;
 	[Export] public int PropCount { get; set; } = 110;
 	[Export] public int ActorCount { get; set; } = 36;
@@ -232,6 +250,7 @@ public partial class World : Node3D
 			MoveSpeed = isMonster ? (float)_rng.RandfRange(2.0f, 3.1f) : (float)_rng.RandfRange(1.1f, 1.8f),
 			WanderRadius = (float)_rng.RandfRange(8.0f, 17.0f),
 		};
+		ConfigureActorStats(actor, isMonster);
 
 		var collisionShape = new CollisionShape3D
 		{
@@ -275,6 +294,26 @@ public partial class World : Node3D
 		}
 
 		return actor;
+	}
+
+	private void ConfigureActorStats(SimpleActor actor, bool isMonster)
+	{
+		int level = isMonster ? _rng.RandiRange(2, 10) : _rng.RandiRange(1, 7);
+		int maxHealth = isMonster
+			? 95 + level * 22 + _rng.RandiRange(0, 35)
+			: 70 + level * 14 + _rng.RandiRange(0, 24);
+		int attack = isMonster
+			? 9 + level * 4 + _rng.RandiRange(0, 5)
+			: 5 + level * 2 + _rng.RandiRange(0, 3);
+		int defense = isMonster
+			? 5 + level * 3 + _rng.RandiRange(0, 4)
+			: 4 + level * 2 + _rng.RandiRange(0, 3);
+		int experience = isMonster ? level * 9 + _rng.RandiRange(3, 12) : level * 4 + _rng.RandiRange(1, 5);
+		int gold = isMonster ? level * 3 + _rng.RandiRange(0, 8) : level + _rng.RandiRange(0, 4);
+		string[] namePool = isMonster ? MonsterNames : NpcNames;
+		string displayName = namePool[_rng.RandiRange(0, namePool.Length - 1)];
+
+		actor.ConfigureStats(displayName, level, maxHealth, attack, defense, experience, gold);
 	}
 
 	private void AddHorn(Node3D actor, Vector3 position, Vector3 rotationDegrees)

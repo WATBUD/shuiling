@@ -1,4 +1,5 @@
 using Godot;
+using System.Collections.Generic;
 
 public partial class PlayerController : CharacterBody3D
 {
@@ -7,19 +8,34 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float JumpVelocity { get; set; } = 5.2f;
 	[Export] public float MouseSensitivity { get; set; } = 0.0022f;
 	[Export] public float Acceleration { get; set; } = 18.0f;
+	[Export] public float CaptureCooldown { get; set; } = 0.55f;
+	[Export] public float TargetInfoRange { get; set; } = 30.0f;
 
+	private readonly List<SimpleActor> _capturedActors = new();
 	private float _pitch;
 	private float _gravity;
+	private float _captureCooldownRemaining;
 	private Node3D _cameraPivot = null!;
+	private Camera3D _camera = null!;
+	private RayCast3D _targetInfoRay = null!;
+	private TargetInfoPanel _targetInfoPanel = null!;
 
 	public override void _Ready()
 	{
 		_gravity = ProjectSettings.GetSetting("physics/3d/default_gravity").AsSingle();
 		_cameraPivot = GetNode<Node3D>("CameraPivot");
+		_camera = GetNode<Camera3D>("CameraPivot/Camera3D");
+		CreateTargetInfoRay();
+		CreateTargetInfoPanel();
 
 		AddToGroup("player");
 		EnsureInputActions();
 		Input.MouseMode = Input.MouseModeEnum.Captured;
+	}
+
+	public override void _Process(double delta)
+	{
+		UpdateTargetInfoPanel();
 	}
 
 	public override void _UnhandledInput(InputEvent @event)
@@ -47,11 +63,17 @@ public partial class PlayerController : CharacterBody3D
 		{
 			Input.MouseMode = Input.MouseModeEnum.Visible;
 		}
+
+		if (@event.IsActionPressed("capture_net"))
+		{
+			ThrowCaptureNet();
+		}
 	}
 
 	public override void _PhysicsProcess(double delta)
 	{
 		float step = (float)delta;
+		_captureCooldownRemaining = Mathf.Max(_captureCooldownRemaining - step, 0.0f);
 		Vector3 velocity = Velocity;
 
 		if (!IsOnFloor())
@@ -85,6 +107,82 @@ public partial class PlayerController : CharacterBody3D
 		AddKeyAction("move_right", Key.D);
 		AddKeyAction("jump", Key.Space);
 		AddKeyAction("sprint", Key.Shift);
+		AddKeyAction("capture_net", Key.R);
+	}
+
+	private void ThrowCaptureNet()
+	{
+		if (_captureCooldownRemaining > 0.0f)
+		{
+			return;
+		}
+
+		_captureCooldownRemaining = CaptureCooldown;
+		Vector3 direction = -_camera.GlobalTransform.Basis.Z.Normalized();
+		Vector3 spawnPosition = _camera.GlobalPosition + direction * 1.1f;
+		var net = new CaptureNet
+		{
+			OwnerPlayer = this,
+			Direction = direction,
+		};
+
+		Node projectileParent = GetTree().CurrentScene ?? GetParent();
+		projectileParent.AddChild(net);
+		net.GlobalPosition = spawnPosition;
+		net.AlignToDirection();
+	}
+
+	public bool CaptureActor(SimpleActor actor)
+	{
+		if (!actor.CanBeCaptured || _capturedActors.Contains(actor))
+		{
+			return false;
+		}
+
+		int followSlot = _capturedActors.Count;
+		_capturedActors.Add(actor);
+		actor.Capture(this, followSlot);
+		return true;
+	}
+
+	private void CreateTargetInfoRay()
+	{
+		_targetInfoRay = new RayCast3D
+		{
+			Name = "TargetInfoRay",
+			Enabled = true,
+			ExcludeParent = true,
+			CollideWithAreas = false,
+			CollideWithBodies = true,
+			TargetPosition = new Vector3(0.0f, 0.0f, -TargetInfoRange),
+		};
+		_camera.AddChild(_targetInfoRay);
+		_targetInfoRay.AddException(this);
+	}
+
+	private void CreateTargetInfoPanel()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "TargetInfoLayer",
+			Layer = 20,
+		};
+
+		AddChild(layer);
+		_targetInfoPanel = new TargetInfoPanel();
+		layer.AddChild(_targetInfoPanel);
+	}
+
+	private void UpdateTargetInfoPanel()
+	{
+		_targetInfoRay.ForceRaycastUpdate();
+		if (_targetInfoRay.IsColliding() && _targetInfoRay.GetCollider() is SimpleActor actor)
+		{
+			_targetInfoPanel.ShowActor(actor);
+			return;
+		}
+
+		_targetInfoPanel.HideActor();
 	}
 
 	private static void AddKeyAction(StringName actionName, Key physicalKeycode)
