@@ -10,6 +10,12 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float Acceleration { get; set; } = 18.0f;
 	[Export] public float CaptureCooldown { get; set; } = 0.55f;
 	[Export] public float TargetInfoRange { get; set; } = 30.0f;
+	[Export] public string PlayerName { get; set; } = "玩家";
+	[Export] public int Level { get; set; } = 1;
+	[Export] public int MaxHealth { get; set; } = 150;
+	[Export] public int CurrentHealth { get; set; } = 150;
+	[Export] public int Attack { get; set; } = 16;
+	[Export] public int Defense { get; set; } = 10;
 
 	private readonly List<SimpleActor> _capturedActors = new();
 	private float _pitch;
@@ -19,6 +25,10 @@ public partial class PlayerController : CharacterBody3D
 	private Camera3D _camera = null!;
 	private RayCast3D _targetInfoRay = null!;
 	private TargetInfoPanel _targetInfoPanel = null!;
+	private PartyPanel _partyPanel = null!;
+
+	public IReadOnlyList<SimpleActor> CapturedActors => _capturedActors;
+	public float HealthRatio => MaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)MaxHealth, 0.0f, 1.0f);
 
 	public override void _Ready()
 	{
@@ -27,6 +37,7 @@ public partial class PlayerController : CharacterBody3D
 		_camera = GetNode<Camera3D>("CameraPivot/Camera3D");
 		CreateTargetInfoRay();
 		CreateTargetInfoPanel();
+		CreatePartyPanel();
 
 		AddToGroup("player");
 		EnsureInputActions();
@@ -40,6 +51,22 @@ public partial class PlayerController : CharacterBody3D
 
 	public override void _UnhandledInput(InputEvent @event)
 	{
+		if (@event.IsActionPressed("party_panel"))
+		{
+			SetPartyPanelVisible(!_partyPanel.Visible);
+			return;
+		}
+
+		if (_partyPanel.Visible)
+		{
+			if (@event.IsActionPressed("ui_cancel"))
+			{
+				SetPartyPanelVisible(false);
+			}
+
+			return;
+		}
+
 		if (@event is InputEventMouseMotion mouseMotion && Input.MouseMode == Input.MouseModeEnum.Captured)
 		{
 			RotateY(-mouseMotion.Relative.X * MouseSensitivity);
@@ -108,6 +135,7 @@ public partial class PlayerController : CharacterBody3D
 		AddKeyAction("jump", Key.Space);
 		AddKeyAction("sprint", Key.Shift);
 		AddKeyAction("capture_net", Key.R);
+		AddKeyAction("party_panel", Key.P);
 	}
 
 	private void ThrowCaptureNet()
@@ -142,6 +170,7 @@ public partial class PlayerController : CharacterBody3D
 		int followSlot = _capturedActors.Count;
 		_capturedActors.Add(actor);
 		actor.Capture(this, followSlot);
+		_partyPanel.RefreshParty();
 		return true;
 	}
 
@@ -171,6 +200,26 @@ public partial class PlayerController : CharacterBody3D
 		AddChild(layer);
 		_targetInfoPanel = new TargetInfoPanel();
 		layer.AddChild(_targetInfoPanel);
+	}
+
+	private void CreatePartyPanel()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "PartyLayer",
+			Layer = 30,
+		};
+
+		AddChild(layer);
+		_partyPanel = new PartyPanel();
+		layer.AddChild(_partyPanel);
+		_partyPanel.Bind(this);
+	}
+
+	private void SetPartyPanelVisible(bool visible)
+	{
+		_partyPanel.SetPanelVisible(visible);
+		Input.MouseMode = visible ? Input.MouseModeEnum.Visible : Input.MouseModeEnum.Captured;
 	}
 
 	private void UpdateTargetInfoPanel()

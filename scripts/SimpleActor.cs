@@ -23,6 +23,7 @@ public partial class SimpleActor : CharacterBody3D
 	private float _gravity;
 	private Vector3 _targetPosition = Vector3.Zero;
 	private float _waitTime;
+	private Label3D? _nameplate;
 
 	public bool CanBeCaptured => !_isCaptured;
 	public bool IsCaptured => _isCaptured;
@@ -42,6 +43,7 @@ public partial class SimpleActor : CharacterBody3D
 
 		_targetPosition = PickWanderTarget();
 		AddToGroup(ActorKind == "monster" ? "monsters" : "npcs");
+		CreateNameplate();
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -118,6 +120,7 @@ public partial class SimpleActor : CharacterBody3D
 		followTarget.AddCollisionExceptionWith(this);
 		RemoveFromGroup(ActorKind == "monster" ? "monsters" : "npcs");
 		AddToGroup("captured_actors");
+		RefreshNameplate();
 	}
 
 	public void ConfigureStats(string displayName, int level, int maxHealth, int attack, int defense, int experienceReward, int goldReward)
@@ -130,6 +133,42 @@ public partial class SimpleActor : CharacterBody3D
 		Defense = Mathf.Max(defense, 0);
 		ExperienceReward = Mathf.Max(experienceReward, 0);
 		GoldReward = Mathf.Max(goldReward, 0);
+		RefreshNameplate();
+	}
+
+	private void CreateNameplate()
+	{
+		_nameplate = new Label3D
+		{
+			Name = "Nameplate",
+			Position = new Vector3(0.0f, 2.35f, 0.0f),
+			Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+			FixedSize = true,
+			NoDepthTest = false,
+			FontSize = 22,
+			PixelSize = 0.0085f,
+			OutlineSize = 7,
+			HorizontalAlignment = HorizontalAlignment.Center,
+			VerticalAlignment = VerticalAlignment.Center,
+			Width = 320.0f,
+		};
+		AddChild(_nameplate);
+		RefreshNameplate();
+	}
+
+	private void RefreshNameplate()
+	{
+		if (_nameplate == null)
+		{
+			return;
+		}
+
+		string capturedText = _isCaptured ? " 已捕捉" : string.Empty;
+		_nameplate.Text = $"Lv.{Level} {DisplayName}{capturedText}";
+		_nameplate.Modulate = ActorKind == "monster"
+			? new Color(1.0f, 0.34f, 0.26f)
+			: new Color(0.64f, 0.86f, 1.0f);
+		_nameplate.OutlineModulate = new Color(0.02f, 0.025f, 0.03f, 0.96f);
 	}
 
 	private void FollowCapturedTarget(Vector3 velocity, float step)
