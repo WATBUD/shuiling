@@ -16,8 +16,10 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public int CurrentHealth { get; set; } = 150;
 	[Export] public int Attack { get; set; } = 16;
 	[Export] public int Defense { get; set; } = 10;
+	[Export] public int ActivePartyLimit { get; set; } = 20;
 
-	private readonly List<SimpleActor> _capturedActors = new();
+	private readonly List<SimpleActor> _capturedCollection = new();
+	private readonly List<SimpleActor> _activeParty = new();
 	private float _pitch;
 	private float _gravity;
 	private float _captureCooldownRemaining;
@@ -27,7 +29,8 @@ public partial class PlayerController : CharacterBody3D
 	private TargetInfoPanel _targetInfoPanel = null!;
 	private PartyPanel _partyPanel = null!;
 
-	public IReadOnlyList<SimpleActor> CapturedActors => _capturedActors;
+	public IReadOnlyList<SimpleActor> CapturedCollection => _capturedCollection;
+	public IReadOnlyList<SimpleActor> ActiveParty => _activeParty;
 	public float HealthRatio => MaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)MaxHealth, 0.0f, 1.0f);
 
 	public override void _Ready()
@@ -162,16 +165,84 @@ public partial class PlayerController : CharacterBody3D
 
 	public bool CaptureActor(SimpleActor actor)
 	{
-		if (!actor.CanBeCaptured || _capturedActors.Contains(actor))
+		if (!actor.CanBeCaptured || _capturedCollection.Contains(actor))
 		{
 			return false;
 		}
 
-		int followSlot = _capturedActors.Count;
-		_capturedActors.Add(actor);
-		actor.Capture(this, followSlot);
+		_capturedCollection.Add(actor);
+		actor.Capture(this);
+
+		if (_activeParty.Count < ActivePartyLimit)
+		{
+			DeployCompanion(actor, false);
+		}
+		else
+		{
+			actor.StoreInCollection();
+		}
+
 		_partyPanel.RefreshParty();
 		return true;
+	}
+
+	public bool IsInActiveParty(SimpleActor actor)
+	{
+		return _activeParty.Contains(actor);
+	}
+
+	public bool DeployCompanion(SimpleActor actor, bool replaceLastIfFull)
+	{
+		if (!_capturedCollection.Contains(actor))
+		{
+			return false;
+		}
+
+		if (_activeParty.Contains(actor))
+		{
+			return true;
+		}
+
+		if (_activeParty.Count >= ActivePartyLimit)
+		{
+			if (!replaceLastIfFull || _activeParty.Count == 0)
+			{
+				return false;
+			}
+
+			StoreCompanion(_activeParty[_activeParty.Count - 1]);
+		}
+
+		_activeParty.Add(actor);
+		actor.DeployToParty(this, _activeParty.Count - 1);
+		_partyPanel.RefreshParty();
+		return true;
+	}
+
+	public bool StoreCompanion(SimpleActor actor)
+	{
+		if (!_capturedCollection.Contains(actor))
+		{
+			return false;
+		}
+
+		bool removed = _activeParty.Remove(actor);
+		actor.StoreInCollection();
+		if (removed)
+		{
+			ReassignFollowSlots();
+		}
+
+		_partyPanel.RefreshParty();
+		return true;
+	}
+
+	private void ReassignFollowSlots()
+	{
+		for (int index = 0; index < _activeParty.Count; index++)
+		{
+			_activeParty[index].SetFollowSlot(index);
+		}
 	}
 
 	private void CreateTargetInfoRay()

@@ -15,9 +15,16 @@ public partial class SimpleActor : CharacterBody3D
 	[Export] public int Defense { get; set; } = 6;
 	[Export] public int ExperienceReward { get; set; } = 6;
 	[Export] public int GoldReward { get; set; } = 2;
+	[Export] public int Experience { get; set; }
+	[Export] public int EvolutionStage { get; set; }
+	[Export] public string SpecialAbility { get; set; } = "無";
+	[Export] public int AbilityRank { get; set; } = 1;
 
 	private readonly RandomNumberGenerator _rng = new();
 	private bool _isCaptured;
+	private bool _isInActiveParty;
+	private uint _defaultCollisionLayer;
+	private uint _defaultCollisionMask;
 	private PlayerController? _followTarget;
 	private int _followSlot;
 	private float _gravity;
@@ -27,14 +34,20 @@ public partial class SimpleActor : CharacterBody3D
 
 	public bool CanBeCaptured => !_isCaptured;
 	public bool IsCaptured => _isCaptured;
+	public bool IsInActiveParty => _isInActiveParty;
 	public string TypeName => ActorKind == "monster" ? "怪物" : "NPC";
-	public string StateName => _isCaptured ? "已捕捉" : ActorKind == "monster" ? "敵對" : "中立";
+	public string StateName => _isCaptured ? _isInActiveParty ? "出戰中" : "收藏中" : ActorKind == "monster" ? "敵對" : "中立";
+	public string GrowthName => EvolutionStage <= 0 ? "初階" : EvolutionStage == 1 ? "進化 I" : EvolutionStage == 2 ? "進化 II" : "完全體";
+	public int ExperienceToNextLevel => 35 + Level * 18 + EvolutionStage * 20;
+	public bool CanEvolve => EvolutionStage < 3 && Level >= (EvolutionStage + 1) * 5;
 	public float HealthRatio => MaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)MaxHealth, 0.0f, 1.0f);
 
 	public override void _Ready()
 	{
 		_gravity = ProjectSettings.GetSetting("physics/3d/default_gravity").AsSingle();
 		_rng.Seed = Time.GetTicksUsec() + GetInstanceId();
+		_defaultCollisionLayer = CollisionLayer;
+		_defaultCollisionMask = CollisionMask;
 
 		if (HomePosition == Vector3.Zero)
 		{
@@ -109,11 +122,11 @@ public partial class SimpleActor : CharacterBody3D
 		MoveAndSlide();
 	}
 
-	public void Capture(PlayerController followTarget, int followSlot)
+	public void Capture(PlayerController followTarget)
 	{
 		_isCaptured = true;
 		_followTarget = followTarget;
-		_followSlot = followSlot;
+		_isInActiveParty = false;
 		_waitTime = 0.0f;
 		Velocity = Vector3.Zero;
 		AddCollisionExceptionWith(followTarget);
@@ -121,6 +134,38 @@ public partial class SimpleActor : CharacterBody3D
 		RemoveFromGroup(ActorKind == "monster" ? "monsters" : "npcs");
 		AddToGroup("captured_actors");
 		RefreshNameplate();
+	}
+
+	public void DeployToParty(PlayerController followTarget, int followSlot)
+	{
+		_followTarget = followTarget;
+		_followSlot = followSlot;
+		_isInActiveParty = true;
+		Visible = true;
+		SetPhysicsProcess(true);
+		CollisionLayer = _defaultCollisionLayer;
+		CollisionMask = _defaultCollisionMask;
+		AddCollisionExceptionWith(followTarget);
+		followTarget.AddCollisionExceptionWith(this);
+		GlobalPosition = GetFollowDestination();
+		Velocity = Vector3.Zero;
+		RefreshNameplate();
+	}
+
+	public void StoreInCollection()
+	{
+		_isInActiveParty = false;
+		Velocity = Vector3.Zero;
+		CollisionLayer = 0;
+		CollisionMask = 0;
+		Visible = false;
+		SetPhysicsProcess(false);
+		RefreshNameplate();
+	}
+
+	public void SetFollowSlot(int followSlot)
+	{
+		_followSlot = followSlot;
 	}
 
 	public void ConfigureStats(string displayName, int level, int maxHealth, int attack, int defense, int experienceReward, int goldReward)
@@ -133,6 +178,54 @@ public partial class SimpleActor : CharacterBody3D
 		Defense = Mathf.Max(defense, 0);
 		ExperienceReward = Mathf.Max(experienceReward, 0);
 		GoldReward = Mathf.Max(goldReward, 0);
+		RefreshNameplate();
+	}
+
+	public void ConfigureGrowth(string specialAbility, int abilityRank)
+	{
+		SpecialAbility = specialAbility;
+		AbilityRank = Mathf.Max(abilityRank, 1);
+	}
+
+	public void GrantTraining(int amount)
+	{
+		Experience += Mathf.Max(amount, 0);
+		while (Experience >= ExperienceToNextLevel)
+		{
+			Experience -= ExperienceToNextLevel;
+			LevelUp();
+		}
+
+		RefreshNameplate();
+	}
+
+	public bool TryEvolve()
+	{
+		if (!CanEvolve)
+		{
+			return false;
+		}
+
+		EvolutionStage++;
+		MaxHealth += 36 + EvolutionStage * 14;
+		CurrentHealth = MaxHealth;
+		Attack += 8 + EvolutionStage * 2;
+		Defense += 6 + EvolutionStage * 2;
+		AbilityRank++;
+		RefreshNameplate();
+		return true;
+	}
+
+	public void EnhanceAbility()
+	{
+		if (SpecialAbility == "無")
+		{
+			SpecialAbility = ActorKind == "monster" ? "野性爆發" : "戰術支援";
+		}
+
+		AbilityRank++;
+		Attack += ActorKind == "monster" ? 2 : 1;
+		Defense += ActorKind == "monster" ? 1 : 2;
 		RefreshNameplate();
 	}
 
@@ -163,7 +256,7 @@ public partial class SimpleActor : CharacterBody3D
 			return;
 		}
 
-		string capturedText = _isCaptured ? " 已捕捉" : string.Empty;
+		string capturedText = _isCaptured ? _isInActiveParty ? " 出戰" : " 收藏" : string.Empty;
 		_nameplate.Text = $"Lv.{Level} {DisplayName}{capturedText}";
 		_nameplate.Modulate = ActorKind == "monster"
 			? new Color(1.0f, 0.34f, 0.26f)
@@ -173,24 +266,14 @@ public partial class SimpleActor : CharacterBody3D
 
 	private void FollowCapturedTarget(Vector3 velocity, float step)
 	{
-		if (_followTarget == null || !IsInstanceValid(_followTarget))
+		if (!_isInActiveParty || _followTarget == null || !IsInstanceValid(_followTarget))
 		{
 			Velocity = SlowToStop(velocity, step);
 			MoveAndSlide();
 			return;
 		}
 
-		Vector3 behind = _followTarget.GlobalTransform.Basis.Z;
-		behind.Y = 0.0f;
-		behind = behind.LengthSquared() > 0.001f ? behind.Normalized() : new Vector3(0.0f, 0.0f, 1.0f);
-
-		Vector3 right = _followTarget.GlobalTransform.Basis.X;
-		right.Y = 0.0f;
-		right = right.LengthSquared() > 0.001f ? right.Normalized() : new Vector3(1.0f, 0.0f, 0.0f);
-
-		float rowDistance = 2.0f + (_followSlot / 2) * 1.35f;
-		float sideOffset = _followSlot == 0 ? 0.0f : (_followSlot % 2 == 0 ? -0.7f : 0.7f);
-		Vector3 destination = _followTarget.GlobalPosition + behind * rowDistance + right * sideOffset;
+		Vector3 destination = GetFollowDestination();
 		Vector3 toDestination = destination - GlobalPosition;
 		toDestination.Y = 0.0f;
 
@@ -217,6 +300,35 @@ public partial class SimpleActor : CharacterBody3D
 
 		Velocity = velocity;
 		MoveAndSlide();
+	}
+
+	private Vector3 GetFollowDestination()
+	{
+		if (_followTarget == null || !IsInstanceValid(_followTarget))
+		{
+			return GlobalPosition;
+		}
+
+		Vector3 behind = _followTarget.GlobalTransform.Basis.Z;
+		behind.Y = 0.0f;
+		behind = behind.LengthSquared() > 0.001f ? behind.Normalized() : new Vector3(0.0f, 0.0f, 1.0f);
+
+		Vector3 right = _followTarget.GlobalTransform.Basis.X;
+		right.Y = 0.0f;
+		right = right.LengthSquared() > 0.001f ? right.Normalized() : new Vector3(1.0f, 0.0f, 0.0f);
+
+		float rowDistance = 2.0f + (_followSlot / 2) * 1.35f;
+		float sideOffset = _followSlot == 0 ? 0.0f : (_followSlot % 2 == 0 ? -0.7f : 0.7f);
+		return _followTarget.GlobalPosition + behind * rowDistance + right * sideOffset;
+	}
+
+	private void LevelUp()
+	{
+		Level++;
+		MaxHealth += 14 + EvolutionStage * 4;
+		CurrentHealth = MaxHealth;
+		Attack += 3 + EvolutionStage;
+		Defense += 2 + EvolutionStage;
 	}
 
 	private Vector3 SlowToStop(Vector3 velocity, float step)
