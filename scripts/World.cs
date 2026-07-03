@@ -21,6 +21,24 @@ public partial class World : Node3D
 		"毒牙小鬼",
 	};
 
+	private static readonly string[] NpcAbilities =
+	{
+		"治療鼓舞",
+		"護衛姿態",
+		"採集專精",
+		"戰術指揮",
+		"快速補給",
+	};
+
+	private static readonly string[] MonsterAbilities =
+	{
+		"撕裂爪擊",
+		"毒霧吐息",
+		"硬皮防禦",
+		"野性衝撞",
+		"夜視追蹤",
+	};
+
 	[Export] public float MapSize { get; set; } = 150.0f;
 	[Export] public int PropCount { get; set; } = 110;
 	[Export] public int ActorCount { get; set; } = 36;
@@ -45,6 +63,13 @@ public partial class World : Node3D
 	private StandardMaterial3D _matMonster = null!;
 	private StandardMaterial3D _matActorDark = null!;
 	private StandardMaterial3D _matHorn = null!;
+	private StandardMaterial3D _matSkin = null!;
+	private StandardMaterial3D _matLeather = null!;
+	private StandardMaterial3D _matMetal = null!;
+	private StandardMaterial3D _matNpcAccent = null!;
+	private StandardMaterial3D _matMonsterBelly = null!;
+	private StandardMaterial3D _matMonsterClaw = null!;
+	private StandardMaterial3D _matEyeWhite = null!;
 
 	public override void _Ready()
 	{
@@ -78,6 +103,13 @@ public partial class World : Node3D
 		_matMonster = MakeMaterial(new Color(0.84f, 0.16f, 0.13f));
 		_matActorDark = MakeMaterial(new Color(0.08f, 0.08f, 0.09f));
 		_matHorn = MakeMaterial(new Color(0.94f, 0.86f, 0.58f));
+		_matSkin = MakeMaterial(new Color(0.86f, 0.62f, 0.44f));
+		_matLeather = MakeMaterial(new Color(0.26f, 0.16f, 0.10f));
+		_matMetal = MakeMaterial(new Color(0.72f, 0.76f, 0.78f), 0.38f);
+		_matNpcAccent = MakeMaterial(new Color(0.94f, 0.76f, 0.28f));
+		_matMonsterBelly = MakeMaterial(new Color(0.46f, 0.08f, 0.08f));
+		_matMonsterClaw = MakeMaterial(new Color(0.95f, 0.88f, 0.70f), 0.45f);
+		_matEyeWhite = MakeMaterial(new Color(0.98f, 0.96f, 0.88f), 0.35f);
 	}
 
 	private void BuildEnvironment()
@@ -256,44 +288,111 @@ public partial class World : Node3D
 		{
 			Name = "CollisionShape3D",
 			Position = new Vector3(0.0f, 0.9f, 0.0f),
-			Shape = new CapsuleShape3D { Radius = 0.36f, Height = 1.75f },
+			Shape = new CapsuleShape3D
+			{
+				Radius = isMonster ? 0.52f : 0.34f,
+				Height = isMonster ? 1.72f : 1.78f,
+			},
 		};
 		actor.AddChild(collisionShape);
 
-		var body = new MeshInstance3D
-		{
-			Name = "Body",
-			Mesh = new CapsuleMesh { Radius = 0.38f, Height = 1.35f },
-			Position = new Vector3(0.0f, 0.82f, 0.0f),
-		};
-		body.SetSurfaceOverrideMaterial(0, isMonster ? _matMonster : _matNpc);
-		actor.AddChild(body);
-
-		var head = new MeshInstance3D
-		{
-			Name = "Head",
-			Mesh = new SphereMesh { Radius = 0.32f, Height = 0.64f },
-			Position = new Vector3(0.0f, 1.63f, 0.0f),
-		};
-		head.SetSurfaceOverrideMaterial(0, isMonster ? _matMonster : _matNpc);
-		actor.AddChild(head);
-
-		var eyeBand = new MeshInstance3D
-		{
-			Name = "EyeBand",
-			Mesh = BoxMeshFor(new Vector3(0.44f, 0.08f, 0.04f)),
-			Position = new Vector3(0.0f, 1.67f, -0.29f),
-		};
-		eyeBand.SetSurfaceOverrideMaterial(0, _matActorDark);
-		actor.AddChild(eyeBand);
-
 		if (isMonster)
 		{
-			AddHorn(actor, new Vector3(-0.18f, 1.98f, -0.02f), new Vector3(20.0f, 0.0f, -20.0f));
-			AddHorn(actor, new Vector3(0.18f, 1.98f, -0.02f), new Vector3(20.0f, 0.0f, 20.0f));
+			BuildMonsterVisual(actor);
+		}
+		else
+		{
+			BuildNpcVisual(actor);
 		}
 
 		return actor;
+	}
+
+	private void BuildNpcVisual(Node3D actor)
+	{
+		AddMesh(actor, "Torso", new CapsuleMesh { Radius = 0.28f, Height = 0.92f }, new Vector3(0.0f, 1.02f, 0.0f), Vector3.Zero, new Vector3(0.92f, 1.0f, 0.78f), _matNpc);
+		AddMesh(actor, "ChestTrim", BoxMeshFor(new Vector3(0.58f, 0.08f, 0.06f)), new Vector3(0.0f, 1.20f, -0.24f), Vector3.Zero, Vector3.One, _matNpcAccent);
+		AddMesh(actor, "Belt", BoxMeshFor(new Vector3(0.66f, 0.10f, 0.12f)), new Vector3(0.0f, 0.74f, -0.02f), Vector3.Zero, Vector3.One, _matLeather);
+		AddMesh(actor, "BeltBuckle", BoxMeshFor(new Vector3(0.14f, 0.12f, 0.05f)), new Vector3(0.0f, 0.74f, -0.28f), Vector3.Zero, Vector3.One, _matMetal);
+
+		AddMesh(actor, "Head", new SphereMesh { Radius = 0.27f, Height = 0.54f }, new Vector3(0.0f, 1.66f, 0.0f), Vector3.Zero, new Vector3(0.94f, 1.05f, 0.92f), _matSkin);
+		AddMesh(actor, "Hair", new SphereMesh { Radius = 0.285f, Height = 0.36f }, new Vector3(0.0f, 1.82f, 0.02f), Vector3.Zero, new Vector3(1.02f, 0.48f, 0.92f), _matActorDark);
+		AddMesh(actor, "HatBrim", CylinderMeshFor(0.36f, 0.36f, 0.04f), new Vector3(0.0f, 1.87f, 0.0f), Vector3.Zero, Vector3.One, _matLeather);
+		AddMesh(actor, "HatTop", CylinderMeshFor(0.20f, 0.28f, 0.20f), new Vector3(0.0f, 1.98f, 0.0f), Vector3.Zero, Vector3.One, _matLeather);
+
+		AddEye(actor, new Vector3(-0.095f, 1.68f, -0.245f), 0.033f);
+		AddEye(actor, new Vector3(0.095f, 1.68f, -0.245f), 0.033f);
+		AddMesh(actor, "Nose", CylinderMeshFor(0.018f, 0.035f, 0.09f), new Vector3(0.0f, 1.63f, -0.275f), new Vector3(90.0f, 0.0f, 0.0f), Vector3.One, _matSkin);
+
+		AddMesh(actor, "LeftArm", new CapsuleMesh { Radius = 0.075f, Height = 0.78f }, new Vector3(-0.38f, 1.04f, 0.0f), new Vector3(0.0f, 0.0f, -9.0f), Vector3.One, _matSkin);
+		AddMesh(actor, "RightArm", new CapsuleMesh { Radius = 0.075f, Height = 0.78f }, new Vector3(0.38f, 1.04f, 0.0f), new Vector3(0.0f, 0.0f, 9.0f), Vector3.One, _matSkin);
+		AddMesh(actor, "LeftShoulder", new SphereMesh { Radius = 0.12f, Height = 0.14f }, new Vector3(-0.33f, 1.32f, -0.02f), Vector3.Zero, new Vector3(1.2f, 0.55f, 0.9f), _matMetal);
+		AddMesh(actor, "RightShoulder", new SphereMesh { Radius = 0.12f, Height = 0.14f }, new Vector3(0.33f, 1.32f, -0.02f), Vector3.Zero, new Vector3(1.2f, 0.55f, 0.9f), _matMetal);
+		AddMesh(actor, "LeftGlove", new SphereMesh { Radius = 0.10f, Height = 0.18f }, new Vector3(-0.44f, 0.66f, -0.03f), Vector3.Zero, Vector3.One, _matLeather);
+		AddMesh(actor, "RightGlove", new SphereMesh { Radius = 0.10f, Height = 0.18f }, new Vector3(0.44f, 0.66f, -0.03f), Vector3.Zero, Vector3.One, _matLeather);
+
+		AddMesh(actor, "LeftLeg", new CapsuleMesh { Radius = 0.095f, Height = 0.72f }, new Vector3(-0.14f, 0.36f, 0.0f), Vector3.Zero, Vector3.One, _matLeather);
+		AddMesh(actor, "RightLeg", new CapsuleMesh { Radius = 0.095f, Height = 0.72f }, new Vector3(0.14f, 0.36f, 0.0f), Vector3.Zero, Vector3.One, _matLeather);
+		AddMesh(actor, "LeftBoot", BoxMeshFor(new Vector3(0.20f, 0.12f, 0.32f)), new Vector3(-0.14f, 0.06f, -0.05f), Vector3.Zero, Vector3.One, _matActorDark);
+		AddMesh(actor, "RightBoot", BoxMeshFor(new Vector3(0.20f, 0.12f, 0.32f)), new Vector3(0.14f, 0.06f, -0.05f), Vector3.Zero, Vector3.One, _matActorDark);
+
+		AddMesh(actor, "Backpack", BoxMeshFor(new Vector3(0.42f, 0.48f, 0.18f)), new Vector3(0.0f, 1.08f, 0.31f), Vector3.Zero, Vector3.One, _matLeather);
+	}
+
+	private void BuildMonsterVisual(Node3D actor)
+	{
+		AddMesh(actor, "Body", new SphereMesh { Radius = 0.52f, Height = 0.92f }, new Vector3(0.0f, 0.76f, 0.08f), Vector3.Zero, new Vector3(1.25f, 0.82f, 1.42f), _matMonster);
+		AddMesh(actor, "Belly", new SphereMesh { Radius = 0.34f, Height = 0.50f }, new Vector3(0.0f, 0.72f, -0.44f), Vector3.Zero, new Vector3(1.1f, 0.78f, 0.38f), _matMonsterBelly);
+		AddMesh(actor, "Head", new SphereMesh { Radius = 0.38f, Height = 0.66f }, new Vector3(0.0f, 1.22f, -0.50f), Vector3.Zero, new Vector3(1.12f, 0.92f, 1.0f), _matMonster);
+		AddMesh(actor, "Snout", new CapsuleMesh { Radius = 0.16f, Height = 0.42f }, new Vector3(0.0f, 1.13f, -0.82f), new Vector3(90.0f, 0.0f, 0.0f), new Vector3(1.25f, 0.82f, 1.0f), _matMonsterBelly);
+
+		AddEye(actor, new Vector3(-0.16f, 1.32f, -0.82f), 0.055f);
+		AddEye(actor, new Vector3(0.16f, 1.32f, -0.82f), 0.055f);
+		AddMesh(actor, "Mouth", BoxMeshFor(new Vector3(0.34f, 0.05f, 0.04f)), new Vector3(0.0f, 1.06f, -0.99f), Vector3.Zero, Vector3.One, _matActorDark);
+
+		AddHorn(actor, new Vector3(-0.22f, 1.58f, -0.48f), new Vector3(20.0f, 0.0f, -22.0f));
+		AddHorn(actor, new Vector3(0.22f, 1.58f, -0.48f), new Vector3(20.0f, 0.0f, 22.0f));
+		AddMesh(actor, "BackSpike1", CylinderMeshFor(0.0f, 0.10f, 0.32f), new Vector3(0.0f, 1.28f, 0.06f), new Vector3(-22.0f, 0.0f, 0.0f), Vector3.One, _matHorn);
+		AddMesh(actor, "BackSpike2", CylinderMeshFor(0.0f, 0.09f, 0.28f), new Vector3(0.0f, 1.18f, 0.38f), new Vector3(-28.0f, 0.0f, 0.0f), Vector3.One, _matHorn);
+		AddMesh(actor, "BackSpike3", CylinderMeshFor(0.0f, 0.08f, 0.24f), new Vector3(0.0f, 1.02f, 0.68f), new Vector3(-34.0f, 0.0f, 0.0f), Vector3.One, _matHorn);
+
+		AddMesh(actor, "LeftForeLeg", new CapsuleMesh { Radius = 0.12f, Height = 0.58f }, new Vector3(-0.34f, 0.42f, -0.46f), new Vector3(8.0f, 0.0f, -8.0f), Vector3.One, _matMonster);
+		AddMesh(actor, "RightForeLeg", new CapsuleMesh { Radius = 0.12f, Height = 0.58f }, new Vector3(0.34f, 0.42f, -0.46f), new Vector3(8.0f, 0.0f, 8.0f), Vector3.One, _matMonster);
+		AddMesh(actor, "LeftBackLeg", new CapsuleMesh { Radius = 0.13f, Height = 0.62f }, new Vector3(-0.38f, 0.40f, 0.42f), new Vector3(-8.0f, 0.0f, -8.0f), Vector3.One, _matMonster);
+		AddMesh(actor, "RightBackLeg", new CapsuleMesh { Radius = 0.13f, Height = 0.62f }, new Vector3(0.38f, 0.40f, 0.42f), new Vector3(-8.0f, 0.0f, 8.0f), Vector3.One, _matMonster);
+
+		AddClaw(actor, new Vector3(-0.35f, 0.10f, -0.68f), -12.0f);
+		AddClaw(actor, new Vector3(0.35f, 0.10f, -0.68f), 12.0f);
+		AddClaw(actor, new Vector3(-0.40f, 0.10f, 0.56f), -16.0f);
+		AddClaw(actor, new Vector3(0.40f, 0.10f, 0.56f), 16.0f);
+		AddMesh(actor, "Tail", new CapsuleMesh { Radius = 0.10f, Height = 0.78f }, new Vector3(0.0f, 0.78f, 0.98f), new Vector3(65.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.82f, 1.0f), _matMonster);
+		AddMesh(actor, "TailTip", new SphereMesh { Radius = 0.13f, Height = 0.20f }, new Vector3(0.0f, 0.44f, 1.28f), Vector3.Zero, Vector3.One, _matMonsterBelly);
+	}
+
+	private MeshInstance3D AddMesh(Node3D parent, string nodeName, Mesh mesh, Vector3 position, Vector3 rotationDegrees, Vector3 scale, Material material)
+	{
+		var meshInstance = new MeshInstance3D
+		{
+			Name = nodeName,
+			Mesh = mesh,
+			Position = position,
+			RotationDegrees = rotationDegrees,
+			Scale = scale,
+		};
+		meshInstance.SetSurfaceOverrideMaterial(0, material);
+		parent.AddChild(meshInstance);
+		return meshInstance;
+	}
+
+	private void AddEye(Node3D actor, Vector3 position, float radius)
+	{
+		AddMesh(actor, "EyeWhite", new SphereMesh { Radius = radius, Height = radius * 2.0f }, position, Vector3.Zero, new Vector3(1.0f, 1.0f, 0.45f), _matEyeWhite);
+		AddMesh(actor, "EyePupil", new SphereMesh { Radius = radius * 0.45f, Height = radius * 0.9f }, position + new Vector3(0.0f, 0.0f, -radius * 0.72f), Vector3.Zero, new Vector3(1.0f, 1.0f, 0.35f), _matActorDark);
+	}
+
+	private void AddClaw(Node3D actor, Vector3 position, float yawDegrees)
+	{
+		AddMesh(actor, "Claw", CylinderMeshFor(0.0f, 0.045f, 0.18f), position, new Vector3(72.0f, yawDegrees, 0.0f), Vector3.One, _matMonsterClaw);
 	}
 
 	private void ConfigureActorStats(SimpleActor actor, bool isMonster)
@@ -312,8 +411,11 @@ public partial class World : Node3D
 		int gold = isMonster ? level * 3 + _rng.RandiRange(0, 8) : level + _rng.RandiRange(0, 4);
 		string[] namePool = isMonster ? MonsterNames : NpcNames;
 		string displayName = namePool[_rng.RandiRange(0, namePool.Length - 1)];
+		string[] abilityPool = isMonster ? MonsterAbilities : NpcAbilities;
+		string specialAbility = abilityPool[_rng.RandiRange(0, abilityPool.Length - 1)];
 
 		actor.ConfigureStats(displayName, level, maxHealth, attack, defense, experience, gold);
+		actor.ConfigureGrowth(specialAbility, _rng.RandiRange(1, 2));
 	}
 
 	private void AddHorn(Node3D actor, Vector3 position, Vector3 rotationDegrees)
