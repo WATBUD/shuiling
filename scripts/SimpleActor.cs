@@ -7,7 +7,7 @@ public partial class SimpleActor : CharacterBody3D
 	[Export] public float WanderRadius { get; set; } = 10.0f;
 	[Export] public float ChaseRadius { get; set; } = 20.0f;
 	[Export] public Vector3 HomePosition { get; set; } = Vector3.Zero;
-	[Export] public string DisplayName { get; set; } = "旅人";
+	[Export] public string DisplayName { get; set; } = "name.actor.traveler";
 	[Export] public int Level { get; set; } = 1;
 	[Export] public int MaxHealth { get; set; } = 100;
 	[Export] public int CurrentHealth { get; set; } = 100;
@@ -17,11 +17,11 @@ public partial class SimpleActor : CharacterBody3D
 	[Export] public int GoldReward { get; set; } = 2;
 	[Export] public int Experience { get; set; }
 	[Export] public int EvolutionStage { get; set; }
-	[Export] public string SpecialAbility { get; set; } = "無";
+	[Export] public string SpecialAbility { get; set; } = "ability.none";
 	[Export] public int AbilityRank { get; set; } = 1;
 	[Export] public string CombatRole { get; set; } = "DPS";
-	[Export] public string Personality { get; set; } = "沉著";
-	[Export] public string PassiveAbility { get; set; } = "無";
+	[Export] public string Personality { get; set; } = "personality.calm";
+	[Export] public string PassiveAbility { get; set; } = "ability.none";
 	[Export] public int Affinity { get; set; } = 50;
 	[Export] public float DetectionRadius { get; set; } = 12.0f;
 	[Export] public float AttackRange { get; set; } = 1.8f;
@@ -41,28 +41,80 @@ public partial class SimpleActor : CharacterBody3D
 	private float _attackCooldownRemaining;
 	private SimpleActor? _combatTarget;
 	private Label3D? _nameplate;
+	private CompanionBuildLoadout _buildLoadout = new();
+	private BuildStats _buildStats = new();
+	private bool _buildConfigured;
+	private bool _buildStatsDirty = true;
 
 	public bool CanBeCaptured => !_isCaptured && !_isDefeated;
 	public bool IsCaptured => _isCaptured;
 	public bool IsInActiveParty => _isInActiveParty;
 	public bool IsDefeated => _isDefeated;
 	public bool IsHostileToPlayer => !_isCaptured && !_isDefeated && ActorKind == "monster";
-	public string TypeName => ActorKind == "monster" ? "怪物" : "NPC";
-	public string StateName => _isDefeated ? "擊倒" : _isCaptured ? _isInActiveParty ? "出戰中" : "收藏中" : ActorKind == "monster" ? "敵對" : "中立";
-	public string GrowthName => EvolutionStage <= 0 ? "初階" : EvolutionStage == 1 ? "進化 I" : EvolutionStage == 2 ? "進化 II" : "完全體";
+	public CompanionBuildLoadout BuildLoadout
+	{
+		get
+		{
+			EnsureBuildLoadout();
+			return _buildLoadout;
+		}
+	}
+	public BuildStats CurrentBuildStats
+	{
+		get
+		{
+			if (_buildStatsDirty)
+			{
+				RecalculateBuildStats();
+			}
+
+			return _buildStats;
+		}
+	}
+	public int EffectiveMaxHealth => CurrentBuildStats.MaxHealth;
+	public int EffectiveAttack => CurrentBuildStats.Attack;
+	public int EffectiveDefense => CurrentBuildStats.Defense;
+	public float EffectiveMoveSpeed => Mathf.Max(MoveSpeed * CurrentBuildStats.MoveSpeedMultiplier, 0.3f);
+	public float EffectiveAttackRange => Mathf.Max(AttackRange + CurrentBuildStats.AttackRangeBonus, 0.75f);
+	public float EffectiveDetectionRadius => Mathf.Max(DetectionRadius + CurrentBuildStats.DetectionRadiusBonus, 3.0f);
+	public float EffectiveAttackCooldown => Mathf.Max(AttackCooldown * CurrentBuildStats.AttackCooldownMultiplier, 0.22f);
+	public string TypeName => LocaleText.T(ActorKind == "monster" ? "actor.type.monster" : "actor.type.npc");
+	public string StateName => _isDefeated
+		? LocaleText.T("actor.state.defeated")
+		: _isCaptured
+			? _isInActiveParty ? LocaleText.T("actor.state.active") : LocaleText.T("actor.state.stored")
+			: ActorKind == "monster" ? LocaleText.T("actor.state.hostile") : LocaleText.T("actor.state.neutral");
+	public string GrowthName => EvolutionStage <= 0
+		? LocaleText.T("actor.growth.base")
+		: EvolutionStage == 1
+			? LocaleText.T("actor.growth.evo1")
+			: EvolutionStage == 2 ? LocaleText.T("actor.growth.evo2") : LocaleText.T("actor.growth.final");
 	public string CombatRoleName => CombatRole switch
 	{
-		"Tank" => "坦克",
-		"Ranged" => "遠程",
-		"Support" => "支援",
-		"Gatherer" => "採集",
-		"Builder" => "建造",
-		_ => "輸出",
+		"Tank" => LocaleText.T("role.tank"),
+		"Ranged" => LocaleText.T("role.ranged"),
+		"Support" => LocaleText.T("role.support"),
+		"Gatherer" => LocaleText.T("role.gatherer"),
+		"Builder" => LocaleText.T("role.builder"),
+		_ => LocaleText.T("role.dps"),
 	};
-	public string CombatSummary => $"{CombatRoleName} / {Personality} / 親密 {Affinity}";
+	public string LocalizedDisplayName => LocaleText.T(DisplayName);
+	public string LocalizedSpecialAbility => LocaleText.T(SpecialAbility);
+	public string LocalizedPersonality => LocaleText.T(Personality);
+	public string LocalizedPassiveAbility => LocaleText.T(PassiveAbility);
+	public string IdentityName => LocaleText.T(CurrentBuildStats.IdentityNameKey);
+	public string IdentityPassives => BuildCatalog.LocalizedList(CurrentBuildStats.PassiveKeys);
+	public string IdentityUniqueSkills => BuildCatalog.LocalizedList(CurrentBuildStats.UniqueSkillKeys);
+	public string BuildEquipmentSummary => BuildCatalog.LocalizedEquipmentSet(BuildLoadout);
+	public string BuildSkillSummary => BuildCatalog.LocalizedSkillGems(BuildLoadout);
+	public string BuildAttributeGemName => LocaleText.T(BuildCatalog.GetAttributeGem(BuildLoadout.AttributeGemId).NameKey);
+	public string BuildAiGemName => LocaleText.T(BuildCatalog.GetAiGem(BuildLoadout.AiGemId).NameKey);
+	public string BuildRareComboName => BuildCatalog.LocalizedRareCombo(CurrentBuildStats);
+	public string BuildElementName => LocaleText.T(CurrentBuildStats.DamageElementNameKey);
+	public string CombatSummary => LocaleText.F("combat.summary", CombatRoleName, LocalizedPersonality, Affinity);
 	public int ExperienceToNextLevel => 35 + Level * 18 + EvolutionStage * 20;
 	public bool CanEvolve => EvolutionStage < 3 && Level >= (EvolutionStage + 1) * 5;
-	public float HealthRatio => MaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)MaxHealth, 0.0f, 1.0f);
+	public float HealthRatio => EffectiveMaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)EffectiveMaxHealth, 0.0f, 1.0f);
 
 	public override void _Ready()
 	{
@@ -77,8 +129,16 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		_targetPosition = PickWanderTarget();
+		EnsureBuildLoadout();
+		RecalculateBuildStats();
 		AddToGroup(ActorKind == "monster" ? "monsters" : "npcs");
 		CreateNameplate();
+		LocaleText.LanguageChanged += RefreshNameplate;
+	}
+
+	public override void _ExitTree()
+	{
+		LocaleText.LanguageChanged -= RefreshNameplate;
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -164,7 +224,7 @@ public partial class SimpleActor : CharacterBody3D
 		_isInActiveParty = false;
 		_waitTime = 0.0f;
 		Velocity = Vector3.Zero;
-		CurrentHealth = Mathf.Max(CurrentHealth, Mathf.RoundToInt(MaxHealth * 0.45f));
+		CurrentHealth = Mathf.Max(CurrentHealth, Mathf.RoundToInt(EffectiveMaxHealth * 0.45f));
 		AddCollisionExceptionWith(followTarget);
 		followTarget.AddCollisionExceptionWith(this);
 		RemoveFromGroup(ActorKind == "monster" ? "monsters" : "npcs");
@@ -204,6 +264,30 @@ public partial class SimpleActor : CharacterBody3D
 		_followSlot = followSlot;
 	}
 
+	public void CycleBuildEquipment(EquipmentSlot slot)
+	{
+		BuildLoadout.CycleEquipment(slot);
+		MarkBuildChanged();
+	}
+
+	public void CycleAttributeGem()
+	{
+		BuildLoadout.CycleAttributeGem();
+		MarkBuildChanged();
+	}
+
+	public void CycleSkillGem(int slotIndex)
+	{
+		BuildLoadout.CycleSkillGem(slotIndex);
+		MarkBuildChanged();
+	}
+
+	public void CycleAiGem()
+	{
+		BuildLoadout.CycleAiGem();
+		MarkBuildChanged();
+	}
+
 	public void ConfigureStats(string displayName, int level, int maxHealth, int attack, int defense, int experienceReward, int goldReward)
 	{
 		DisplayName = displayName;
@@ -214,6 +298,8 @@ public partial class SimpleActor : CharacterBody3D
 		Defense = Mathf.Max(defense, 0);
 		ExperienceReward = Mathf.Max(experienceReward, 0);
 		GoldReward = Mathf.Max(goldReward, 0);
+		_buildConfigured = false;
+		_buildStatsDirty = true;
 		RefreshNameplate();
 	}
 
@@ -267,6 +353,47 @@ public partial class SimpleActor : CharacterBody3D
 				AttackCooldown = 1.20f;
 				break;
 		}
+
+		_buildConfigured = false;
+		EnsureBuildLoadout();
+		RecalculateBuildStats();
+		CurrentHealth = EffectiveMaxHealth;
+	}
+
+	private void EnsureBuildLoadout()
+	{
+		if (_buildConfigured)
+		{
+			return;
+		}
+
+		_buildLoadout = BuildCatalog.CreateStarterLoadout(this);
+		_buildConfigured = true;
+		_buildStatsDirty = true;
+	}
+
+	private void RecalculateBuildStats()
+	{
+		EnsureBuildLoadout();
+		_buildStats = BuildCatalog.CalculateStats(this, _buildLoadout);
+		_buildStatsDirty = false;
+		CurrentHealth = Mathf.Clamp(CurrentHealth, 0, _buildStats.MaxHealth);
+	}
+
+	private void MarkBuildChanged()
+	{
+		_buildStatsDirty = true;
+		RecalculateBuildStats();
+		RefreshNameplate();
+	}
+
+	private void MarkBaseStatsChanged()
+	{
+		_buildStatsDirty = true;
+		if (_buildConfigured)
+		{
+			RecalculateBuildStats();
+		}
 	}
 
 	public void GrantTraining(int amount)
@@ -294,20 +421,23 @@ public partial class SimpleActor : CharacterBody3D
 		Attack += 8 + EvolutionStage * 2;
 		Defense += 6 + EvolutionStage * 2;
 		AbilityRank++;
+		MarkBaseStatsChanged();
+		CurrentHealth = EffectiveMaxHealth;
 		RefreshNameplate();
 		return true;
 	}
 
 	public void EnhanceAbility()
 	{
-		if (SpecialAbility == "無")
+		if (SpecialAbility == "ability.none")
 		{
-			SpecialAbility = ActorKind == "monster" ? "野性爆發" : "戰術支援";
+			SpecialAbility = ActorKind == "monster" ? "ability.monster.burst" : "ability.npc.tactics";
 		}
 
 		AbilityRank++;
 		Attack += ActorKind == "monster" ? 2 : 1;
 		Defense += ActorKind == "monster" ? 1 : 2;
+		MarkBaseStatsChanged();
 		RefreshNameplate();
 	}
 
@@ -318,7 +448,7 @@ public partial class SimpleActor : CharacterBody3D
 			return 0;
 		}
 
-		int mitigatedDamage = Mathf.Max(rawDamage - Mathf.RoundToInt(Defense * 0.35f), 1);
+		int mitigatedDamage = Mathf.Max(rawDamage - Mathf.RoundToInt(EffectiveDefense * 0.35f), 1);
 		CurrentHealth = Mathf.Max(CurrentHealth - mitigatedDamage, 0);
 		SpawnCombatEffect(mitigatedDamage, attacker?.GetAttackColor() ?? new Color(1.0f, 0.5f, 0.22f, 0.92f));
 
@@ -329,6 +459,26 @@ public partial class SimpleActor : CharacterBody3D
 
 		RefreshNameplate();
 		return mitigatedDamage;
+	}
+
+	public int ReceiveHealing(int rawHealing)
+	{
+		if (_isDefeated)
+		{
+			return 0;
+		}
+
+		int missingHealth = Mathf.Max(EffectiveMaxHealth - CurrentHealth, 0);
+		int healing = Mathf.Min(Mathf.Max(rawHealing, 0), missingHealth);
+		if (healing <= 0)
+		{
+			return 0;
+		}
+
+		CurrentHealth += healing;
+		SpawnCombatEffect($"+{healing}", new Color(0.36f, 1.0f, 0.54f, 0.92f), GlobalPosition + new Vector3(0.0f, 1.3f, 0.0f), 0.58f, 0.46f);
+		RefreshNameplate();
+		return healing;
 	}
 
 	private void CreateNameplate()
@@ -358,8 +508,10 @@ public partial class SimpleActor : CharacterBody3D
 			return;
 		}
 
-		string capturedText = _isCaptured ? _isInActiveParty ? " 出戰" : " 收藏" : string.Empty;
-		_nameplate.Text = $"Lv.{Level} {DisplayName}{capturedText}";
+		string capturedText = _isCaptured
+			? _isInActiveParty ? LocaleText.T("actor.nameplate.active") : LocaleText.T("actor.nameplate.stored")
+			: string.Empty;
+		_nameplate.Text = $"{LocaleText.T("actor.level_prefix")}{Level} {LocalizedDisplayName}{capturedText}";
 		_nameplate.Modulate = ActorKind == "monster"
 			? new Color(1.0f, 0.34f, 0.26f)
 			: new Color(0.64f, 0.86f, 1.0f);
@@ -371,6 +523,13 @@ public partial class SimpleActor : CharacterBody3D
 		if (!_isInActiveParty || _followTarget == null || !IsInstanceValid(_followTarget))
 		{
 			Velocity = SlowToStop(velocity, step);
+			MoveAndSlide();
+			return;
+		}
+
+		if (TryUseSupportBuild(ref velocity, step))
+		{
+			Velocity = velocity;
 			MoveAndSlide();
 			return;
 		}
@@ -393,7 +552,7 @@ public partial class SimpleActor : CharacterBody3D
 			return;
 		}
 
-		float followSpeed = Mathf.Max(MoveSpeed * 2.4f, 5.0f);
+		float followSpeed = Mathf.Max(EffectiveMoveSpeed * 2.4f, 5.0f);
 		if (toDestination.Length() > 0.45f)
 		{
 			Vector3 direction = toDestination.Normalized();
@@ -426,7 +585,7 @@ public partial class SimpleActor : CharacterBody3D
 		right.Y = 0.0f;
 		right = right.LengthSquared() > 0.001f ? right.Normalized() : new Vector3(1.0f, 0.0f, 0.0f);
 
-		float rowDistance = 2.0f + (_followSlot / 2) * 1.35f;
+		float rowDistance = (2.0f + (_followSlot / 2) * 1.35f) * CurrentBuildStats.FollowDistanceMultiplier;
 		float sideOffset = _followSlot == 0 ? 0.0f : (_followSlot % 2 == 0 ? -0.7f : 0.7f);
 		return _followTarget.GlobalPosition + behind * rowDistance + right * sideOffset;
 	}
@@ -438,6 +597,47 @@ public partial class SimpleActor : CharacterBody3D
 		CurrentHealth = MaxHealth;
 		Attack += 3 + EvolutionStage;
 		Defense += 2 + EvolutionStage;
+		MarkBaseStatsChanged();
+		CurrentHealth = EffectiveMaxHealth;
+	}
+
+	private bool TryUseSupportBuild(ref Vector3 velocity, float step)
+	{
+		BuildStats stats = CurrentBuildStats;
+		if (!stats.HasHealSkill || stats.AiBehaviorId != BuildCatalog.AiHealAllies || _followTarget == null || !IsInstanceValid(_followTarget) || _attackCooldownRemaining > 0.0f)
+		{
+			return false;
+		}
+
+		int healing = Mathf.Max(Mathf.RoundToInt(stats.Attack * 0.58f + stats.Defense * 0.18f), 8);
+		if (_followTarget.CurrentHealth < Mathf.RoundToInt(_followTarget.MaxHealth * 0.72f))
+		{
+			velocity = SlowToStop(velocity, step);
+			FaceDirection(_followTarget.GlobalPosition - GlobalPosition, step);
+			if (_followTarget.ReceiveHealing(healing) > 0)
+			{
+				_attackCooldownRemaining = EffectiveAttackCooldown;
+				return true;
+			}
+		}
+
+		foreach (SimpleActor ally in _followTarget.ActiveParty)
+		{
+			if (ally == this || !IsInstanceValid(ally) || !ally.IsInActiveParty || ally.HealthRatio >= 0.68f)
+			{
+				continue;
+			}
+
+			velocity = SlowToStop(velocity, step);
+			FaceDirection(ally.GlobalPosition - GlobalPosition, step);
+			if (ally.ReceiveHealing(healing) > 0)
+			{
+				_attackCooldownRemaining = EffectiveAttackCooldown;
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private bool TryCompanionCombat(ref Vector3 velocity, float step)
@@ -452,13 +652,24 @@ public partial class SimpleActor : CharacterBody3D
 		Vector3 toTarget = target.GlobalPosition - GlobalPosition;
 		toTarget.Y = 0.0f;
 		float distance = toTarget.Length();
-		if (distance > DetectionRadius * 1.25f)
+		if (distance > EffectiveDetectionRadius * 1.25f)
 		{
 			_combatTarget = null;
 			return false;
 		}
 
-		if (distance <= AttackRange)
+		BuildStats stats = CurrentBuildStats;
+		if (stats.AiBehaviorId == BuildCatalog.AiKeepDistance && distance < Mathf.Min(EffectiveAttackRange * 0.62f, 4.2f) && distance > 0.05f)
+		{
+			Vector3 retreatDirection = -toTarget.Normalized();
+			float retreatSpeed = Mathf.Max(EffectiveMoveSpeed * 2.0f, 4.0f);
+			velocity.X = Mathf.MoveToward(velocity.X, retreatDirection.X * retreatSpeed, retreatSpeed * 8.0f * step);
+			velocity.Z = Mathf.MoveToward(velocity.Z, retreatDirection.Z * retreatSpeed, retreatSpeed * 8.0f * step);
+			FaceDirection(toTarget, step);
+			return true;
+		}
+
+		if (distance <= EffectiveAttackRange)
 		{
 			velocity = SlowToStop(velocity, step);
 			FaceDirection(toTarget, step);
@@ -467,7 +678,8 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		Vector3 direction = toTarget.Normalized();
-		float combatSpeed = Mathf.Max(MoveSpeed * 2.05f, 4.2f);
+		float combatSpeedMultiplier = stats.AiBehaviorId == BuildCatalog.AiAggressive ? 2.35f : 2.05f;
+		float combatSpeed = Mathf.Max(EffectiveMoveSpeed * combatSpeedMultiplier, 4.2f);
 		velocity.X = Mathf.MoveToward(velocity.X, direction.X * combatSpeed, combatSpeed * 8.0f * step);
 		velocity.Z = Mathf.MoveToward(velocity.Z, direction.Z * combatSpeed, combatSpeed * 8.0f * step);
 		FaceDirection(direction, step);
@@ -476,13 +688,27 @@ public partial class SimpleActor : CharacterBody3D
 
 	private SimpleActor? GetCombatTarget()
 	{
-		if (_combatTarget != null && IsInstanceValid(_combatTarget) && _combatTarget.IsHostileToPlayer)
+		if (_combatTarget != null && IsInstanceValid(_combatTarget) && _combatTarget.IsHostileToPlayer && GlobalPosition.DistanceTo(_combatTarget.GlobalPosition) <= EffectiveDetectionRadius * 1.35f)
 		{
 			return _combatTarget;
 		}
 
-		SimpleActor? nearest = null;
-		float nearestDistance = DetectionRadius;
+		BuildStats stats = CurrentBuildStats;
+		Vector3 anchor = GlobalPosition;
+		bool playerAnchored = stats.AiBehaviorId is BuildCatalog.AiProtectPlayer or BuildCatalog.AiDefensive or BuildCatalog.AiHealAllies or BuildCatalog.AiFollowClosely;
+		if (playerAnchored && _followTarget != null && IsInstanceValid(_followTarget))
+		{
+			anchor = _followTarget.GlobalPosition;
+		}
+
+		float searchRadius = EffectiveDetectionRadius;
+		if (stats.AiBehaviorId is BuildCatalog.AiGatherResources or BuildCatalog.AiLootNearby or BuildCatalog.AiRoamFreely)
+		{
+			searchRadius *= 0.58f;
+		}
+
+		SimpleActor? selected = null;
+		float bestScore = float.MaxValue;
 		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
 		{
 			if (node is not SimpleActor actor || !actor.IsHostileToPlayer)
@@ -490,16 +716,30 @@ public partial class SimpleActor : CharacterBody3D
 				continue;
 			}
 
-			float distance = GlobalPosition.DistanceTo(actor.GlobalPosition);
-			if (distance < nearestDistance)
+			float distanceFromSelf = GlobalPosition.DistanceTo(actor.GlobalPosition);
+			float distanceFromAnchor = anchor.DistanceTo(actor.GlobalPosition);
+			if (distanceFromSelf > searchRadius && distanceFromAnchor > searchRadius)
 			{
-				nearest = actor;
-				nearestDistance = distance;
+				continue;
+			}
+
+			float score = stats.AiBehaviorId switch
+			{
+				BuildCatalog.AiAttackBossFirst => -actor.Level * 1000.0f + distanceFromSelf,
+				BuildCatalog.AiAttackLowestHp => actor.HealthRatio * 1000.0f + distanceFromSelf * 0.04f,
+				BuildCatalog.AiProtectPlayer or BuildCatalog.AiDefensive or BuildCatalog.AiHealAllies or BuildCatalog.AiFollowClosely => distanceFromAnchor,
+				_ => distanceFromSelf,
+			};
+
+			if (score < bestScore)
+			{
+				selected = actor;
+				bestScore = score;
 			}
 		}
 
-		_combatTarget = nearest;
-		return nearest;
+		_combatTarget = selected;
+		return selected;
 	}
 
 	private void AttackActor(SimpleActor target)
@@ -509,19 +749,30 @@ public partial class SimpleActor : CharacterBody3D
 			return;
 		}
 
+		BuildStats stats = CurrentBuildStats;
 		int roleBonus = CombatRole == "DPS" ? 4 : CombatRole == "Tank" ? 1 : CombatRole == "Ranged" ? 2 : 0;
 		int affinityBonus = Affinity >= 80 ? 2 : Affinity >= 55 ? 1 : 0;
-		int damage = Mathf.Max(Attack + roleBonus + affinityBonus, 1);
+		int damage = Mathf.Max(stats.Attack + roleBonus + affinityBonus, 1);
+		if (_rng.Randf() < stats.CritChance)
+		{
+			damage = Mathf.RoundToInt(damage * 1.55f);
+		}
+
 		SpawnSwingEffect(target.GlobalPosition);
-		target.ReceiveDamage(damage, this);
-		_attackCooldownRemaining = AttackCooldown;
+		int dealtDamage = target.ReceiveDamage(damage, this);
+		if (stats.LifeStealPercent > 0.0f && dealtDamage > 0)
+		{
+			ReceiveHealing(Mathf.RoundToInt(dealtDamage * stats.LifeStealPercent));
+		}
+
+		_attackCooldownRemaining = EffectiveAttackCooldown;
 	}
 
 	private bool TryAttackPlayer(Node3D player, Vector3 velocity, float step)
 	{
 		Vector3 toPlayer = player.GlobalPosition - GlobalPosition;
 		toPlayer.Y = 0.0f;
-		if (toPlayer.Length() > AttackRange)
+		if (toPlayer.Length() > EffectiveAttackRange)
 		{
 			return false;
 		}
@@ -531,8 +782,8 @@ public partial class SimpleActor : CharacterBody3D
 		if (_attackCooldownRemaining <= 0.0f && player is PlayerController playerController)
 		{
 			SpawnSwingEffect(player.GlobalPosition);
-			playerController.ReceiveDamage(Attack);
-			_attackCooldownRemaining = AttackCooldown;
+			playerController.ReceiveDamage(EffectiveAttack);
+			_attackCooldownRemaining = EffectiveAttackCooldown;
 		}
 
 		MoveAndSlide();
@@ -558,6 +809,12 @@ public partial class SimpleActor : CharacterBody3D
 
 	private Color GetAttackColor()
 	{
+		BuildStats stats = CurrentBuildStats;
+		if (stats.DamageElementId != "physical")
+		{
+			return stats.AttackColor;
+		}
+
 		return CombatRole switch
 		{
 			"Tank" => new Color(1.0f, 0.78f, 0.28f, 0.9f),

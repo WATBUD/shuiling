@@ -5,38 +5,40 @@ public partial class World : Node3D
 {
 	private static readonly string[] NpcNames =
 	{
-		"村莊守衛",
-		"巡邏獵人",
-		"旅途商人",
-		"森林採集者",
-		"修練學徒",
+		"name.npc.guard",
+		"name.npc.hunter",
+		"name.npc.merchant",
+		"name.npc.gatherer",
+		"name.npc.apprentice",
 	};
 
 	private static readonly string[] MonsterNames =
 	{
-		"野生史萊姆",
-		"紅角獸",
-		"荒野獵手",
-		"洞穴狼",
-		"毒牙小鬼",
+		"name.monster.slime",
+		"name.monster.water_spirit",
+		"name.monster.redhorn",
+		"name.monster.hunter",
+		"name.monster.wolf",
+		"name.monster.imp",
+		"name.monster.dragon",
 	};
 
 	private static readonly string[] NpcAbilities =
 	{
-		"治療鼓舞",
-		"護衛姿態",
-		"採集專精",
-		"戰術指揮",
-		"快速補給",
+		"ability.npc.heal",
+		"ability.npc.guard",
+		"ability.npc.gather",
+		"ability.npc.command",
+		"ability.npc.supply",
 	};
 
 	private static readonly string[] MonsterAbilities =
 	{
-		"撕裂爪擊",
-		"毒霧吐息",
-		"硬皮防禦",
-		"野性衝撞",
-		"夜視追蹤",
+		"ability.monster.claw",
+		"ability.monster.poison",
+		"ability.monster.hide",
+		"ability.monster.charge",
+		"ability.monster.track",
 	};
 
 	private static readonly string[] NpcRoles =
@@ -59,22 +61,22 @@ public partial class World : Node3D
 
 	private static readonly string[] Personalities =
 	{
-		"沉著",
-		"勇敢",
-		"謹慎",
-		"衝動",
-		"親和",
-		"固執",
+		"personality.calm",
+		"personality.brave",
+		"personality.cautious",
+		"personality.impulsive",
+		"personality.friendly",
+		"personality.stubborn",
 	};
 
 	private static readonly string[] PassiveAbilities =
 	{
-		"危機感知",
-		"夜行本能",
-		"堅韌體魄",
-		"連擊節奏",
-		"護主反應",
-		"成長加速",
+		"passive.danger_sense",
+		"passive.night_instinct",
+		"passive.tough_body",
+		"passive.combo_rhythm",
+		"passive.protector",
+		"passive.fast_growth",
 	};
 
 	[Export] public float MapSize { get; set; } = 150.0f;
@@ -1023,41 +1025,28 @@ public partial class World : Node3D
 		var layer = new CanvasLayer { Name = "HUD" };
 		AddChild(layer);
 
-		var crosshair = new Control
+		var reticle = new Panel
 		{
-			Name = "Crosshair",
+			Name = "ReticleDot",
 			MouseFilter = Control.MouseFilterEnum.Ignore,
-		};
-		crosshair.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		layer.AddChild(crosshair);
-
-		var horizontal = new ColorRect
-		{
-			Color = new Color(1.0f, 1.0f, 1.0f, 0.82f),
 			AnchorLeft = 0.5f,
 			AnchorRight = 0.5f,
 			AnchorTop = 0.5f,
 			AnchorBottom = 0.5f,
-			OffsetLeft = -9.0f,
-			OffsetRight = 9.0f,
-			OffsetTop = -1.0f,
-			OffsetBottom = 1.0f,
+			OffsetLeft = -3.0f,
+			OffsetRight = 3.0f,
+			OffsetTop = -3.0f,
+			OffsetBottom = 3.0f,
 		};
-		crosshair.AddChild(horizontal);
-
-		var vertical = new ColorRect
+		var dotStyle = new StyleBoxFlat
 		{
-			Color = horizontal.Color,
-			AnchorLeft = 0.5f,
-			AnchorRight = 0.5f,
-			AnchorTop = 0.5f,
-			AnchorBottom = 0.5f,
-			OffsetLeft = -1.0f,
-			OffsetRight = 1.0f,
-			OffsetTop = -9.0f,
-			OffsetBottom = 9.0f,
+			BgColor = new Color(1.0f, 1.0f, 1.0f, 0.72f),
+			BorderColor = new Color(0.04f, 0.05f, 0.06f, 0.62f),
 		};
-		crosshair.AddChild(vertical);
+		dotStyle.SetBorderWidthAll(1);
+		dotStyle.SetCornerRadiusAll(3);
+		reticle.AddThemeStyleboxOverride("panel", dotStyle);
+		layer.AddChild(reticle);
 	}
 
 	private static BoxMesh BoxMeshFor(Vector3 size)
