@@ -15,6 +15,10 @@ public partial class PartyPanel : PanelContainer
 	private Label _growthLabel = null!;
 	private Label _experienceLabel = null!;
 	private Label _abilityLabel = null!;
+	private Label _combatRoleLabel = null!;
+	private Label _personalityLabel = null!;
+	private Label _passiveLabel = null!;
+	private Label _affinityLabel = null!;
 	private Label _stateLabel = null!;
 	private Button _toggleActiveButton = null!;
 	private Button _trainButton = null!;
@@ -188,6 +192,10 @@ public partial class PartyPanel : PanelContainer
 		_levelLabel = AddStatRow(detailRows, "等級");
 		_attackLabel = AddStatRow(detailRows, "攻擊");
 		_defenseLabel = AddStatRow(detailRows, "防禦");
+		_combatRoleLabel = AddStatRow(detailRows, "定位");
+		_personalityLabel = AddStatRow(detailRows, "個性");
+		_passiveLabel = AddStatRow(detailRows, "被動");
+		_affinityLabel = AddStatRow(detailRows, "親密");
 		_growthLabel = AddStatRow(detailRows, "進化");
 		_experienceLabel = AddStatRow(detailRows, "經驗");
 		_abilityLabel = AddStatRow(detailRows, "能力");
@@ -273,12 +281,16 @@ public partial class PartyPanel : PanelContainer
 		if (_selected is SimpleActor actor && IsInstanceValid(actor))
 		{
 			_nameLabel.Text = actor.DisplayName;
-			_roleLabel.Text = $"{actor.TypeName} / {actor.ActorKind.ToUpperInvariant()}";
+			_roleLabel.Text = $"{actor.TypeName} / {actor.ActorKind.ToUpperInvariant()} / {actor.CombatSummary}";
 			_healthBar.Value = actor.HealthRatio * 100.0f;
 			_healthLabel.Text = $"生命 {actor.CurrentHealth} / {actor.MaxHealth}";
 			_levelLabel.Text = actor.Level.ToString();
 			_attackLabel.Text = actor.Attack.ToString();
 			_defenseLabel.Text = actor.Defense.ToString();
+			_combatRoleLabel.Text = actor.CombatRoleName;
+			_personalityLabel.Text = actor.Personality;
+			_passiveLabel.Text = actor.PassiveAbility;
+			_affinityLabel.Text = $"{actor.Affinity} / 100";
 			_growthLabel.Text = actor.GrowthName;
 			_experienceLabel.Text = $"{actor.Experience} / {actor.ExperienceToNextLevel}";
 			_abilityLabel.Text = $"{actor.SpecialAbility} Lv.{actor.AbilityRank}";
@@ -295,6 +307,10 @@ public partial class PartyPanel : PanelContainer
 		_levelLabel.Text = _player.Level.ToString();
 		_attackLabel.Text = _player.Attack.ToString();
 		_defenseLabel.Text = _player.Defense.ToString();
+		_combatRoleLabel.Text = "領隊";
+		_personalityLabel.Text = "-";
+		_passiveLabel.Text = "-";
+		_affinityLabel.Text = "-";
 		_growthLabel.Text = "-";
 		_experienceLabel.Text = "-";
 		_abilityLabel.Text = "-";
