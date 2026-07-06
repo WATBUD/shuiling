@@ -237,12 +237,66 @@ public partial class PlayerController : CharacterBody3D
 		return true;
 	}
 
+	public int ReceiveDamage(int rawDamage)
+	{
+		int mitigatedDamage = Mathf.Max(rawDamage - Mathf.RoundToInt(Defense * 0.35f), 1);
+		CurrentHealth = Mathf.Max(CurrentHealth - mitigatedDamage, 0);
+		SpawnDamageEffect(mitigatedDamage);
+
+		if (CurrentHealth <= 0)
+		{
+			RecoverFromKnockdown();
+		}
+
+		return mitigatedDamage;
+	}
+
+	public void GrantCombatExperience(int amount)
+	{
+		int experience = Mathf.Max(amount, 0);
+		if (experience <= 0)
+		{
+			return;
+		}
+
+		foreach (SimpleActor actor in _activeParty)
+		{
+			if (IsInstanceValid(actor) && actor.IsInActiveParty)
+			{
+				actor.GrantTraining(experience);
+			}
+		}
+
+		_partyPanel.RefreshParty();
+	}
+
 	private void ReassignFollowSlots()
 	{
 		for (int index = 0; index < _activeParty.Count; index++)
 		{
 			_activeParty[index].SetFollowSlot(index);
 		}
+	}
+
+	private void RecoverFromKnockdown()
+	{
+		CurrentHealth = Mathf.Max(MaxHealth / 2, 1);
+		GlobalPosition = new Vector3(0.0f, 0.0f, 8.0f);
+		Velocity = Vector3.Zero;
+	}
+
+	private void SpawnDamageEffect(int damage)
+	{
+		Node parent = GetTree().CurrentScene ?? GetParent();
+		var effect = new CombatEffect
+		{
+			Text = damage.ToString(),
+			EffectColor = new Color(1.0f, 0.18f, 0.14f, 0.92f),
+			Lifetime = 0.48f,
+			Radius = 0.62f,
+		};
+		parent.AddChild(effect);
+		effect.GlobalPosition = GlobalPosition + new Vector3(0.0f, 1.15f, 0.0f);
 	}
 
 	private void CreateTargetInfoRay()

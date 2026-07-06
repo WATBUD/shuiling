@@ -132,7 +132,7 @@ public partial class TargetInfoPanel : PanelContainer
 	private void UpdateFromActor(SimpleActor actor)
 	{
 		_nameLabel.Text = actor.DisplayName;
-		_typeLabel.Text = $"{actor.TypeName}  /  {actor.ActorKind.ToUpperInvariant()}";
+		_typeLabel.Text = $"{actor.TypeName}  /  {actor.CombatSummary}";
 		_healthBar.Value = actor.HealthRatio * 100.0f;
 		_healthLabel.Text = $"生命 {actor.CurrentHealth} / {actor.MaxHealth}";
 		_levelLabel.Text = actor.Level.ToString();
