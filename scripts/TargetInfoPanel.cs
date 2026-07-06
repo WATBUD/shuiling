@@ -8,6 +8,7 @@ public partial class TargetInfoPanel : PanelContainer
 	private Label _healthLabel = null!;
 	private Label _attackLabel = null!;
 	private Label _defenseLabel = null!;
+	private Label _buildLabel = null!;
 	private Label _rewardLabel = null!;
 	private Label _stateLabel = null!;
 	private ProgressBar _healthBar = null!;
@@ -16,7 +17,13 @@ public partial class TargetInfoPanel : PanelContainer
 	public override void _Ready()
 	{
 		BuildPanel();
+		LocaleText.LanguageChanged += OnLanguageChanged;
 		HideActor();
+	}
+
+	public override void _ExitTree()
+	{
+		LocaleText.LanguageChanged -= OnLanguageChanged;
 	}
 
 	public override void _Process(double delta)
@@ -54,8 +61,8 @@ public partial class TargetInfoPanel : PanelContainer
 		OffsetLeft = -348.0f;
 		OffsetRight = -24.0f;
 		OffsetTop = 24.0f;
-		OffsetBottom = 220.0f;
-		CustomMinimumSize = new Vector2(324.0f, 196.0f);
+		OffsetBottom = 248.0f;
+		CustomMinimumSize = new Vector2(324.0f, 224.0f);
 
 		var panelStyle = new StyleBoxFlat
 		{
@@ -96,11 +103,12 @@ public partial class TargetInfoPanel : PanelContainer
 		_healthLabel = MakeLabel(13, new Color(0.94f, 0.94f, 0.94f));
 		rows.AddChild(_healthLabel);
 
-		_levelLabel = AddStatRow(rows, "等級");
-		_attackLabel = AddStatRow(rows, "攻擊");
-		_defenseLabel = AddStatRow(rows, "防禦");
-		_rewardLabel = AddStatRow(rows, "獎勵");
-		_stateLabel = AddStatRow(rows, "狀態");
+		_levelLabel = AddStatRow(rows, "stat.level");
+		_attackLabel = AddStatRow(rows, "stat.attack");
+		_defenseLabel = AddStatRow(rows, "stat.defense");
+		_buildLabel = AddStatRow(rows, "build.title");
+		_rewardLabel = AddStatRow(rows, "stat.reward");
+		_stateLabel = AddStatRow(rows, "stat.state");
 	}
 
 	private static Label MakeLabel(int fontSize, Color color)
@@ -112,14 +120,14 @@ public partial class TargetInfoPanel : PanelContainer
 		return label;
 	}
 
-	private static Label AddStatRow(VBoxContainer rows, string title)
+	private static Label AddStatRow(VBoxContainer rows, string titleKey)
 	{
 		var row = new HBoxContainer();
 		row.AddThemeConstantOverride("separation", 8);
 		rows.AddChild(row);
 
 		var titleLabel = MakeLabel(13, new Color(0.68f, 0.74f, 0.78f));
-		titleLabel.Text = title;
+		titleLabel.Text = LocaleText.T(titleKey);
 		titleLabel.CustomMinimumSize = new Vector2(48.0f, 0.0f);
 		row.AddChild(titleLabel);
 
@@ -131,14 +139,35 @@ public partial class TargetInfoPanel : PanelContainer
 
 	private void UpdateFromActor(SimpleActor actor)
 	{
-		_nameLabel.Text = actor.DisplayName;
+		_nameLabel.Text = actor.LocalizedDisplayName;
 		_typeLabel.Text = $"{actor.TypeName}  /  {actor.CombatSummary}";
 		_healthBar.Value = actor.HealthRatio * 100.0f;
-		_healthLabel.Text = $"生命 {actor.CurrentHealth} / {actor.MaxHealth}";
+		_healthLabel.Text = LocaleText.F("stat.health_value", actor.CurrentHealth, actor.EffectiveMaxHealth);
 		_levelLabel.Text = actor.Level.ToString();
-		_attackLabel.Text = actor.Attack.ToString();
-		_defenseLabel.Text = actor.Defense.ToString();
-		_rewardLabel.Text = $"{actor.ExperienceReward} EXP  /  {actor.GoldReward} 金幣";
+		_attackLabel.Text = LocaleText.F("build.effective_stat", actor.EffectiveAttack, actor.Attack);
+		_defenseLabel.Text = LocaleText.F("build.effective_stat", actor.EffectiveDefense, actor.Defense);
+		_buildLabel.Text = $"{actor.BuildElementName} / {actor.BuildRareComboName}";
+		_rewardLabel.Text = LocaleText.F("stat.reward_value", actor.ExperienceReward, actor.GoldReward);
 		_stateLabel.Text = actor.StateName;
+	}
+
+	private void OnLanguageChanged()
+	{
+		SimpleActor? actor = _currentActor;
+		foreach (Node child in GetChildren())
+		{
+			RemoveChild(child);
+			child.QueueFree();
+		}
+
+		BuildPanel();
+		if (actor != null && IsInstanceValid(actor))
+		{
+			ShowActor(actor);
+		}
+		else
+		{
+			HideActor();
+		}
 	}
 }
