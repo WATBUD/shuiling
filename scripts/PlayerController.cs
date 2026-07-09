@@ -778,25 +778,53 @@ public partial class PlayerController : CharacterBody3D
 	private void CreatePlayerVisual()
 	{
 		var matCoat = MakeMaterial(new Color(0.18f, 0.36f, 0.62f));
+		var matCoatDark = MakeMaterial(new Color(0.08f, 0.19f, 0.32f));
 		var matTrim = MakeMaterial(new Color(0.95f, 0.72f, 0.26f));
+		var matScarf = MakeMaterial(new Color(0.68f, 0.10f, 0.12f));
 		var matSkin = MakeMaterial(new Color(0.86f, 0.62f, 0.44f));
 		var matLeather = MakeMaterial(new Color(0.22f, 0.14f, 0.09f));
 		var matDark = MakeMaterial(new Color(0.06f, 0.07f, 0.08f));
 		var matMetal = MakeMaterial(new Color(0.72f, 0.76f, 0.78f), 0.36f);
+		var matEye = MakeMaterial(new Color(0.98f, 0.96f, 0.88f), 0.35f);
 
-		AddVisualMesh("PlayerBody", new CapsuleMesh { Radius = 0.30f, Height = 0.95f }, new Vector3(0.0f, 0.98f, 0.0f), Vector3.Zero, new Vector3(0.95f, 1.0f, 0.78f), matCoat);
-		AddVisualMesh("PlayerChestTrim", new BoxMesh { Size = new Vector3(0.58f, 0.08f, 0.055f) }, new Vector3(0.0f, 1.22f, -0.24f), Vector3.Zero, Vector3.One, matTrim);
-		AddVisualMesh("PlayerBelt", new BoxMesh { Size = new Vector3(0.66f, 0.10f, 0.12f) }, new Vector3(0.0f, 0.74f, -0.02f), Vector3.Zero, Vector3.One, matLeather);
-		AddVisualMesh("PlayerHead", new SphereMesh { Radius = 0.27f, Height = 0.54f }, new Vector3(0.0f, 1.66f, 0.0f), Vector3.Zero, new Vector3(0.94f, 1.05f, 0.92f), matSkin);
-		AddVisualMesh("PlayerHair", new SphereMesh { Radius = 0.29f, Height = 0.34f }, new Vector3(0.0f, 1.82f, 0.03f), Vector3.Zero, new Vector3(1.02f, 0.48f, 0.92f), matDark);
-		AddVisualMesh("PlayerLeftArm", new CapsuleMesh { Radius = 0.075f, Height = 0.78f }, new Vector3(-0.38f, 1.04f, 0.0f), new Vector3(0.0f, 0.0f, -9.0f), Vector3.One, matSkin);
-		AddVisualMesh("PlayerRightArm", new CapsuleMesh { Radius = 0.075f, Height = 0.78f }, new Vector3(0.38f, 1.04f, 0.0f), new Vector3(0.0f, 0.0f, 9.0f), Vector3.One, matSkin);
-		AddVisualMesh("PlayerLeftLeg", new CapsuleMesh { Radius = 0.095f, Height = 0.72f }, new Vector3(-0.14f, 0.36f, 0.0f), Vector3.Zero, Vector3.One, matLeather);
-		AddVisualMesh("PlayerRightLeg", new CapsuleMesh { Radius = 0.095f, Height = 0.72f }, new Vector3(0.14f, 0.36f, 0.0f), Vector3.Zero, Vector3.One, matLeather);
-		AddVisualMesh("PlayerLeftBoot", new BoxMesh { Size = new Vector3(0.20f, 0.12f, 0.32f) }, new Vector3(-0.14f, 0.06f, -0.05f), Vector3.Zero, Vector3.One, matDark);
-		AddVisualMesh("PlayerRightBoot", new BoxMesh { Size = new Vector3(0.20f, 0.12f, 0.32f) }, new Vector3(0.14f, 0.06f, -0.05f), Vector3.Zero, Vector3.One, matDark);
-		AddVisualMesh("PlayerCape", new BoxMesh { Size = new Vector3(0.50f, 0.78f, 0.055f) }, new Vector3(0.0f, 1.04f, 0.38f), new Vector3(-8.0f, 0.0f, 0.0f), Vector3.One, matTrim);
-		AddVisualMesh("PlayerTool", new BoxMesh { Size = new Vector3(0.075f, 0.74f, 0.045f) }, new Vector3(0.55f, 0.98f, -0.12f), new Vector3(0.0f, 0.0f, -22.0f), Vector3.One, matMetal);
+		AddVisualMesh("PlayerCoatBody", new CapsuleMesh { Radius = 0.31f, Height = 1.06f }, new Vector3(0.0f, 1.02f, 0.0f), Vector3.Zero, new Vector3(1.0f, 1.0f, 0.76f), matCoat);
+		AddVisualMesh("PlayerChestArmor", new BoxMesh { Size = new Vector3(0.56f, 0.24f, 0.065f) }, new Vector3(0.0f, 1.28f, -0.255f), Vector3.Zero, Vector3.One, matMetal);
+		AddVisualMesh("PlayerFrontPanel", new BoxMesh { Size = new Vector3(0.34f, 0.60f, 0.058f) }, new Vector3(0.0f, 0.98f, -0.275f), Vector3.Zero, Vector3.One, matCoatDark);
+		AddVisualMesh("PlayerChestTrim", new BoxMesh { Size = new Vector3(0.60f, 0.065f, 0.066f) }, new Vector3(0.0f, 1.42f, -0.30f), Vector3.Zero, Vector3.One, matTrim);
+		AddVisualMesh("PlayerSash", new BoxMesh { Size = new Vector3(0.12f, 0.80f, 0.065f) }, new Vector3(-0.12f, 1.13f, -0.315f), new Vector3(0.0f, 0.0f, -24.0f), Vector3.One, matScarf);
+		AddVisualMesh("PlayerBelt", new BoxMesh { Size = new Vector3(0.70f, 0.11f, 0.13f) }, new Vector3(0.0f, 0.72f, -0.02f), Vector3.Zero, Vector3.One, matLeather);
+		AddVisualMesh("PlayerBeltBuckle", new BoxMesh { Size = new Vector3(0.15f, 0.13f, 0.055f) }, new Vector3(0.0f, 0.72f, -0.29f), Vector3.Zero, Vector3.One, matTrim);
+
+		AddVisualMesh("PlayerHead", new SphereMesh { Radius = 0.27f, Height = 0.54f }, new Vector3(0.0f, 1.67f, 0.0f), Vector3.Zero, new Vector3(0.94f, 1.05f, 0.92f), matSkin);
+		AddVisualMesh("PlayerHairCap", new SphereMesh { Radius = 0.30f, Height = 0.36f }, new Vector3(0.0f, 1.83f, 0.03f), Vector3.Zero, new Vector3(1.04f, 0.50f, 0.94f), matDark);
+		AddVisualMesh("PlayerHairBangLeft", new SphereMesh { Radius = 0.10f, Height = 0.12f }, new Vector3(-0.10f, 1.75f, -0.22f), Vector3.Zero, new Vector3(1.1f, 0.55f, 0.8f), matDark);
+		AddVisualMesh("PlayerHairBangRight", new SphereMesh { Radius = 0.09f, Height = 0.11f }, new Vector3(0.09f, 1.74f, -0.23f), Vector3.Zero, new Vector3(1.0f, 0.5f, 0.8f), matDark);
+		AddPlayerEye("Left", new Vector3(-0.095f, 1.68f, -0.245f), 0.032f, matEye, matDark);
+		AddPlayerEye("Right", new Vector3(0.095f, 1.68f, -0.245f), 0.032f, matEye, matDark);
+		AddVisualMesh("PlayerNose", new CapsuleMesh { Radius = 0.022f, Height = 0.08f }, new Vector3(0.0f, 1.63f, -0.275f), new Vector3(90.0f, 0.0f, 0.0f), Vector3.One, matSkin);
+		AddVisualMesh("PlayerScarfCollar", new CylinderMesh { TopRadius = 0.31f, BottomRadius = 0.33f, Height = 0.08f, RadialSegments = 24 }, new Vector3(0.0f, 1.43f, 0.0f), Vector3.Zero, new Vector3(1.0f, 1.0f, 0.82f), matScarf);
+		AddVisualMesh("PlayerScarfTail", new BoxMesh { Size = new Vector3(0.14f, 0.44f, 0.055f) }, new Vector3(-0.24f, 1.18f, 0.32f), new Vector3(-12.0f, 0.0f, -12.0f), Vector3.One, matScarf);
+
+		AddVisualMesh("PlayerLeftShoulder", new SphereMesh { Radius = 0.13f, Height = 0.16f }, new Vector3(-0.35f, 1.34f, -0.02f), Vector3.Zero, new Vector3(1.35f, 0.55f, 0.95f), matMetal);
+		AddVisualMesh("PlayerRightShoulder", new SphereMesh { Radius = 0.13f, Height = 0.16f }, new Vector3(0.35f, 1.34f, -0.02f), Vector3.Zero, new Vector3(1.35f, 0.55f, 0.95f), matMetal);
+		AddVisualMesh("PlayerLeftSleeve", new CapsuleMesh { Radius = 0.082f, Height = 0.54f }, new Vector3(-0.43f, 1.03f, 0.0f), new Vector3(0.0f, 0.0f, -11.0f), Vector3.One, matCoat);
+		AddVisualMesh("PlayerRightSleeve", new CapsuleMesh { Radius = 0.082f, Height = 0.54f }, new Vector3(0.43f, 1.03f, 0.0f), new Vector3(0.0f, 0.0f, 11.0f), Vector3.One, matCoat);
+		AddVisualMesh("PlayerLeftGlove", new SphereMesh { Radius = 0.10f, Height = 0.18f }, new Vector3(-0.48f, 0.70f, -0.03f), Vector3.Zero, Vector3.One, matLeather);
+		AddVisualMesh("PlayerRightGlove", new SphereMesh { Radius = 0.10f, Height = 0.18f }, new Vector3(0.48f, 0.70f, -0.03f), Vector3.Zero, Vector3.One, matLeather);
+
+		AddVisualMesh("PlayerLeftLeg", new CapsuleMesh { Radius = 0.105f, Height = 0.72f }, new Vector3(-0.16f, 0.36f, 0.0f), Vector3.Zero, Vector3.One, matLeather);
+		AddVisualMesh("PlayerRightLeg", new CapsuleMesh { Radius = 0.105f, Height = 0.72f }, new Vector3(0.16f, 0.36f, 0.0f), Vector3.Zero, Vector3.One, matLeather);
+		AddVisualMesh("PlayerLeftBoot", new BoxMesh { Size = new Vector3(0.23f, 0.14f, 0.36f) }, new Vector3(-0.16f, 0.07f, -0.055f), Vector3.Zero, Vector3.One, matDark);
+		AddVisualMesh("PlayerRightBoot", new BoxMesh { Size = new Vector3(0.23f, 0.14f, 0.36f) }, new Vector3(0.16f, 0.07f, -0.055f), Vector3.Zero, Vector3.One, matDark);
+		AddVisualMesh("PlayerCape", new BoxMesh { Size = new Vector3(0.62f, 0.90f, 0.055f) }, new Vector3(0.0f, 1.02f, 0.38f), new Vector3(-8.0f, 0.0f, 0.0f), Vector3.One, matTrim);
+		AddVisualMesh("PlayerBackBlade", new BoxMesh { Size = new Vector3(0.075f, 0.90f, 0.045f) }, new Vector3(0.44f, 1.10f, 0.36f), new Vector3(0.0f, 0.0f, -24.0f), Vector3.One, matMetal);
+		AddVisualMesh("PlayerBackBladeGuard", new BoxMesh { Size = new Vector3(0.30f, 0.055f, 0.055f) }, new Vector3(0.30f, 0.73f, 0.36f), new Vector3(0.0f, 0.0f, -24.0f), Vector3.One, matTrim);
+	}
+
+	private void AddPlayerEye(string side, Vector3 position, float radius, Material eyeMaterial, Material pupilMaterial)
+	{
+		AddVisualMesh($"Player{side}EyeWhite", new SphereMesh { Radius = radius, Height = radius * 2.0f }, position, Vector3.Zero, new Vector3(1.0f, 1.0f, 0.45f), eyeMaterial);
+		AddVisualMesh($"Player{side}EyePupil", new SphereMesh { Radius = radius * 0.45f, Height = radius * 0.9f }, position + new Vector3(0.0f, 0.0f, -radius * 0.72f), Vector3.Zero, new Vector3(1.0f, 1.0f, 0.35f), pupilMaterial);
 	}
 
 	private void AddVisualMesh(string nodeName, Mesh mesh, Vector3 position, Vector3 rotationDegrees, Vector3 scale, Material material)

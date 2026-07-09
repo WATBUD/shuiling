@@ -704,32 +704,56 @@ public partial class World : Node3D
 
 	private void BuildMonsterVisual(Node3D actor)
 	{
-		AddMesh(actor, "Body", new SphereMesh { Radius = 0.52f, Height = 0.92f }, new Vector3(0.0f, 0.76f, 0.08f), Vector3.Zero, new Vector3(1.25f, 0.82f, 1.42f), _matMonster);
-		AddMesh(actor, "Belly", new SphereMesh { Radius = 0.34f, Height = 0.50f }, new Vector3(0.0f, 0.72f, -0.44f), Vector3.Zero, new Vector3(1.1f, 0.78f, 0.38f), _matMonsterBelly);
-		AddMesh(actor, "Head", new SphereMesh { Radius = 0.38f, Height = 0.66f }, new Vector3(0.0f, 1.22f, -0.50f), Vector3.Zero, new Vector3(1.12f, 0.92f, 1.0f), _matMonster);
-		AddMesh(actor, "Snout", new CapsuleMesh { Radius = 0.16f, Height = 0.42f }, new Vector3(0.0f, 1.13f, -0.82f), new Vector3(90.0f, 0.0f, 0.0f), new Vector3(1.25f, 0.82f, 1.0f), _matMonsterBelly);
+		AddMesh(actor, "BodyCore", new SphereMesh { Radius = 0.54f, Height = 0.86f }, new Vector3(0.0f, 0.74f, 0.10f), Vector3.Zero, new Vector3(1.34f, 0.72f, 1.72f), _matMonster);
+		AddMesh(actor, "ChestMass", new SphereMesh { Radius = 0.42f, Height = 0.62f }, new Vector3(0.0f, 0.86f, -0.50f), Vector3.Zero, new Vector3(1.26f, 0.82f, 1.05f), _matMonster);
+		AddMesh(actor, "HindMass", new SphereMesh { Radius = 0.45f, Height = 0.62f }, new Vector3(0.0f, 0.72f, 0.68f), Vector3.Zero, new Vector3(1.36f, 0.78f, 0.98f), _matMonster);
+		AddMesh(actor, "BellyPlate", new SphereMesh { Radius = 0.34f, Height = 0.42f }, new Vector3(0.0f, 0.52f, -0.06f), Vector3.Zero, new Vector3(1.10f, 0.42f, 1.58f), _matMonsterBelly);
+		AddMesh(actor, "Neck", new CapsuleMesh { Radius = 0.16f, Height = 0.52f }, new Vector3(0.0f, 1.03f, -0.60f), new Vector3(38.0f, 0.0f, 0.0f), new Vector3(1.08f, 1.0f, 0.90f), _matMonster);
+		AddMesh(actor, "Head", new SphereMesh { Radius = 0.38f, Height = 0.62f }, new Vector3(0.0f, 1.18f, -0.92f), Vector3.Zero, new Vector3(1.12f, 0.84f, 0.96f), _matMonster);
+		AddMesh(actor, "Snout", new CapsuleMesh { Radius = 0.15f, Height = 0.55f }, new Vector3(0.0f, 1.08f, -1.22f), new Vector3(90.0f, 0.0f, 0.0f), new Vector3(1.30f, 0.78f, 1.0f), _matMonsterBelly);
+		AddMesh(actor, "Nose", new SphereMesh { Radius = 0.08f, Height = 0.10f }, new Vector3(0.0f, 1.12f, -1.49f), Vector3.Zero, new Vector3(1.35f, 0.70f, 0.75f), _matActorDark);
 
-		AddEye(actor, new Vector3(-0.16f, 1.32f, -0.82f), 0.055f);
-		AddEye(actor, new Vector3(0.16f, 1.32f, -0.82f), 0.055f);
-		AddMesh(actor, "Mouth", BoxMeshFor(new Vector3(0.34f, 0.05f, 0.04f)), new Vector3(0.0f, 1.06f, -0.99f), Vector3.Zero, Vector3.One, _matActorDark);
+		AddEye(actor, new Vector3(-0.17f, 1.29f, -1.17f), 0.058f);
+		AddEye(actor, new Vector3(0.17f, 1.29f, -1.17f), 0.058f);
+		AddMesh(actor, "BrowLeft", BoxMeshFor(new Vector3(0.22f, 0.055f, 0.06f)), new Vector3(-0.16f, 1.38f, -1.12f), new Vector3(0.0f, 0.0f, -10.0f), Vector3.One, _matHorn);
+		AddMesh(actor, "BrowRight", BoxMeshFor(new Vector3(0.22f, 0.055f, 0.06f)), new Vector3(0.16f, 1.38f, -1.12f), new Vector3(0.0f, 0.0f, 10.0f), Vector3.One, _matHorn);
+		AddMesh(actor, "LowerJaw", BoxMeshFor(new Vector3(0.36f, 0.07f, 0.20f)), new Vector3(0.0f, 1.00f, -1.28f), Vector3.Zero, Vector3.One, _matActorDark);
+		AddMesh(actor, "LeftFang", CylinderMeshFor(0.0f, 0.027f, 0.14f), new Vector3(-0.12f, 0.96f, -1.38f), new Vector3(8.0f, 0.0f, 0.0f), Vector3.One, _matMonsterClaw);
+		AddMesh(actor, "RightFang", CylinderMeshFor(0.0f, 0.027f, 0.14f), new Vector3(0.12f, 0.96f, -1.38f), new Vector3(8.0f, 0.0f, 0.0f), Vector3.One, _matMonsterClaw);
 
-		AddHorn(actor, new Vector3(-0.22f, 1.58f, -0.48f), new Vector3(20.0f, 0.0f, -22.0f));
-		AddHorn(actor, new Vector3(0.22f, 1.58f, -0.48f), new Vector3(20.0f, 0.0f, 22.0f));
-		AddMesh(actor, "BackSpike1", CylinderMeshFor(0.0f, 0.10f, 0.32f), new Vector3(0.0f, 1.28f, 0.06f), new Vector3(-22.0f, 0.0f, 0.0f), Vector3.One, _matHorn);
-		AddMesh(actor, "BackSpike2", CylinderMeshFor(0.0f, 0.09f, 0.28f), new Vector3(0.0f, 1.18f, 0.38f), new Vector3(-28.0f, 0.0f, 0.0f), Vector3.One, _matHorn);
-		AddMesh(actor, "BackSpike3", CylinderMeshFor(0.0f, 0.08f, 0.24f), new Vector3(0.0f, 1.02f, 0.68f), new Vector3(-34.0f, 0.0f, 0.0f), Vector3.One, _matHorn);
+		AddHorn(actor, new Vector3(-0.24f, 1.49f, -0.78f), new Vector3(28.0f, 0.0f, -28.0f));
+		AddHorn(actor, new Vector3(0.24f, 1.49f, -0.78f), new Vector3(28.0f, 0.0f, 28.0f));
+		AddMesh(actor, "LeftEar", CylinderMeshFor(0.0f, 0.08f, 0.24f), new Vector3(-0.36f, 1.32f, -0.86f), new Vector3(40.0f, 0.0f, -48.0f), Vector3.One, _matMonster);
+		AddMesh(actor, "RightEar", CylinderMeshFor(0.0f, 0.08f, 0.24f), new Vector3(0.36f, 1.32f, -0.86f), new Vector3(40.0f, 0.0f, 48.0f), Vector3.One, _matMonster);
+		AddMesh(actor, "BackSpikeA", CylinderMeshFor(0.0f, 0.105f, 0.36f), new Vector3(0.0f, 1.22f, -0.28f), new Vector3(-22.0f, 0.0f, 0.0f), Vector3.One, _matHorn);
+		AddMesh(actor, "BackSpikeB", CylinderMeshFor(0.0f, 0.10f, 0.34f), new Vector3(0.0f, 1.20f, 0.03f), new Vector3(-26.0f, 0.0f, 0.0f), Vector3.One, _matHorn);
+		AddMesh(actor, "BackSpikeC", CylinderMeshFor(0.0f, 0.09f, 0.30f), new Vector3(0.0f, 1.12f, 0.35f), new Vector3(-30.0f, 0.0f, 0.0f), Vector3.One, _matHorn);
+		AddMesh(actor, "BackSpikeD", CylinderMeshFor(0.0f, 0.075f, 0.24f), new Vector3(0.0f, 1.00f, 0.66f), new Vector3(-34.0f, 0.0f, 0.0f), Vector3.One, _matHorn);
 
-		AddMesh(actor, "LeftForeLeg", new CapsuleMesh { Radius = 0.12f, Height = 0.58f }, new Vector3(-0.34f, 0.42f, -0.46f), new Vector3(8.0f, 0.0f, -8.0f), Vector3.One, _matMonster);
-		AddMesh(actor, "RightForeLeg", new CapsuleMesh { Radius = 0.12f, Height = 0.58f }, new Vector3(0.34f, 0.42f, -0.46f), new Vector3(8.0f, 0.0f, 8.0f), Vector3.One, _matMonster);
-		AddMesh(actor, "LeftBackLeg", new CapsuleMesh { Radius = 0.13f, Height = 0.62f }, new Vector3(-0.38f, 0.40f, 0.42f), new Vector3(-8.0f, 0.0f, -8.0f), Vector3.One, _matMonster);
-		AddMesh(actor, "RightBackLeg", new CapsuleMesh { Radius = 0.13f, Height = 0.62f }, new Vector3(0.38f, 0.40f, 0.42f), new Vector3(-8.0f, 0.0f, 8.0f), Vector3.One, _matMonster);
+		AddMesh(actor, "LeftShoulder", new SphereMesh { Radius = 0.19f, Height = 0.25f }, new Vector3(-0.42f, 0.80f, -0.52f), Vector3.Zero, new Vector3(1.10f, 0.72f, 0.95f), _matMonster);
+		AddMesh(actor, "RightShoulder", new SphereMesh { Radius = 0.19f, Height = 0.25f }, new Vector3(0.42f, 0.80f, -0.52f), Vector3.Zero, new Vector3(1.10f, 0.72f, 0.95f), _matMonster);
+		AddMesh(actor, "LeftHip", new SphereMesh { Radius = 0.21f, Height = 0.28f }, new Vector3(-0.44f, 0.72f, 0.52f), Vector3.Zero, new Vector3(1.08f, 0.74f, 0.95f), _matMonster);
+		AddMesh(actor, "RightHip", new SphereMesh { Radius = 0.21f, Height = 0.28f }, new Vector3(0.44f, 0.72f, 0.52f), Vector3.Zero, new Vector3(1.08f, 0.74f, 0.95f), _matMonster);
+		AddMesh(actor, "LeftForeLeg", new CapsuleMesh { Radius = 0.105f, Height = 0.60f }, new Vector3(-0.42f, 0.42f, -0.55f), new Vector3(7.0f, 0.0f, -7.0f), Vector3.One, _matMonster);
+		AddMesh(actor, "RightForeLeg", new CapsuleMesh { Radius = 0.105f, Height = 0.60f }, new Vector3(0.42f, 0.42f, -0.55f), new Vector3(7.0f, 0.0f, 7.0f), Vector3.One, _matMonster);
+		AddMesh(actor, "LeftBackLeg", new CapsuleMesh { Radius = 0.12f, Height = 0.64f }, new Vector3(-0.44f, 0.40f, 0.52f), new Vector3(-8.0f, 0.0f, -8.0f), Vector3.One, _matMonster);
+		AddMesh(actor, "RightBackLeg", new CapsuleMesh { Radius = 0.12f, Height = 0.64f }, new Vector3(0.44f, 0.40f, 0.52f), new Vector3(-8.0f, 0.0f, 8.0f), Vector3.One, _matMonster);
+		AddMesh(actor, "LeftFrontPaw", new SphereMesh { Radius = 0.14f, Height = 0.16f }, new Vector3(-0.42f, 0.13f, -0.70f), Vector3.Zero, new Vector3(1.18f, 0.42f, 1.36f), _matMonsterBelly);
+		AddMesh(actor, "RightFrontPaw", new SphereMesh { Radius = 0.14f, Height = 0.16f }, new Vector3(0.42f, 0.13f, -0.70f), Vector3.Zero, new Vector3(1.18f, 0.42f, 1.36f), _matMonsterBelly);
+		AddMesh(actor, "LeftBackPaw", new SphereMesh { Radius = 0.15f, Height = 0.17f }, new Vector3(-0.46f, 0.13f, 0.68f), Vector3.Zero, new Vector3(1.22f, 0.42f, 1.32f), _matMonsterBelly);
+		AddMesh(actor, "RightBackPaw", new SphereMesh { Radius = 0.15f, Height = 0.17f }, new Vector3(0.46f, 0.13f, 0.68f), Vector3.Zero, new Vector3(1.22f, 0.42f, 1.32f), _matMonsterBelly);
 
-		AddClaw(actor, new Vector3(-0.35f, 0.10f, -0.68f), -12.0f);
-		AddClaw(actor, new Vector3(0.35f, 0.10f, -0.68f), 12.0f);
-		AddClaw(actor, new Vector3(-0.40f, 0.10f, 0.56f), -16.0f);
-		AddClaw(actor, new Vector3(0.40f, 0.10f, 0.56f), 16.0f);
-		AddMesh(actor, "Tail", new CapsuleMesh { Radius = 0.10f, Height = 0.78f }, new Vector3(0.0f, 0.78f, 0.98f), new Vector3(65.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.82f, 1.0f), _matMonster);
-		AddMesh(actor, "TailTip", new SphereMesh { Radius = 0.13f, Height = 0.20f }, new Vector3(0.0f, 0.44f, 1.28f), Vector3.Zero, Vector3.One, _matMonsterBelly);
+		AddClaw(actor, new Vector3(-0.50f, 0.08f, -0.83f), -16.0f);
+		AddClaw(actor, new Vector3(-0.38f, 0.08f, -0.86f), 0.0f);
+		AddClaw(actor, new Vector3(-0.26f, 0.08f, -0.83f), 16.0f);
+		AddClaw(actor, new Vector3(0.26f, 0.08f, -0.83f), -16.0f);
+		AddClaw(actor, new Vector3(0.38f, 0.08f, -0.86f), 0.0f);
+		AddClaw(actor, new Vector3(0.50f, 0.08f, -0.83f), 16.0f);
+		AddClaw(actor, new Vector3(-0.52f, 0.08f, 0.55f), -18.0f);
+		AddClaw(actor, new Vector3(0.52f, 0.08f, 0.55f), 18.0f);
+
+		AddMesh(actor, "TailBase", new CapsuleMesh { Radius = 0.105f, Height = 0.88f }, new Vector3(0.0f, 0.73f, 1.06f), new Vector3(64.0f, 0.0f, 0.0f), new Vector3(1.0f, 0.86f, 1.0f), _matMonster);
+		AddMesh(actor, "TailTip", new SphereMesh { Radius = 0.15f, Height = 0.22f }, new Vector3(0.0f, 0.38f, 1.42f), Vector3.Zero, new Vector3(1.0f, 0.82f, 1.0f), _matMonsterBelly);
 
 		if (actor is SimpleActor monster)
 		{
