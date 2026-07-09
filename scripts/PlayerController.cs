@@ -6,14 +6,10 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float WalkSpeed { get; set; } = 6.5f;
 	[Export] public float SprintSpeed { get; set; } = 10.0f;
 	[Export] public float JumpVelocity { get; set; } = 5.2f;
-	[Export] public float MouseSensitivity { get; set; } = 0.0022f;
-	[Export] public float ThirdPersonDistance { get; set; } = 4.0f;
-	[Export] public float ThirdPersonHeight { get; set; } = 0.58f;
-	[Export] public float ThirdPersonTargetHeight { get; set; } = 1.35f;
-	[Export] public float CameraHeightSensitivity { get; set; } = 1.35f;
-	[Export] public float CameraShoulderOffset { get; set; } = 0.12f;
-	[Export] public float MinCameraDistance { get; set; } = 3.0f;
-	[Export] public float MaxCameraDistance { get; set; } = 5.4f;
+	[Export] public float ThirdPersonDistance { get; set; } = 6.2f;
+	[Export] public float ThirdPersonCameraHeight { get; set; } = 3.35f;
+	[Export] public float ThirdPersonLookHeight { get; set; } = 2.2f;
+	[Export] public float CameraWorldHalfExtent { get; set; } = 68.5f;
 	[Export] public float FallRespawnHeight { get; set; } = -8.0f;
 	[Export] public float Acceleration { get; set; } = 18.0f;
 	[Export] public float CaptureCooldown { get; set; } = 0.55f;
@@ -32,9 +28,6 @@ public partial class PlayerController : CharacterBody3D
 	private readonly List<SimpleActor> _activeParty = new();
 	private readonly Dictionary<string, int> _inventoryItems = new();
 	private float _cameraYaw;
-	private float _cameraPitch;
-	private float _cameraDistance;
-	private bool _cameraPositionInitialized;
 	private Vector3 _lastSafePosition = new(0.0f, 0.2f, 8.0f);
 	private float _gravity;
 	private float _captureCooldownRemaining;
@@ -84,7 +77,7 @@ public partial class PlayerController : CharacterBody3D
 	public override void _Process(double delta)
 	{
 		UpdateCaptureNetRecharge((float)delta);
-		UpdateThirdPersonCamera((float)delta);
+		UpdateThirdPersonCamera();
 		UpdateTargetInfoPanel();
 		UpdateCaptureAmmoHud();
 	}
@@ -140,30 +133,8 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
-		if (@event is InputEventMouseMotion mouseMotion && Input.MouseMode == Input.MouseModeEnum.Captured)
+		if (@event is InputEventMouseButton { Pressed: true })
 		{
-			_cameraYaw -= mouseMotion.Relative.X * MouseSensitivity;
-			_cameraPitch = Mathf.Clamp(
-				_cameraPitch - mouseMotion.Relative.Y * MouseSensitivity * CameraHeightSensitivity,
-				Mathf.DegToRad(-6.0f),
-				Mathf.DegToRad(42.0f)
-			);
-		}
-
-		if (@event is InputEventMouseButton { Pressed: true } mouseButton)
-		{
-			if (mouseButton.ButtonIndex == MouseButton.WheelUp)
-			{
-				_cameraDistance = Mathf.Max(_cameraDistance - 0.35f, MinCameraDistance);
-				return;
-			}
-
-			if (mouseButton.ButtonIndex == MouseButton.WheelDown)
-			{
-				_cameraDistance = Mathf.Min(_cameraDistance + 0.35f, MaxCameraDistance);
-				return;
-			}
-
 			Input.MouseMode = Input.MouseModeEnum.Captured;
 		}
 
@@ -240,7 +211,7 @@ public partial class PlayerController : CharacterBody3D
 
 		_captureCooldownRemaining = CaptureCooldown;
 		_captureNetCharges = Mathf.Max(_captureNetCharges - 1, 0);
-		Vector3 direction = GetCameraAimDirection();
+		Vector3 direction = GetCaptureThrowDirection();
 		Vector3 spawnPosition = GlobalPosition + new Vector3(0.0f, 1.18f, 0.0f) + GetCameraPlanarForward() * 1.05f;
 		var net = new CaptureNet
 		{
@@ -612,40 +583,36 @@ public partial class PlayerController : CharacterBody3D
 
 	private void ConfigureThirdPersonCamera()
 	{
-		_cameraYaw = Rotation.Y;
-		_cameraPitch = Mathf.DegToRad(18.0f);
-		_cameraDistance = Mathf.Clamp(ThirdPersonDistance, MinCameraDistance, MaxCameraDistance);
+		_cameraYaw = 0.0f;
 		_camera.TopLevel = true;
-		_camera.Fov = 68.0f;
+		_camera.Fov = 58.0f;
 		_camera.Near = 0.05f;
-		_cameraPivot.Position = new Vector3(0.0f, ThirdPersonTargetHeight, 0.0f);
-		UpdateThirdPersonCamera(0.0f);
+		_camera.HOffset = 0.0f;
+		_camera.VOffset = 0.0f;
+		_cameraPivot.Position = Vector3.Zero;
+		UpdateThirdPersonCamera();
 	}
 
-	private void UpdateThirdPersonCamera(float step)
+	private void UpdateThirdPersonCamera()
 	{
-		Vector3 target = GlobalPosition + Vector3.Up * ThirdPersonTargetHeight;
 		Vector3 backward = GetCameraPlanarBackward();
-		Vector3 right = GetCameraPlanarRight();
-		float distance = Mathf.Clamp(_cameraDistance, MinCameraDistance, MaxCameraDistance);
-		float horizontalDistance = Mathf.Cos(_cameraPitch) * distance;
-		float verticalOffset = ThirdPersonHeight + Mathf.Sin(_cameraPitch) * distance;
-		Vector3 desiredPosition = target + backward * horizontalDistance + right * CameraShoulderOffset + Vector3.Up * verticalOffset;
-		desiredPosition.Y = Mathf.Max(desiredPosition.Y, GlobalPosition.Y + 0.82f);
+		float distance = Mathf.Max(ThirdPersonDistance, 1.0f);
+		float cameraHeight = Mathf.Max(ThirdPersonCameraHeight, 2.8f);
+		float lookHeight = Mathf.Clamp(ThirdPersonLookHeight, 1.75f, cameraHeight - 0.35f);
+		Vector3 cameraPosition = GlobalPosition + backward * distance + Vector3.Up * cameraHeight;
+		cameraPosition = ClampCameraInsideMap(cameraPosition);
+		Vector3 lookTarget = GlobalPosition + Vector3.Up * lookHeight;
 
-		Vector3 resolvedPosition = ResolveCameraCollision(target, desiredPosition);
-		if (!_cameraPositionInitialized || step <= 0.0f)
-		{
-			_camera.GlobalPosition = resolvedPosition;
-			_cameraPositionInitialized = true;
-		}
-		else
-		{
-			float smoothing = 1.0f - Mathf.Exp(-18.0f * step);
-			_camera.GlobalPosition = _camera.GlobalPosition.Lerp(resolvedPosition, smoothing);
-		}
+		_camera.LookAtFromPosition(cameraPosition, lookTarget, Vector3.Up);
+	}
 
-		_camera.LookAt(target + GetCameraPlanarForward() * 1.05f + Vector3.Up * 0.18f, Vector3.Up);
+	private Vector3 ClampCameraInsideMap(Vector3 position)
+	{
+		float halfExtent = Mathf.Max(CameraWorldHalfExtent, 8.0f);
+		position.X = Mathf.Clamp(position.X, -halfExtent, halfExtent);
+		position.Z = Mathf.Clamp(position.Z, -halfExtent, halfExtent);
+		position.Y = Mathf.Max(position.Y, GlobalPosition.Y + 2.8f);
+		return position;
 	}
 
 	private Vector3 GetCameraPlanarBackward()
@@ -660,8 +627,8 @@ public partial class PlayerController : CharacterBody3D
 
 	private Vector3 GetCameraPlanarRight()
 	{
-		Vector3 backward = GetCameraPlanarBackward();
-		return new Vector3(backward.Z, 0.0f, -backward.X).Normalized();
+		Vector3 forward = GetCameraPlanarForward();
+		return new Vector3(-forward.Z, 0.0f, forward.X).Normalized();
 	}
 
 	private Vector3 GetCameraAimDirection()
@@ -674,31 +641,9 @@ public partial class PlayerController : CharacterBody3D
 		return -_camera.GlobalTransform.Basis.Z.Normalized();
 	}
 
-	private Vector3 ResolveCameraCollision(Vector3 target, Vector3 desiredPosition)
+	private Vector3 GetCaptureThrowDirection()
 	{
-		PhysicsDirectSpaceState3D spaceState = GetWorld3D().DirectSpaceState;
-		var query = PhysicsRayQueryParameters3D.Create(target, desiredPosition);
-		query.CollideWithAreas = false;
-		query.CollideWithBodies = true;
-		query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-
-		Godot.Collections.Dictionary result = spaceState.IntersectRay(query);
-		if (!result.TryGetValue("position", out Variant positionVariant))
-		{
-			return desiredPosition;
-		}
-
-		if (result.TryGetValue("collider", out Variant colliderVariant) && colliderVariant.AsGodotObject() is SimpleActor)
-		{
-			return desiredPosition;
-		}
-
-		Vector3 hitPosition = positionVariant.AsVector3();
-		Vector3 hitNormal = result.TryGetValue("normal", out Variant normalVariant)
-			? normalVariant.AsVector3()
-			: (target - desiredPosition).Normalized();
-		Vector3 resolvedPosition = hitPosition + hitNormal * 0.28f;
-		return resolvedPosition.DistanceTo(target) < 1.25f ? target + (desiredPosition - target).Normalized() * 1.25f : resolvedPosition;
+		return GetCameraPlanarForward();
 	}
 
 	private void UpdateSafeGroundPosition()
@@ -736,7 +681,6 @@ public partial class PlayerController : CharacterBody3D
 
 		GlobalPosition = safePosition;
 		Velocity = Vector3.Zero;
-		_cameraPositionInitialized = false;
 	}
 
 	private void FaceMovementDirection(Vector3 direction, float step)
