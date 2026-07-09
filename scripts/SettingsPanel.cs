@@ -16,8 +16,7 @@ public partial class SettingsPanel : PanelContainer
 	private OptionButton _languageOption = null!;
 	private OptionButton _resolutionOption = null!;
 	private OptionButton _windowModeOption = null!;
-	private HSlider _mouseSensitivitySlider = null!;
-	private Label _mouseSensitivityValueLabel = null!;
+	private Label _cameraModeValueLabel = null!;
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -36,7 +35,7 @@ public partial class SettingsPanel : PanelContainer
 	public void Bind(PlayerController player)
 	{
 		_player = player;
-		if (_mouseSensitivitySlider != null)
+		if (_cameraModeValueLabel != null)
 		{
 			SyncFromPlayer();
 		}
@@ -165,23 +164,8 @@ public partial class SettingsPanel : PanelContainer
 	private void BuildControlSection(VBoxContainer rows)
 	{
 		var section = MakeSection(rows, "ui.controls");
-		var sensitivityRow = new HBoxContainer();
-		sensitivityRow.AddThemeConstantOverride("separation", 10);
-
-		_mouseSensitivitySlider = new HSlider
-		{
-			MinValue = 0.08,
-			MaxValue = 0.40,
-			Step = 0.01,
-			CustomMinimumSize = new Vector2(260.0f, 0.0f),
-		};
-		_mouseSensitivitySlider.ValueChanged += OnMouseSensitivityChanged;
-		sensitivityRow.AddChild(_mouseSensitivitySlider);
-
-		_mouseSensitivityValueLabel = MakeLabel("100%", 15, new Color(0.96f, 0.98f, 1.0f));
-		_mouseSensitivityValueLabel.CustomMinimumSize = new Vector2(70.0f, 0.0f);
-		sensitivityRow.AddChild(_mouseSensitivityValueLabel);
-		AddSettingRow(section, "ui.mouse_sensitivity", sensitivityRow);
+		_cameraModeValueLabel = MakeLabel(LocaleText.T("ui.fixed_third_person_camera"), 15, new Color(0.96f, 0.98f, 1.0f));
+		AddSettingRow(section, "ui.camera_mode", _cameraModeValueLabel);
 	}
 
 	private void BuildShortcutSection(VBoxContainer rows)
@@ -194,7 +178,7 @@ public partial class SettingsPanel : PanelContainer
 		AddShortcutRow(section, "shortcut.party", "P");
 		AddShortcutRow(section, "shortcut.inventory", "I");
 		AddShortcutRow(section, "shortcut.settings", "Esc");
-		AddShortcutRow(section, "shortcut.mouse_look", LocaleText.T("shortcut.mouse_move"));
+		AddShortcutRow(section, "shortcut.camera", LocaleText.T("shortcut.fixed_camera"));
 	}
 
 	private void ApplyDisplaySettings()
@@ -231,13 +215,7 @@ public partial class SettingsPanel : PanelContainer
 		SyncLanguage();
 		SyncResolution();
 		SyncWindowMode();
-
-		if (_player != null)
-		{
-			double value = Mathf.Clamp(_player.MouseSensitivity / 0.0022f * 0.20f, 0.08f, 0.40f);
-			_mouseSensitivitySlider.Value = value;
-			UpdateMouseSensitivityLabel(value);
-		}
+		_cameraModeValueLabel.Text = LocaleText.T("ui.fixed_third_person_camera");
 	}
 
 	private void SyncLanguage()
@@ -285,27 +263,12 @@ public partial class SettingsPanel : PanelContainer
 		}
 	}
 
-	private void OnMouseSensitivityChanged(double value)
-	{
-		if (_player != null)
-		{
-			_player.MouseSensitivity = (float)(0.0022f * (value / 0.20));
-		}
-
-		UpdateMouseSensitivityLabel(value);
-	}
-
 	private void OnLanguageSelected(long index)
 	{
 		if (index >= 0 && index < LocaleText.LanguageCodes.Length)
 		{
 			LocaleText.SetLanguage(LocaleText.LanguageCodes[(int)index]);
 		}
-	}
-
-	private void UpdateMouseSensitivityLabel(double value)
-	{
-		_mouseSensitivityValueLabel.Text = $"{Mathf.RoundToInt((float)(value / 0.20 * 100.0))}%";
 	}
 
 	private void OnLanguageChanged()
