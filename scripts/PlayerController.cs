@@ -9,6 +9,7 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float ThirdPersonDistance { get; set; } = 6.2f;
 	[Export] public float ThirdPersonCameraHeight { get; set; } = 3.35f;
 	[Export] public float ThirdPersonLookHeight { get; set; } = 2.2f;
+	[Export] public float HorizontalLookSensitivity { get; set; } = 0.0026f;
 	[Export] public float CameraWorldHalfExtent { get; set; } = 68.5f;
 	[Export] public float FallRespawnHeight { get; set; } = -8.0f;
 	[Export] public float Acceleration { get; set; } = 18.0f;
@@ -23,6 +24,7 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public int Attack { get; set; } = 16;
 	[Export] public int Defense { get; set; } = 10;
 	[Export] public int ActivePartyLimit { get; set; } = 20;
+	[Export] public float DamageFlashDuration { get; set; } = 0.32f;
 
 	private readonly List<SimpleActor> _capturedCollection = new();
 	private readonly List<SimpleActor> _activeParty = new();
@@ -44,6 +46,8 @@ public partial class PlayerController : CharacterBody3D
 	private Label _captureAmmoCaptionLabel = null!;
 	private Label _captureAmmoCountLabel = null!;
 	private ProgressBar _captureAmmoRechargeBar = null!;
+	private ColorRect _damageFlashOverlay = null!;
+	private float _damageFlashRemaining;
 
 	public IReadOnlyList<SimpleActor> CapturedCollection => _capturedCollection;
 	public IReadOnlyList<SimpleActor> ActiveParty => _activeParty;
@@ -68,6 +72,7 @@ public partial class PlayerController : CharacterBody3D
 		InitializeStarterInventory();
 		InitializeCaptureNetAmmo();
 		CreateCaptureAmmoHud();
+		CreateDamageFlashHud();
 
 		AddToGroup("player");
 		EnsureInputActions();
@@ -80,6 +85,7 @@ public partial class PlayerController : CharacterBody3D
 		UpdateThirdPersonCamera();
 		UpdateTargetInfoPanel();
 		UpdateCaptureAmmoHud();
+		UpdateDamageFlash((float)delta);
 	}
 
 	public override void _UnhandledInput(InputEvent @event)
@@ -130,6 +136,16 @@ public partial class PlayerController : CharacterBody3D
 
 		if (_partyPanel.Visible)
 		{
+			return;
+		}
+
+		if (@event is InputEventMouseMotion mouseMotion && Input.MouseMode == Input.MouseModeEnum.Captured)
+		{
+			_cameraYaw = Mathf.Wrap(
+				_cameraYaw - mouseMotion.Relative.X * HorizontalLookSensitivity,
+				-Mathf.Pi,
+				Mathf.Pi
+			);
 			return;
 		}
 
@@ -336,11 +352,14 @@ public partial class PlayerController : CharacterBody3D
 		_inventoryPanel.SelectActor(actor);
 	}
 
-	public int ReceiveDamage(int rawDamage)
+	public int ReceiveDamage(int rawDamage, SimpleActor? attacker = null)
 	{
 		int mitigatedDamage = Mathf.Max(rawDamage - Mathf.RoundToInt(Defense * 0.35f), 1);
 		CurrentHealth = Mathf.Max(CurrentHealth - mitigatedDamage, 0);
-		SpawnFloatingEffect(mitigatedDamage.ToString(), new Color(1.0f, 0.18f, 0.14f, 0.92f), 0.48f, 0.62f);
+		Color hitColor = attacker?.AttackFxColor ?? new Color(1.0f, 0.18f, 0.14f, 0.92f);
+		SpawnWorldCombatEffect($"-{mitigatedDamage}", hitColor, GlobalPosition + new Vector3(0.0f, 1.45f, 0.0f), 0.78f, 0.88f);
+		SpawnIncomingAttackCue(attacker, hitColor);
+		TriggerDamageFlash();
 
 		if (CurrentHealth <= 0)
 		{
@@ -404,6 +423,23 @@ public partial class PlayerController : CharacterBody3D
 
 	private void SpawnFloatingEffect(string text, Color color, float lifetime, float radius)
 	{
+		SpawnWorldCombatEffect(text, color, GlobalPosition + new Vector3(0.0f, 1.15f, 0.0f), lifetime, radius);
+	}
+
+	private void SpawnIncomingAttackCue(SimpleActor? attacker, Color color)
+	{
+		if (attacker == null || !IsInstanceValid(attacker))
+		{
+			return;
+		}
+
+		Vector3 midpoint = attacker.GlobalPosition + (GlobalPosition - attacker.GlobalPosition) * 0.62f;
+		midpoint.Y = Mathf.Max(attacker.GlobalPosition.Y, GlobalPosition.Y) + 1.15f;
+		SpawnWorldCombatEffect("!", color, midpoint, 0.42f, 0.72f);
+	}
+
+	private void SpawnWorldCombatEffect(string text, Color color, Vector3 position, float lifetime, float radius)
+	{
 		Node parent = GetTree().CurrentScene ?? GetParent();
 		var effect = new CombatEffect
 		{
@@ -413,7 +449,7 @@ public partial class PlayerController : CharacterBody3D
 			Radius = radius,
 		};
 		parent.AddChild(effect);
-		effect.GlobalPosition = GlobalPosition + new Vector3(0.0f, 1.15f, 0.0f);
+		effect.GlobalPosition = position;
 	}
 
 	private void InitializeCaptureNetAmmo()
@@ -523,6 +559,33 @@ public partial class PlayerController : CharacterBody3D
 		UpdateCaptureAmmoHud();
 	}
 
+	private void CreateDamageFlashHud()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "DamageFlashLayer",
+			Layer = 80,
+		};
+		AddChild(layer);
+
+		_damageFlashOverlay = new ColorRect
+		{
+			Name = "DamageFlashOverlay",
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			AnchorLeft = 0.0f,
+			AnchorRight = 1.0f,
+			AnchorTop = 0.0f,
+			AnchorBottom = 1.0f,
+			OffsetLeft = 0.0f,
+			OffsetRight = 0.0f,
+			OffsetTop = 0.0f,
+			OffsetBottom = 0.0f,
+			Color = new Color(1.0f, 0.06f, 0.02f, 0.0f),
+			Visible = false,
+		};
+		layer.AddChild(_damageFlashOverlay);
+	}
+
 	private void UpdateCaptureAmmoHud()
 	{
 		if (_captureAmmoCountLabel == null || _captureAmmoRechargeBar == null)
@@ -555,6 +618,27 @@ public partial class PlayerController : CharacterBody3D
 		_captureAmmoCaptionLabel.Text = full
 			? LocaleText.T("hud.capture_net_key")
 			: LocaleText.F("hud.recharge_seconds", Mathf.CeilToInt(_captureNetRechargeRemaining));
+	}
+
+	private void TriggerDamageFlash()
+	{
+		_damageFlashRemaining = Mathf.Max(DamageFlashDuration, 0.05f);
+	}
+
+	private void UpdateDamageFlash(float step)
+	{
+		if (_damageFlashOverlay == null)
+		{
+			return;
+		}
+
+		_damageFlashRemaining = Mathf.Max(_damageFlashRemaining - step, 0.0f);
+		float duration = Mathf.Max(DamageFlashDuration, 0.05f);
+		float alpha = _damageFlashRemaining <= 0.0f
+			? 0.0f
+			: Mathf.Clamp((_damageFlashRemaining / duration) * 0.28f, 0.0f, 0.28f);
+		_damageFlashOverlay.Visible = alpha > 0.01f;
+		_damageFlashOverlay.Color = new Color(1.0f, 0.06f, 0.02f, alpha);
 	}
 
 	private static Label MakeHudLabel(string text, int fontSize, Color color)

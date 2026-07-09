@@ -112,6 +112,7 @@ public partial class SimpleActor : CharacterBody3D
 	public string BuildRareComboName => BuildCatalog.LocalizedRareCombo(CurrentBuildStats);
 	public string BuildElementName => LocaleText.T(CurrentBuildStats.DamageElementNameKey);
 	public string CombatSummary => LocaleText.F("combat.summary", CombatRoleName, LocalizedPersonality, Affinity);
+	public Color AttackFxColor => GetAttackColor();
 	public int ExperienceToNextLevel => 35 + Level * 18 + EvolutionStage * 20;
 	public bool CanEvolve => EvolutionStage < 3 && Level >= (EvolutionStage + 1) * 5;
 	public float HealthRatio => EffectiveMaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)EffectiveMaxHealth, 0.0f, 1.0f);
@@ -811,8 +812,9 @@ public partial class SimpleActor : CharacterBody3D
 		FaceDirection(toPlayer, step);
 		if (_attackCooldownRemaining <= 0.0f && player is PlayerController playerController)
 		{
+			SpawnPlayerAttackCue(player.GlobalPosition);
 			SpawnSwingEffect(player.GlobalPosition);
-			playerController.ReceiveDamage(EffectiveAttack);
+			playerController.ReceiveDamage(EffectiveAttack, this);
 			_attackCooldownRemaining = EffectiveAttackCooldown;
 		}
 
@@ -861,6 +863,13 @@ public partial class SimpleActor : CharacterBody3D
 		Vector3 position = GlobalPosition + (targetPosition - GlobalPosition) * 0.5f;
 		position.Y = Mathf.Max(GlobalPosition.Y, targetPosition.Y) + 0.95f;
 		SpawnCombatEffect(string.Empty, GetAttackColor(), position, 0.34f, 0.36f);
+	}
+
+	private void SpawnPlayerAttackCue(Vector3 playerPosition)
+	{
+		Color color = GetAttackColor();
+		SpawnCombatEffect("!", color, GlobalPosition + new Vector3(0.0f, 1.75f, 0.0f), 0.48f, 0.68f);
+		SpawnCombatEffect(string.Empty, color, playerPosition + new Vector3(0.0f, 1.12f, 0.0f), 0.42f, 0.72f);
 	}
 
 	private void SpawnCombatEffect(int damage, Color color)

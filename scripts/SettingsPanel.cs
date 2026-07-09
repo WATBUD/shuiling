@@ -164,7 +164,7 @@ public partial class SettingsPanel : PanelContainer
 	private void BuildControlSection(VBoxContainer rows)
 	{
 		var section = MakeSection(rows, "ui.controls");
-		_cameraModeValueLabel = MakeLabel(LocaleText.T("ui.fixed_third_person_camera"), 15, new Color(0.96f, 0.98f, 1.0f));
+		_cameraModeValueLabel = MakeLabel(LocaleText.T("ui.horizontal_orbit_camera"), 15, new Color(0.96f, 0.98f, 1.0f));
 		AddSettingRow(section, "ui.camera_mode", _cameraModeValueLabel);
 	}
 
@@ -178,7 +178,7 @@ public partial class SettingsPanel : PanelContainer
 		AddShortcutRow(section, "shortcut.party", "P");
 		AddShortcutRow(section, "shortcut.inventory", "I");
 		AddShortcutRow(section, "shortcut.settings", "Esc");
-		AddShortcutRow(section, "shortcut.camera", LocaleText.T("shortcut.fixed_camera"));
+		AddShortcutRow(section, "shortcut.camera", LocaleText.T("shortcut.horizontal_mouse"));
 	}
 
 	private void ApplyDisplaySettings()
@@ -215,7 +215,7 @@ public partial class SettingsPanel : PanelContainer
 		SyncLanguage();
 		SyncResolution();
 		SyncWindowMode();
-		_cameraModeValueLabel.Text = LocaleText.T("ui.fixed_third_person_camera");
+		_cameraModeValueLabel.Text = LocaleText.T("ui.horizontal_orbit_camera");
 	}
 
 	private void SyncLanguage()
