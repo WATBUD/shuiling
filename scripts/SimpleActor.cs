@@ -270,9 +270,26 @@ public partial class SimpleActor : CharacterBody3D
 		MarkBuildChanged();
 	}
 
+	public void EquipBuildEquipment(EquipmentSlot slot, string equipmentId)
+	{
+		if (BuildCatalog.GetEquipment(equipmentId).Slot != slot)
+		{
+			return;
+		}
+
+		BuildLoadout.SetEquipmentId(slot, equipmentId);
+		MarkBuildChanged();
+	}
+
 	public void CycleAttributeGem()
 	{
 		BuildLoadout.CycleAttributeGem();
+		MarkBuildChanged();
+	}
+
+	public void EquipAttributeGem(string gemId)
+	{
+		BuildLoadout.AttributeGemId = BuildCatalog.GetAttributeGem(gemId).Id;
 		MarkBuildChanged();
 	}
 
@@ -282,9 +299,22 @@ public partial class SimpleActor : CharacterBody3D
 		MarkBuildChanged();
 	}
 
+	public void EquipSkillGem(int slotIndex, string gemId)
+	{
+		int safeSlot = Mathf.Clamp(slotIndex, 0, BuildLoadout.SkillGemIds.Length - 1);
+		BuildLoadout.SkillGemIds[safeSlot] = BuildCatalog.GetSkillGem(gemId).Id;
+		MarkBuildChanged();
+	}
+
 	public void CycleAiGem()
 	{
 		BuildLoadout.CycleAiGem();
+		MarkBuildChanged();
+	}
+
+	public void EquipAiGem(string gemId)
+	{
+		BuildLoadout.AiGemId = BuildCatalog.GetAiGem(gemId).Id;
 		MarkBuildChanged();
 	}
 

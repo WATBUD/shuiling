@@ -192,6 +192,7 @@ public partial class SettingsPanel : PanelContainer
 		AddShortcutRow(section, "shortcut.sprint", "Shift");
 		AddShortcutRow(section, "shortcut.capture_net", "R");
 		AddShortcutRow(section, "shortcut.party", "P");
+		AddShortcutRow(section, "shortcut.inventory", "I");
 		AddShortcutRow(section, "shortcut.settings", "Esc");
 		AddShortcutRow(section, "shortcut.mouse_look", LocaleText.T("shortcut.mouse_move"));
 	}

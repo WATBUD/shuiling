@@ -7,10 +7,14 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float SprintSpeed { get; set; } = 10.0f;
 	[Export] public float JumpVelocity { get; set; } = 5.2f;
 	[Export] public float MouseSensitivity { get; set; } = 0.0022f;
-	[Export] public float ThirdPersonDistance { get; set; } = 5.2f;
-	[Export] public float ThirdPersonHeight { get; set; } = 2.7f;
+	[Export] public float ThirdPersonDistance { get; set; } = 4.0f;
+	[Export] public float ThirdPersonHeight { get; set; } = 0.58f;
 	[Export] public float ThirdPersonTargetHeight { get; set; } = 1.35f;
-	[Export] public float CameraHeightSensitivity { get; set; } = 2.2f;
+	[Export] public float CameraHeightSensitivity { get; set; } = 1.35f;
+	[Export] public float CameraShoulderOffset { get; set; } = 0.12f;
+	[Export] public float MinCameraDistance { get; set; } = 3.0f;
+	[Export] public float MaxCameraDistance { get; set; } = 5.4f;
+	[Export] public float FallRespawnHeight { get; set; } = -8.0f;
 	[Export] public float Acceleration { get; set; } = 18.0f;
 	[Export] public float CaptureCooldown { get; set; } = 0.55f;
 	[Export] public int CaptureNetCapacity { get; set; } = 6;
@@ -26,8 +30,12 @@ public partial class PlayerController : CharacterBody3D
 
 	private readonly List<SimpleActor> _capturedCollection = new();
 	private readonly List<SimpleActor> _activeParty = new();
+	private readonly Dictionary<string, int> _inventoryItems = new();
 	private float _cameraYaw;
-	private float _cameraHeightOffset;
+	private float _cameraPitch;
+	private float _cameraDistance;
+	private bool _cameraPositionInitialized;
+	private Vector3 _lastSafePosition = new(0.0f, 0.2f, 8.0f);
 	private float _gravity;
 	private float _captureCooldownRemaining;
 	private int _captureNetCharges;
@@ -36,6 +44,7 @@ public partial class PlayerController : CharacterBody3D
 	private Camera3D _camera = null!;
 	private TargetInfoPanel _targetInfoPanel = null!;
 	private PartyPanel _partyPanel = null!;
+	private InventoryPanel _inventoryPanel = null!;
 	private SettingsPanel _settingsPanel = null!;
 	private MinimapPanel _minimapPanel = null!;
 	private PanelContainer _captureAmmoPanel = null!;
@@ -45,6 +54,7 @@ public partial class PlayerController : CharacterBody3D
 
 	public IReadOnlyList<SimpleActor> CapturedCollection => _capturedCollection;
 	public IReadOnlyList<SimpleActor> ActiveParty => _activeParty;
+	public IReadOnlyDictionary<string, int> InventoryItems => _inventoryItems;
 	public string LocalizedPlayerName => LocaleText.T(PlayerName);
 	public Vector3 MinimapForward => GetCameraPlanarForward();
 	public float HealthRatio => MaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)MaxHealth, 0.0f, 1.0f);
@@ -54,12 +64,15 @@ public partial class PlayerController : CharacterBody3D
 		_gravity = ProjectSettings.GetSetting("physics/3d/default_gravity").AsSingle();
 		_cameraPivot = GetNode<Node3D>("CameraPivot");
 		_camera = GetNode<Camera3D>("CameraPivot/Camera3D");
+		_lastSafePosition = GlobalPosition + Vector3.Up * 0.2f;
 		ConfigureThirdPersonCamera();
 		CreatePlayerVisual();
 		CreateTargetInfoPanel();
 		CreateMinimapPanel();
 		CreatePartyPanel();
+		CreateInventoryPanel();
 		CreateSettingsPanel();
+		InitializeStarterInventory();
 		InitializeCaptureNetAmmo();
 		CreateCaptureAmmoHud();
 
@@ -71,7 +84,7 @@ public partial class PlayerController : CharacterBody3D
 	public override void _Process(double delta)
 	{
 		UpdateCaptureNetRecharge((float)delta);
-		UpdateThirdPersonCamera();
+		UpdateThirdPersonCamera((float)delta);
 		UpdateTargetInfoPanel();
 		UpdateCaptureAmmoHud();
 	}
@@ -83,6 +96,10 @@ public partial class PlayerController : CharacterBody3D
 			if (_settingsPanel.Visible)
 			{
 				SetSettingsPanelVisible(false);
+			}
+			else if (_inventoryPanel.Visible)
+			{
+				SetInventoryPanelVisible(false);
 			}
 			else if (_partyPanel.Visible)
 			{
@@ -101,6 +118,17 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
+		if (@event.IsActionPressed("inventory_panel"))
+		{
+			SetInventoryPanelVisible(!_inventoryPanel.Visible);
+			return;
+		}
+
+		if (_inventoryPanel.Visible)
+		{
+			return;
+		}
+
 		if (@event.IsActionPressed("party_panel"))
 		{
 			SetPartyPanelVisible(!_partyPanel.Visible);
@@ -115,15 +143,27 @@ public partial class PlayerController : CharacterBody3D
 		if (@event is InputEventMouseMotion mouseMotion && Input.MouseMode == Input.MouseModeEnum.Captured)
 		{
 			_cameraYaw -= mouseMotion.Relative.X * MouseSensitivity;
-			_cameraHeightOffset = Mathf.Clamp(
-				_cameraHeightOffset + mouseMotion.Relative.Y * MouseSensitivity * CameraHeightSensitivity,
-				-0.8f,
-				1.4f
+			_cameraPitch = Mathf.Clamp(
+				_cameraPitch - mouseMotion.Relative.Y * MouseSensitivity * CameraHeightSensitivity,
+				Mathf.DegToRad(-6.0f),
+				Mathf.DegToRad(42.0f)
 			);
 		}
 
-		if (@event is InputEventMouseButton { Pressed: true })
+		if (@event is InputEventMouseButton { Pressed: true } mouseButton)
 		{
+			if (mouseButton.ButtonIndex == MouseButton.WheelUp)
+			{
+				_cameraDistance = Mathf.Max(_cameraDistance - 0.35f, MinCameraDistance);
+				return;
+			}
+
+			if (mouseButton.ButtonIndex == MouseButton.WheelDown)
+			{
+				_cameraDistance = Mathf.Min(_cameraDistance + 0.35f, MaxCameraDistance);
+				return;
+			}
+
 			Input.MouseMode = Input.MouseModeEnum.Captured;
 		}
 
@@ -135,10 +175,12 @@ public partial class PlayerController : CharacterBody3D
 
 	public override void _PhysicsProcess(double delta)
 	{
-		if (_settingsPanel.Visible || _partyPanel.Visible)
+		if (_settingsPanel.Visible || _partyPanel.Visible || _inventoryPanel.Visible)
 		{
 			Velocity = SlowPlayerToStop(Velocity, (float)delta);
 			MoveAndSlide();
+			UpdateSafeGroundPosition();
+			RecoverIfOutOfWorld();
 			return;
 		}
 
@@ -171,6 +213,8 @@ public partial class PlayerController : CharacterBody3D
 
 		Velocity = velocity;
 		MoveAndSlide();
+		UpdateSafeGroundPosition();
+		RecoverIfOutOfWorld();
 	}
 
 	private static void EnsureInputActions()
@@ -183,6 +227,7 @@ public partial class PlayerController : CharacterBody3D
 		AddKeyAction("sprint", Key.Shift);
 		AddKeyAction("capture_net", Key.R);
 		AddKeyAction("party_panel", Key.P);
+		AddKeyAction("inventory_panel", Key.I);
 		AddKeyAction("ui_cancel", Key.Escape);
 	}
 
@@ -195,8 +240,8 @@ public partial class PlayerController : CharacterBody3D
 
 		_captureCooldownRemaining = CaptureCooldown;
 		_captureNetCharges = Mathf.Max(_captureNetCharges - 1, 0);
-		Vector3 direction = GetCameraPlanarForward();
-		Vector3 spawnPosition = GlobalPosition + new Vector3(0.0f, 1.18f, 0.0f) + direction * 1.05f;
+		Vector3 direction = GetCameraAimDirection();
+		Vector3 spawnPosition = GlobalPosition + new Vector3(0.0f, 1.18f, 0.0f) + GetCameraPlanarForward() * 1.05f;
 		var net = new CaptureNet
 		{
 			OwnerPlayer = this,
@@ -284,6 +329,42 @@ public partial class PlayerController : CharacterBody3D
 		return true;
 	}
 
+	public int GetInventoryCount(string itemId)
+	{
+		if (BuildCatalog.IsFreeItem(itemId))
+		{
+			return 1;
+		}
+
+		return _inventoryItems.TryGetValue(itemId, out int count) ? count : 0;
+	}
+
+	public bool HasInventoryItem(string itemId)
+	{
+		return BuildCatalog.IsFreeItem(itemId) || GetInventoryCount(itemId) > 0;
+	}
+
+	public void AddInventoryItem(string itemId, int amount = 1)
+	{
+		if (BuildCatalog.IsFreeItem(itemId))
+		{
+			return;
+		}
+
+		_inventoryItems.TryGetValue(itemId, out int currentCount);
+		_inventoryItems[itemId] = Mathf.Max(currentCount + amount, 0);
+		if (_inventoryPanel != null)
+		{
+			_inventoryPanel.RefreshAll();
+		}
+	}
+
+	public void OpenInventoryForActor(SimpleActor actor)
+	{
+		SetInventoryPanelVisible(true);
+		_inventoryPanel.SelectActor(actor);
+	}
+
 	public int ReceiveDamage(int rawDamage)
 	{
 		int mitigatedDamage = Mathf.Max(rawDamage - Mathf.RoundToInt(Defense * 0.35f), 1);
@@ -342,8 +423,7 @@ public partial class PlayerController : CharacterBody3D
 	private void RecoverFromKnockdown()
 	{
 		CurrentHealth = Mathf.Max(MaxHealth / 2, 1);
-		GlobalPosition = new Vector3(0.0f, 0.0f, 8.0f);
-		Velocity = Vector3.Zero;
+		TeleportToSafePosition();
 	}
 
 	private void SpawnDamageEffect(int damage)
@@ -370,6 +450,14 @@ public partial class PlayerController : CharacterBody3D
 		CaptureNetCapacity = Mathf.Max(CaptureNetCapacity, 1);
 		_captureNetCharges = CaptureNetCapacity;
 		_captureNetRechargeRemaining = CaptureNetRechargeSeconds;
+	}
+
+	private void InitializeStarterInventory()
+	{
+		foreach (string itemId in BuildCatalog.GetStarterInventoryItemIds())
+		{
+			AddInventoryItem(itemId);
+		}
 	}
 
 	private void UpdateCaptureNetRecharge(float step)
@@ -525,21 +613,39 @@ public partial class PlayerController : CharacterBody3D
 	private void ConfigureThirdPersonCamera()
 	{
 		_cameraYaw = Rotation.Y;
+		_cameraPitch = Mathf.DegToRad(18.0f);
+		_cameraDistance = Mathf.Clamp(ThirdPersonDistance, MinCameraDistance, MaxCameraDistance);
 		_camera.TopLevel = true;
-		_camera.Fov = 62.0f;
+		_camera.Fov = 68.0f;
 		_camera.Near = 0.05f;
 		_cameraPivot.Position = new Vector3(0.0f, ThirdPersonTargetHeight, 0.0f);
-		UpdateThirdPersonCamera();
+		UpdateThirdPersonCamera(0.0f);
 	}
 
-	private void UpdateThirdPersonCamera()
+	private void UpdateThirdPersonCamera(float step)
 	{
 		Vector3 target = GlobalPosition + Vector3.Up * ThirdPersonTargetHeight;
 		Vector3 backward = GetCameraPlanarBackward();
-		float height = Mathf.Max(ThirdPersonHeight + _cameraHeightOffset, 1.85f);
+		Vector3 right = GetCameraPlanarRight();
+		float distance = Mathf.Clamp(_cameraDistance, MinCameraDistance, MaxCameraDistance);
+		float horizontalDistance = Mathf.Cos(_cameraPitch) * distance;
+		float verticalOffset = ThirdPersonHeight + Mathf.Sin(_cameraPitch) * distance;
+		Vector3 desiredPosition = target + backward * horizontalDistance + right * CameraShoulderOffset + Vector3.Up * verticalOffset;
+		desiredPosition.Y = Mathf.Max(desiredPosition.Y, GlobalPosition.Y + 0.82f);
 
-		_camera.GlobalPosition = target + backward * ThirdPersonDistance + Vector3.Up * height;
-		_camera.LookAt(target + GetCameraPlanarForward() * 1.65f, Vector3.Up);
+		Vector3 resolvedPosition = ResolveCameraCollision(target, desiredPosition);
+		if (!_cameraPositionInitialized || step <= 0.0f)
+		{
+			_camera.GlobalPosition = resolvedPosition;
+			_cameraPositionInitialized = true;
+		}
+		else
+		{
+			float smoothing = 1.0f - Mathf.Exp(-18.0f * step);
+			_camera.GlobalPosition = _camera.GlobalPosition.Lerp(resolvedPosition, smoothing);
+		}
+
+		_camera.LookAt(target + GetCameraPlanarForward() * 1.05f + Vector3.Up * 0.18f, Vector3.Up);
 	}
 
 	private Vector3 GetCameraPlanarBackward()
@@ -550,6 +656,87 @@ public partial class PlayerController : CharacterBody3D
 	private Vector3 GetCameraPlanarForward()
 	{
 		return -GetCameraPlanarBackward();
+	}
+
+	private Vector3 GetCameraPlanarRight()
+	{
+		Vector3 backward = GetCameraPlanarBackward();
+		return new Vector3(backward.Z, 0.0f, -backward.X).Normalized();
+	}
+
+	private Vector3 GetCameraAimDirection()
+	{
+		if (_camera == null || !IsInstanceValid(_camera))
+		{
+			return GetCameraPlanarForward();
+		}
+
+		return -_camera.GlobalTransform.Basis.Z.Normalized();
+	}
+
+	private Vector3 ResolveCameraCollision(Vector3 target, Vector3 desiredPosition)
+	{
+		PhysicsDirectSpaceState3D spaceState = GetWorld3D().DirectSpaceState;
+		var query = PhysicsRayQueryParameters3D.Create(target, desiredPosition);
+		query.CollideWithAreas = false;
+		query.CollideWithBodies = true;
+		query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+
+		Godot.Collections.Dictionary result = spaceState.IntersectRay(query);
+		if (!result.TryGetValue("position", out Variant positionVariant))
+		{
+			return desiredPosition;
+		}
+
+		if (result.TryGetValue("collider", out Variant colliderVariant) && colliderVariant.AsGodotObject() is SimpleActor)
+		{
+			return desiredPosition;
+		}
+
+		Vector3 hitPosition = positionVariant.AsVector3();
+		Vector3 hitNormal = result.TryGetValue("normal", out Variant normalVariant)
+			? normalVariant.AsVector3()
+			: (target - desiredPosition).Normalized();
+		Vector3 resolvedPosition = hitPosition + hitNormal * 0.28f;
+		return resolvedPosition.DistanceTo(target) < 1.25f ? target + (desiredPosition - target).Normalized() * 1.25f : resolvedPosition;
+	}
+
+	private void UpdateSafeGroundPosition()
+	{
+		if (!IsOnFloor())
+		{
+			return;
+		}
+
+		if (GlobalPosition.Y < -0.2f || GetFloorNormal().Dot(Vector3.Up) < 0.65f)
+		{
+			return;
+		}
+
+		_lastSafePosition = GlobalPosition + Vector3.Up * 0.18f;
+	}
+
+	private void RecoverIfOutOfWorld()
+	{
+		if (GlobalPosition.Y > FallRespawnHeight)
+		{
+			return;
+		}
+
+		TeleportToSafePosition();
+	}
+
+	private void TeleportToSafePosition()
+	{
+		Vector3 safePosition = _lastSafePosition;
+		if (safePosition.Y < 0.05f)
+		{
+			safePosition.Y = 0.35f;
+		}
+
+		GlobalPosition = safePosition;
+		Velocity = Vector3.Zero;
+		_cameraPositionInitialized = false;
 	}
 
 	private void FaceMovementDirection(Vector3 direction, float step)
@@ -648,6 +835,21 @@ public partial class PlayerController : CharacterBody3D
 		_partyPanel.Bind(this);
 	}
 
+	private void CreateInventoryPanel()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "InventoryLayer",
+			Layer = 34,
+		};
+
+		AddChild(layer);
+		_inventoryPanel = new InventoryPanel();
+		layer.AddChild(_inventoryPanel);
+		_inventoryPanel.Bind(this);
+		_inventoryPanel.CloseRequested = () => SetInventoryPanelVisible(false);
+	}
+
 	private void CreateSettingsPanel()
 	{
 		var layer = new CanvasLayer
@@ -669,6 +871,19 @@ public partial class PlayerController : CharacterBody3D
 		if (visible)
 		{
 			_settingsPanel.SetPanelVisible(false);
+			_inventoryPanel.SetPanelVisible(false);
+		}
+
+		UpdateMouseModeForPanels();
+	}
+
+	private void SetInventoryPanelVisible(bool visible)
+	{
+		_inventoryPanel.SetPanelVisible(visible);
+		if (visible)
+		{
+			_partyPanel.SetPanelVisible(false);
+			_settingsPanel.SetPanelVisible(false);
 		}
 
 		UpdateMouseModeForPanels();
@@ -680,6 +895,7 @@ public partial class PlayerController : CharacterBody3D
 		if (visible)
 		{
 			_partyPanel.SetPanelVisible(false);
+			_inventoryPanel.SetPanelVisible(false);
 		}
 
 		UpdateMouseModeForPanels();
@@ -687,7 +903,7 @@ public partial class PlayerController : CharacterBody3D
 
 	private void UpdateMouseModeForPanels()
 	{
-		Input.MouseMode = _partyPanel.Visible || _settingsPanel.Visible
+		Input.MouseMode = _partyPanel.Visible || _inventoryPanel.Visible || _settingsPanel.Visible
 			? Input.MouseModeEnum.Visible
 			: Input.MouseModeEnum.Captured;
 	}
@@ -696,7 +912,7 @@ public partial class PlayerController : CharacterBody3D
 	{
 		PhysicsDirectSpaceState3D spaceState = GetWorld3D().DirectSpaceState;
 		Vector3 origin = _camera.GlobalPosition;
-		Vector3 end = origin + (-_camera.GlobalTransform.Basis.Z.Normalized() * TargetInfoRange);
+		Vector3 end = origin + GetCameraAimDirection() * TargetInfoRange;
 		var query = PhysicsRayQueryParameters3D.Create(origin, end);
 		query.CollideWithAreas = false;
 		query.CollideWithBodies = true;
