@@ -9,6 +9,14 @@ public enum EquipmentSlot
 	Accessory,
 }
 
+public enum InventoryItemKind
+{
+	Equipment,
+	AttributeGem,
+	SkillGem,
+	AiGem,
+}
+
 public sealed class CompanionIdentity
 {
 	public string Id { get; set; } = "identity.traveler";
@@ -595,6 +603,138 @@ public static class BuildCatalog
 		}
 
 		return AiGems[1];
+	}
+
+	public static List<EquipmentDefinition> GetEquipmentDefinitions(EquipmentSlot slot)
+	{
+		var definitions = new List<EquipmentDefinition>();
+		foreach (EquipmentDefinition equipment in Equipment)
+		{
+			if (equipment.Slot == slot)
+			{
+				definitions.Add(equipment);
+			}
+		}
+
+		return definitions;
+	}
+
+	public static List<AttributeGemDefinition> GetAttributeGemDefinitions()
+	{
+		return new List<AttributeGemDefinition>(AttributeGems);
+	}
+
+	public static List<SkillGemDefinition> GetSkillGemDefinitions()
+	{
+		return new List<SkillGemDefinition>(SkillGems);
+	}
+
+	public static List<AiGemDefinition> GetAiGemDefinitions()
+	{
+		return new List<AiGemDefinition>(AiGems);
+	}
+
+	public static List<string> GetStarterInventoryItemIds()
+	{
+		var ids = new List<string>();
+		foreach (EquipmentDefinition equipment in Equipment)
+		{
+			ids.Add(equipment.Id);
+		}
+
+		foreach (AttributeGemDefinition gem in AttributeGems)
+		{
+			if (!IsFreeItem(gem.Id))
+			{
+				ids.Add(gem.Id);
+			}
+		}
+
+		foreach (SkillGemDefinition gem in SkillGems)
+		{
+			if (!IsFreeItem(gem.Id))
+			{
+				ids.Add(gem.Id);
+			}
+		}
+
+		foreach (AiGemDefinition gem in AiGems)
+		{
+			ids.Add(gem.Id);
+		}
+
+		return ids;
+	}
+
+	public static bool IsFreeItem(string id)
+	{
+		return id is "gem.attribute.none" or "gem.skill.none";
+	}
+
+	public static string GetItemNameKey(string id)
+	{
+		foreach (EquipmentDefinition equipment in Equipment)
+		{
+			if (equipment.Id == id)
+			{
+				return equipment.NameKey;
+			}
+		}
+
+		foreach (AttributeGemDefinition gem in AttributeGems)
+		{
+			if (gem.Id == id)
+			{
+				return gem.NameKey;
+			}
+		}
+
+		foreach (SkillGemDefinition gem in SkillGems)
+		{
+			if (gem.Id == id)
+			{
+				return gem.NameKey;
+			}
+		}
+
+		foreach (AiGemDefinition gem in AiGems)
+		{
+			if (gem.Id == id)
+			{
+				return gem.NameKey;
+			}
+		}
+
+		return id;
+	}
+
+	public static InventoryItemKind GetItemKind(string id)
+	{
+		foreach (EquipmentDefinition equipment in Equipment)
+		{
+			if (equipment.Id == id)
+			{
+				return InventoryItemKind.Equipment;
+			}
+		}
+
+		foreach (AttributeGemDefinition gem in AttributeGems)
+		{
+			if (gem.Id == id)
+			{
+				return InventoryItemKind.AttributeGem;
+			}
+		}
+
+		foreach (SkillGemDefinition gem in SkillGems)
+		{
+			if (gem.Id == id)
+			{
+				return InventoryItemKind.SkillGem;
+			}
+		}
+
+		return InventoryItemKind.AiGem;
 	}
 
 	public static string GetNextEquipmentId(EquipmentSlot slot, string currentId)

@@ -536,70 +536,47 @@ public partial class PartyPanel : PanelContainer
 
 	private void OnHelmetPressed()
 	{
-		CycleEquipmentSlot(EquipmentSlot.Helmet);
+		OpenInventoryForSelectedActor();
 	}
 
 	private void OnWeaponPressed()
 	{
-		CycleEquipmentSlot(EquipmentSlot.Weapon);
+		OpenInventoryForSelectedActor();
 	}
 
 	private void OnArmorPressed()
 	{
-		CycleEquipmentSlot(EquipmentSlot.Armor);
+		OpenInventoryForSelectedActor();
 	}
 
 	private void OnAccessoryPressed()
 	{
-		CycleEquipmentSlot(EquipmentSlot.Accessory);
+		OpenInventoryForSelectedActor();
 	}
 
 	private void OnAttributeGemPressed()
 	{
-		if (_selected is not SimpleActor actor || !IsInstanceValid(actor))
-		{
-			return;
-		}
-
-		actor.CycleAttributeGem();
-		RefreshParty();
-		UpdateDetails();
+		OpenInventoryForSelectedActor();
 	}
 
 	private void OnSkillGemPressed(int slotIndex)
 	{
-		if (_selected is not SimpleActor actor || !IsInstanceValid(actor))
-		{
-			return;
-		}
-
-		actor.CycleSkillGem(slotIndex);
-		RefreshParty();
-		UpdateDetails();
+		OpenInventoryForSelectedActor();
 	}
 
 	private void OnAiGemPressed()
 	{
-		if (_selected is not SimpleActor actor || !IsInstanceValid(actor))
-		{
-			return;
-		}
-
-		actor.CycleAiGem();
-		RefreshParty();
-		UpdateDetails();
+		OpenInventoryForSelectedActor();
 	}
 
-	private void CycleEquipmentSlot(EquipmentSlot slot)
+	private void OpenInventoryForSelectedActor()
 	{
-		if (_selected is not SimpleActor actor || !IsInstanceValid(actor))
+		if (_player == null || _selected is not SimpleActor actor || !IsInstanceValid(actor))
 		{
 			return;
 		}
 
-		actor.CycleBuildEquipment(slot);
-		RefreshParty();
-		UpdateDetails();
+		_player.OpenInventoryForActor(actor);
 	}
 
 	private void OnLanguageChanged()
