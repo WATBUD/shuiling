@@ -3,6 +3,14 @@ using System.Collections.Generic;
 
 public partial class SettingsPanel : PanelContainer
 {
+	private enum SettingsCategory
+	{
+		Language,
+		Video,
+		Controls,
+		Shortcuts,
+	}
+
 	private readonly List<Vector2I> _resolutions = new()
 	{
 		new Vector2I(1280, 720),
@@ -17,6 +25,9 @@ public partial class SettingsPanel : PanelContainer
 	private OptionButton _resolutionOption = null!;
 	private OptionButton _windowModeOption = null!;
 	private Label _cameraModeValueLabel = null!;
+	private VBoxContainer _settingsRows = null!;
+	private readonly Dictionary<SettingsCategory, Button> _categoryButtons = new();
+	private SettingsCategory _selectedCategory = SettingsCategory.Language;
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -105,9 +116,10 @@ public partial class SettingsPanel : PanelContainer
 		};
 		nav.AddThemeConstantOverride("separation", 8);
 		content.AddChild(nav);
-		nav.AddChild(MakeNavLabel("ui.video"));
-		nav.AddChild(MakeNavLabel("ui.controls"));
-		nav.AddChild(MakeNavLabel("ui.shortcuts"));
+		AddCategoryButton(nav, SettingsCategory.Language, "ui.language");
+		AddCategoryButton(nav, SettingsCategory.Video, "ui.video");
+		AddCategoryButton(nav, SettingsCategory.Controls, "ui.controls");
+		AddCategoryButton(nav, SettingsCategory.Shortcuts, "ui.shortcuts");
 
 		var scroll = new ScrollContainer
 		{
@@ -117,14 +129,49 @@ public partial class SettingsPanel : PanelContainer
 		};
 		content.AddChild(scroll);
 
-		var rows = new VBoxContainer();
-		rows.AddThemeConstantOverride("separation", 16);
-		scroll.AddChild(rows);
+		_settingsRows = new VBoxContainer();
+		_settingsRows.AddThemeConstantOverride("separation", 16);
+		scroll.AddChild(_settingsRows);
 
-		BuildLanguageSection(rows);
-		BuildDisplaySection(rows);
-		BuildControlSection(rows);
-		BuildShortcutSection(rows);
+		BuildSelectedCategory();
+	}
+
+	private void BuildSelectedCategory()
+	{
+		if (_settingsRows == null)
+		{
+			return;
+		}
+
+		foreach (Node child in _settingsRows.GetChildren())
+		{
+			_settingsRows.RemoveChild(child);
+			child.QueueFree();
+		}
+
+		_languageOption = null!;
+		_resolutionOption = null!;
+		_windowModeOption = null!;
+		_cameraModeValueLabel = null!;
+
+		switch (_selectedCategory)
+		{
+			case SettingsCategory.Language:
+				BuildLanguageSection(_settingsRows);
+				break;
+			case SettingsCategory.Video:
+				BuildDisplaySection(_settingsRows);
+				break;
+			case SettingsCategory.Controls:
+				BuildControlSection(_settingsRows);
+				break;
+			case SettingsCategory.Shortcuts:
+				BuildShortcutSection(_settingsRows);
+				break;
+		}
+
+		SyncFromPlayer();
+		RefreshCategoryButtons();
 	}
 
 	private void BuildLanguageSection(VBoxContainer rows)
@@ -165,6 +212,8 @@ public partial class SettingsPanel : PanelContainer
 	{
 		var section = MakeSection(rows, "ui.controls");
 		_cameraModeValueLabel = MakeLabel(LocaleText.T("ui.horizontal_orbit_camera"), 15, new Color(0.96f, 0.98f, 1.0f));
+		_cameraModeValueLabel.AutowrapMode = TextServer.AutowrapMode.Off;
+		_cameraModeValueLabel.ClipText = false;
 		AddSettingRow(section, "ui.camera_mode", _cameraModeValueLabel);
 	}
 
@@ -175,11 +224,13 @@ public partial class SettingsPanel : PanelContainer
 		AddShortcutRow(section, "shortcut.jump", "Space");
 		AddShortcutRow(section, "shortcut.sprint", "Shift");
 		AddShortcutRow(section, "shortcut.capture_net", "R");
+		AddShortcutTextRow(section, LocaleText.CurrentLanguage == LocaleText.En ? "Select / Focus Target" : "選取 / 集火目標", "Left Mouse");
+		AddShortcutTextRow(section, LocaleText.CurrentLanguage == LocaleText.En ? "Interact / Revive" : "互動 / 復活", "E");
 		AddShortcutRow(section, "shortcut.party", "P");
 		AddShortcutRow(section, "shortcut.inventory", "I");
 		AddShortcutRow(section, "shortcut.formation_panel", "F");
 		AddShortcutRow(section, "shortcut.settings", "Esc");
-		AddShortcutRow(section, "shortcut.camera", LocaleText.T("shortcut.horizontal_mouse"));
+		AddShortcutRow(section, "shortcut.camera", LocaleText.CurrentLanguage == LocaleText.En ? "Mouse Look" : "滑鼠上下左右");
 	}
 
 	private void ApplyDisplaySettings()
@@ -213,10 +264,25 @@ public partial class SettingsPanel : PanelContainer
 
 	private void SyncFromPlayer()
 	{
-		SyncLanguage();
-		SyncResolution();
-		SyncWindowMode();
-		_cameraModeValueLabel.Text = LocaleText.T("ui.horizontal_orbit_camera");
+		if (_languageOption != null)
+		{
+			SyncLanguage();
+		}
+
+		if (_resolutionOption != null)
+		{
+			SyncResolution();
+		}
+
+		if (_windowModeOption != null)
+		{
+			SyncWindowMode();
+		}
+
+		if (_cameraModeValueLabel != null)
+		{
+			_cameraModeValueLabel.Text = LocaleText.T("ui.horizontal_orbit_camera");
+		}
 	}
 
 	private void SyncLanguage()
@@ -286,6 +352,37 @@ public partial class SettingsPanel : PanelContainer
 		SyncFromPlayer();
 	}
 
+	private void AddCategoryButton(VBoxContainer nav, SettingsCategory category, string textKey)
+	{
+		var button = MakeButton(LocaleText.T(textKey));
+		button.CustomMinimumSize = new Vector2(0.0f, 38.0f);
+		button.Alignment = HorizontalAlignment.Left;
+		button.ToggleMode = true;
+		button.Pressed += () => SelectCategory(category);
+		nav.AddChild(button);
+		_categoryButtons[category] = button;
+	}
+
+	private void SelectCategory(SettingsCategory category)
+	{
+		if (_selectedCategory == category)
+		{
+			RefreshCategoryButtons();
+			return;
+		}
+
+		_selectedCategory = category;
+		BuildSelectedCategory();
+	}
+
+	private void RefreshCategoryButtons()
+	{
+		foreach (KeyValuePair<SettingsCategory, Button> pair in _categoryButtons)
+		{
+			pair.Value.ButtonPressed = pair.Key == _selectedCategory;
+		}
+	}
+
 	private VBoxContainer MakeSection(VBoxContainer rows, string titleKey)
 	{
 		var section = new VBoxContainer();
@@ -299,38 +396,50 @@ public partial class SettingsPanel : PanelContainer
 
 	private void AddSettingRow(VBoxContainer section, string labelKey, Control control)
 	{
-		var row = new HBoxContainer();
+		var row = new HBoxContainer
+		{
+			CustomMinimumSize = new Vector2(0.0f, 38.0f),
+		};
 		row.AddThemeConstantOverride("separation", 14);
 		section.AddChild(row);
 
 		var label = MakeLabel(string.IsNullOrEmpty(labelKey) ? string.Empty : LocaleText.T(labelKey), 15, new Color(0.68f, 0.76f, 0.84f));
 		label.CustomMinimumSize = new Vector2(130.0f, 0.0f);
+		label.AutowrapMode = TextServer.AutowrapMode.Off;
+		label.ClipText = false;
 		row.AddChild(label);
 
+		control.CustomMinimumSize = new Vector2(Mathf.Max(control.CustomMinimumSize.X, 260.0f), Mathf.Max(control.CustomMinimumSize.Y, 36.0f));
 		control.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		row.AddChild(control);
 	}
 
 	private void AddShortcutRow(VBoxContainer section, string actionKey, string key)
 	{
-		var row = new HBoxContainer();
+		AddShortcutTextRow(section, LocaleText.T(actionKey), key);
+	}
+
+	private void AddShortcutTextRow(VBoxContainer section, string actionText, string key)
+	{
+		var row = new HBoxContainer
+		{
+			CustomMinimumSize = new Vector2(0.0f, 28.0f),
+		};
 		row.AddThemeConstantOverride("separation", 14);
 		section.AddChild(row);
 
-		var actionLabel = MakeLabel(LocaleText.T(actionKey), 15, new Color(0.80f, 0.86f, 0.92f));
-		actionLabel.CustomMinimumSize = new Vector2(160.0f, 0.0f);
+		var actionLabel = MakeLabel(actionText, 15, new Color(0.80f, 0.86f, 0.92f));
+		actionLabel.CustomMinimumSize = new Vector2(230.0f, 0.0f);
+		actionLabel.AutowrapMode = TextServer.AutowrapMode.Off;
+		actionLabel.ClipText = false;
 		row.AddChild(actionLabel);
 
 		var keyLabel = MakeLabel(key, 15, new Color(1.0f, 1.0f, 1.0f));
+		keyLabel.CustomMinimumSize = new Vector2(260.0f, 0.0f);
+		keyLabel.AutowrapMode = TextServer.AutowrapMode.Off;
+		keyLabel.ClipText = false;
 		keyLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		row.AddChild(keyLabel);
-	}
-
-	private static Label MakeNavLabel(string textKey)
-	{
-		var label = MakeLabel(LocaleText.T(textKey), 16, new Color(0.88f, 0.94f, 1.0f));
-		label.CustomMinimumSize = new Vector2(0.0f, 34.0f);
-		return label;
 	}
 
 	private static Label MakeLabel(string text, int fontSize, Color color)
