@@ -49,7 +49,12 @@ public partial class SimpleActor : CharacterBody3D
 	private Vector3 _targetPosition = Vector3.Zero;
 	private float _waitTime;
 	private float _attackCooldownRemaining;
+	private float _footstepEffectRemaining;
+	private float _movementAnimationPhase;
+	private Tween? _attackPoseTween;
 	private SimpleActor? _combatTarget;
+	private SimpleActor? _retaliationTarget;
+	private float _retaliationTargetRemaining;
 	private Label3D? _nameplate;
 	private SquadActivity _squadActivity = SquadActivity.Follow;
 	private Vector3 _squadActivityLocalOffset = Vector3.Zero;
@@ -125,7 +130,7 @@ public partial class SimpleActor : CharacterBody3D
 	public string BuildAiGemName => LocaleText.T(BuildCatalog.GetAiGem(BuildLoadout.AiGemId).NameKey);
 	public string BuildRareComboName => BuildCatalog.LocalizedRareCombo(CurrentBuildStats);
 	public string BuildElementName => LocaleText.T(CurrentBuildStats.DamageElementNameKey);
-	public string CombatSummary => LocaleText.F("combat.summary", CombatRoleName, LocalizedPersonality, Affinity);
+	public string CombatSummary => $"{LocaleText.F("combat.summary", CombatRoleName, LocalizedPersonality, Affinity)} / Affinity {Affinity}";
 	public Color AttackFxColor => GetAttackColor();
 	public int ExperienceToNextLevel => 35 + Level * 18 + EvolutionStage * 20;
 	public bool CanEvolve => EvolutionStage < 3 && Level >= (EvolutionStage + 1) * 5;
@@ -160,12 +165,13 @@ public partial class SimpleActor : CharacterBody3D
 	{
 		float step = (float)delta;
 		_attackCooldownRemaining = Mathf.Max(_attackCooldownRemaining - step, 0.0f);
+		_retaliationTargetRemaining = Mathf.Max(_retaliationTargetRemaining - step, 0.0f);
 		Vector3 velocity = Velocity;
 
 		if (_isDefeated)
 		{
 			Velocity = SlowToStop(velocity, step);
-			MoveAndSlide();
+			MoveAndSlideWithEffects(step);
 			return;
 		}
 
@@ -186,14 +192,26 @@ public partial class SimpleActor : CharacterBody3D
 
 		if (ActorKind == "monster" && player != null)
 		{
-			float distanceToPlayer = GlobalPosition.DistanceTo(player.GlobalPosition);
-			if (distanceToPlayer <= ChaseRadius)
+			if (TryGetRetaliationTarget(out SimpleActor retaliationTarget))
 			{
 				chasing = true;
-				destination = player.GlobalPosition;
-				if (TryAttackPlayer(player, velocity, step))
+				destination = retaliationTarget.GlobalPosition;
+				if (TryAttackActorTarget(retaliationTarget, velocity, step))
 				{
 					return;
+				}
+			}
+			else
+			{
+				float distanceToPlayer = GlobalPosition.DistanceTo(player.GlobalPosition);
+				if (distanceToPlayer <= ChaseRadius)
+				{
+					chasing = true;
+					destination = player.GlobalPosition;
+					if (TryAttackPlayer(player, velocity, step))
+					{
+						return;
+					}
 				}
 			}
 		}
@@ -204,7 +222,7 @@ public partial class SimpleActor : CharacterBody3D
 			if (_waitTime > 0.0f)
 			{
 				Velocity = SlowToStop(velocity, step);
-				MoveAndSlide();
+				MoveAndSlideWithEffects(step);
 				return;
 			}
 		}
@@ -228,7 +246,7 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		Velocity = velocity;
-		MoveAndSlide();
+		MoveAndSlideWithEffects(step);
 	}
 
 	public void Capture(PlayerController followTarget)
@@ -254,13 +272,17 @@ public partial class SimpleActor : CharacterBody3D
 		_followSlot = followSlot;
 		_isInActiveParty = true;
 		Visible = true;
-		SetPhysicsProcess(true);
+		SetPhysicsProcess(!_isDefeated);
 		CollisionLayer = _defaultCollisionLayer;
 		CollisionMask = _defaultCollisionMask;
 		AddCollisionExceptionWith(followTarget);
 		followTarget.AddCollisionExceptionWith(this);
 		ResetSquadActivity();
-		GlobalPosition = GetFollowDestination();
+		if (!_isDefeated)
+		{
+			GlobalPosition = GetFollowDestination();
+			ApplyLivingPose();
+		}
 		Velocity = Vector3.Zero;
 		RefreshNameplate();
 	}
@@ -504,6 +526,7 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		int mitigatedDamage = Mathf.Max(rawDamage - Mathf.RoundToInt(EffectiveDefense * 0.35f), 1);
+		RememberAttacker(attacker);
 		CurrentHealth = Mathf.Max(CurrentHealth - mitigatedDamage, 0);
 		SpawnCombatEffect(mitigatedDamage, attacker?.GetAttackColor() ?? new Color(1.0f, 0.5f, 0.22f, 0.92f));
 
@@ -536,6 +559,32 @@ public partial class SimpleActor : CharacterBody3D
 		return healing;
 	}
 
+	public bool ReviveFromCaretaker(PlayerController followTarget)
+	{
+		if (!_isCaptured || !_isDefeated)
+		{
+			return false;
+		}
+
+		_isDefeated = false;
+		_followTarget = followTarget;
+		CurrentHealth = Mathf.Max(Mathf.RoundToInt(EffectiveMaxHealth * 0.65f), 1);
+		Velocity = Vector3.Zero;
+		Visible = _isInActiveParty;
+		CollisionLayer = _defaultCollisionLayer;
+		CollisionMask = _defaultCollisionMask;
+		SetPhysicsProcess(_isInActiveParty);
+		ApplyLivingPose();
+		if (_isInActiveParty)
+		{
+			GlobalPosition = GetFollowDestination();
+		}
+
+		SpawnCombatEffect("Revive", new Color(0.42f, 1.0f, 0.66f, 0.94f), GlobalPosition + new Vector3(0.0f, 1.25f, 0.0f), 0.9f, 0.76f);
+		RefreshNameplate();
+		return true;
+	}
+
 	private void CreateNameplate()
 	{
 		_nameplate = new Label3D
@@ -563,7 +612,9 @@ public partial class SimpleActor : CharacterBody3D
 			return;
 		}
 
-		string capturedText = _isCaptured
+		string capturedText = _isDefeated
+			? " [Dead]"
+			: _isCaptured
 			? _isInActiveParty ? LocaleText.T("actor.nameplate.active") : LocaleText.T("actor.nameplate.stored")
 			: string.Empty;
 		_nameplate.Text = $"{LocaleText.T("actor.level_prefix")}{Level} {LocalizedDisplayName}{capturedText}";
@@ -578,7 +629,7 @@ public partial class SimpleActor : CharacterBody3D
 		if (!_isInActiveParty || _followTarget == null || !IsInstanceValid(_followTarget))
 		{
 			Velocity = SlowToStop(velocity, step);
-			MoveAndSlide();
+			MoveAndSlideWithEffects(step);
 			return;
 		}
 
@@ -587,7 +638,7 @@ public partial class SimpleActor : CharacterBody3D
 			_squadActivity = SquadActivity.Follow;
 			_squadThinkRemaining = 1.2f;
 			Velocity = velocity;
-			MoveAndSlide();
+			MoveAndSlideWithEffects(step);
 			return;
 		}
 
@@ -596,7 +647,7 @@ public partial class SimpleActor : CharacterBody3D
 			_squadActivity = SquadActivity.Follow;
 			_squadThinkRemaining = 1.6f;
 			Velocity = velocity;
-			MoveAndSlide();
+			MoveAndSlideWithEffects(step);
 			return;
 		}
 
@@ -630,7 +681,7 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		Velocity = velocity;
-		MoveAndSlide();
+		MoveAndSlideWithEffects(step);
 	}
 
 	private Vector3 GetFollowDestination()
@@ -840,6 +891,7 @@ public partial class SimpleActor : CharacterBody3D
 			FaceDirection(_followTarget.GlobalPosition - GlobalPosition, step);
 			if (_followTarget.ReceiveHealing(healing) > 0)
 			{
+				PlayAttackAction(_followTarget.GlobalPosition, true);
 				_attackCooldownRemaining = EffectiveAttackCooldown;
 				return true;
 			}
@@ -856,6 +908,7 @@ public partial class SimpleActor : CharacterBody3D
 			FaceDirection(ally.GlobalPosition - GlobalPosition, step);
 			if (ally.ReceiveHealing(healing) > 0)
 			{
+				PlayAttackAction(ally.GlobalPosition, true);
 				_attackCooldownRemaining = EffectiveAttackCooldown;
 				return true;
 			}
@@ -912,7 +965,23 @@ public partial class SimpleActor : CharacterBody3D
 
 	private SimpleActor? GetCombatTarget()
 	{
-		if (_combatTarget != null && IsInstanceValid(_combatTarget) && _combatTarget.IsHostileToPlayer && GlobalPosition.DistanceTo(_combatTarget.GlobalPosition) <= EffectiveDetectionRadius * 1.35f)
+		if (_followTarget != null && IsInstanceValid(_followTarget))
+		{
+			SimpleActor? focusedTarget = _followTarget.FocusedTarget;
+			if (focusedTarget != null && IsValidCommandTarget(focusedTarget))
+			{
+				float distanceFromSelf = GlobalPosition.DistanceTo(focusedTarget.GlobalPosition);
+				float distanceFromPlayer = _followTarget.GlobalPosition.DistanceTo(focusedTarget.GlobalPosition);
+				float commandRadius = Mathf.Max(EffectiveDetectionRadius * 1.85f, 18.0f);
+				if (distanceFromSelf <= commandRadius || distanceFromPlayer <= commandRadius)
+				{
+					_combatTarget = focusedTarget;
+					return focusedTarget;
+				}
+			}
+		}
+
+		if (_combatTarget != null && IsValidCommandTarget(_combatTarget) && _combatTarget.IsHostileToPlayer && GlobalPosition.DistanceTo(_combatTarget.GlobalPosition) <= EffectiveDetectionRadius * 1.35f)
 		{
 			return _combatTarget;
 		}
@@ -966,6 +1035,11 @@ public partial class SimpleActor : CharacterBody3D
 		return selected;
 	}
 
+	private bool IsValidCommandTarget(SimpleActor? actor)
+	{
+		return actor != null && IsInstanceValid(actor) && !actor.IsDefeated && !actor.IsCaptured && actor != this;
+	}
+
 	private void AttackActor(SimpleActor target)
 	{
 		if (_attackCooldownRemaining > 0.0f)
@@ -982,7 +1056,7 @@ public partial class SimpleActor : CharacterBody3D
 			damage = Mathf.RoundToInt(damage * 1.55f);
 		}
 
-		SpawnSwingEffect(target.GlobalPosition);
+		PlayAttackAction(target.GlobalPosition, false);
 		int dealtDamage = target.ReceiveDamage(damage, this);
 		if (stats.LifeStealPercent > 0.0f && dealtDamage > 0)
 		{
@@ -1006,21 +1080,86 @@ public partial class SimpleActor : CharacterBody3D
 		if (_attackCooldownRemaining <= 0.0f && player is PlayerController playerController)
 		{
 			SpawnPlayerAttackCue(player.GlobalPosition);
-			SpawnSwingEffect(player.GlobalPosition);
+			PlayAttackAction(player.GlobalPosition, false);
 			playerController.ReceiveDamage(EffectiveAttack, this);
 			_attackCooldownRemaining = EffectiveAttackCooldown;
 		}
 
-		MoveAndSlide();
+		MoveAndSlideWithEffects(step);
+		return true;
+	}
+
+	private bool TryAttackActorTarget(SimpleActor target, Vector3 velocity, float step)
+	{
+		Vector3 toTarget = target.GlobalPosition - GlobalPosition;
+		toTarget.Y = 0.0f;
+		if (toTarget.Length() > EffectiveAttackRange)
+		{
+			return false;
+		}
+
+		Velocity = SlowToStop(velocity, step);
+		FaceDirection(toTarget, step);
+		AttackActor(target);
+		MoveAndSlideWithEffects(step);
+		return true;
+	}
+
+	private void RememberAttacker(SimpleActor? attacker)
+	{
+		if (ActorKind != "monster" || attacker == null || !IsInstanceValid(attacker) || attacker == this || attacker.IsDefeated)
+		{
+			return;
+		}
+
+		_retaliationTarget = attacker;
+		_retaliationTargetRemaining = 8.0f;
+		_combatTarget = attacker;
+	}
+
+	private bool TryGetRetaliationTarget(out SimpleActor target)
+	{
+		target = null!;
+		if (_retaliationTargetRemaining <= 0.0f || _retaliationTarget == null || !IsInstanceValid(_retaliationTarget) || _retaliationTarget.IsDefeated)
+		{
+			_retaliationTarget = null;
+			return false;
+		}
+
+		if (GlobalPosition.DistanceTo(_retaliationTarget.GlobalPosition) > ChaseRadius * 1.65f)
+		{
+			_retaliationTarget = null;
+			_retaliationTargetRemaining = 0.0f;
+			return false;
+		}
+
+		target = _retaliationTarget;
 		return true;
 	}
 
 	private void Defeat(SimpleActor? attacker)
 	{
 		_isDefeated = true;
-		_isInActiveParty = false;
 		Velocity = Vector3.Zero;
 		RemoveFromGroup(ActorKind == "monster" ? "monsters" : "npcs");
+		_retaliationTarget = null;
+		_retaliationTargetRemaining = 0.0f;
+		_combatTarget = null;
+
+		if (_isCaptured)
+		{
+			Affinity = Mathf.Max(Affinity - 12, 0);
+			CollisionLayer = _defaultCollisionLayer;
+			CollisionMask = _defaultCollisionMask;
+			Visible = true;
+			SetPhysicsProcess(false);
+			ApplyDefeatedPose();
+			SpawnCombatEffect("Affinity -12", new Color(1.0f, 0.28f, 0.22f, 0.92f), GlobalPosition + new Vector3(0.0f, 1.15f, 0.0f), 0.95f, 0.72f);
+			RefreshNameplate();
+			return;
+		}
+
+		_isInActiveParty = false;
 		CollisionLayer = 0;
 		CollisionMask = 0;
 		Visible = false;
@@ -1030,6 +1169,20 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			attacker._followTarget.GrantCombatExperience(ExperienceReward);
 		}
+	}
+
+	private void ApplyDefeatedPose()
+	{
+		RotationDegrees = new Vector3(0.0f, RotationDegrees.Y, 88.0f);
+		Scale = new Vector3(1.0f, 0.72f, 1.0f);
+		SetChildRotation("Head", ActorKind == "monster" ? new Vector3(22.0f, 0.0f, -16.0f) : new Vector3(28.0f, 0.0f, -12.0f));
+		SetChildRotation("TailBase", new Vector3(82.0f, 0.0f, 0.0f));
+	}
+
+	private void ApplyLivingPose()
+	{
+		RotationDegrees = new Vector3(0.0f, RotationDegrees.Y, 0.0f);
+		Scale = Vector3.One;
 	}
 
 	private Color GetAttackColor()
@@ -1056,6 +1209,67 @@ public partial class SimpleActor : CharacterBody3D
 		Vector3 position = GlobalPosition + (targetPosition - GlobalPosition) * 0.5f;
 		position.Y = Mathf.Max(GlobalPosition.Y, targetPosition.Y) + 0.95f;
 		SpawnCombatEffect(string.Empty, GetAttackColor(), position, 0.34f, 0.36f);
+	}
+
+	private void PlayAttackAction(Vector3 targetPosition, bool isHealing)
+	{
+		AnimateAttackPose();
+		SpawnAttackProjectile(targetPosition, isHealing);
+		if (!UsesProjectileAttack(isHealing))
+		{
+			SpawnSwingEffect(targetPosition);
+		}
+	}
+
+	private void AnimateAttackPose()
+	{
+		if (_attackPoseTween != null && IsInstanceValid(_attackPoseTween))
+		{
+			_attackPoseTween.Kill();
+		}
+
+		Scale = Vector3.One;
+		_attackPoseTween = CreateTween();
+		_attackPoseTween.SetTrans(Tween.TransitionType.Sine);
+		_attackPoseTween.SetEase(Tween.EaseType.Out);
+		_attackPoseTween.TweenProperty(this, "scale", new Vector3(1.12f, 0.90f, 1.20f), 0.075f);
+		_attackPoseTween.TweenProperty(this, "scale", new Vector3(0.94f, 1.08f, 0.92f), 0.085f);
+		_attackPoseTween.TweenProperty(this, "scale", Vector3.One, 0.13f);
+	}
+
+	private void SpawnAttackProjectile(Vector3 targetPosition, bool isHealing)
+	{
+		Node parent = GetTree().CurrentScene ?? GetParent();
+		if (parent == null)
+		{
+			return;
+		}
+
+		bool isMelee = !UsesProjectileAttack(isHealing);
+		Vector3 toTarget = targetPosition - GlobalPosition;
+		toTarget.Y = 0.0f;
+		Vector3 forward = toTarget.LengthSquared() > 0.001f ? toTarget.Normalized() : -GlobalTransform.Basis.Z;
+		Color color = isHealing ? new Color(0.36f, 1.0f, 0.54f, 0.92f) : GetAttackColor();
+		float travelDistance = GlobalPosition.DistanceTo(targetPosition);
+
+		var projectile = new AttackProjectile
+		{
+			StartPosition = GlobalPosition + Vector3.Up * (isMelee ? 1.04f : 1.22f) + forward * 0.44f,
+			EndPosition = targetPosition + Vector3.Up * (isMelee ? 1.02f : 1.16f),
+			EffectColor = color,
+			IsMelee = isMelee,
+			IsHealing = isHealing,
+			Radius = isMelee ? 0.24f : 0.20f,
+			Lifetime = isMelee
+				? 0.16f
+				: Mathf.Clamp(travelDistance / 18.0f, 0.24f, 0.48f),
+		};
+		parent.AddChild(projectile);
+	}
+
+	private bool UsesProjectileAttack(bool isHealing)
+	{
+		return isHealing || CombatRole == "Ranged" || CombatRole == "Support" || EffectiveAttackRange > 3.0f;
 	}
 
 	private void SpawnPlayerAttackCue(Vector3 playerPosition)
@@ -1089,6 +1303,155 @@ public partial class SimpleActor : CharacterBody3D
 		velocity.X = Mathf.MoveToward(velocity.X, 0.0f, MoveSpeed * 5.0f * step);
 		velocity.Z = Mathf.MoveToward(velocity.Z, 0.0f, MoveSpeed * 5.0f * step);
 		return velocity;
+	}
+
+	private void MoveAndSlideWithEffects(float step)
+	{
+		MoveAndSlide();
+		UpdateMovementEffects(step);
+		UpdateMovementAnimation(step);
+	}
+
+	private void UpdateMovementEffects(float step)
+	{
+		_footstepEffectRemaining = Mathf.Max(_footstepEffectRemaining - step, 0.0f);
+		Vector3 planarVelocity = Velocity;
+		planarVelocity.Y = 0.0f;
+		float speed = planarVelocity.Length();
+		if (!IsOnFloor() || speed < 0.85f || _footstepEffectRemaining > 0.0f)
+		{
+			return;
+		}
+
+		bool isFastStep = speed > Mathf.Max(EffectiveMoveSpeed * 1.65f, 3.6f);
+		SpawnMovementDust(planarVelocity.Normalized(), speed, isFastStep);
+		_footstepEffectRemaining = isFastStep ? 0.16f : 0.28f;
+	}
+
+	private void SpawnMovementDust(Vector3 moveDirection, float speed, bool isFastStep)
+	{
+		Node parent = GetTree().CurrentScene ?? GetParent();
+		if (parent == null)
+		{
+			return;
+		}
+
+		Vector3 back = -moveDirection;
+		Vector3 side = new(-moveDirection.Z, 0.0f, moveDirection.X);
+		float footSide = Mathf.Sin((Time.GetTicksMsec() + GetInstanceId()) * 0.016f) >= 0.0f ? 1.0f : -1.0f;
+		Color color = ActorKind == "monster"
+			? (isFastStep ? new Color(0.82f, 0.42f, 0.32f, 0.70f) : new Color(0.62f, 0.44f, 0.36f, 0.58f))
+			: (isFastStep ? new Color(0.78f, 0.86f, 0.92f, 0.66f) : new Color(0.62f, 0.70f, 0.72f, 0.54f));
+
+		var dust = new MovementDustEffect
+		{
+			DustColor = color,
+			Radius = isFastStep ? 0.22f : 0.15f,
+			Lifetime = isFastStep ? 0.34f : 0.42f,
+			IsFastStep = isFastStep,
+			DirectionYaw = Mathf.RadToDeg(Mathf.Atan2(-moveDirection.X, -moveDirection.Z)),
+		};
+		parent.AddChild(dust);
+		dust.GlobalPosition = GlobalPosition + back * Mathf.Clamp(speed * 0.032f, 0.14f, 0.40f) + side * footSide * 0.15f + Vector3.Up * 0.04f;
+	}
+
+	private void UpdateMovementAnimation(float step)
+	{
+		Vector3 planarVelocity = Velocity;
+		planarVelocity.Y = 0.0f;
+		float speed = planarVelocity.Length();
+		float speedReference = Mathf.Max(EffectiveMoveSpeed * 2.4f, 4.5f);
+		float moveRatio = Mathf.Clamp(speed / speedReference, 0.0f, 1.0f);
+		bool isMoving = speed > 0.18f && IsOnFloor() && !_isDefeated;
+		float phaseSpeed = Mathf.Lerp(5.5f, 10.8f, moveRatio);
+
+		if (isMoving)
+		{
+			_movementAnimationPhase += step * phaseSpeed;
+		}
+		else
+		{
+			_movementAnimationPhase = Mathf.Lerp(_movementAnimationPhase, 0.0f, Mathf.Min(step * 8.0f, 1.0f));
+		}
+
+		if (ActorKind == "monster")
+		{
+			UpdateMonsterMovementAnimation(isMoving, moveRatio);
+		}
+		else
+		{
+			UpdateHumanoidMovementAnimation(isMoving, moveRatio);
+		}
+	}
+
+	private void UpdateHumanoidMovementAnimation(bool isMoving, float moveRatio)
+	{
+		float swing = Mathf.Sin(_movementAnimationPhase);
+		float counterSwing = Mathf.Sin(_movementAnimationPhase + Mathf.Pi);
+		float intensity = isMoving ? Mathf.Lerp(0.38f, 1.0f, moveRatio) : 0.0f;
+		float bob = Mathf.Abs(swing) * 0.035f * intensity;
+		float lean = moveRatio * -3.6f;
+
+		SetChildPosition("Body", new Vector3(0.0f, 1.02f + bob, 0.0f));
+		SetChildPosition("Tunic", new Vector3(0.0f, 1.04f + bob, -0.26f));
+		SetChildRotation("Body", new Vector3(lean, 0.0f, swing * 1.4f * intensity));
+		SetChildRotation("Head", new Vector3(Mathf.Abs(swing) * 2.0f * intensity, 0.0f, -swing * 1.2f * intensity));
+
+		SetChildRotation("LeftLeg", new Vector3(swing * 25.0f * intensity, 0.0f, -1.8f * intensity));
+		SetChildRotation("RightLeg", new Vector3(counterSwing * 25.0f * intensity, 0.0f, 1.8f * intensity));
+		SetChildPosition("LeftBoot", new Vector3(-0.14f, 0.06f + Mathf.Max(counterSwing, 0.0f) * 0.06f * intensity, -0.05f + swing * 0.045f * intensity));
+		SetChildPosition("RightBoot", new Vector3(0.14f, 0.06f + Mathf.Max(swing, 0.0f) * 0.06f * intensity, -0.05f + counterSwing * 0.045f * intensity));
+
+		SetChildRotation("LeftArm", new Vector3(counterSwing * 22.0f * intensity, 0.0f, -9.0f - swing * 4.0f * intensity));
+		SetChildRotation("RightArm", new Vector3(swing * 22.0f * intensity, 0.0f, 9.0f - counterSwing * 4.0f * intensity));
+		SetChildPosition("LeftGlove", new Vector3(-0.44f, 0.66f + counterSwing * 0.055f * intensity, -0.03f - counterSwing * 0.075f * intensity));
+		SetChildPosition("RightGlove", new Vector3(0.44f, 0.66f + swing * 0.055f * intensity, -0.03f - swing * 0.075f * intensity));
+		SetChildRotation("Cape", new Vector3(-8.0f + Mathf.Abs(swing) * 6.0f * intensity, 0.0f, -swing * 2.2f * intensity));
+	}
+
+	private void UpdateMonsterMovementAnimation(bool isMoving, float moveRatio)
+	{
+		float phaseA = Mathf.Sin(_movementAnimationPhase);
+		float phaseB = Mathf.Sin(_movementAnimationPhase + Mathf.Pi);
+		float liftA = Mathf.Max(phaseA, 0.0f);
+		float liftB = Mathf.Max(phaseB, 0.0f);
+		float intensity = isMoving ? Mathf.Lerp(0.42f, 1.0f, moveRatio) : 0.0f;
+		float bob = Mathf.Abs(phaseA) * 0.045f * intensity;
+		float lean = moveRatio * -4.8f;
+
+		SetChildPosition("BodyCore", new Vector3(0.0f, 0.74f + bob, 0.10f));
+		SetChildPosition("Head", new Vector3(0.0f, 1.18f + bob * 0.65f, -0.92f));
+		SetChildRotation("BodyCore", new Vector3(lean + phaseA * 2.0f * intensity, 0.0f, phaseA * 2.2f * intensity));
+		SetChildRotation("Head", new Vector3(phaseB * 3.0f * intensity, 0.0f, -phaseA * 1.5f * intensity));
+
+		SetChildRotation("LeftForeLeg", new Vector3(7.0f + phaseA * 26.0f * intensity, 0.0f, -7.0f));
+		SetChildRotation("RightForeLeg", new Vector3(7.0f + phaseB * 26.0f * intensity, 0.0f, 7.0f));
+		SetChildRotation("LeftBackLeg", new Vector3(-8.0f + phaseB * 24.0f * intensity, 0.0f, -8.0f));
+		SetChildRotation("RightBackLeg", new Vector3(-8.0f + phaseA * 24.0f * intensity, 0.0f, 8.0f));
+
+		SetChildPosition("LeftFrontPaw", new Vector3(-0.42f, 0.13f + liftA * 0.08f * intensity, -0.70f + phaseA * 0.055f * intensity));
+		SetChildPosition("RightFrontPaw", new Vector3(0.42f, 0.13f + liftB * 0.08f * intensity, -0.70f + phaseB * 0.055f * intensity));
+		SetChildPosition("LeftBackPaw", new Vector3(-0.46f, 0.13f + liftB * 0.07f * intensity, 0.68f + phaseB * 0.05f * intensity));
+		SetChildPosition("RightBackPaw", new Vector3(0.46f, 0.13f + liftA * 0.07f * intensity, 0.68f + phaseA * 0.05f * intensity));
+
+		SetChildRotation("TailBase", new Vector3(64.0f + Mathf.Abs(phaseA) * 5.0f * intensity, phaseA * 9.0f * intensity, 0.0f));
+		SetChildPosition("TailTip", new Vector3(phaseA * 0.05f * intensity, 0.38f + bob * 0.45f, 1.42f));
+	}
+
+	private void SetChildPosition(string nodeName, Vector3 position)
+	{
+		if (GetNodeOrNull<Node3D>(nodeName) is Node3D node)
+		{
+			node.Position = position;
+		}
+	}
+
+	private void SetChildRotation(string nodeName, Vector3 rotationDegrees)
+	{
+		if (GetNodeOrNull<Node3D>(nodeName) is Node3D node)
+		{
+			node.RotationDegrees = rotationDegrees;
+		}
 	}
 
 	private void FaceDirection(Vector3 direction, float step)

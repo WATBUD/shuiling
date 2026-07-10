@@ -23,6 +23,7 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float ThirdPersonCameraHeight { get; set; } = 3.35f;
 	[Export] public float ThirdPersonLookHeight { get; set; } = 2.2f;
 	[Export] public float HorizontalLookSensitivity { get; set; } = 0.0026f;
+	[Export] public float VerticalLookSensitivity { get; set; } = 0.0022f;
 	[Export] public float CameraWorldHalfExtent { get; set; } = 68.5f;
 	[Export] public float FallRespawnHeight { get; set; } = -8.0f;
 	[Export] public float Acceleration { get; set; } = 18.0f;
@@ -30,6 +31,7 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public int CaptureNetCapacity { get; set; } = 6;
 	[Export] public float CaptureNetRechargeSeconds { get; set; } = 5.0f;
 	[Export] public float TargetInfoRange { get; set; } = 30.0f;
+	[Export] public float RevivalNpcInteractRange { get; set; } = 4.2f;
 	[Export] public string PlayerName { get; set; } = "player.default_name";
 	[Export] public int Level { get; set; } = 1;
 	[Export] public int MaxHealth { get; set; } = 150;
@@ -45,6 +47,7 @@ public partial class PlayerController : CharacterBody3D
 	private readonly Dictionary<int, SimpleActor> _formationActorsBySlot = new();
 	private readonly Dictionary<SimpleActor, int> _formationSlotsByActor = new();
 	private float _cameraYaw;
+	private float _cameraPitch = 0.08f;
 	private Vector3 _lastSafePosition = new(0.0f, 0.2f, 8.0f);
 	private float _gravity;
 	private float _captureCooldownRemaining;
@@ -63,10 +66,22 @@ public partial class PlayerController : CharacterBody3D
 	private Label _captureAmmoCountLabel = null!;
 	private ProgressBar _captureAmmoRechargeBar = null!;
 	private ColorRect _damageFlashOverlay = null!;
+	private Label _interactionPromptLabel = null!;
+	private Node3D? _selectedTargetMarker;
+	private MeshInstance3D? _selectedTargetOuterRing;
+	private MeshInstance3D? _selectedTargetInnerRing;
+	private MeshInstance3D? _selectedTargetArrow;
+	private StandardMaterial3D? _selectedTargetRingMaterial;
+	private StandardMaterial3D? _selectedTargetArrowMaterial;
+	private SimpleActor? _selectedActor;
+	private SimpleActor? _focusedTarget;
 	private float _damageFlashRemaining;
+	private float _footstepEffectRemaining;
+	private float _movementAnimationPhase;
 
 	public IReadOnlyList<SimpleActor> CapturedCollection => _capturedCollection;
 	public IReadOnlyList<SimpleActor> ActiveParty => _activeParty;
+	public SimpleActor? FocusedTarget => IsValidFocusedTarget(_focusedTarget) ? _focusedTarget : null;
 	public IReadOnlyDictionary<string, int> InventoryItems => _inventoryItems;
 	public int FormationGridSide => FormationGridSideLength;
 	public int FormationPlayerSlotIndex => FormationCenterSlotIndex;
@@ -93,6 +108,7 @@ public partial class PlayerController : CharacterBody3D
 		InitializeCaptureNetAmmo();
 		CreateCaptureAmmoHud();
 		CreateDamageFlashHud();
+		CreateInteractionPromptHud();
 
 		AddToGroup("player");
 		EnsureInputActions();
@@ -106,6 +122,9 @@ public partial class PlayerController : CharacterBody3D
 		UpdateTargetInfoPanel();
 		UpdateCaptureAmmoHud();
 		UpdateDamageFlash((float)delta);
+		UpdateMovementAnimation((float)delta);
+		UpdateFocusedTargetMarker((float)delta);
+		UpdateInteractionPrompt();
 	}
 
 	public override void _UnhandledInput(InputEvent @event)
@@ -176,17 +195,32 @@ public partial class PlayerController : CharacterBody3D
 				-Mathf.Pi,
 				Mathf.Pi
 			);
+			_cameraPitch = Mathf.Clamp(
+				_cameraPitch - mouseMotion.Relative.Y * VerticalLookSensitivity,
+				-0.42f,
+				0.76f
+			);
 			return;
 		}
 
 		if (@event is InputEventMouseButton { Pressed: true })
 		{
 			Input.MouseMode = Input.MouseModeEnum.Captured;
+			if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left })
+			{
+				TrySelectActorTarget();
+				return;
+			}
 		}
 
 		if (@event.IsActionPressed("capture_net"))
 		{
 			ThrowCaptureNet();
+		}
+
+		if (@event.IsActionPressed("interact"))
+		{
+			TryInteractWithRevivalNpc();
 		}
 	}
 
@@ -230,6 +264,7 @@ public partial class PlayerController : CharacterBody3D
 
 		Velocity = velocity;
 		MoveAndSlide();
+		UpdateMovementEffects(step, targetSpeed);
 		UpdateSafeGroundPosition();
 		RecoverIfOutOfWorld();
 	}
@@ -243,6 +278,7 @@ public partial class PlayerController : CharacterBody3D
 		AddKeyAction("jump", Key.Space);
 		AddKeyAction("sprint", Key.Shift);
 		AddKeyAction("capture_net", Key.R);
+		AddKeyAction("interact", Key.E);
 		AddKeyAction("party_panel", Key.P);
 		AddKeyAction("inventory_panel", Key.I);
 		AddKeyAction("formation_panel", Key.F);
@@ -351,6 +387,37 @@ public partial class PlayerController : CharacterBody3D
 		_partyPanel.RefreshParty();
 		_formationPanel.RefreshAll();
 		return true;
+	}
+
+	public int ReviveDefeatedCompanions()
+	{
+		int revivedCount = 0;
+		foreach (SimpleActor actor in _capturedCollection)
+		{
+			if (!IsInstanceValid(actor) || !actor.IsDefeated)
+			{
+				continue;
+			}
+
+			if (actor.ReviveFromCaretaker(this))
+			{
+				revivedCount++;
+			}
+		}
+
+		if (revivedCount > 0)
+		{
+			ReassignFollowSlots();
+			_partyPanel.RefreshParty();
+			_formationPanel.RefreshAll();
+			SpawnWorldCombatEffect($"Revived x{revivedCount}", new Color(0.42f, 1.0f, 0.66f, 0.94f), GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 1.0f, 0.82f);
+		}
+		else
+		{
+			SpawnWorldCombatEffect("No fallen pets", new Color(0.72f, 0.86f, 1.0f, 0.9f), GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 0.8f, 0.58f);
+		}
+
+		return revivedCount;
 	}
 
 	public SimpleActor? GetFormationActor(int slotIndex)
@@ -842,6 +909,252 @@ public partial class PlayerController : CharacterBody3D
 		layer.AddChild(_damageFlashOverlay);
 	}
 
+	private void CreateInteractionPromptHud()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "InteractionPromptLayer",
+			Layer = 26,
+		};
+		AddChild(layer);
+
+		_interactionPromptLabel = new Label
+		{
+			Name = "InteractionPrompt",
+			Text = string.Empty,
+			HorizontalAlignment = HorizontalAlignment.Center,
+			VerticalAlignment = VerticalAlignment.Center,
+			AnchorLeft = 0.5f,
+			AnchorRight = 0.5f,
+			AnchorTop = 0.78f,
+			AnchorBottom = 0.78f,
+			OffsetLeft = -240.0f,
+			OffsetRight = 240.0f,
+			OffsetTop = -22.0f,
+			OffsetBottom = 22.0f,
+			Visible = false,
+		};
+		_interactionPromptLabel.AddThemeFontSizeOverride("font_size", 18);
+		_interactionPromptLabel.AddThemeColorOverride("font_color", new Color(0.92f, 1.0f, 0.88f));
+		_interactionPromptLabel.AddThemeColorOverride("font_outline_color", new Color(0.02f, 0.03f, 0.025f, 0.94f));
+		_interactionPromptLabel.AddThemeConstantOverride("outline_size", 6);
+		layer.AddChild(_interactionPromptLabel);
+	}
+
+	private void UpdateInteractionPrompt()
+	{
+		if (_interactionPromptLabel == null)
+		{
+			return;
+		}
+
+		Node3D? revivalNpc = GetNearestRevivalNpc();
+		_interactionPromptLabel.Visible = revivalNpc != null;
+		if (revivalNpc != null)
+		{
+			_interactionPromptLabel.Text = "E  Revive fallen pets";
+		}
+	}
+
+	private void TryInteractWithRevivalNpc()
+	{
+		if (GetNearestRevivalNpc() == null)
+		{
+			return;
+		}
+
+		ReviveDefeatedCompanions();
+	}
+
+	private Node3D? GetNearestRevivalNpc()
+	{
+		Node3D? nearest = null;
+		float bestDistance = RevivalNpcInteractRange;
+		foreach (Node node in GetTree().GetNodesInGroup("revival_npc"))
+		{
+			if (node is not Node3D npc || !IsInstanceValid(npc))
+			{
+				continue;
+			}
+
+			float distance = GlobalPosition.DistanceTo(npc.GlobalPosition);
+			if (distance <= bestDistance)
+			{
+				nearest = npc;
+				bestDistance = distance;
+			}
+		}
+
+		return nearest;
+	}
+
+	private void TrySelectActorTarget()
+	{
+		if (TryRaycastActor(out SimpleActor actor))
+		{
+			SetSelectedActor(actor);
+			return;
+		}
+
+		ClearSelectedActor();
+	}
+
+	private bool TryRaycastActor(out SimpleActor actor)
+	{
+		actor = null!;
+		PhysicsDirectSpaceState3D spaceState = GetWorld3D().DirectSpaceState;
+		Vector3 origin = _camera.GlobalPosition;
+		Vector3 end = origin + GetCameraAimDirection() * TargetInfoRange;
+		var query = PhysicsRayQueryParameters3D.Create(origin, end);
+		query.CollideWithAreas = false;
+		query.CollideWithBodies = true;
+		query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+
+		Godot.Collections.Dictionary result = spaceState.IntersectRay(query);
+		if (result.TryGetValue("collider", out Variant colliderVariant) && colliderVariant.AsGodotObject() is SimpleActor hitActor)
+		{
+			actor = hitActor;
+			return true;
+		}
+
+		return false;
+	}
+
+	private void SetSelectedActor(SimpleActor actor)
+	{
+		_selectedActor = actor;
+		bool isAttackCommandTarget = IsAttackCommandTarget(actor);
+		_focusedTarget = isAttackCommandTarget ? actor : null;
+		EnsureSelectedTargetMarker();
+		UpdateSelectedTargetMarkerColors(isAttackCommandTarget);
+		if (_selectedTargetMarker != null)
+		{
+			_selectedTargetMarker.Visible = true;
+		}
+	}
+
+	private void ClearSelectedActor()
+	{
+		_selectedActor = null;
+		_focusedTarget = null;
+		if (_selectedTargetMarker != null)
+		{
+			_selectedTargetMarker.Visible = false;
+		}
+	}
+
+	private bool IsValidFocusedTarget(SimpleActor? actor)
+	{
+		return actor != null && IsInstanceValid(actor) && IsAttackCommandTarget(actor) && GlobalPosition.DistanceTo(actor.GlobalPosition) <= TargetInfoRange * 1.6f;
+	}
+
+	private bool IsValidSelectedActor(SimpleActor? actor)
+	{
+		return actor != null && IsInstanceValid(actor) && !actor.IsDefeated && GlobalPosition.DistanceTo(actor.GlobalPosition) <= TargetInfoRange * 1.6f;
+	}
+
+	private bool IsAttackCommandTarget(SimpleActor actor)
+	{
+		return IsInstanceValid(actor) && !actor.IsDefeated && !actor.IsCaptured;
+	}
+
+	private void EnsureSelectedTargetMarker()
+	{
+		if (_selectedTargetMarker != null && IsInstanceValid(_selectedTargetMarker))
+		{
+			return;
+		}
+
+		_selectedTargetMarker = new Node3D { Name = "SelectedTargetMarker", Visible = false };
+		Node parent = GetTree().CurrentScene ?? GetParent();
+		parent.AddChild(_selectedTargetMarker);
+
+		_selectedTargetRingMaterial = new StandardMaterial3D
+		{
+			AlbedoColor = new Color(1.0f, 0.78f, 0.16f, 0.78f),
+			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			Roughness = 0.35f,
+		};
+		_selectedTargetArrowMaterial = new StandardMaterial3D
+		{
+			AlbedoColor = new Color(1.0f, 0.32f, 0.18f, 0.9f),
+			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			Roughness = 0.25f,
+		};
+
+		_selectedTargetOuterRing = AddMarkerMesh("SelectedRingOuter", new CylinderMesh { TopRadius = 1.15f, BottomRadius = 1.15f, Height = 0.035f, RadialSegments = 48 }, new Vector3(0.0f, 0.035f, 0.0f), Vector3.Zero, Vector3.One, _selectedTargetRingMaterial);
+		_selectedTargetInnerRing = AddMarkerMesh("SelectedRingInner", new CylinderMesh { TopRadius = 0.82f, BottomRadius = 0.82f, Height = 0.04f, RadialSegments = 48 }, new Vector3(0.0f, 0.045f, 0.0f), Vector3.Zero, Vector3.One, _selectedTargetRingMaterial);
+		_selectedTargetArrow = AddMarkerMesh("SelectedArrow", new CylinderMesh { TopRadius = 0.0f, BottomRadius = 0.18f, Height = 0.42f, RadialSegments = 3 }, new Vector3(0.0f, 2.65f, 0.0f), new Vector3(180.0f, 30.0f, 0.0f), Vector3.One, _selectedTargetArrowMaterial);
+	}
+
+	private MeshInstance3D? AddMarkerMesh(string nodeName, Mesh mesh, Vector3 position, Vector3 rotationDegrees, Vector3 scale, Material material)
+	{
+		if (_selectedTargetMarker == null)
+		{
+			return null;
+		}
+
+		var meshInstance = new MeshInstance3D
+		{
+			Name = nodeName,
+			Mesh = mesh,
+			Position = position,
+			RotationDegrees = rotationDegrees,
+			Scale = scale,
+		};
+		meshInstance.SetSurfaceOverrideMaterial(0, material);
+		_selectedTargetMarker.AddChild(meshInstance);
+		return meshInstance;
+	}
+
+	private void UpdateSelectedTargetMarkerColors(bool isHostile)
+	{
+		if (_selectedTargetRingMaterial == null || _selectedTargetArrowMaterial == null)
+		{
+			return;
+		}
+
+		_selectedTargetRingMaterial.AlbedoColor = isHostile
+			? new Color(1.0f, 0.78f, 0.16f, 0.78f)
+			: new Color(0.34f, 0.72f, 1.0f, 0.70f);
+		_selectedTargetArrowMaterial.AlbedoColor = isHostile
+			? new Color(1.0f, 0.32f, 0.18f, 0.9f)
+			: new Color(0.36f, 0.92f, 1.0f, 0.86f);
+	}
+
+	private void UpdateFocusedTargetMarker(float step)
+	{
+		if (!IsValidSelectedActor(_selectedActor))
+		{
+			ClearSelectedActor();
+			return;
+		}
+
+		EnsureSelectedTargetMarker();
+		if (_selectedTargetMarker == null || _selectedActor == null)
+		{
+			return;
+		}
+
+		bool isAttackCommandTarget = IsAttackCommandTarget(_selectedActor);
+		_focusedTarget = isAttackCommandTarget ? _selectedActor : null;
+		UpdateSelectedTargetMarkerColors(isAttackCommandTarget);
+		if (_selectedTargetInnerRing != null)
+		{
+			_selectedTargetInnerRing.Visible = isAttackCommandTarget;
+		}
+
+		_selectedTargetMarker.Visible = true;
+		_selectedTargetMarker.GlobalPosition = _selectedActor.GlobalPosition + Vector3.Up * 0.03f;
+		_selectedTargetMarker.RotationDegrees += new Vector3(0.0f, (isAttackCommandTarget ? 120.0f : 72.0f) * step, 0.0f);
+		float pulse = 1.0f + Mathf.Sin(Time.GetTicksMsec() * 0.008f) * 0.08f;
+		_selectedTargetMarker.Scale = new Vector3(pulse, 1.0f, pulse);
+		if (_selectedTargetArrow != null)
+		{
+			_selectedTargetArrow.Position = new Vector3(0.0f, isAttackCommandTarget ? 2.65f : 2.45f, 0.0f);
+		}
+	}
+
 	private void UpdateCaptureAmmoHud()
 	{
 		if (_captureAmmoCountLabel == null || _captureAmmoRechargeBar == null)
@@ -897,6 +1210,106 @@ public partial class PlayerController : CharacterBody3D
 		_damageFlashOverlay.Color = new Color(1.0f, 0.06f, 0.02f, alpha);
 	}
 
+	private void UpdateMovementEffects(float step, float targetSpeed)
+	{
+		_footstepEffectRemaining = Mathf.Max(_footstepEffectRemaining - step, 0.0f);
+		Vector3 planarVelocity = Velocity;
+		planarVelocity.Y = 0.0f;
+		float speed = planarVelocity.Length();
+		if (!IsOnFloor() || speed < 1.2f || _footstepEffectRemaining > 0.0f)
+		{
+			return;
+		}
+
+		bool isFastStep = speed > WalkSpeed * 1.12f || targetSpeed > WalkSpeed + 0.1f;
+		SpawnMovementDust(planarVelocity.Normalized(), speed, isFastStep);
+		_footstepEffectRemaining = isFastStep ? 0.13f : 0.22f;
+	}
+
+	private void SpawnMovementDust(Vector3 moveDirection, float speed, bool isFastStep)
+	{
+		Node parent = GetTree().CurrentScene ?? GetParent();
+		if (parent == null)
+		{
+			return;
+		}
+
+		Vector3 back = -moveDirection;
+		Vector3 side = new(-moveDirection.Z, 0.0f, moveDirection.X);
+		float footSide = Mathf.Sin(Time.GetTicksMsec() * 0.018f) >= 0.0f ? 1.0f : -1.0f;
+		var dust = new MovementDustEffect
+		{
+			DustColor = isFastStep ? new Color(0.86f, 0.78f, 0.52f, 0.74f) : new Color(0.68f, 0.62f, 0.48f, 0.62f),
+			Radius = isFastStep ? 0.24f : 0.17f,
+			Lifetime = isFastStep ? 0.34f : 0.44f,
+			IsFastStep = isFastStep,
+			DirectionYaw = Mathf.RadToDeg(Mathf.Atan2(-moveDirection.X, -moveDirection.Z)),
+		};
+		parent.AddChild(dust);
+		dust.GlobalPosition = GlobalPosition + back * Mathf.Clamp(speed * 0.035f, 0.18f, 0.45f) + side * footSide * 0.18f + Vector3.Up * 0.04f;
+	}
+
+	private void UpdateMovementAnimation(float step)
+	{
+		Vector3 planarVelocity = Velocity;
+		planarVelocity.Y = 0.0f;
+		float speed = planarVelocity.Length();
+		float moveRatio = Mathf.Clamp(speed / Mathf.Max(SprintSpeed, 0.01f), 0.0f, 1.0f);
+		bool isMoving = speed > 0.25f && IsOnFloor();
+		float phaseSpeed = Mathf.Lerp(6.2f, 11.2f, moveRatio);
+
+		if (isMoving)
+		{
+			_movementAnimationPhase += step * phaseSpeed;
+		}
+		else
+		{
+			_movementAnimationPhase = Mathf.Lerp(_movementAnimationPhase, 0.0f, Mathf.Min(step * 8.0f, 1.0f));
+		}
+
+		float swing = Mathf.Sin(_movementAnimationPhase);
+		float counterSwing = Mathf.Sin(_movementAnimationPhase + Mathf.Pi);
+		float lift = Mathf.Abs(Mathf.Cos(_movementAnimationPhase));
+		float intensity = isMoving ? Mathf.Lerp(0.45f, 1.0f, moveRatio) : 0.0f;
+		float bob = Mathf.Abs(swing) * 0.045f * intensity;
+		float lean = Mathf.Clamp(speed / Mathf.Max(SprintSpeed, 0.01f), 0.0f, 1.0f) * -4.5f;
+
+		SetVisualPosition("PlayerCoatBody", new Vector3(0.0f, 1.02f + bob, 0.0f));
+		SetVisualPosition("PlayerChestArmor", new Vector3(0.0f, 1.28f + bob, -0.255f));
+		SetVisualPosition("PlayerFrontPanel", new Vector3(0.0f, 0.98f + bob, -0.275f));
+		SetVisualPosition("PlayerChestTrim", new Vector3(0.0f, 1.42f + bob, -0.30f));
+		SetVisualRotation("PlayerCoatBody", new Vector3(lean, 0.0f, swing * 1.6f * intensity));
+
+		SetVisualRotation("PlayerLeftLeg", new Vector3(swing * 28.0f * intensity, 0.0f, -2.0f * intensity));
+		SetVisualRotation("PlayerRightLeg", new Vector3(counterSwing * 28.0f * intensity, 0.0f, 2.0f * intensity));
+		SetVisualPosition("PlayerLeftBoot", new Vector3(-0.16f, 0.07f + Mathf.Max(counterSwing, 0.0f) * 0.07f * intensity, -0.055f + swing * 0.05f * intensity));
+		SetVisualPosition("PlayerRightBoot", new Vector3(0.16f, 0.07f + Mathf.Max(swing, 0.0f) * 0.07f * intensity, -0.055f + counterSwing * 0.05f * intensity));
+
+		SetVisualRotation("PlayerLeftSleeve", new Vector3(counterSwing * 24.0f * intensity, 0.0f, -11.0f - swing * 5.0f * intensity));
+		SetVisualRotation("PlayerRightSleeve", new Vector3(swing * 24.0f * intensity, 0.0f, 11.0f - counterSwing * 5.0f * intensity));
+		SetVisualPosition("PlayerLeftGlove", new Vector3(-0.48f, 0.70f + counterSwing * 0.06f * intensity, -0.03f - counterSwing * 0.08f * intensity));
+		SetVisualPosition("PlayerRightGlove", new Vector3(0.48f, 0.70f + swing * 0.06f * intensity, -0.03f - swing * 0.08f * intensity));
+
+		SetVisualRotation("PlayerCape", new Vector3(-8.0f + Mathf.Abs(swing) * 7.0f * intensity, 0.0f, -swing * 2.5f * intensity));
+		SetVisualRotation("PlayerScarfTail", new Vector3(-12.0f - moveRatio * 12.0f, 0.0f, -12.0f + swing * 5.0f * intensity));
+	}
+
+	private void SetVisualPosition(string nodeName, Vector3 position)
+	{
+		if (GetNodeOrNull<Node3D>(nodeName) is Node3D node)
+		{
+			node.Position = position;
+		}
+	}
+
+	private void SetVisualRotation(string nodeName, Vector3 rotationDegrees)
+	{
+		if (GetNodeOrNull<Node3D>(nodeName) is Node3D node)
+		{
+			node.RotationDegrees = rotationDegrees;
+		}
+	}
+
 	private static Label MakeHudLabel(string text, int fontSize, Color color)
 	{
 		var label = new Label
@@ -924,6 +1337,7 @@ public partial class PlayerController : CharacterBody3D
 	private void ConfigureThirdPersonCamera()
 	{
 		_cameraYaw = 0.0f;
+		_cameraPitch = 0.08f;
 		_camera.TopLevel = true;
 		_camera.Fov = 58.0f;
 		_camera.Near = 0.05f;
@@ -937,9 +1351,10 @@ public partial class PlayerController : CharacterBody3D
 	{
 		Vector3 backward = GetCameraPlanarBackward();
 		float distance = Mathf.Max(ThirdPersonDistance, 1.0f);
-		float cameraHeight = Mathf.Max(ThirdPersonCameraHeight, 2.8f);
-		float lookHeight = Mathf.Clamp(ThirdPersonLookHeight, 1.75f, cameraHeight - 0.35f);
-		Vector3 cameraPosition = GlobalPosition + backward * distance + Vector3.Up * cameraHeight;
+		float horizontalDistance = Mathf.Max(Mathf.Cos(_cameraPitch) * distance, 1.2f);
+		float cameraHeight = Mathf.Max(ThirdPersonCameraHeight + Mathf.Sin(_cameraPitch) * distance, 0.85f);
+		float lookHeight = Mathf.Clamp(ThirdPersonLookHeight - Mathf.Sin(_cameraPitch) * 0.45f, 1.35f, 2.75f);
+		Vector3 cameraPosition = GlobalPosition + backward * horizontalDistance + Vector3.Up * cameraHeight;
 		cameraPosition = ClampCameraInsideMap(cameraPosition);
 		Vector3 lookTarget = GlobalPosition + Vector3.Up * lookHeight;
 
@@ -1253,16 +1668,7 @@ public partial class PlayerController : CharacterBody3D
 
 	private void UpdateTargetInfoPanel()
 	{
-		PhysicsDirectSpaceState3D spaceState = GetWorld3D().DirectSpaceState;
-		Vector3 origin = _camera.GlobalPosition;
-		Vector3 end = origin + GetCameraAimDirection() * TargetInfoRange;
-		var query = PhysicsRayQueryParameters3D.Create(origin, end);
-		query.CollideWithAreas = false;
-		query.CollideWithBodies = true;
-		query.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-
-		Godot.Collections.Dictionary result = spaceState.IntersectRay(query);
-		if (result.TryGetValue("collider", out Variant colliderVariant) && colliderVariant.AsGodotObject() is SimpleActor actor)
+		if (TryRaycastActor(out SimpleActor actor))
 		{
 			_targetInfoPanel.ShowActor(actor);
 			return;

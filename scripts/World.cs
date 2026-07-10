@@ -220,6 +220,7 @@ public partial class World : Node3D
 		CreateBoundaries();
 		CreateLandmarks();
 		CreateSpawnCamp();
+		CreateMainCity();
 		CreateRuinSite();
 		CreateMonsterDen();
 		ScatterProps();
@@ -270,6 +271,72 @@ public partial class World : Node3D
 		_obstaclePositions.Add(new Vector3(-7.0f, 0.0f, 15.0f));
 		_obstaclePositions.Add(new Vector3(7.0f, 0.0f, 15.5f));
 		_obstaclePositions.Add(new Vector3(0.0f, 0.0f, 17.2f));
+	}
+
+	private void CreateMainCity()
+	{
+		Vector3 center = new(0.0f, 0.0f, -20.0f);
+		CreateMesh(_mapRoot, "MainCityPlaza", CylinderMeshFor(15.5f, 15.5f, 0.12f), center + new Vector3(0.0f, 0.11f, 0.0f), _matPath);
+		CreateStaticBox(_propsRoot, "CityNorthGate", center + new Vector3(0.0f, 1.85f, -10.2f), new Vector3(8.5f, 3.7f, 1.1f), _matWall);
+		CreateStaticBox(_propsRoot, "CityLeftHouse", center + new Vector3(-9.4f, 1.35f, -1.6f), new Vector3(5.0f, 2.7f, 5.6f), _matWood);
+		CreateStaticBox(_propsRoot, "CityRightHouse", center + new Vector3(9.4f, 1.35f, -1.6f), new Vector3(5.0f, 2.7f, 5.6f), _matWood);
+		AddMesh(_propsRoot, "CityLeftRoof", CylinderMeshFor(0.0f, 3.8f, 2.1f), center + new Vector3(-9.4f, 3.45f, -1.6f), Vector3.Zero, new Vector3(1.0f, 0.72f, 1.0f), _matTentCloth);
+		AddMesh(_propsRoot, "CityRightRoof", CylinderMeshFor(0.0f, 3.8f, 2.1f), center + new Vector3(9.4f, 3.45f, -1.6f), Vector3.Zero, new Vector3(1.0f, 0.72f, 1.0f), _matTentCloth);
+		CreateStaticBox(_propsRoot, "CityClinic", center + new Vector3(0.0f, 1.25f, 7.0f), new Vector3(6.4f, 2.5f, 4.6f), _matWall);
+		AddMesh(_propsRoot, "ClinicRoof", CylinderMeshFor(0.0f, 4.0f, 1.8f), center + new Vector3(0.0f, 3.15f, 7.0f), Vector3.Zero, new Vector3(1.0f, 0.68f, 0.78f), _matNpcAccent);
+		AddMesh(_propsRoot, "ClinicCrossVertical", BoxMeshFor(new Vector3(0.18f, 0.72f, 0.06f)), center + new Vector3(0.0f, 2.0f, 4.66f), Vector3.Zero, Vector3.One, _matCrystal);
+		AddMesh(_propsRoot, "ClinicCrossHorizontal", BoxMeshFor(new Vector3(0.58f, 0.18f, 0.065f)), center + new Vector3(0.0f, 2.0f, 4.62f), Vector3.Zero, Vector3.One, _matCrystal);
+		CreateRevivalNpc(center + new Vector3(0.0f, 0.0f, 2.7f));
+		CreateBanner(center + new Vector3(-5.2f, 0.0f, 2.6f), 18.0f, _matCrystal);
+		CreateBanner(center + new Vector3(5.2f, 0.0f, 2.6f), -18.0f, _matCrystal);
+		CreateTorch(center + new Vector3(-6.9f, 0.0f, 6.0f));
+		CreateTorch(center + new Vector3(6.9f, 0.0f, 6.0f));
+
+		_obstaclePositions.Add(center);
+		_obstaclePositions.Add(center + new Vector3(-9.4f, 0.0f, -1.6f));
+		_obstaclePositions.Add(center + new Vector3(9.4f, 0.0f, -1.6f));
+		_obstaclePositions.Add(center + new Vector3(0.0f, 0.0f, 7.0f));
+	}
+
+	private void CreateRevivalNpc(Vector3 position)
+	{
+		var npc = new StaticBody3D
+		{
+			Name = "PetRevivalNpc",
+			Position = position,
+		};
+		npc.AddToGroup("revival_npc");
+		_propsRoot.AddChild(npc);
+
+		AddMesh(npc, "Robe", new CapsuleMesh { Radius = 0.30f, Height = 1.12f }, new Vector3(0.0f, 0.92f, 0.0f), Vector3.Zero, new Vector3(1.0f, 1.0f, 0.78f), _matNpc);
+		AddMesh(npc, "Head", new SphereMesh { Radius = 0.24f, Height = 0.48f }, new Vector3(0.0f, 1.62f, 0.0f), Vector3.Zero, Vector3.One, _matSkin);
+		AddMesh(npc, "HealerHat", CylinderMeshFor(0.18f, 0.30f, 0.22f), new Vector3(0.0f, 1.88f, 0.0f), Vector3.Zero, Vector3.One, _matCrystal);
+		AddMesh(npc, "Staff", new CylinderMesh { TopRadius = 0.035f, BottomRadius = 0.045f, Height = 1.7f }, new Vector3(0.46f, 0.92f, -0.02f), new Vector3(0.0f, 0.0f, -7.0f), Vector3.One, _matWood);
+		AddMesh(npc, "StaffOrb", new SphereMesh { Radius = 0.14f, Height = 0.22f }, new Vector3(0.58f, 1.74f, -0.02f), Vector3.Zero, Vector3.One, _matCrystal);
+		AddMesh(npc, "AuraRing", CylinderMeshFor(0.92f, 0.92f, 0.035f), new Vector3(0.0f, 0.06f, 0.0f), Vector3.Zero, Vector3.One, _matCrystal);
+
+		var label = new Label3D
+		{
+			Name = "RevivalNpcLabel",
+			Text = "Pet Revival",
+			Position = new Vector3(0.0f, 2.35f, 0.0f),
+			Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+			FontSize = 22,
+			PixelSize = 0.008f,
+			OutlineSize = 6,
+			HorizontalAlignment = HorizontalAlignment.Center,
+			Width = 260.0f,
+		};
+		label.OutlineModulate = new Color(0.02f, 0.03f, 0.025f, 0.95f);
+		label.Modulate = new Color(0.64f, 1.0f, 0.82f);
+		npc.AddChild(label);
+
+		var collisionShape = new CollisionShape3D
+		{
+			Position = new Vector3(0.0f, 0.9f, 0.0f),
+			Shape = new CapsuleShape3D { Radius = 0.42f, Height = 1.8f },
+		};
+		npc.AddChild(collisionShape);
 	}
 
 	private void CreateRuinSite()
