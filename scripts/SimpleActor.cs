@@ -56,6 +56,7 @@ public partial class SimpleActor : CharacterBody3D
 	private Tween? _attackPoseTween;
 	private Node3D? _attackPoseTarget;
 	private Vector3 _attackPoseBaseScale = Vector3.One;
+	private Node3D? _externalModelRootMotionNode;
 	private SimpleActor? _combatTarget;
 	private SimpleActor? _retaliationTarget;
 	private float _retaliationTargetRemaining;
@@ -628,6 +629,65 @@ public partial class SimpleActor : CharacterBody3D
 			? new Color(1.0f, 0.34f, 0.26f)
 			: new Color(0.64f, 0.86f, 1.0f);
 		_nameplate.OutlineModulate = new Color(0.02f, 0.025f, 0.03f, 0.96f);
+		UpdateNameplatePosition();
+	}
+
+	private void UpdateNameplatePosition()
+	{
+		if (_nameplate == null)
+		{
+			return;
+		}
+
+		float visualTop = GetVisualTopY(this);
+		float fallbackTop = ActorKind == "monster" ? 2.2f : 2.05f;
+		float labelY = Mathf.Max(visualTop + 0.38f, fallbackTop);
+		_nameplate.Position = new Vector3(0.0f, labelY, 0.0f);
+	}
+
+	private float GetVisualTopY(Node node)
+	{
+		float topY = 0.0f;
+		foreach (Node child in node.GetChildren())
+		{
+			if (child == _nameplate || child is CollisionShape3D)
+			{
+				continue;
+			}
+
+			if (child is MeshInstance3D meshInstance && meshInstance.Mesh != null)
+			{
+				topY = Mathf.Max(topY, GetMeshTopY(meshInstance));
+			}
+
+			topY = Mathf.Max(topY, GetVisualTopY(child));
+		}
+
+		return topY;
+	}
+
+	private float GetMeshTopY(MeshInstance3D meshInstance)
+	{
+		Aabb aabb = meshInstance.GetAabb();
+		float topY = 0.0f;
+		for (int x = 0; x <= 1; x++)
+		{
+			for (int y = 0; y <= 1; y++)
+			{
+				for (int z = 0; z <= 1; z++)
+				{
+					var corner = new Vector3(
+						x == 0 ? aabb.Position.X : aabb.Position.X + aabb.Size.X,
+						y == 0 ? aabb.Position.Y : aabb.Position.Y + aabb.Size.Y,
+						z == 0 ? aabb.Position.Z : aabb.Position.Z + aabb.Size.Z
+					);
+					Vector3 actorLocalCorner = ToLocal(meshInstance.ToGlobal(corner));
+					topY = Mathf.Max(topY, actorLocalCorner.Y);
+				}
+			}
+		}
+
+		return topY;
 	}
 
 	private void FollowCapturedTarget(Vector3 velocity, float step)
@@ -1364,6 +1424,7 @@ public partial class SimpleActor : CharacterBody3D
 		MoveAndSlide();
 		UpdateMovementEffects(step);
 		UpdateMovementAnimation(step);
+		StabilizeExternalModelRootMotion();
 	}
 
 	private void UpdateMovementEffects(float step)
@@ -1516,15 +1577,11 @@ public partial class SimpleActor : CharacterBody3D
 
 	private void SetExternalAnimationState(string state, float lockDuration = 0.0f)
 	{
-		if (lockDuration <= 0.0f && _externalAnimationState == state)
-		{
-			return;
-		}
-
 		bool played = ExternalModelLibrary.TryPlayActorAnimation(this, state);
 		if (played)
 		{
 			_externalAnimationState = state;
+			StabilizeExternalModelRootMotion();
 		}
 
 		if (played && lockDuration > 0.0f)
@@ -1547,6 +1604,53 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			node.RotationDegrees = rotationDegrees;
 		}
+	}
+
+	private void StabilizeExternalModelRootMotion()
+	{
+		Node3D? model = GetNodeOrNull<Node3D>("ExternalModel");
+		if (model == null)
+		{
+			_externalModelRootMotionNode = null;
+			return;
+		}
+
+		model.Position = Vector3.Zero;
+		model.RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f);
+
+		Node3D? rootMotionNode = _externalModelRootMotionNode;
+		if (rootMotionNode == null || !IsInstanceValid(rootMotionNode))
+		{
+			rootMotionNode = FindDescendantNode3D(model, "root") ?? FindDescendantNode3D(model, "Root");
+			_externalModelRootMotionNode = rootMotionNode;
+		}
+
+		if (rootMotionNode == null)
+		{
+			return;
+		}
+
+		rootMotionNode.Position = Vector3.Zero;
+		rootMotionNode.Rotation = Vector3.Zero;
+	}
+
+	private static Node3D? FindDescendantNode3D(Node node, string nodeName)
+	{
+		foreach (Node child in node.GetChildren())
+		{
+			if (child is Node3D childNode3D && childNode3D.Name == nodeName)
+			{
+				return childNode3D;
+			}
+
+			Node3D? found = FindDescendantNode3D(child, nodeName);
+			if (found != null)
+			{
+				return found;
+			}
+		}
+
+		return null;
 	}
 
 	private void FaceDirection(Vector3 direction, float step)
