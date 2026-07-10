@@ -61,6 +61,7 @@ public partial class PlayerController : CharacterBody3D
 	private FormationPanel _formationPanel = null!;
 	private SettingsPanel _settingsPanel = null!;
 	private MinimapPanel _minimapPanel = null!;
+	private SystemLogPanel _systemLogPanel = null!;
 	private PanelContainer _captureAmmoPanel = null!;
 	private Label _captureAmmoCaptionLabel = null!;
 	private Label _captureAmmoCountLabel = null!;
@@ -109,6 +110,7 @@ public partial class PlayerController : CharacterBody3D
 		CreateCaptureAmmoHud();
 		CreateDamageFlashHud();
 		CreateInteractionPromptHud();
+		CreateSystemLogPanel();
 
 		AddToGroup("player");
 		EnsureInputActions();
@@ -196,7 +198,7 @@ public partial class PlayerController : CharacterBody3D
 				Mathf.Pi
 			);
 			_cameraPitch = Mathf.Clamp(
-				_cameraPitch - mouseMotion.Relative.Y * VerticalLookSensitivity,
+				_cameraPitch + mouseMotion.Relative.Y * VerticalLookSensitivity,
 				-0.42f,
 				0.76f
 			);
@@ -318,6 +320,7 @@ public partial class PlayerController : CharacterBody3D
 
 		_capturedCollection.Add(actor);
 		actor.Capture(this);
+		PostSystemMessage($"Captured {actor.LocalizedDisplayName}.", new Color(0.62f, 0.90f, 1.0f));
 
 		if (_activeParty.Count < ActivePartyLimit)
 		{
@@ -411,10 +414,12 @@ public partial class PlayerController : CharacterBody3D
 			_partyPanel.RefreshParty();
 			_formationPanel.RefreshAll();
 			SpawnWorldCombatEffect($"Revived x{revivedCount}", new Color(0.42f, 1.0f, 0.66f, 0.94f), GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 1.0f, 0.82f);
+			PostSystemMessage($"Revived {revivedCount} fallen pet(s).", new Color(0.54f, 1.0f, 0.70f));
 		}
 		else
 		{
 			SpawnWorldCombatEffect("No fallen pets", new Color(0.72f, 0.86f, 1.0f, 0.9f), GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 0.8f, 0.58f);
+			PostSystemMessage("No fallen pets to revive.", new Color(0.78f, 0.88f, 1.0f));
 		}
 
 		return revivedCount;
@@ -562,6 +567,7 @@ public partial class PlayerController : CharacterBody3D
 
 		_inventoryItems.TryGetValue(itemId, out int currentCount);
 		_inventoryItems[itemId] = Mathf.Max(currentCount + amount, 0);
+		PostSystemMessage($"Obtained {itemId} x{Mathf.Max(amount, 0)}.", new Color(1.0f, 0.88f, 0.48f));
 		if (_inventoryPanel != null)
 		{
 			_inventoryPanel.RefreshAll();
@@ -621,6 +627,7 @@ public partial class PlayerController : CharacterBody3D
 			}
 		}
 
+		PostSystemMessage($"Party gained {experience} EXP.", new Color(0.86f, 0.78f, 1.0f));
 		_partyPanel.RefreshParty();
 	}
 
@@ -939,6 +946,29 @@ public partial class PlayerController : CharacterBody3D
 		_interactionPromptLabel.AddThemeColorOverride("font_outline_color", new Color(0.02f, 0.03f, 0.025f, 0.94f));
 		_interactionPromptLabel.AddThemeConstantOverride("outline_size", 6);
 		layer.AddChild(_interactionPromptLabel);
+	}
+
+	private void CreateSystemLogPanel()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "SystemLogLayer",
+			Layer = 28,
+		};
+		AddChild(layer);
+
+		_systemLogPanel = new SystemLogPanel();
+		layer.AddChild(_systemLogPanel);
+	}
+
+	public void PostSystemMessage(string message, Color color)
+	{
+		if (_systemLogPanel == null)
+		{
+			return;
+		}
+
+		_systemLogPanel.AddMessage(message, color);
 	}
 
 	private void UpdateInteractionPrompt()

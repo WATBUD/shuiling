@@ -45,6 +45,7 @@ public partial class World : Node3D
 	{
 		"Support",
 		"Ranged",
+		"Ranged",
 		"Tank",
 		"Gatherer",
 		"Builder",
@@ -56,6 +57,7 @@ public partial class World : Node3D
 		"DPS",
 		"DPS",
 		"Tank",
+		"Ranged",
 		"Ranged",
 	};
 
@@ -291,11 +293,21 @@ public partial class World : Node3D
 		CreateBanner(center + new Vector3(5.2f, 0.0f, 2.6f), -18.0f, _matCrystal);
 		CreateTorch(center + new Vector3(-6.9f, 0.0f, 6.0f));
 		CreateTorch(center + new Vector3(6.9f, 0.0f, 6.0f));
+		CreateExternalProp("CityFountain", "res://assets/models/environment/fountain.glb", center + new Vector3(0.0f, 0.0f, -4.0f), Vector3.Zero, new Vector3(1.45f, 1.45f, 1.45f), new Vector3(2.4f, 1.0f, 2.4f), new Vector3(0.0f, 0.5f, 0.0f));
+		CreateExternalProp("CityMarketStallLeft", "res://assets/models/environment/stall.glb", center + new Vector3(-6.3f, 0.0f, -6.2f), new Vector3(0.0f, 32.0f, 0.0f), new Vector3(1.15f, 1.15f, 1.15f), new Vector3(2.4f, 1.7f, 1.8f), new Vector3(0.0f, 0.85f, 0.0f));
+		CreateExternalProp("CityMarketStallRight", "res://assets/models/environment/stall.glb", center + new Vector3(6.3f, 0.0f, -6.2f), new Vector3(0.0f, -32.0f, 0.0f), new Vector3(1.15f, 1.15f, 1.15f), new Vector3(2.4f, 1.7f, 1.8f), new Vector3(0.0f, 0.85f, 0.0f));
+		CreateExternalProp("CityLanternLeft", "res://assets/models/environment/lantern.glb", center + new Vector3(-3.4f, 0.0f, -7.5f), Vector3.Zero, new Vector3(1.35f, 1.35f, 1.35f), new Vector3(0.6f, 2.2f, 0.6f), new Vector3(0.0f, 1.1f, 0.0f));
+		CreateExternalProp("CityLanternRight", "res://assets/models/environment/lantern.glb", center + new Vector3(3.4f, 0.0f, -7.5f), Vector3.Zero, new Vector3(1.35f, 1.35f, 1.35f), new Vector3(0.6f, 2.2f, 0.6f), new Vector3(0.0f, 1.1f, 0.0f));
+		CreateExternalProp("CityTreeLeft", "res://assets/models/environment/tree_01.glb", center + new Vector3(-12.0f, 0.0f, 5.2f), Vector3.Zero, new Vector3(1.55f, 1.55f, 1.55f), new Vector3(1.3f, 3.2f, 1.3f), new Vector3(0.0f, 1.6f, 0.0f));
+		CreateExternalProp("CityTreeRight", "res://assets/models/environment/oak_tree.glb", center + new Vector3(12.0f, 0.0f, 5.2f), Vector3.Zero, new Vector3(1.45f, 1.45f, 1.45f), new Vector3(1.3f, 3.0f, 1.3f), new Vector3(0.0f, 1.5f, 0.0f));
 
 		_obstaclePositions.Add(center);
 		_obstaclePositions.Add(center + new Vector3(-9.4f, 0.0f, -1.6f));
 		_obstaclePositions.Add(center + new Vector3(9.4f, 0.0f, -1.6f));
 		_obstaclePositions.Add(center + new Vector3(0.0f, 0.0f, 7.0f));
+		_obstaclePositions.Add(center + new Vector3(0.0f, 0.0f, -4.0f));
+		_obstaclePositions.Add(center + new Vector3(-6.3f, 0.0f, -6.2f));
+		_obstaclePositions.Add(center + new Vector3(6.3f, 0.0f, -6.2f));
 	}
 
 	private void CreateRevivalNpc(Vector3 position)
@@ -734,6 +746,11 @@ public partial class World : Node3D
 
 	private void BuildNpcVisual(Node3D actor)
 	{
+		if (actor is SimpleActor npcActor && ExternalModelLibrary.TryAddActorModel(npcActor))
+		{
+			return;
+		}
+
 		AddMesh(actor, "Torso", new CapsuleMesh { Radius = 0.28f, Height = 0.92f }, new Vector3(0.0f, 1.02f, 0.0f), Vector3.Zero, new Vector3(0.92f, 1.0f, 0.78f), _matNpc);
 		AddMesh(actor, "ChestTrim", BoxMeshFor(new Vector3(0.58f, 0.08f, 0.06f)), new Vector3(0.0f, 1.20f, -0.24f), Vector3.Zero, Vector3.One, _matNpcAccent);
 		AddMesh(actor, "Belt", BoxMeshFor(new Vector3(0.66f, 0.10f, 0.12f)), new Vector3(0.0f, 0.74f, -0.02f), Vector3.Zero, Vector3.One, _matLeather);
@@ -771,6 +788,11 @@ public partial class World : Node3D
 
 	private void BuildMonsterVisual(Node3D actor)
 	{
+		if (actor is SimpleActor monsterActor && ExternalModelLibrary.TryAddActorModel(monsterActor))
+		{
+			return;
+		}
+
 		AddMesh(actor, "BodyCore", new SphereMesh { Radius = 0.54f, Height = 0.86f }, new Vector3(0.0f, 0.74f, 0.10f), Vector3.Zero, new Vector3(1.34f, 0.72f, 1.72f), _matMonster);
 		AddMesh(actor, "ChestMass", new SphereMesh { Radius = 0.42f, Height = 0.62f }, new Vector3(0.0f, 0.86f, -0.50f), Vector3.Zero, new Vector3(1.26f, 0.82f, 1.05f), _matMonster);
 		AddMesh(actor, "HindMass", new SphereMesh { Radius = 0.45f, Height = 0.62f }, new Vector3(0.0f, 0.72f, 0.68f), Vector3.Zero, new Vector3(1.36f, 0.78f, 0.98f), _matMonster);
@@ -839,6 +861,9 @@ public partial class World : Node3D
 			case "Ranged":
 				AddMesh(actor, "Bow", new CapsuleMesh { Radius = 0.035f, Height = 1.05f }, new Vector3(0.54f, 1.04f, 0.02f), new Vector3(0.0f, 0.0f, 18.0f), new Vector3(1.0f, 1.0f, 0.6f), _matWood);
 				AddMesh(actor, "ArrowBundle", BoxMeshFor(new Vector3(0.18f, 0.62f, 0.10f)), new Vector3(0.22f, 1.12f, 0.38f), new Vector3(-14.0f, 0.0f, 10.0f), Vector3.One, _matLeather);
+				AddMesh(actor, "Quiver", CylinderMeshFor(0.11f, 0.14f, 0.62f), new Vector3(0.24f, 1.12f, 0.43f), new Vector3(-18.0f, 0.0f, 12.0f), new Vector3(0.82f, 1.0f, 0.82f), _matLeather);
+				AddMesh(actor, "ReadyArrow", new CapsuleMesh { Radius = 0.018f, Height = 0.86f }, new Vector3(0.55f, 1.03f, -0.13f), new Vector3(88.0f, 0.0f, 10.0f), Vector3.One, _matHorn);
+				AddMesh(actor, "ArrowTip", CylinderMeshFor(0.0f, 0.045f, 0.13f), new Vector3(0.58f, 1.00f, -0.55f), new Vector3(88.0f, 0.0f, 10.0f), Vector3.One, _matMetal);
 				break;
 			case "Support":
 				AddMesh(actor, "Staff", new CylinderMesh { TopRadius = 0.035f, BottomRadius = 0.045f, Height = 1.35f }, new Vector3(0.55f, 1.06f, -0.04f), new Vector3(0.0f, 0.0f, -8.0f), Vector3.One, _matWood);
@@ -871,6 +896,8 @@ public partial class World : Node3D
 			case "Ranged":
 				AddMesh(actor, "ThroatGlow", new SphereMesh { Radius = 0.18f, Height = 0.26f }, new Vector3(0.0f, 1.00f, -0.72f), Vector3.Zero, new Vector3(1.2f, 0.72f, 0.8f), _matCrystal);
 				AddMesh(actor, "SpitOrb", new SphereMesh { Radius = 0.12f, Height = 0.18f }, new Vector3(0.0f, 1.08f, -1.10f), Vector3.Zero, Vector3.One, _matCrystal);
+				AddMesh(actor, "SpitterJawMark", BoxMeshFor(new Vector3(0.30f, 0.035f, 0.06f)), new Vector3(0.0f, 1.03f, -1.42f), Vector3.Zero, Vector3.One, _matCrystal);
+				AddMesh(actor, "BackCrystalLauncher", CylinderMeshFor(0.0f, 0.10f, 0.34f), new Vector3(0.0f, 1.32f, -0.05f), new Vector3(-24.0f, 0.0f, 0.0f), Vector3.One, _matCrystal);
 				break;
 			case "Support":
 				AddMesh(actor, "RuneBand", CylinderMeshFor(0.58f, 0.58f, 0.035f), new Vector3(0.0f, 0.98f, 0.08f), Vector3.Zero, new Vector3(1.12f, 1.0f, 1.42f), _matRune);
@@ -1000,6 +1027,17 @@ public partial class World : Node3D
 		};
 		_propsRoot.AddChild(tree);
 
+		if (ExternalModelLibrary.TryAddPropModel(tree, "tree", unchecked((int)_rng.Randi()), Vector3.Zero, new Vector3(1.15f, 1.15f, 1.15f)))
+		{
+			var modelCollisionShape = new CollisionShape3D
+			{
+				Position = new Vector3(0.0f, 1.35f, 0.0f),
+				Shape = new BoxShape3D { Size = new Vector3(0.95f, 2.7f, 0.95f) },
+			};
+			tree.AddChild(modelCollisionShape);
+			return;
+		}
+
 		var trunk = new MeshInstance3D
 		{
 			Name = "Trunk",
@@ -1050,6 +1088,17 @@ public partial class World : Node3D
 			(float)_rng.RandfRange(1.0f, 2.4f)
 		);
 
+		if (ExternalModelLibrary.TryAddPropModel(rock, "rock", unchecked((int)_rng.Randi()), Vector3.Zero, new Vector3(size.X * 0.55f, size.Y * 0.75f, size.Z * 0.55f)))
+		{
+			var modelCollisionShape = new CollisionShape3D
+			{
+				Position = new Vector3(0.0f, size.Y * 0.5f, 0.0f),
+				Shape = new BoxShape3D { Size = size },
+			};
+			rock.AddChild(modelCollisionShape);
+			return;
+		}
+
 		var meshInstance = new MeshInstance3D
 		{
 			Name = "RockMesh",
@@ -1092,6 +1141,28 @@ public partial class World : Node3D
 		var collisionShape = new CollisionShape3D
 		{
 			Shape = new BoxShape3D { Size = size },
+		};
+		body.AddChild(collisionShape);
+
+		return body;
+	}
+
+	private StaticBody3D CreateExternalProp(string nodeName, string modelPath, Vector3 position, Vector3 rotationDegrees, Vector3 modelScale, Vector3 collisionSize, Vector3 collisionPosition)
+	{
+		var body = new StaticBody3D
+		{
+			Name = nodeName,
+			Position = position,
+			RotationDegrees = rotationDegrees,
+		};
+		_propsRoot.AddChild(body);
+
+		ExternalModelLibrary.TryAddModel(body, modelPath, "ExternalModel", Vector3.Zero, Vector3.Zero, modelScale);
+
+		var collisionShape = new CollisionShape3D
+		{
+			Position = collisionPosition,
+			Shape = new BoxShape3D { Size = collisionSize },
 		};
 		body.AddChild(collisionShape);
 
