@@ -2,6 +2,16 @@ using Godot;
 
 public partial class SimpleActor : CharacterBody3D
 {
+	private enum SquadActivity
+	{
+		Follow,
+		Guard,
+		Scout,
+		Gather,
+		Roam,
+		Rest,
+	}
+
 	[Export] public string ActorKind { get; set; } = "npc";
 	[Export] public float MoveSpeed { get; set; } = 1.6f;
 	[Export] public float WanderRadius { get; set; } = 10.0f;
@@ -41,6 +51,10 @@ public partial class SimpleActor : CharacterBody3D
 	private float _attackCooldownRemaining;
 	private SimpleActor? _combatTarget;
 	private Label3D? _nameplate;
+	private SquadActivity _squadActivity = SquadActivity.Follow;
+	private Vector3 _squadActivityLocalOffset = Vector3.Zero;
+	private float _squadActivityRemaining;
+	private float _squadThinkRemaining;
 	private CompanionBuildLoadout _buildLoadout = new();
 	private BuildStats _buildStats = new();
 	private bool _buildConfigured;
@@ -224,6 +238,7 @@ public partial class SimpleActor : CharacterBody3D
 		_followTarget = followTarget;
 		_isInActiveParty = false;
 		_waitTime = 0.0f;
+		ResetSquadActivity();
 		Velocity = Vector3.Zero;
 		CurrentHealth = Mathf.Max(CurrentHealth, Mathf.RoundToInt(EffectiveMaxHealth * 0.45f));
 		AddCollisionExceptionWith(followTarget);
@@ -244,6 +259,7 @@ public partial class SimpleActor : CharacterBody3D
 		CollisionMask = _defaultCollisionMask;
 		AddCollisionExceptionWith(followTarget);
 		followTarget.AddCollisionExceptionWith(this);
+		ResetSquadActivity();
 		GlobalPosition = GetFollowDestination();
 		Velocity = Vector3.Zero;
 		RefreshNameplate();
@@ -263,6 +279,14 @@ public partial class SimpleActor : CharacterBody3D
 	public void SetFollowSlot(int followSlot)
 	{
 		_followSlot = followSlot;
+		_squadThinkRemaining = Mathf.Min(_squadThinkRemaining, 0.2f);
+	}
+
+	public void OnFormationLayoutChanged()
+	{
+		ResetSquadActivity();
+		_squadActivityRemaining = 0.0f;
+		_squadThinkRemaining = 0.0f;
 	}
 
 	public void CycleBuildEquipment(EquipmentSlot slot)
@@ -560,6 +584,8 @@ public partial class SimpleActor : CharacterBody3D
 
 		if (TryUseSupportBuild(ref velocity, step))
 		{
+			_squadActivity = SquadActivity.Follow;
+			_squadThinkRemaining = 1.2f;
 			Velocity = velocity;
 			MoveAndSlide();
 			return;
@@ -567,24 +593,30 @@ public partial class SimpleActor : CharacterBody3D
 
 		if (TryCompanionCombat(ref velocity, step))
 		{
+			_squadActivity = SquadActivity.Follow;
+			_squadThinkRemaining = 1.6f;
 			Velocity = velocity;
 			MoveAndSlide();
 			return;
 		}
 
-		Vector3 destination = GetFollowDestination();
+		UpdateSquadActivity(step);
+		Vector3 destination = GetLivingSquadDestination();
 		Vector3 toDestination = destination - GlobalPosition;
 		toDestination.Y = 0.0f;
+		float distanceToPlayer = GlobalPosition.DistanceTo(_followTarget.GlobalPosition);
 
-		if (toDestination.Length() > 16.0f)
+		if (distanceToPlayer > 19.0f)
 		{
-			GlobalPosition = destination;
+			GlobalPosition = GetFollowDestination();
 			Velocity = Vector3.Zero;
+			ResetSquadActivity();
 			return;
 		}
 
-		float followSpeed = Mathf.Max(EffectiveMoveSpeed * 2.4f, 5.0f);
-		if (toDestination.Length() > 0.45f)
+		float followSpeed = GetLivingSquadMoveSpeed(distanceToPlayer);
+		float stopDistance = _squadActivity == SquadActivity.Rest ? 0.85f : 0.55f;
+		if (toDestination.Length() > stopDistance)
 		{
 			Vector3 direction = toDestination.Normalized();
 			velocity.X = Mathf.MoveToward(velocity.X, direction.X * followSpeed, followSpeed * 7.0f * step);
@@ -594,7 +626,7 @@ public partial class SimpleActor : CharacterBody3D
 		else
 		{
 			velocity = SlowToStop(velocity, step);
-			FaceDirection(_followTarget.GlobalPosition - GlobalPosition, step);
+			FaceDirection(GetLivingSquadLookDirection(destination), step);
 		}
 
 		Velocity = velocity;
@@ -608,17 +640,178 @@ public partial class SimpleActor : CharacterBody3D
 			return GlobalPosition;
 		}
 
-		Vector3 behind = _followTarget.GlobalTransform.Basis.Z;
-		behind.Y = 0.0f;
-		behind = behind.LengthSquared() > 0.001f ? behind.Normalized() : new Vector3(0.0f, 0.0f, 1.0f);
+		return _followTarget.GlobalPosition + PlayerLocalToWorld(GetFormationLocalOffset());
+	}
+
+	private Vector3 GetLivingSquadDestination()
+	{
+		if (_followTarget == null || !IsInstanceValid(_followTarget))
+		{
+			return GlobalPosition;
+		}
+
+		Vector3 formationOffset = GetFormationLocalOffset();
+		Vector3 localOffset = _squadActivity switch
+		{
+			SquadActivity.Guard => formationOffset * 0.72f + _squadActivityLocalOffset * 0.28f,
+			SquadActivity.Scout => _squadActivityLocalOffset,
+			SquadActivity.Gather => _squadActivityLocalOffset,
+			SquadActivity.Roam => _squadActivityLocalOffset,
+			SquadActivity.Rest => formationOffset * 0.82f + _squadActivityLocalOffset * 0.18f,
+			_ => formationOffset,
+		};
+
+		return _followTarget.GlobalPosition + PlayerLocalToWorld(localOffset);
+	}
+
+	private void UpdateSquadActivity(float step)
+	{
+		if (_followTarget == null || !IsInstanceValid(_followTarget))
+		{
+			return;
+		}
+
+		float distanceToPlayer = GlobalPosition.DistanceTo(_followTarget.GlobalPosition);
+		if (distanceToPlayer > GetFormationRegroupDistance())
+		{
+			_squadActivity = SquadActivity.Follow;
+			_squadActivityRemaining = 1.0f;
+			_squadThinkRemaining = 1.2f;
+			return;
+		}
+
+		_squadActivityRemaining = Mathf.Max(_squadActivityRemaining - step, 0.0f);
+		_squadThinkRemaining = Mathf.Max(_squadThinkRemaining - step, 0.0f);
+		if (_squadActivityRemaining > 0.0f || _squadThinkRemaining > 0.0f)
+		{
+			return;
+		}
+
+		ChooseSquadActivity();
+	}
+
+	private void ChooseSquadActivity()
+	{
+		BuildStats stats = CurrentBuildStats;
+		float roll = _rng.Randf();
+		_squadActivity = ChooseLivingSquadActivity(stats, roll);
+		_squadActivityLocalOffset = MakeActivityLocalOffset(_squadActivity);
+		_squadActivityRemaining = (float)_rng.RandfRange(2.4f, 6.8f);
+		_squadThinkRemaining = (float)_rng.RandfRange(0.3f, 1.2f);
+	}
+
+	private SquadActivity ChooseLivingSquadActivity(BuildStats stats, float roll)
+	{
+		return stats.AiBehaviorId switch
+		{
+			BuildCatalog.AiFollowClosely => roll < 0.78f ? SquadActivity.Follow : SquadActivity.Rest,
+			BuildCatalog.AiProtectPlayer or BuildCatalog.AiDefensive => roll < 0.58f ? SquadActivity.Guard : roll < 0.78f ? SquadActivity.Follow : SquadActivity.Rest,
+			BuildCatalog.AiHealAllies => roll < 0.55f ? SquadActivity.Follow : roll < 0.82f ? SquadActivity.Guard : SquadActivity.Rest,
+			BuildCatalog.AiGatherResources or BuildCatalog.AiLootNearby => roll < 0.62f ? SquadActivity.Gather : roll < 0.82f ? SquadActivity.Roam : SquadActivity.Follow,
+			BuildCatalog.AiRoamFreely => roll < 0.54f ? SquadActivity.Roam : roll < 0.82f ? SquadActivity.Scout : SquadActivity.Follow,
+			BuildCatalog.AiAggressive => roll < 0.48f ? SquadActivity.Scout : roll < 0.80f ? SquadActivity.Guard : SquadActivity.Roam,
+			BuildCatalog.AiKeepDistance => roll < 0.46f ? SquadActivity.Scout : roll < 0.76f ? SquadActivity.Roam : SquadActivity.Follow,
+			_ => roll < 0.36f ? SquadActivity.Follow : roll < 0.62f ? SquadActivity.Guard : roll < 0.82f ? SquadActivity.Roam : SquadActivity.Rest,
+		};
+	}
+
+	private Vector3 MakeActivityLocalOffset(SquadActivity activity)
+	{
+		Vector3 formation = GetFormationLocalOffset();
+		float side = _followSlot % 2 == 0 ? -1.0f : 1.0f;
+		return activity switch
+		{
+			SquadActivity.Guard => formation + new Vector3(side * (float)_rng.RandfRange(0.45f, 1.15f), 0.0f, (float)_rng.RandfRange(-0.5f, 1.0f)),
+			SquadActivity.Scout => new Vector3(side * (float)_rng.RandfRange(1.0f, 3.8f), 0.0f, (float)_rng.RandfRange(4.8f, 8.0f)),
+			SquadActivity.Gather => RandomLocalRingOffset(3.4f, 6.4f),
+			SquadActivity.Roam => RandomLocalRingOffset(3.0f, 7.2f),
+			SquadActivity.Rest => formation + RandomLocalRingOffset(0.2f, 0.9f),
+			_ => formation,
+		};
+	}
+
+	private Vector3 RandomLocalRingOffset(float minRadius, float maxRadius)
+	{
+		float angle = (float)_rng.RandfRange(-Mathf.Pi, Mathf.Pi);
+		float radius = (float)_rng.RandfRange(minRadius, maxRadius) * CurrentBuildStats.FollowDistanceMultiplier;
+		return new Vector3(Mathf.Sin(angle) * radius, 0.0f, Mathf.Cos(angle) * radius);
+	}
+
+	private Vector3 GetFormationLocalOffset()
+	{
+		Vector3 offset = _followTarget != null && IsInstanceValid(_followTarget)
+			? _followTarget.GetFormationLocalOffset(this)
+			: Vector3.Zero;
+		if (offset.LengthSquared() <= 0.001f)
+		{
+			offset = new Vector3(0.0f, 0.0f, 2.35f);
+		}
+
+		return offset * CurrentBuildStats.FollowDistanceMultiplier;
+	}
+
+	private Vector3 PlayerLocalToWorld(Vector3 localOffset)
+	{
+		if (_followTarget == null || !IsInstanceValid(_followTarget))
+		{
+			return localOffset;
+		}
+
+		Vector3 forward = -_followTarget.GlobalTransform.Basis.Z;
+		forward.Y = 0.0f;
+		forward = forward.LengthSquared() > 0.001f ? forward.Normalized() : Vector3.Forward;
 
 		Vector3 right = _followTarget.GlobalTransform.Basis.X;
 		right.Y = 0.0f;
-		right = right.LengthSquared() > 0.001f ? right.Normalized() : new Vector3(1.0f, 0.0f, 0.0f);
+		right = right.LengthSquared() > 0.001f ? right.Normalized() : Vector3.Right;
+		return right * localOffset.X + forward * localOffset.Z;
+	}
 
-		float rowDistance = (2.0f + (_followSlot / 2) * 1.35f) * CurrentBuildStats.FollowDistanceMultiplier;
-		float sideOffset = _followSlot == 0 ? 0.0f : (_followSlot % 2 == 0 ? -0.7f : 0.7f);
-		return _followTarget.GlobalPosition + behind * rowDistance + right * sideOffset;
+	private float GetLivingSquadMoveSpeed(float distanceToPlayer)
+	{
+		float multiplier = _squadActivity switch
+		{
+			SquadActivity.Scout => 2.55f,
+			SquadActivity.Gather or SquadActivity.Roam => 2.25f,
+			SquadActivity.Guard => 2.05f,
+			SquadActivity.Rest => 1.35f,
+			_ => 2.35f,
+		};
+
+		if (distanceToPlayer > 8.0f)
+		{
+			multiplier += 0.8f;
+		}
+
+		return Mathf.Max(EffectiveMoveSpeed * multiplier, 4.8f);
+	}
+
+	private Vector3 GetLivingSquadLookDirection(Vector3 destination)
+	{
+		if (_followTarget == null || !IsInstanceValid(_followTarget))
+		{
+			return destination - GlobalPosition;
+		}
+
+		return _squadActivity switch
+		{
+			SquadActivity.Guard or SquadActivity.Scout => GlobalPosition - _followTarget.GlobalPosition,
+			SquadActivity.Gather or SquadActivity.Roam => destination - GlobalPosition,
+			_ => _followTarget.GlobalPosition - GlobalPosition,
+		};
+	}
+
+	private void ResetSquadActivity()
+	{
+		_squadActivity = SquadActivity.Follow;
+		_squadActivityLocalOffset = GetFormationLocalOffset();
+		_squadActivityRemaining = 0.0f;
+		_squadThinkRemaining = (float)_rng.RandfRange(0.15f, 1.1f);
+	}
+
+	private float GetFormationRegroupDistance()
+	{
+		return 12.5f;
 	}
 
 	private void LevelUp()
