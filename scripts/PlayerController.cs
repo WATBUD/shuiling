@@ -3,6 +3,19 @@ using System.Collections.Generic;
 
 public partial class PlayerController : CharacterBody3D
 {
+	private const int FormationGridSideLength = 5;
+	private const int FormationCenterSlotIndex = 12;
+	private const float FormationSlotSpacing = 2.35f;
+
+	private static readonly int[] FormationFillOrder =
+	{
+		7, 11, 13, 17,
+		6, 8, 16, 18,
+		2, 10, 14, 22,
+		1, 3, 5, 9, 15, 19, 21, 23,
+		0, 4, 20, 24,
+	};
+
 	[Export] public float WalkSpeed { get; set; } = 6.5f;
 	[Export] public float SprintSpeed { get; set; } = 10.0f;
 	[Export] public float JumpVelocity { get; set; } = 5.2f;
@@ -29,6 +42,8 @@ public partial class PlayerController : CharacterBody3D
 	private readonly List<SimpleActor> _capturedCollection = new();
 	private readonly List<SimpleActor> _activeParty = new();
 	private readonly Dictionary<string, int> _inventoryItems = new();
+	private readonly Dictionary<int, SimpleActor> _formationActorsBySlot = new();
+	private readonly Dictionary<SimpleActor, int> _formationSlotsByActor = new();
 	private float _cameraYaw;
 	private Vector3 _lastSafePosition = new(0.0f, 0.2f, 8.0f);
 	private float _gravity;
@@ -40,6 +55,7 @@ public partial class PlayerController : CharacterBody3D
 	private TargetInfoPanel _targetInfoPanel = null!;
 	private PartyPanel _partyPanel = null!;
 	private InventoryPanel _inventoryPanel = null!;
+	private FormationPanel _formationPanel = null!;
 	private SettingsPanel _settingsPanel = null!;
 	private MinimapPanel _minimapPanel = null!;
 	private PanelContainer _captureAmmoPanel = null!;
@@ -52,6 +68,9 @@ public partial class PlayerController : CharacterBody3D
 	public IReadOnlyList<SimpleActor> CapturedCollection => _capturedCollection;
 	public IReadOnlyList<SimpleActor> ActiveParty => _activeParty;
 	public IReadOnlyDictionary<string, int> InventoryItems => _inventoryItems;
+	public int FormationGridSide => FormationGridSideLength;
+	public int FormationPlayerSlotIndex => FormationCenterSlotIndex;
+	public int FormationAssignedCount => _formationSlotsByActor.Count;
 	public string LocalizedPlayerName => LocaleText.T(PlayerName);
 	public Vector3 MinimapForward => GetCameraPlanarForward();
 	public float HealthRatio => MaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)MaxHealth, 0.0f, 1.0f);
@@ -68,6 +87,7 @@ public partial class PlayerController : CharacterBody3D
 		CreateMinimapPanel();
 		CreatePartyPanel();
 		CreateInventoryPanel();
+		CreateFormationPanel();
 		CreateSettingsPanel();
 		InitializeStarterInventory();
 		InitializeCaptureNetAmmo();
@@ -100,6 +120,10 @@ public partial class PlayerController : CharacterBody3D
 			{
 				SetInventoryPanelVisible(false);
 			}
+			else if (_formationPanel.Visible)
+			{
+				SetFormationPanelVisible(false);
+			}
 			else if (_partyPanel.Visible)
 			{
 				SetPartyPanelVisible(false);
@@ -123,7 +147,13 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
-		if (_inventoryPanel.Visible)
+		if (@event.IsActionPressed("formation_panel"))
+		{
+			SetFormationPanelVisible(!_formationPanel.Visible);
+			return;
+		}
+
+		if (_inventoryPanel.Visible || _formationPanel.Visible)
 		{
 			return;
 		}
@@ -162,7 +192,7 @@ public partial class PlayerController : CharacterBody3D
 
 	public override void _PhysicsProcess(double delta)
 	{
-		if (_settingsPanel.Visible || _partyPanel.Visible || _inventoryPanel.Visible)
+		if (_settingsPanel.Visible || _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible)
 		{
 			Velocity = SlowPlayerToStop(Velocity, (float)delta);
 			MoveAndSlide();
@@ -215,6 +245,7 @@ public partial class PlayerController : CharacterBody3D
 		AddKeyAction("capture_net", Key.R);
 		AddKeyAction("party_panel", Key.P);
 		AddKeyAction("inventory_panel", Key.I);
+		AddKeyAction("formation_panel", Key.F);
 		AddKeyAction("ui_cancel", Key.Escape);
 	}
 
@@ -262,6 +293,7 @@ public partial class PlayerController : CharacterBody3D
 		}
 
 		_partyPanel.RefreshParty();
+		_formationPanel.RefreshAll();
 		return true;
 	}
 
@@ -294,7 +326,10 @@ public partial class PlayerController : CharacterBody3D
 
 		_activeParty.Add(actor);
 		actor.DeployToParty(this, _activeParty.Count - 1);
+		EnsureFormationSlotForActor(actor);
+		actor.OnFormationLayoutChanged();
 		_partyPanel.RefreshParty();
+		_formationPanel.RefreshAll();
 		return true;
 	}
 
@@ -306,6 +341,7 @@ public partial class PlayerController : CharacterBody3D
 		}
 
 		bool removed = _activeParty.Remove(actor);
+		ClearFormationAssignment(actor);
 		actor.StoreInCollection();
 		if (removed)
 		{
@@ -313,7 +349,126 @@ public partial class PlayerController : CharacterBody3D
 		}
 
 		_partyPanel.RefreshParty();
+		_formationPanel.RefreshAll();
 		return true;
+	}
+
+	public SimpleActor? GetFormationActor(int slotIndex)
+	{
+		if (!IsValidFormationSlot(slotIndex) || !_formationActorsBySlot.TryGetValue(slotIndex, out SimpleActor? actor))
+		{
+			return null;
+		}
+
+		if (!IsInstanceValid(actor) || !actor.IsCaptured || !actor.IsInActiveParty)
+		{
+			_formationActorsBySlot.Remove(slotIndex);
+			_formationSlotsByActor.Remove(actor);
+			return null;
+		}
+
+		return actor;
+	}
+
+	public int GetFormationSlot(SimpleActor actor)
+	{
+		if (!IsInstanceValid(actor) || !_formationSlotsByActor.TryGetValue(actor, out int slotIndex))
+		{
+			return -1;
+		}
+
+		return GetFormationActor(slotIndex) == actor ? slotIndex : -1;
+	}
+
+	public bool CanAssignCompanionToFormation(SimpleActor actor, int slotIndex)
+	{
+		if (!IsInstanceValid(actor) || !actor.IsCaptured || !IsValidCompanionFormationSlot(slotIndex))
+		{
+			return false;
+		}
+
+		if (_activeParty.Contains(actor))
+		{
+			return true;
+		}
+
+		if (_activeParty.Count < ActivePartyLimit)
+		{
+			return true;
+		}
+
+		SimpleActor? target = GetFormationActor(slotIndex);
+		return target != null && target != actor;
+	}
+
+	public bool AssignCompanionToFormation(SimpleActor actor, int slotIndex)
+	{
+		if (!CanAssignCompanionToFormation(actor, slotIndex))
+		{
+			return false;
+		}
+
+		SimpleActor? targetBeforeDeploy = GetFormationActor(slotIndex);
+		if (!_activeParty.Contains(actor) && _activeParty.Count >= ActivePartyLimit && targetBeforeDeploy != null && targetBeforeDeploy != actor)
+		{
+			StoreCompanion(targetBeforeDeploy);
+		}
+
+		if (!_activeParty.Contains(actor) && !DeployCompanion(actor, false))
+		{
+			return false;
+		}
+
+		int previousSlot = GetFormationSlot(actor);
+		SimpleActor? target = GetFormationActor(slotIndex);
+		if (target == actor)
+		{
+			RefreshFormationViews();
+			return true;
+		}
+
+		if (previousSlot >= 0)
+		{
+			_formationActorsBySlot.Remove(previousSlot);
+		}
+
+		if (target != null)
+		{
+			_formationSlotsByActor.Remove(target);
+			if (previousSlot >= 0)
+			{
+				SetFormationAssignment(target, previousSlot);
+			}
+
+			target.OnFormationLayoutChanged();
+		}
+
+		SetFormationAssignment(actor, slotIndex);
+		actor.OnFormationLayoutChanged();
+		RefreshFormationViews();
+		return true;
+	}
+
+	public bool ClearFormationSlot(int slotIndex)
+	{
+		if (!IsValidCompanionFormationSlot(slotIndex))
+		{
+			return false;
+		}
+
+		SimpleActor? actor = GetFormationActor(slotIndex);
+		return actor != null && StoreCompanion(actor);
+	}
+
+	public Vector3 GetFormationLocalOffset(SimpleActor actor)
+	{
+		int slotIndex = GetFormationSlot(actor);
+		if (slotIndex >= 0)
+		{
+			return GetFormationSlotLocalOffset(slotIndex);
+		}
+
+		return GetFallbackFormationOffset(actor);
 	}
 
 	public int GetInventoryCount(string itemId)
@@ -407,6 +562,107 @@ public partial class PlayerController : CharacterBody3D
 		for (int index = 0; index < _activeParty.Count; index++)
 		{
 			_activeParty[index].SetFollowSlot(index);
+		}
+	}
+
+	private void EnsureFormationSlotForActor(SimpleActor actor)
+	{
+		if (GetFormationSlot(actor) >= 0)
+		{
+			return;
+		}
+
+		int slotIndex = FindFirstOpenFormationSlot();
+		if (slotIndex >= 0)
+		{
+			SetFormationAssignment(actor, slotIndex);
+		}
+	}
+
+	private int FindFirstOpenFormationSlot()
+	{
+		foreach (int slotIndex in FormationFillOrder)
+		{
+			if (IsValidCompanionFormationSlot(slotIndex) && GetFormationActor(slotIndex) == null)
+			{
+				return slotIndex;
+			}
+		}
+
+		return -1;
+	}
+
+	private void SetFormationAssignment(SimpleActor actor, int slotIndex)
+	{
+		if (!IsValidCompanionFormationSlot(slotIndex))
+		{
+			return;
+		}
+
+		ClearFormationAssignment(actor);
+		if (GetFormationActor(slotIndex) is SimpleActor previousActor)
+		{
+			_formationSlotsByActor.Remove(previousActor);
+		}
+
+		_formationActorsBySlot[slotIndex] = actor;
+		_formationSlotsByActor[actor] = slotIndex;
+	}
+
+	private void ClearFormationAssignment(SimpleActor actor)
+	{
+		if (!IsInstanceValid(actor) || !_formationSlotsByActor.TryGetValue(actor, out int slotIndex))
+		{
+			return;
+		}
+
+		_formationSlotsByActor.Remove(actor);
+		if (_formationActorsBySlot.TryGetValue(slotIndex, out SimpleActor? assignedActor) && assignedActor == actor)
+		{
+			_formationActorsBySlot.Remove(slotIndex);
+		}
+	}
+
+	private bool IsValidFormationSlot(int slotIndex)
+	{
+		return slotIndex >= 0 && slotIndex < FormationGridSideLength * FormationGridSideLength;
+	}
+
+	private bool IsValidCompanionFormationSlot(int slotIndex)
+	{
+		return IsValidFormationSlot(slotIndex) && slotIndex != FormationCenterSlotIndex;
+	}
+
+	private Vector3 GetFormationSlotLocalOffset(int slotIndex)
+	{
+		int row = slotIndex / FormationGridSideLength;
+		int column = slotIndex % FormationGridSideLength;
+		int center = FormationGridSideLength / 2;
+		float localX = (column - center) * FormationSlotSpacing;
+		float localZ = (center - row) * FormationSlotSpacing;
+		return new Vector3(localX, 0.0f, localZ);
+	}
+
+	private Vector3 GetFallbackFormationOffset(SimpleActor actor)
+	{
+		int index = Mathf.Max(_activeParty.IndexOf(actor), 0);
+		int ring = index / 8;
+		int ringSlot = index % 8;
+		float radius = 3.0f + ring * 1.35f;
+		float angle = -Mathf.Pi * 0.5f + ringSlot * (Mathf.Pi * 2.0f / 8.0f);
+		return new Vector3(Mathf.Cos(angle) * radius, 0.0f, Mathf.Sin(angle) * radius);
+	}
+
+	private void RefreshFormationViews()
+	{
+		if (_partyPanel != null)
+		{
+			_partyPanel.RefreshParty();
+		}
+
+		if (_formationPanel != null)
+		{
+			_formationPanel.RefreshAll();
 		}
 	}
 
@@ -906,6 +1162,21 @@ public partial class PlayerController : CharacterBody3D
 		_inventoryPanel.CloseRequested = () => SetInventoryPanelVisible(false);
 	}
 
+	private void CreateFormationPanel()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "FormationLayer",
+			Layer = 36,
+		};
+
+		AddChild(layer);
+		_formationPanel = new FormationPanel();
+		layer.AddChild(_formationPanel);
+		_formationPanel.Bind(this);
+		_formationPanel.CloseRequested = () => SetFormationPanelVisible(false);
+	}
+
 	private void CreateSettingsPanel()
 	{
 		var layer = new CanvasLayer
@@ -928,6 +1199,7 @@ public partial class PlayerController : CharacterBody3D
 		{
 			_settingsPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
+			_formationPanel.SetPanelVisible(false);
 		}
 
 		UpdateMouseModeForPanels();
@@ -939,6 +1211,20 @@ public partial class PlayerController : CharacterBody3D
 		if (visible)
 		{
 			_partyPanel.SetPanelVisible(false);
+			_settingsPanel.SetPanelVisible(false);
+			_formationPanel.SetPanelVisible(false);
+		}
+
+		UpdateMouseModeForPanels();
+	}
+
+	private void SetFormationPanelVisible(bool visible)
+	{
+		_formationPanel.SetPanelVisible(visible);
+		if (visible)
+		{
+			_partyPanel.SetPanelVisible(false);
+			_inventoryPanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
 		}
 
@@ -952,6 +1238,7 @@ public partial class PlayerController : CharacterBody3D
 		{
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
+			_formationPanel.SetPanelVisible(false);
 		}
 
 		UpdateMouseModeForPanels();
@@ -959,7 +1246,7 @@ public partial class PlayerController : CharacterBody3D
 
 	private void UpdateMouseModeForPanels()
 	{
-		Input.MouseMode = _partyPanel.Visible || _inventoryPanel.Visible || _settingsPanel.Visible
+		Input.MouseMode = _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _settingsPanel.Visible
 			? Input.MouseModeEnum.Visible
 			: Input.MouseModeEnum.Captured;
 	}

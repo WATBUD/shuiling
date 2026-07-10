@@ -177,6 +177,7 @@ public partial class SettingsPanel : PanelContainer
 		AddShortcutRow(section, "shortcut.capture_net", "R");
 		AddShortcutRow(section, "shortcut.party", "P");
 		AddShortcutRow(section, "shortcut.inventory", "I");
+		AddShortcutRow(section, "shortcut.formation_panel", "F");
 		AddShortcutRow(section, "shortcut.settings", "Esc");
 		AddShortcutRow(section, "shortcut.camera", LocaleText.T("shortcut.horizontal_mouse"));
 	}

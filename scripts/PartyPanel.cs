@@ -130,6 +130,7 @@ public partial class PartyPanel : PanelContainer
 		{
 			SelectMember(_player);
 		}
+
 	}
 
 	private void BuildPanel()
