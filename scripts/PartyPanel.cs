@@ -28,10 +28,6 @@ public partial class PartyPanel : PanelContainer
 	private Label _equipmentLabel = null!;
 	private Label _skillGemsLabel = null!;
 	private Label _aiGemLabel = null!;
-	private Button _toggleActiveButton = null!;
-	private Button _trainButton = null!;
-	private Button _evolveButton = null!;
-	private Button _abilityButton = null!;
 	private Button _helmetButton = null!;
 	private Button _weaponButton = null!;
 	private Button _armorButton = null!;
@@ -42,6 +38,8 @@ public partial class PartyPanel : PanelContainer
 	private Button _skillGem3Button = null!;
 	private Button _aiGemButton = null!;
 	private ProgressBar _healthBar = null!;
+	private PopupMenu _memberContextMenu = null!;
+	private SimpleActor? _contextActor;
 	private GodotObject? _selected;
 
 	public override void _Ready()
@@ -108,13 +106,13 @@ public partial class PartyPanel : PanelContainer
 		}
 
 		_titleLabel.Text = LocaleText.F("party.title", _player.ActiveParty.Count, _player.ActivePartyLimit, _player.CapturedCollection.Count);
-		AddMemberButton(LocaleText.T("party.player"), _player.LocalizedPlayerName, _selected == _player, () => SelectMember(_player));
+		AddMemberButton(FormatPlayerListText(), _selected == _player, () => SelectMember(_player), null);
 
 		AddHeader(LocaleText.T("party.active"));
 		int activeIndex = 1;
 		foreach (SimpleActor actor in GetActiveCompanions())
 		{
-			AddMemberButton(actor.TypeName, $"{activeIndex}. {actor.LocalizedDisplayName}", _selected == actor, () => SelectMember(actor));
+			AddMemberButton(FormatActorListText(activeIndex, actor), _selected == actor, () => SelectMember(actor), actor);
 			activeIndex++;
 		}
 
@@ -122,7 +120,7 @@ public partial class PartyPanel : PanelContainer
 		int storedIndex = 1;
 		foreach (SimpleActor actor in GetStoredCompanions())
 		{
-			AddMemberButton(actor.TypeName, $"{storedIndex}. {actor.LocalizedDisplayName}", _selected == actor, () => SelectMember(actor));
+			AddMemberButton(FormatActorListText(storedIndex, actor), _selected == actor, () => SelectMember(actor), actor);
 			storedIndex++;
 		}
 
@@ -241,26 +239,6 @@ public partial class PartyPanel : PanelContainer
 		_skillGemsLabel = AddStatRow(detailRows, "build.skill_gems");
 		_aiGemLabel = AddStatRow(detailRows, "build.ai_gem");
 
-		var actionRow = new HBoxContainer();
-		actionRow.AddThemeConstantOverride("separation", 8);
-		detailRows.AddChild(actionRow);
-
-		_toggleActiveButton = MakeActionButton(LocaleText.T("button.deploy"));
-		_toggleActiveButton.Pressed += OnToggleActivePressed;
-		actionRow.AddChild(_toggleActiveButton);
-
-		_trainButton = MakeActionButton(LocaleText.T("button.train"));
-		_trainButton.Pressed += OnTrainPressed;
-		actionRow.AddChild(_trainButton);
-
-		_evolveButton = MakeActionButton(LocaleText.T("button.evolve"));
-		_evolveButton.Pressed += OnEvolvePressed;
-		actionRow.AddChild(_evolveButton);
-
-		_abilityButton = MakeActionButton(LocaleText.T("button.enhance_ability"));
-		_abilityButton.Pressed += OnAbilityPressed;
-		actionRow.AddChild(_abilityButton);
-
 		var buildButtonGrid = new GridContainer
 		{
 			Columns = 3,
@@ -278,6 +256,13 @@ public partial class PartyPanel : PanelContainer
 		_skillGem1Button = AddBuildButton(buildButtonGrid, () => OnSkillGemPressed(0));
 		_skillGem2Button = AddBuildButton(buildButtonGrid, () => OnSkillGemPressed(1));
 		_skillGem3Button = AddBuildButton(buildButtonGrid, () => OnSkillGemPressed(2));
+
+		_memberContextMenu = new PopupMenu
+		{
+			Name = "MemberContextMenu",
+		};
+		_memberContextMenu.IdPressed += OnMemberContextMenuIdPressed;
+		AddChild(_memberContextMenu);
 	}
 
 	private static MarginContainer MakeSection()
@@ -297,29 +282,34 @@ public partial class PartyPanel : PanelContainer
 		_memberList.AddChild(label);
 	}
 
-	private void AddMemberButton(string tag, string text, bool selected, System.Action onPressed)
+	private string FormatPlayerListText()
+	{
+		if (_player == null)
+		{
+			return "[0]: - 0/0";
+		}
+
+		return $"[0]: {_player.LocalizedPlayerName} {_player.CurrentHealth}/{_player.MaxHealth}";
+	}
+
+	private static string FormatActorListText(int index, SimpleActor actor)
+	{
+		return $"[{index}]: {actor.LocalizedDisplayName} {actor.CurrentHealth}/{actor.EffectiveMaxHealth}";
+	}
+
+	private void AddMemberButton(string text, bool selected, System.Action onPressed, SimpleActor? actor)
 	{
 		var button = new Button
 		{
-			Text = $"{tag}  {text}",
+			Text = text,
 			Alignment = HorizontalAlignment.Left,
 			CustomMinimumSize = new Vector2(0.0f, 38.0f),
 		};
 		button.AddThemeFontSizeOverride("font_size", 14);
 		button.AddThemeColorOverride("font_color", selected ? new Color(1.0f, 0.94f, 0.68f) : new Color(0.9f, 0.94f, 0.98f));
 		button.Pressed += onPressed;
+		button.GuiInput += inputEvent => OnMemberButtonGuiInput(inputEvent, actor);
 		_memberList.AddChild(button);
-	}
-
-	private static Button MakeActionButton(string text)
-	{
-		var button = new Button
-		{
-			Text = text,
-			CustomMinimumSize = new Vector2(116.0f, 36.0f),
-		};
-		button.AddThemeFontSizeOverride("font_size", 13);
-		return button;
 	}
 
 	private static Button AddBuildButton(GridContainer parent, System.Action onPressed)
@@ -374,7 +364,6 @@ public partial class PartyPanel : PanelContainer
 			_equipmentLabel.Text = LocaleText.F("build.equipment_summary", actor.BuildEquipmentSummary, actor.CurrentBuildStats.EquipmentSocketCount);
 			_skillGemsLabel.Text = actor.BuildSkillSummary;
 			_aiGemLabel.Text = actor.BuildAiGemName;
-			UpdateActorButtons(actor);
 			UpdateBuildButtons(actor);
 			return;
 		}
@@ -403,26 +392,7 @@ public partial class PartyPanel : PanelContainer
 		_equipmentLabel.Text = "-";
 		_skillGemsLabel.Text = "-";
 		_aiGemLabel.Text = "-";
-		SetActorButtonsDisabled(true);
 		SetBuildButtonsDisabled(true);
-	}
-
-	private void UpdateActorButtons(SimpleActor actor)
-	{
-		if (_player == null)
-		{
-			SetActorButtonsDisabled(true);
-			return;
-		}
-
-		bool active = _player.IsInActiveParty(actor);
-		_toggleActiveButton.Disabled = false;
-		_toggleActiveButton.Text = active
-			? LocaleText.T("button.store")
-			: _player.ActiveParty.Count >= _player.ActivePartyLimit ? LocaleText.T("button.replace_deploy") : LocaleText.T("button.add_deploy");
-		_trainButton.Disabled = false;
-		_evolveButton.Disabled = !actor.CanEvolve;
-		_abilityButton.Disabled = false;
 	}
 
 	private void UpdateBuildButtons(SimpleActor actor)
@@ -443,14 +413,6 @@ public partial class PartyPanel : PanelContainer
 	private static string BuildButtonText(string slotKey, string value)
 	{
 		return LocaleText.F("build.button.slot", LocaleText.T(slotKey), value);
-	}
-
-	private void SetActorButtonsDisabled(bool disabled)
-	{
-		_toggleActiveButton.Disabled = disabled;
-		_trainButton.Disabled = disabled;
-		_evolveButton.Disabled = disabled;
-		_abilityButton.Disabled = disabled;
 	}
 
 	private void SetBuildButtonsDisabled(bool disabled)
@@ -479,58 +441,80 @@ public partial class PartyPanel : PanelContainer
 		}
 	}
 
-	private void OnToggleActivePressed()
+	private void OnMemberButtonGuiInput(InputEvent inputEvent, SimpleActor? actor)
 	{
-		if (_player == null || _selected is not SimpleActor actor || !IsInstanceValid(actor))
+		if (actor == null || !IsInstanceValid(actor) || _player == null)
 		{
 			return;
 		}
+
+		if (inputEvent is not InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Right } mouseButton)
+		{
+			return;
+		}
+
+		SelectMember(actor);
+		ShowMemberContextMenu(actor, mouseButton.GlobalPosition);
+		AcceptEvent();
+	}
+
+	private void ShowMemberContextMenu(SimpleActor actor, Vector2 screenPosition)
+	{
+		if (_player == null)
+		{
+			return;
+		}
+
+		_contextActor = actor;
+		_memberContextMenu.Clear();
 
 		if (_player.IsInActiveParty(actor))
 		{
-			_player.StoreCompanion(actor);
+			_memberContextMenu.AddItem(LocaleText.T("button.store"), 1);
 		}
 		else
 		{
-			_player.DeployCompanion(actor, true);
+			string deployText = _player.ActiveParty.Count >= _player.ActivePartyLimit
+				? LocaleText.T("button.replace_deploy")
+				: LocaleText.T("button.add_deploy");
+			_memberContextMenu.AddItem(deployText, 2);
 		}
 
-		RefreshParty();
-		UpdateDetails();
+		_memberContextMenu.AddSeparator();
+		_memberContextMenu.AddItem(LocaleText.T("button.train"), 3);
+		_memberContextMenu.AddItem(LocaleText.T("button.evolve"), 4);
+		_memberContextMenu.SetItemDisabled(_memberContextMenu.GetItemIndex(4), !actor.CanEvolve);
+		_memberContextMenu.AddItem(LocaleText.T("button.enhance_ability"), 5);
+		_memberContextMenu.Position = new Vector2I(Mathf.RoundToInt(screenPosition.X), Mathf.RoundToInt(screenPosition.Y));
+		_memberContextMenu.Popup();
 	}
 
-	private void OnTrainPressed()
+	private void OnMemberContextMenuIdPressed(long id)
 	{
-		if (_selected is not SimpleActor actor || !IsInstanceValid(actor))
+		if (_player == null || _contextActor == null || !IsInstanceValid(_contextActor))
 		{
 			return;
 		}
 
-		actor.GrantTraining(25);
-		RefreshParty();
-		UpdateDetails();
-	}
-
-	private void OnEvolvePressed()
-	{
-		if (_selected is not SimpleActor actor || !IsInstanceValid(actor))
+		switch (id)
 		{
-			return;
+			case 1:
+				_player.StoreCompanion(_contextActor);
+				break;
+			case 2:
+				_player.DeployCompanion(_contextActor, true);
+				break;
+			case 3:
+				_contextActor.GrantTraining(25);
+				break;
+			case 4:
+				_contextActor.TryEvolve();
+				break;
+			case 5:
+				_contextActor.EnhanceAbility();
+				break;
 		}
 
-		actor.TryEvolve();
-		RefreshParty();
-		UpdateDetails();
-	}
-
-	private void OnAbilityPressed()
-	{
-		if (_selected is not SimpleActor actor || !IsInstanceValid(actor))
-		{
-			return;
-		}
-
-		actor.EnhanceAbility();
 		RefreshParty();
 		UpdateDetails();
 	}

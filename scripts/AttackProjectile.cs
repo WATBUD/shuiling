@@ -10,6 +10,7 @@ public partial class AttackProjectile : Node3D
 	[Export] public float Radius { get; set; } = 0.22f;
 	[Export] public bool IsMelee { get; set; }
 	[Export] public bool IsHealing { get; set; }
+	[Export] public bool IsArrow { get; set; }
 
 	private readonly List<StandardMaterial3D> _materials = new();
 	private float _age;
@@ -73,6 +74,35 @@ public partial class AttackProjectile : Node3D
 				new Vector3(90.0f, 0.0f, 0.0f),
 				new Vector3(1.0f, 0.28f, 1.0f),
 				new Color(EffectColor.R, EffectColor.G, EffectColor.B, EffectColor.A * 0.58f)
+			);
+			return;
+		}
+
+		if (IsArrow)
+		{
+			AddFxMesh(
+				"ArrowShaft",
+				new CapsuleMesh { Radius = Radius * 0.13f, Height = Radius * 4.8f },
+				Vector3.Zero,
+				new Vector3(90.0f, 0.0f, 0.0f),
+				Vector3.One,
+				new Color(0.62f, 0.38f, 0.16f, 0.96f)
+			);
+			AddFxMesh(
+				"ArrowHead",
+				new CylinderMesh { TopRadius = 0.0f, BottomRadius = Radius * 0.32f, Height = Radius * 0.72f, RadialSegments = 16 },
+				_direction * Radius * 2.35f,
+				new Vector3(90.0f, 0.0f, 0.0f),
+				Vector3.One,
+				new Color(0.82f, 0.86f, 0.86f, 0.98f)
+			);
+			AddFxMesh(
+				"ArrowFletching",
+				new BoxMesh { Size = new Vector3(Radius * 0.72f, Radius * 0.11f, Radius * 0.38f) },
+				_direction * -Radius * 2.25f,
+				new Vector3(0.0f, 0.0f, 24.0f),
+				Vector3.One,
+				new Color(0.96f, 0.78f, 0.28f, 0.92f)
 			);
 			return;
 		}

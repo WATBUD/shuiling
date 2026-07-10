@@ -51,7 +51,11 @@ public partial class SimpleActor : CharacterBody3D
 	private float _attackCooldownRemaining;
 	private float _footstepEffectRemaining;
 	private float _movementAnimationPhase;
+	private float _externalAnimationLockRemaining;
+	private string _externalAnimationState = string.Empty;
 	private Tween? _attackPoseTween;
+	private Node3D? _attackPoseTarget;
+	private Vector3 _attackPoseBaseScale = Vector3.One;
 	private SimpleActor? _combatTarget;
 	private SimpleActor? _retaliationTarget;
 	private float _retaliationTargetRemaining;
@@ -130,7 +134,9 @@ public partial class SimpleActor : CharacterBody3D
 	public string BuildAiGemName => LocaleText.T(BuildCatalog.GetAiGem(BuildLoadout.AiGemId).NameKey);
 	public string BuildRareComboName => BuildCatalog.LocalizedRareCombo(CurrentBuildStats);
 	public string BuildElementName => LocaleText.T(CurrentBuildStats.DamageElementNameKey);
-	public string CombatSummary => $"{LocaleText.F("combat.summary", CombatRoleName, LocalizedPersonality, Affinity)} / Affinity {Affinity}";
+	public bool IsRangedCombatant => CombatRole == "Ranged" || CombatRole == "Support" || EffectiveAttackRange > 3.0f;
+	public string CombatRangeName => IsRangedCombatant ? "Ranged" : "Melee";
+	public string CombatSummary => $"{LocaleText.F("combat.summary", CombatRoleName, LocalizedPersonality, Affinity)} / {CombatRangeName} / Affinity {Affinity}";
 	public Color AttackFxColor => GetAttackColor();
 	public int ExperienceToNextLevel => 35 + Level * 18 + EvolutionStage * 20;
 	public bool CanEvolve => EvolutionStage < 3 && Level >= (EvolutionStage + 1) * 5;
@@ -1167,14 +1173,16 @@ public partial class SimpleActor : CharacterBody3D
 
 		if (attacker?._followTarget != null && IsInstanceValid(attacker._followTarget))
 		{
+			attacker._followTarget.PostSystemMessage($"{attacker.LocalizedDisplayName} defeated {LocalizedDisplayName}.", new Color(1.0f, 0.70f, 0.42f));
 			attacker._followTarget.GrantCombatExperience(ExperienceReward);
 		}
 	}
 
 	private void ApplyDefeatedPose()
 	{
+		SetExternalAnimationState("death");
+		ResetAttackVisualScale();
 		RotationDegrees = new Vector3(0.0f, RotationDegrees.Y, 88.0f);
-		Scale = new Vector3(1.0f, 0.72f, 1.0f);
 		SetChildRotation("Head", ActorKind == "monster" ? new Vector3(22.0f, 0.0f, -16.0f) : new Vector3(28.0f, 0.0f, -12.0f));
 		SetChildRotation("TailBase", new Vector3(82.0f, 0.0f, 0.0f));
 	}
@@ -1183,6 +1191,8 @@ public partial class SimpleActor : CharacterBody3D
 	{
 		RotationDegrees = new Vector3(0.0f, RotationDegrees.Y, 0.0f);
 		Scale = Vector3.One;
+		ResetAttackVisualScale();
+		SetExternalAnimationState("idle");
 	}
 
 	private Color GetAttackColor()
@@ -1213,12 +1223,23 @@ public partial class SimpleActor : CharacterBody3D
 
 	private void PlayAttackAction(Vector3 targetPosition, bool isHealing)
 	{
+		SetExternalAnimationState(GetExternalAttackAnimationState(isHealing), 0.48f);
 		AnimateAttackPose();
 		SpawnAttackProjectile(targetPosition, isHealing);
 		if (!UsesProjectileAttack(isHealing))
 		{
 			SpawnSwingEffect(targetPosition);
 		}
+	}
+
+	private string GetExternalAttackAnimationState(bool isHealing)
+	{
+		if (isHealing || CombatRole == "Support")
+		{
+			return "cast";
+		}
+
+		return UsesArrowProjectile(false) ? "shoot" : "attack";
 	}
 
 	private void AnimateAttackPose()
@@ -1228,13 +1249,40 @@ public partial class SimpleActor : CharacterBody3D
 			_attackPoseTween.Kill();
 		}
 
-		Scale = Vector3.One;
+		ResetAttackVisualScale();
+		Node3D? visualTarget = GetAttackVisualTarget();
+		if (visualTarget == null)
+		{
+			return;
+		}
+
+		_attackPoseTarget = visualTarget;
+		_attackPoseBaseScale = visualTarget.Scale;
 		_attackPoseTween = CreateTween();
 		_attackPoseTween.SetTrans(Tween.TransitionType.Sine);
 		_attackPoseTween.SetEase(Tween.EaseType.Out);
-		_attackPoseTween.TweenProperty(this, "scale", new Vector3(1.12f, 0.90f, 1.20f), 0.075f);
-		_attackPoseTween.TweenProperty(this, "scale", new Vector3(0.94f, 1.08f, 0.92f), 0.085f);
-		_attackPoseTween.TweenProperty(this, "scale", Vector3.One, 0.13f);
+		_attackPoseTween.TweenProperty(visualTarget, "scale", _attackPoseBaseScale * new Vector3(1.12f, 0.90f, 1.20f), 0.075f);
+		_attackPoseTween.TweenProperty(visualTarget, "scale", _attackPoseBaseScale * new Vector3(0.94f, 1.08f, 0.92f), 0.085f);
+		_attackPoseTween.TweenProperty(visualTarget, "scale", _attackPoseBaseScale, 0.13f);
+	}
+
+	private Node3D? GetAttackVisualTarget()
+	{
+		return GetNodeOrNull<Node3D>("ExternalModel")
+			?? GetNodeOrNull<Node3D>("BodyCore")
+			?? GetNodeOrNull<Node3D>("Torso")
+			?? GetNodeOrNull<Node3D>("Head");
+	}
+
+	private void ResetAttackVisualScale()
+	{
+		if (_attackPoseTarget != null && IsInstanceValid(_attackPoseTarget))
+		{
+			_attackPoseTarget.Scale = _attackPoseBaseScale;
+		}
+
+		_attackPoseTarget = null;
+		_attackPoseBaseScale = Vector3.One;
 	}
 
 	private void SpawnAttackProjectile(Vector3 targetPosition, bool isHealing)
@@ -1259,6 +1307,7 @@ public partial class SimpleActor : CharacterBody3D
 			EffectColor = color,
 			IsMelee = isMelee,
 			IsHealing = isHealing,
+			IsArrow = UsesArrowProjectile(isHealing),
 			Radius = isMelee ? 0.24f : 0.20f,
 			Lifetime = isMelee
 				? 0.16f
@@ -1269,7 +1318,12 @@ public partial class SimpleActor : CharacterBody3D
 
 	private bool UsesProjectileAttack(bool isHealing)
 	{
-		return isHealing || CombatRole == "Ranged" || CombatRole == "Support" || EffectiveAttackRange > 3.0f;
+		return isHealing || IsRangedCombatant;
+	}
+
+	private bool UsesArrowProjectile(bool isHealing)
+	{
+		return !isHealing && ActorKind == "npc" && CombatRole == "Ranged";
 	}
 
 	private void SpawnPlayerAttackCue(Vector3 playerPosition)
@@ -1374,6 +1428,8 @@ public partial class SimpleActor : CharacterBody3D
 			_movementAnimationPhase = Mathf.Lerp(_movementAnimationPhase, 0.0f, Mathf.Min(step * 8.0f, 1.0f));
 		}
 
+		UpdateExternalMovementAnimation(step, isMoving, moveRatio);
+
 		if (ActorKind == "monster")
 		{
 			UpdateMonsterMovementAnimation(isMoving, moveRatio);
@@ -1436,6 +1492,45 @@ public partial class SimpleActor : CharacterBody3D
 
 		SetChildRotation("TailBase", new Vector3(64.0f + Mathf.Abs(phaseA) * 5.0f * intensity, phaseA * 9.0f * intensity, 0.0f));
 		SetChildPosition("TailTip", new Vector3(phaseA * 0.05f * intensity, 0.38f + bob * 0.45f, 1.42f));
+	}
+
+	private void UpdateExternalMovementAnimation(float step, bool isMoving, float moveRatio)
+	{
+		if (_isDefeated)
+		{
+			SetExternalAnimationState("death");
+			return;
+		}
+
+		if (_externalAnimationLockRemaining > 0.0f)
+		{
+			_externalAnimationLockRemaining = Mathf.Max(_externalAnimationLockRemaining - step, 0.0f);
+			return;
+		}
+
+		string state = isMoving
+			? moveRatio > 0.58f ? "run" : "walk"
+			: "idle";
+		SetExternalAnimationState(state);
+	}
+
+	private void SetExternalAnimationState(string state, float lockDuration = 0.0f)
+	{
+		if (lockDuration <= 0.0f && _externalAnimationState == state)
+		{
+			return;
+		}
+
+		bool played = ExternalModelLibrary.TryPlayActorAnimation(this, state);
+		if (played)
+		{
+			_externalAnimationState = state;
+		}
+
+		if (played && lockDuration > 0.0f)
+		{
+			_externalAnimationLockRemaining = lockDuration;
+		}
 	}
 
 	private void SetChildPosition(string nodeName, Vector3 position)
