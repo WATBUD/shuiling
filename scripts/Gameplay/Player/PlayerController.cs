@@ -6,6 +6,10 @@ public partial class PlayerController : CharacterBody3D
 	private const int FormationGridSideLength = 5;
 	private const int FormationCenterSlotIndex = 12;
 	private const float FormationSlotSpacing = 2.35f;
+	private const string NpcRecruitQuestItemId = "monster_trophy";
+	private const int NpcRecruitQuestItemCount = 2;
+	private const int NpcQuestAffinityReward = 25;
+	private const int NpcRecruitAffinityRequirement = 80;
 
 	private static readonly int[] FormationFillOrder =
 	{
@@ -32,12 +36,15 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float CaptureNetRechargeSeconds { get; set; } = 5.0f;
 	[Export] public float TargetInfoRange { get; set; } = 30.0f;
 	[Export] public float RevivalNpcInteractRange { get; set; } = 4.2f;
+	[Export] public float NpcRecruitInteractRange { get; set; } = 4.8f;
+	[Export] public float MapPortalInteractRange { get; set; } = 5.2f;
 	[Export] public string PlayerName { get; set; } = "player.default_name";
 	[Export] public int Level { get; set; } = 1;
 	[Export] public int MaxHealth { get; set; } = 150;
 	[Export] public int CurrentHealth { get; set; } = 150;
 	[Export] public int Attack { get; set; } = 16;
 	[Export] public int Defense { get; set; } = 10;
+	[Export] public int Gold { get; set; }
 	[Export] public int ActivePartyLimit { get; set; } = 20;
 	[Export] public float DamageFlashDuration { get; set; } = 0.32f;
 
@@ -46,6 +53,8 @@ public partial class PlayerController : CharacterBody3D
 	private readonly Dictionary<string, int> _inventoryItems = new();
 	private readonly Dictionary<int, SimpleActor> _formationActorsBySlot = new();
 	private readonly Dictionary<SimpleActor, int> _formationSlotsByActor = new();
+	private readonly HashSet<SimpleActor> _acceptedNpcQuests = new();
+	private readonly HashSet<SimpleActor> _completedNpcQuests = new();
 	private float _cameraYaw;
 	private float _cameraPitch = 0.08f;
 	private Vector3 _lastSafePosition = new(0.0f, 0.2f, 8.0f);
@@ -63,11 +72,17 @@ public partial class PlayerController : CharacterBody3D
 	private MinimapPanel _minimapPanel = null!;
 	private SystemLogPanel _systemLogPanel = null!;
 	private PanelContainer _captureAmmoPanel = null!;
+	private PanelContainer _npcQuestDialog = null!;
 	private Label _captureAmmoCaptionLabel = null!;
 	private Label _captureAmmoCountLabel = null!;
 	private ProgressBar _captureAmmoRechargeBar = null!;
 	private ColorRect _damageFlashOverlay = null!;
 	private Label _interactionPromptLabel = null!;
+	private Label _npcQuestTitleLabel = null!;
+	private Label _npcQuestBodyLabel = null!;
+	private Label _npcQuestRewardLabel = null!;
+	private Button _npcQuestAcceptButton = null!;
+	private Button _npcQuestDeclineButton = null!;
 	private Node3D? _selectedTargetMarker;
 	private MeshInstance3D? _selectedTargetOuterRing;
 	private MeshInstance3D? _selectedTargetInnerRing;
@@ -76,6 +91,9 @@ public partial class PlayerController : CharacterBody3D
 	private StandardMaterial3D? _selectedTargetArrowMaterial;
 	private SimpleActor? _selectedActor;
 	private SimpleActor? _focusedTarget;
+	private SimpleActor? _pendingQuestNpc;
+	private Node3D? _playerExternalModel;
+	private string _playerExternalAnimationState = string.Empty;
 	private float _damageFlashRemaining;
 	private float _footstepEffectRemaining;
 	private float _movementAnimationPhase;
@@ -111,6 +129,7 @@ public partial class PlayerController : CharacterBody3D
 		CreateDamageFlashHud();
 		CreateInteractionPromptHud();
 		CreateSystemLogPanel();
+		CreateNpcQuestDialog();
 
 		AddToGroup("player");
 		EnsureInputActions();
@@ -133,7 +152,11 @@ public partial class PlayerController : CharacterBody3D
 	{
 		if (@event.IsActionPressed("ui_cancel"))
 		{
-			if (_settingsPanel.Visible)
+			if (_npcQuestDialog.Visible)
+			{
+				CloseNpcQuestDialog();
+			}
+			else if (_settingsPanel.Visible)
 			{
 				SetSettingsPanelVisible(false);
 			}
@@ -154,6 +177,11 @@ public partial class PlayerController : CharacterBody3D
 				SetSettingsPanelVisible(true);
 			}
 
+			return;
+		}
+
+		if (_npcQuestDialog.Visible)
+		{
 			return;
 		}
 
@@ -220,15 +248,21 @@ public partial class PlayerController : CharacterBody3D
 			ThrowCaptureNet();
 		}
 
+		if (@event.IsActionPressed("save_game"))
+		{
+			SaveCurrentGame();
+			return;
+		}
+
 		if (@event.IsActionPressed("interact"))
 		{
-			TryInteractWithRevivalNpc();
+			TryInteract();
 		}
 	}
 
 	public override void _PhysicsProcess(double delta)
 	{
-		if (_settingsPanel.Visible || _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible)
+		if (_settingsPanel.Visible || _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _npcQuestDialog.Visible)
 		{
 			Velocity = SlowPlayerToStop(Velocity, (float)delta);
 			MoveAndSlide();
@@ -266,6 +300,7 @@ public partial class PlayerController : CharacterBody3D
 
 		Velocity = velocity;
 		MoveAndSlide();
+		CollectNearbyWorldDrops();
 		UpdateMovementEffects(step, targetSpeed);
 		UpdateSafeGroundPosition();
 		RecoverIfOutOfWorld();
@@ -281,6 +316,7 @@ public partial class PlayerController : CharacterBody3D
 		AddKeyAction("sprint", Key.Shift);
 		AddKeyAction("capture_net", Key.R);
 		AddKeyAction("interact", Key.E);
+		AddKeyAction("save_game", Key.F5);
 		AddKeyAction("party_panel", Key.P);
 		AddKeyAction("inventory_panel", Key.I);
 		AddKeyAction("formation_panel", Key.F);
@@ -313,6 +349,12 @@ public partial class PlayerController : CharacterBody3D
 
 	public bool CaptureActor(SimpleActor actor)
 	{
+		if (actor.ActorKind == "npc")
+		{
+			PostSystemMessage(LocaleText.F("system.npc.requires_task", actor.LocalizedDisplayName), new Color(0.82f, 0.88f, 1.0f));
+			return false;
+		}
+
 		if (!actor.CanBeCaptured || _capturedCollection.Contains(actor))
 		{
 			return false;
@@ -320,7 +362,32 @@ public partial class PlayerController : CharacterBody3D
 
 		_capturedCollection.Add(actor);
 		actor.Capture(this);
-		PostSystemMessage($"Captured {actor.LocalizedDisplayName}.", new Color(0.62f, 0.90f, 1.0f));
+		PostSystemMessage(LocaleText.F("system.capture.success", actor.LocalizedDisplayName), new Color(0.62f, 0.90f, 1.0f));
+
+		if (_activeParty.Count < ActivePartyLimit)
+		{
+			DeployCompanion(actor, false);
+		}
+		else
+		{
+			actor.StoreInCollection();
+		}
+
+		_partyPanel.RefreshParty();
+		_formationPanel.RefreshAll();
+		return true;
+	}
+
+	private bool RecruitNpc(SimpleActor actor)
+	{
+		if (!IsInstanceValid(actor) || !actor.IsNpcRecruitCandidate || _capturedCollection.Contains(actor))
+		{
+			return false;
+		}
+
+		_capturedCollection.Add(actor);
+		actor.Recruit(this);
+		PostSystemMessage(LocaleText.F("system.npc.joined", actor.LocalizedDisplayName), new Color(0.62f, 1.0f, 0.78f));
 
 		if (_activeParty.Count < ActivePartyLimit)
 		{
@@ -392,6 +459,141 @@ public partial class PlayerController : CharacterBody3D
 		return true;
 	}
 
+	public PlayerSaveData ExportSaveData()
+	{
+		var data = new PlayerSaveData
+		{
+			Level = Level,
+			MaxHealth = MaxHealth,
+			CurrentHealth = CurrentHealth,
+			Attack = Attack,
+			Defense = Defense,
+			Gold = Gold,
+			InventoryItems = new Dictionary<string, int>(_inventoryItems),
+		};
+
+		foreach (SimpleActor actor in _acceptedNpcQuests)
+		{
+			if (IsInstanceValid(actor))
+			{
+				data.AcceptedNpcQuestNames.Add(actor.DisplayName);
+			}
+		}
+
+		foreach (SimpleActor actor in _completedNpcQuests)
+		{
+			if (IsInstanceValid(actor))
+			{
+				data.CompletedNpcQuestNames.Add(actor.DisplayName);
+			}
+		}
+
+		for (int index = 0; index < _capturedCollection.Count; index++)
+		{
+			SimpleActor actor = _capturedCollection[index];
+			if (!IsInstanceValid(actor))
+			{
+				continue;
+			}
+
+			data.Companions.Add(actor.ExportSaveData());
+			if (_activeParty.Contains(actor))
+			{
+				data.ActivePartyIndexes.Add(index);
+			}
+		}
+
+		return data;
+	}
+
+	public void ApplySaveData(PlayerSaveData data, IReadOnlyList<SimpleActor> loadedCompanions)
+	{
+		Level = Mathf.Max(data.Level, 1);
+		MaxHealth = Mathf.Max(data.MaxHealth, 1);
+		CurrentHealth = Mathf.Clamp(data.CurrentHealth, 1, MaxHealth);
+		Attack = Mathf.Max(data.Attack, 0);
+		Defense = Mathf.Max(data.Defense, 0);
+		Gold = Mathf.Max(data.Gold, 0);
+
+		_inventoryItems.Clear();
+		foreach (KeyValuePair<string, int> item in data.InventoryItems)
+		{
+			if (!BuildCatalog.IsFreeItem(item.Key) && item.Value > 0)
+			{
+				_inventoryItems[item.Key] = item.Value;
+			}
+		}
+
+		_capturedCollection.Clear();
+		_activeParty.Clear();
+		_formationActorsBySlot.Clear();
+		_formationSlotsByActor.Clear();
+		foreach (SimpleActor actor in loadedCompanions)
+		{
+			if (!IsInstanceValid(actor))
+			{
+				continue;
+			}
+
+			_capturedCollection.Add(actor);
+			actor.Capture(this);
+			actor.StoreInCollection();
+		}
+
+		foreach (int companionIndex in data.ActivePartyIndexes)
+		{
+			if (companionIndex >= 0 && companionIndex < _capturedCollection.Count)
+			{
+				DeployCompanion(_capturedCollection[companionIndex], false);
+			}
+		}
+
+		RestoreNpcQuestSets(data);
+		_partyPanel.RefreshParty();
+		_inventoryPanel.RefreshAll();
+		_formationPanel.RefreshAll();
+	}
+
+	private void RestoreNpcQuestSets(PlayerSaveData data)
+	{
+		_acceptedNpcQuests.Clear();
+		_completedNpcQuests.Clear();
+		foreach (Node node in GetTree().GetNodesInGroup("npcs"))
+		{
+			if (node is not SimpleActor actor || !IsInstanceValid(actor))
+			{
+				continue;
+			}
+
+			if (data.AcceptedNpcQuestNames.Contains(actor.DisplayName))
+			{
+				_acceptedNpcQuests.Add(actor);
+			}
+
+			if (data.CompletedNpcQuestNames.Contains(actor.DisplayName))
+			{
+				_completedNpcQuests.Add(actor);
+			}
+		}
+	}
+
+	private void SaveCurrentGame()
+	{
+		if (GetParent() is not World world)
+		{
+			return;
+		}
+
+		if (SaveGameManager.TrySave(world.ExportSaveData(), out string error))
+		{
+			PostSystemMessage(LocaleText.T("system.save.success"), new Color(0.72f, 1.0f, 0.78f));
+		}
+		else
+		{
+			PostSystemMessage(LocaleText.F("system.save.failed", error), new Color(1.0f, 0.42f, 0.34f));
+		}
+	}
+
 	public int ReviveDefeatedCompanions()
 	{
 		int revivedCount = 0;
@@ -413,13 +615,13 @@ public partial class PlayerController : CharacterBody3D
 			ReassignFollowSlots();
 			_partyPanel.RefreshParty();
 			_formationPanel.RefreshAll();
-			SpawnWorldCombatEffect($"Revived x{revivedCount}", new Color(0.42f, 1.0f, 0.66f, 0.94f), GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 1.0f, 0.82f);
-			PostSystemMessage($"Revived {revivedCount} fallen pet(s).", new Color(0.54f, 1.0f, 0.70f));
+			SpawnWorldCombatEffect(LocaleText.F("effect.revive_count", revivedCount), new Color(0.42f, 1.0f, 0.66f, 0.94f), GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 1.0f, 0.82f);
+			PostSystemMessage(LocaleText.F("system.revive.count", revivedCount), new Color(0.54f, 1.0f, 0.70f));
 		}
 		else
 		{
-			SpawnWorldCombatEffect("No fallen pets", new Color(0.72f, 0.86f, 1.0f, 0.9f), GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 0.8f, 0.58f);
-			PostSystemMessage("No fallen pets to revive.", new Color(0.78f, 0.88f, 1.0f));
+			SpawnWorldCombatEffect(LocaleText.T("effect.no_fallen_pets"), new Color(0.72f, 0.86f, 1.0f, 0.9f), GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 0.8f, 0.58f);
+			PostSystemMessage(LocaleText.T("system.revive.no_fallen"), new Color(0.78f, 0.88f, 1.0f));
 		}
 
 		return revivedCount;
@@ -543,6 +745,25 @@ public partial class PlayerController : CharacterBody3D
 		return GetFallbackFormationOffset(actor);
 	}
 
+	public void TeleportPartyTo(Vector3 position)
+	{
+		GlobalPosition = position;
+		Velocity = Vector3.Zero;
+		_lastSafePosition = position + Vector3.Up * 0.18f;
+		for (int index = 0; index < _activeParty.Count; index++)
+		{
+			SimpleActor actor = _activeParty[index];
+			if (!IsInstanceValid(actor) || actor.IsDefeated)
+			{
+				continue;
+			}
+
+			Vector3 offset = GetFormationLocalOffset(actor);
+			actor.GlobalPosition = position + new Vector3(offset.X, 0.0f, offset.Z);
+			actor.Velocity = Vector3.Zero;
+		}
+	}
+
 	public int GetInventoryCount(string itemId)
 	{
 		if (BuildCatalog.IsFreeItem(itemId))
@@ -558,6 +779,18 @@ public partial class PlayerController : CharacterBody3D
 		return BuildCatalog.IsFreeItem(itemId) || GetInventoryCount(itemId) > 0;
 	}
 
+	public void AddGold(int amount)
+	{
+		int gainedGold = Mathf.Max(amount, 0);
+		if (gainedGold <= 0)
+		{
+			return;
+		}
+
+		Gold += gainedGold;
+		PostSystemMessage(LocaleText.F("system.pickup.gold", gainedGold, Gold), new Color(1.0f, 0.82f, 0.26f));
+	}
+
 	public void AddInventoryItem(string itemId, int amount = 1)
 	{
 		if (BuildCatalog.IsFreeItem(itemId))
@@ -567,11 +800,60 @@ public partial class PlayerController : CharacterBody3D
 
 		_inventoryItems.TryGetValue(itemId, out int currentCount);
 		_inventoryItems[itemId] = Mathf.Max(currentCount + amount, 0);
-		PostSystemMessage($"Obtained {itemId} x{Mathf.Max(amount, 0)}.", new Color(1.0f, 0.88f, 0.48f));
+		PostSystemMessage(LocaleText.F("system.pickup.item", GetInventoryItemDisplayName(itemId), Mathf.Max(amount, 0)), new Color(1.0f, 0.88f, 0.48f));
 		if (_inventoryPanel != null)
 		{
 			_inventoryPanel.RefreshAll();
 		}
+	}
+
+	public bool TryConsumeInventoryItem(string itemId, int amount = 1)
+	{
+		if (BuildCatalog.IsFreeItem(itemId))
+		{
+			return true;
+		}
+
+		int requestedAmount = Mathf.Max(amount, 1);
+		int currentCount = GetInventoryCount(itemId);
+		if (currentCount < requestedAmount)
+		{
+			return false;
+		}
+
+		int nextCount = currentCount - requestedAmount;
+		if (nextCount <= 0)
+		{
+			_inventoryItems.Remove(itemId);
+		}
+		else
+		{
+			_inventoryItems[itemId] = nextCount;
+		}
+
+		PostSystemMessage(LocaleText.F("system.item.used", GetInventoryItemDisplayName(itemId), requestedAmount), new Color(0.72f, 0.88f, 1.0f));
+		if (_inventoryPanel != null)
+		{
+			_inventoryPanel.RefreshAll();
+		}
+
+		return true;
+	}
+
+	private void CollectNearbyWorldDrops()
+	{
+		foreach (Node node in GetTree().GetNodesInGroup("world_drops"))
+		{
+			if (node is WorldDrop drop && IsInstanceValid(drop))
+			{
+				drop.TryCollect(this);
+			}
+		}
+	}
+
+	private static string GetInventoryItemDisplayName(string itemId)
+	{
+		return itemId == "monster_trophy" ? LocaleText.T("item.monster_trophy") : LocaleText.T(BuildCatalog.GetItemNameKey(itemId));
 	}
 
 	public void OpenInventoryForActor(SimpleActor actor)
@@ -627,7 +909,7 @@ public partial class PlayerController : CharacterBody3D
 			}
 		}
 
-		PostSystemMessage($"Party gained {experience} EXP.", new Color(0.86f, 0.78f, 1.0f));
+		PostSystemMessage(LocaleText.F("system.exp.party_gain", experience), new Color(0.86f, 0.78f, 1.0f));
 		_partyPanel.RefreshParty();
 	}
 
@@ -961,6 +1243,103 @@ public partial class PlayerController : CharacterBody3D
 		layer.AddChild(_systemLogPanel);
 	}
 
+	private void CreateNpcQuestDialog()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "NpcQuestDialogLayer",
+			Layer = 42,
+		};
+		AddChild(layer);
+
+		_npcQuestDialog = new PanelContainer
+		{
+			Name = "NpcQuestDialog",
+			MouseFilter = Control.MouseFilterEnum.Stop,
+			Visible = false,
+			AnchorLeft = 0.5f,
+			AnchorRight = 0.5f,
+			AnchorTop = 0.5f,
+			AnchorBottom = 0.5f,
+			OffsetLeft = -260.0f,
+			OffsetRight = 260.0f,
+			OffsetTop = -150.0f,
+			OffsetBottom = 150.0f,
+		};
+		var style = new StyleBoxFlat
+		{
+			BgColor = new Color(0.035f, 0.042f, 0.052f, 0.96f),
+			BorderColor = new Color(0.58f, 0.70f, 0.78f, 0.95f),
+		};
+		style.SetBorderWidthAll(2);
+		style.SetCornerRadiusAll(6);
+		_npcQuestDialog.AddThemeStyleboxOverride("panel", style);
+		layer.AddChild(_npcQuestDialog);
+
+		var margin = new MarginContainer();
+		margin.AddThemeConstantOverride("margin_left", 20);
+		margin.AddThemeConstantOverride("margin_right", 20);
+		margin.AddThemeConstantOverride("margin_top", 18);
+		margin.AddThemeConstantOverride("margin_bottom", 18);
+		_npcQuestDialog.AddChild(margin);
+
+		var root = new VBoxContainer();
+		root.AddThemeConstantOverride("separation", 12);
+		margin.AddChild(root);
+
+		_npcQuestTitleLabel = new Label
+		{
+			HorizontalAlignment = HorizontalAlignment.Center,
+			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+		};
+		_npcQuestTitleLabel.AddThemeFontSizeOverride("font_size", 24);
+		_npcQuestTitleLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.94f, 0.78f));
+		root.AddChild(_npcQuestTitleLabel);
+
+		_npcQuestBodyLabel = new Label
+		{
+			AutowrapMode = TextServer.AutowrapMode.WordSmart,
+			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+			SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+		};
+		_npcQuestBodyLabel.AddThemeFontSizeOverride("font_size", 18);
+		_npcQuestBodyLabel.AddThemeColorOverride("font_color", new Color(0.90f, 0.96f, 1.0f));
+		root.AddChild(_npcQuestBodyLabel);
+
+		_npcQuestRewardLabel = new Label
+		{
+			AutowrapMode = TextServer.AutowrapMode.WordSmart,
+			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+		};
+		_npcQuestRewardLabel.AddThemeFontSizeOverride("font_size", 16);
+		_npcQuestRewardLabel.AddThemeColorOverride("font_color", new Color(0.70f, 1.0f, 0.76f));
+		root.AddChild(_npcQuestRewardLabel);
+
+		var buttons = new HBoxContainer();
+		buttons.AddThemeConstantOverride("separation", 12);
+		root.AddChild(buttons);
+
+		_npcQuestAcceptButton = MakeQuestDialogButton("quest.button.accept");
+		_npcQuestAcceptButton.Pressed += AcceptNpcQuestDialog;
+		buttons.AddChild(_npcQuestAcceptButton);
+
+		_npcQuestDeclineButton = MakeQuestDialogButton("quest.button.decline");
+		_npcQuestDeclineButton.Pressed += DeclineNpcQuestDialog;
+		buttons.AddChild(_npcQuestDeclineButton);
+	}
+
+	private static Button MakeQuestDialogButton(string textKey)
+	{
+		var button = new Button
+		{
+			Text = LocaleText.T(textKey),
+			CustomMinimumSize = new Vector2(130.0f, 40.0f),
+			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+		};
+		button.AddThemeFontSizeOverride("font_size", 17);
+		return button;
+	}
+
 	public void PostSystemMessage(string message, Color color)
 	{
 		if (_systemLogPanel == null)
@@ -978,22 +1357,166 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
+		if (_npcQuestDialog != null && _npcQuestDialog.Visible)
+		{
+			_interactionPromptLabel.Visible = false;
+			return;
+		}
+
 		Node3D? revivalNpc = GetNearestRevivalNpc();
-		_interactionPromptLabel.Visible = revivalNpc != null;
 		if (revivalNpc != null)
 		{
-			_interactionPromptLabel.Text = "E  Revive fallen pets";
+			_interactionPromptLabel.Visible = true;
+			_interactionPromptLabel.Text = LocaleText.F("prompt.revive_pets", "E");
+			return;
 		}
-	}
 
-	private void TryInteractWithRevivalNpc()
-	{
-		if (GetNearestRevivalNpc() == null)
+		Node3D? mapPortal = GetNearestMapPortal();
+		if (mapPortal != null)
+		{
+			_interactionPromptLabel.Visible = true;
+			_interactionPromptLabel.Text = LocaleText.F("prompt.portal", "E", GetPortalLabel(mapPortal));
+			return;
+		}
+
+		SimpleActor? recruitNpc = GetNearestRecruitableNpc();
+		_interactionPromptLabel.Visible = recruitNpc != null;
+		if (recruitNpc == null)
 		{
 			return;
 		}
 
-		ReviveDefeatedCompanions();
+		if (!_acceptedNpcQuests.Contains(recruitNpc))
+		{
+			_interactionPromptLabel.Text = LocaleText.F("prompt.npc.accept_task", "E", recruitNpc.LocalizedDisplayName);
+		}
+		else if (GetInventoryCount(NpcRecruitQuestItemId) >= NpcRecruitQuestItemCount)
+		{
+			_interactionPromptLabel.Text = LocaleText.F("prompt.npc.deliver_task", "E", recruitNpc.LocalizedDisplayName);
+		}
+		else if (_completedNpcQuests.Contains(recruitNpc) && recruitNpc.Affinity >= NpcRecruitAffinityRequirement)
+		{
+			_interactionPromptLabel.Text = LocaleText.F("prompt.npc.invite", "E", recruitNpc.LocalizedDisplayName);
+		}
+		else
+		{
+			_interactionPromptLabel.Text = LocaleText.F("prompt.npc.quest_progress", "E", GetInventoryCount(NpcRecruitQuestItemId), NpcRecruitQuestItemCount, recruitNpc.Affinity, NpcRecruitAffinityRequirement);
+		}
+	}
+
+	private void TryInteract()
+	{
+		if (GetNearestRevivalNpc() != null)
+		{
+			ReviveDefeatedCompanions();
+			return;
+		}
+
+		Node3D? mapPortal = GetNearestMapPortal();
+		if (mapPortal != null)
+		{
+			TryUseMapPortal(mapPortal);
+			return;
+		}
+
+		SimpleActor? recruitNpc = GetNearestRecruitableNpc();
+		if (recruitNpc != null)
+		{
+			TryInteractWithRecruitNpc(recruitNpc);
+		}
+	}
+
+	private void TryInteractWithRecruitNpc(SimpleActor actor)
+	{
+		if (!IsInstanceValid(actor) || !actor.IsNpcRecruitCandidate)
+		{
+			return;
+		}
+
+		if (_completedNpcQuests.Contains(actor) && actor.Affinity >= NpcRecruitAffinityRequirement)
+		{
+			RecruitNpc(actor);
+			return;
+		}
+
+		if (!_acceptedNpcQuests.Contains(actor))
+		{
+			ShowNpcQuestDialog(actor);
+			return;
+		}
+
+		if (!TryConsumeInventoryItem(NpcRecruitQuestItemId, NpcRecruitQuestItemCount))
+		{
+			PostSystemMessage(LocaleText.F("system.npc.waiting_items", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, LocaleText.T("item.monster_trophy")), new Color(0.86f, 0.84f, 0.72f));
+			return;
+		}
+
+		_completedNpcQuests.Add(actor);
+		actor.IncreaseAffinity(NpcQuestAffinityReward);
+		SpawnWorldCombatEffect(LocaleText.F("effect.affinity_gain", NpcQuestAffinityReward), new Color(0.62f, 1.0f, 0.78f, 0.92f), actor.GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 0.85f, 0.62f);
+		PostSystemMessage(LocaleText.F("system.npc.task_complete", actor.LocalizedDisplayName, actor.Affinity, NpcRecruitAffinityRequirement), new Color(0.78f, 1.0f, 0.82f));
+		if (actor.Affinity >= NpcRecruitAffinityRequirement)
+		{
+			RecruitNpc(actor);
+		}
+		else
+		{
+			PostSystemMessage(LocaleText.F("system.npc.need_more_tasks", actor.LocalizedDisplayName), new Color(0.82f, 0.92f, 1.0f));
+		}
+	}
+
+	private void ShowNpcQuestDialog(SimpleActor actor)
+	{
+		if (!IsInstanceValid(actor) || _npcQuestDialog == null)
+		{
+			return;
+		}
+
+		_pendingQuestNpc = actor;
+		_npcQuestTitleLabel.Text = LocaleText.F("quest.dialog.title", actor.LocalizedDisplayName);
+		_npcQuestBodyLabel.Text = LocaleText.F("quest.dialog.body", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, LocaleText.T("item.monster_trophy"));
+		_npcQuestRewardLabel.Text = LocaleText.F("quest.dialog.reward", NpcQuestAffinityReward, NpcRecruitAffinityRequirement);
+		_npcQuestAcceptButton.Text = LocaleText.T("quest.button.accept");
+		_npcQuestDeclineButton.Text = LocaleText.T("quest.button.decline");
+		_npcQuestDialog.Visible = true;
+		_interactionPromptLabel.Visible = false;
+		UpdateMouseModeForPanels();
+	}
+
+	private void AcceptNpcQuestDialog()
+	{
+		SimpleActor? actor = _pendingQuestNpc;
+		if (actor == null || !IsInstanceValid(actor) || !actor.IsNpcRecruitCandidate)
+		{
+			CloseNpcQuestDialog();
+			return;
+		}
+
+		_acceptedNpcQuests.Add(actor);
+		PostSystemMessage(LocaleText.F("system.npc.task_posted", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, LocaleText.T("item.monster_trophy")), new Color(0.82f, 0.92f, 1.0f));
+		CloseNpcQuestDialog();
+	}
+
+	private void DeclineNpcQuestDialog()
+	{
+		SimpleActor? actor = _pendingQuestNpc;
+		if (actor != null && IsInstanceValid(actor))
+		{
+			PostSystemMessage(LocaleText.F("system.npc.task_declined", actor.LocalizedDisplayName), new Color(0.82f, 0.86f, 0.92f));
+		}
+
+		CloseNpcQuestDialog();
+	}
+
+	private void CloseNpcQuestDialog()
+	{
+		_pendingQuestNpc = null;
+		if (_npcQuestDialog != null)
+		{
+			_npcQuestDialog.Visible = false;
+		}
+
+		UpdateMouseModeForPanels();
 	}
 
 	private Node3D? GetNearestRevivalNpc()
@@ -1011,6 +1534,83 @@ public partial class PlayerController : CharacterBody3D
 			if (distance <= bestDistance)
 			{
 				nearest = npc;
+				bestDistance = distance;
+			}
+		}
+
+		return nearest;
+	}
+
+	private Node3D? GetNearestMapPortal()
+	{
+		Node3D? nearest = null;
+		float bestDistance = MapPortalInteractRange;
+		foreach (Node node in GetTree().GetNodesInGroup("map_portal"))
+		{
+			if (node is not Node3D portal || !IsInstanceValid(portal) || !portal.IsVisibleInTree())
+			{
+				continue;
+			}
+
+			float distance = GlobalPosition.DistanceTo(portal.GlobalPosition);
+			if (distance <= bestDistance)
+			{
+				nearest = portal;
+				bestDistance = distance;
+			}
+		}
+
+		return nearest;
+	}
+
+	private string GetPortalLabel(Node3D portal)
+	{
+		if (portal.HasMeta("label"))
+		{
+			string label = portal.GetMeta("label").AsString();
+			if (!string.IsNullOrWhiteSpace(label))
+			{
+				return label;
+			}
+		}
+
+		return "Travel";
+	}
+
+	private void TryUseMapPortal(Node3D portal)
+	{
+		if (!portal.HasMeta("target_map"))
+		{
+			return;
+		}
+
+		string targetMapId = portal.GetMeta("target_map").AsString();
+		if (GetParent() is World world)
+		{
+			world.RequestMapTravel(targetMapId);
+		}
+	}
+
+	private SimpleActor? GetNearestRecruitableNpc()
+	{
+		if (_selectedActor != null && IsInstanceValid(_selectedActor) && _selectedActor.IsNpcRecruitCandidate && GlobalPosition.DistanceTo(_selectedActor.GlobalPosition) <= NpcRecruitInteractRange)
+		{
+			return _selectedActor;
+		}
+
+		SimpleActor? nearest = null;
+		float bestDistance = NpcRecruitInteractRange;
+		foreach (Node node in GetTree().GetNodesInGroup("npcs"))
+		{
+			if (node is not SimpleActor actor || !IsInstanceValid(actor) || !actor.IsNpcRecruitCandidate)
+			{
+				continue;
+			}
+
+			float distance = GlobalPosition.DistanceTo(actor.GlobalPosition);
+			if (distance <= bestDistance)
+			{
+				nearest = actor;
 				bestDistance = distance;
 			}
 		}
@@ -1286,6 +1886,15 @@ public partial class PlayerController : CharacterBody3D
 		float speed = planarVelocity.Length();
 		float moveRatio = Mathf.Clamp(speed / Mathf.Max(SprintSpeed, 0.01f), 0.0f, 1.0f);
 		bool isMoving = speed > 0.25f && IsOnFloor();
+		if (_playerExternalModel != null)
+		{
+			string state = !isMoving ? "idle" : moveRatio > 0.72f ? "run" : "walk";
+			SetPlayerExternalAnimationState(state);
+			_playerExternalModel.Position = Vector3.Zero;
+			_playerExternalModel.RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f);
+			return;
+		}
+
 		float phaseSpeed = Mathf.Lerp(6.2f, 11.2f, moveRatio);
 
 		if (isMoving)
@@ -1322,6 +1931,17 @@ public partial class PlayerController : CharacterBody3D
 
 		SetVisualRotation("PlayerCape", new Vector3(-8.0f + Mathf.Abs(swing) * 7.0f * intensity, 0.0f, -swing * 2.5f * intensity));
 		SetVisualRotation("PlayerScarfTail", new Vector3(-12.0f - moveRatio * 12.0f, 0.0f, -12.0f + swing * 5.0f * intensity));
+	}
+
+	private void SetPlayerExternalAnimationState(string state)
+	{
+		if (_playerExternalModel == null || _playerExternalAnimationState == state)
+		{
+			return;
+		}
+
+		_playerExternalAnimationState = state;
+		ExternalModelLibrary.TryPlayActorAnimation(_playerExternalModel, state);
 	}
 
 	private void SetVisualPosition(string nodeName, Vector3 position)
@@ -1478,6 +2098,13 @@ public partial class PlayerController : CharacterBody3D
 
 	private void CreatePlayerVisual()
 	{
+		_playerExternalModel = ExternalModelLibrary.TryAddPlayerModel(this);
+		if (_playerExternalModel != null)
+		{
+			AddPlayerExternalEquipment();
+			return;
+		}
+
 		var matCoat = MakeMaterial(new Color(0.18f, 0.36f, 0.62f));
 		var matCoatDark = MakeMaterial(new Color(0.08f, 0.19f, 0.32f));
 		var matTrim = MakeMaterial(new Color(0.95f, 0.72f, 0.26f));
@@ -1520,6 +2147,33 @@ public partial class PlayerController : CharacterBody3D
 		AddVisualMesh("PlayerCape", new BoxMesh { Size = new Vector3(0.62f, 0.90f, 0.055f) }, new Vector3(0.0f, 1.02f, 0.38f), new Vector3(-8.0f, 0.0f, 0.0f), Vector3.One, matTrim);
 		AddVisualMesh("PlayerBackBlade", new BoxMesh { Size = new Vector3(0.075f, 0.90f, 0.045f) }, new Vector3(0.44f, 1.10f, 0.36f), new Vector3(0.0f, 0.0f, -24.0f), Vector3.One, matMetal);
 		AddVisualMesh("PlayerBackBladeGuard", new BoxMesh { Size = new Vector3(0.30f, 0.055f, 0.055f) }, new Vector3(0.30f, 0.73f, 0.36f), new Vector3(0.0f, 0.0f, -24.0f), Vector3.One, matTrim);
+	}
+
+	private void AddPlayerExternalEquipment()
+	{
+		var equipmentRoot = new Node3D
+		{
+			Name = "PlayerExternalEquipment",
+			Position = Vector3.Zero,
+		};
+		AddChild(equipmentRoot);
+
+		ExternalModelLibrary.TryAddModel(
+			equipmentRoot,
+			"res://assets/models/player/sword_2handed_color.gltf",
+			"BackSword",
+			new Vector3(0.34f, 1.10f, 0.34f),
+			new Vector3(12.0f, 0.0f, -28.0f),
+			new Vector3(0.82f, 0.82f, 0.82f)
+		);
+		ExternalModelLibrary.TryAddModel(
+			equipmentRoot,
+			"res://assets/models/player/shield_badge_color.gltf",
+			"BackShield",
+			new Vector3(-0.34f, 1.08f, 0.34f),
+			new Vector3(8.0f, 180.0f, 18.0f),
+			new Vector3(0.82f, 0.82f, 0.82f)
+		);
 	}
 
 	private void AddPlayerEye(string side, Vector3 position, float radius, Material eyeMaterial, Material pupilMaterial)
@@ -1645,6 +2299,7 @@ public partial class PlayerController : CharacterBody3D
 			_settingsPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
+			CloseNpcQuestDialog();
 		}
 
 		UpdateMouseModeForPanels();
@@ -1658,6 +2313,7 @@ public partial class PlayerController : CharacterBody3D
 			_partyPanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
+			CloseNpcQuestDialog();
 		}
 
 		UpdateMouseModeForPanels();
@@ -1671,6 +2327,7 @@ public partial class PlayerController : CharacterBody3D
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
+			CloseNpcQuestDialog();
 		}
 
 		UpdateMouseModeForPanels();
@@ -1684,6 +2341,7 @@ public partial class PlayerController : CharacterBody3D
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
+			CloseNpcQuestDialog();
 		}
 
 		UpdateMouseModeForPanels();
@@ -1691,7 +2349,7 @@ public partial class PlayerController : CharacterBody3D
 
 	private void UpdateMouseModeForPanels()
 	{
-		Input.MouseMode = _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _settingsPanel.Visible
+		Input.MouseMode = _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _settingsPanel.Visible || (_npcQuestDialog != null && _npcQuestDialog.Visible)
 			? Input.MouseModeEnum.Visible
 			: Input.MouseModeEnum.Captured;
 	}

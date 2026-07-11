@@ -58,4 +58,4 @@ Environment:
 - `environment/boulder.glb`
 - `environment/stone.glb`
 
-You can add more filenames by extending `scripts/ExternalModelLibrary.cs`.
+You can add more filenames by extending `scripts/Core/Assets/ExternalModelLibrary.cs`.

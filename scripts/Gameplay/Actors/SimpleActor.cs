@@ -70,7 +70,9 @@ public partial class SimpleActor : CharacterBody3D
 	private bool _buildConfigured;
 	private bool _buildStatsDirty = true;
 
-	public bool CanBeCaptured => !_isCaptured && !_isDefeated;
+	public bool CanBeCaptured => ActorKind == "monster" && !_isCaptured && !_isDefeated;
+	public bool IsNpcRecruitCandidate => ActorKind == "npc" && !_isCaptured && !_isDefeated;
+	public bool CanJoinByAffinity => IsNpcRecruitCandidate && Affinity >= 80;
 	public bool IsCaptured => _isCaptured;
 	public bool IsInActiveParty => _isInActiveParty;
 	public bool IsDefeated => _isDefeated;
@@ -137,7 +139,7 @@ public partial class SimpleActor : CharacterBody3D
 	public string BuildElementName => LocaleText.T(CurrentBuildStats.DamageElementNameKey);
 	public bool IsRangedCombatant => CombatRole == "Ranged" || CombatRole == "Support" || EffectiveAttackRange > 3.0f;
 	public string CombatRangeName => IsRangedCombatant ? "Ranged" : "Melee";
-	public string CombatSummary => $"{LocaleText.F("combat.summary", CombatRoleName, LocalizedPersonality, Affinity)} / {CombatRangeName} / Affinity {Affinity}";
+	public string CombatSummary => $"{LocaleText.F("combat.summary", CombatRoleName, LocalizedPersonality, Affinity)} / {CombatRangeName} / {LocaleText.F("stat.affinity_value", Affinity)}";
 	public Color AttackFxColor => GetAttackColor();
 	public int ExperienceToNextLevel => 35 + Level * 18 + EvolutionStage * 20;
 	public bool CanEvolve => EvolutionStage < 3 && Level >= (EvolutionStage + 1) * 5;
@@ -271,6 +273,32 @@ public partial class SimpleActor : CharacterBody3D
 		RemoveFromGroup(ActorKind == "monster" ? "monsters" : "npcs");
 		AddToGroup("captured_actors");
 		RefreshNameplate();
+	}
+
+	public void Recruit(PlayerController followTarget)
+	{
+		Capture(followTarget);
+	}
+
+	public void SetWorldMapActive(bool active)
+	{
+		if (_isCaptured)
+		{
+			return;
+		}
+
+		Visible = active;
+		SetPhysicsProcess(active && !_isDefeated);
+		if (active && !_isDefeated)
+		{
+			CollisionLayer = _defaultCollisionLayer;
+			CollisionMask = _defaultCollisionMask;
+		}
+		else
+		{
+			CollisionLayer = 0;
+			CollisionMask = 0;
+		}
 	}
 
 	public void DeployToParty(PlayerController followTarget, int followSlot)
@@ -444,6 +472,85 @@ public partial class SimpleActor : CharacterBody3D
 		CurrentHealth = EffectiveMaxHealth;
 	}
 
+	public void IncreaseAffinity(int amount)
+	{
+		Affinity = Mathf.Clamp(Affinity + amount, 0, 100);
+		RefreshNameplate();
+	}
+
+	public ActorSaveData ExportSaveData()
+	{
+		CompanionBuildLoadout loadout = BuildLoadout;
+		return new ActorSaveData
+		{
+			ActorKind = ActorKind,
+			DisplayName = DisplayName,
+			Level = Level,
+			MaxHealth = MaxHealth,
+			CurrentHealth = CurrentHealth,
+			Attack = Attack,
+			Defense = Defense,
+			ExperienceReward = ExperienceReward,
+			GoldReward = GoldReward,
+			Experience = Experience,
+			EvolutionStage = EvolutionStage,
+			SpecialAbility = SpecialAbility,
+			AbilityRank = AbilityRank,
+			CombatRole = CombatRole,
+			Personality = Personality,
+			PassiveAbility = PassiveAbility,
+			Affinity = Affinity,
+			BuildLoadout = new CompanionBuildSaveData
+			{
+				HelmetId = loadout.HelmetId,
+				WeaponId = loadout.WeaponId,
+				ArmorId = loadout.ArmorId,
+				AccessoryId = loadout.AccessoryId,
+				AttributeGemId = loadout.AttributeGemId,
+				SkillGemIds = new[] { loadout.SkillGemIds[0], loadout.SkillGemIds[1], loadout.SkillGemIds[2] },
+				AiGemId = loadout.AiGemId,
+			},
+		};
+	}
+
+	public void ApplySaveData(ActorSaveData data)
+	{
+		ActorKind = data.ActorKind;
+		DisplayName = data.DisplayName;
+		Level = Mathf.Max(data.Level, 1);
+		MaxHealth = Mathf.Max(data.MaxHealth, 1);
+		CurrentHealth = Mathf.Clamp(data.CurrentHealth, 1, MaxHealth);
+		Attack = Mathf.Max(data.Attack, 0);
+		Defense = Mathf.Max(data.Defense, 0);
+		ExperienceReward = Mathf.Max(data.ExperienceReward, 0);
+		GoldReward = Mathf.Max(data.GoldReward, 0);
+		Experience = Mathf.Max(data.Experience, 0);
+		EvolutionStage = Mathf.Clamp(data.EvolutionStage, 0, 3);
+		SpecialAbility = data.SpecialAbility;
+		AbilityRank = Mathf.Max(data.AbilityRank, 1);
+		CombatRole = string.IsNullOrWhiteSpace(data.CombatRole) ? "DPS" : data.CombatRole;
+		Personality = string.IsNullOrWhiteSpace(data.Personality) ? "personality.calm" : data.Personality;
+		PassiveAbility = string.IsNullOrWhiteSpace(data.PassiveAbility) ? "ability.none" : data.PassiveAbility;
+		Affinity = Mathf.Clamp(data.Affinity, 0, 100);
+		_buildLoadout = new CompanionBuildLoadout
+		{
+			HelmetId = data.BuildLoadout.HelmetId,
+			WeaponId = data.BuildLoadout.WeaponId,
+			ArmorId = data.BuildLoadout.ArmorId,
+			AccessoryId = data.BuildLoadout.AccessoryId,
+			AttributeGemId = data.BuildLoadout.AttributeGemId,
+			SkillGemIds = data.BuildLoadout.SkillGemIds.Length >= 3
+				? new[] { data.BuildLoadout.SkillGemIds[0], data.BuildLoadout.SkillGemIds[1], data.BuildLoadout.SkillGemIds[2] }
+				: new[] { "gem.skill.none", "gem.skill.none", "gem.skill.none" },
+			AiGemId = data.BuildLoadout.AiGemId,
+		};
+		_buildConfigured = true;
+		_buildStatsDirty = true;
+		RecalculateBuildStats();
+		CurrentHealth = Mathf.Clamp(data.CurrentHealth, 1, EffectiveMaxHealth);
+		RefreshNameplate();
+	}
+
 	private void EnsureBuildLoadout()
 	{
 		if (_buildConfigured)
@@ -587,7 +694,7 @@ public partial class SimpleActor : CharacterBody3D
 			GlobalPosition = GetFollowDestination();
 		}
 
-		SpawnCombatEffect("Revive", new Color(0.42f, 1.0f, 0.66f, 0.94f), GlobalPosition + new Vector3(0.0f, 1.25f, 0.0f), 0.9f, 0.76f);
+		SpawnCombatEffect(LocaleText.T("effect.revive"), new Color(0.42f, 1.0f, 0.66f, 0.94f), GlobalPosition + new Vector3(0.0f, 1.25f, 0.0f), 0.9f, 0.76f);
 		RefreshNameplate();
 		return true;
 	}
@@ -1220,7 +1327,7 @@ public partial class SimpleActor : CharacterBody3D
 			Visible = true;
 			SetPhysicsProcess(false);
 			ApplyDefeatedPose();
-			SpawnCombatEffect("Affinity -12", new Color(1.0f, 0.28f, 0.22f, 0.92f), GlobalPosition + new Vector3(0.0f, 1.15f, 0.0f), 0.95f, 0.72f);
+			SpawnCombatEffect(LocaleText.F("effect.affinity_loss", 12), new Color(1.0f, 0.28f, 0.22f, 0.92f), GlobalPosition + new Vector3(0.0f, 1.15f, 0.0f), 0.95f, 0.72f);
 			RefreshNameplate();
 			return;
 		}
@@ -1233,9 +1340,120 @@ public partial class SimpleActor : CharacterBody3D
 
 		if (attacker?._followTarget != null && IsInstanceValid(attacker._followTarget))
 		{
-			attacker._followTarget.PostSystemMessage($"{attacker.LocalizedDisplayName} defeated {LocalizedDisplayName}.", new Color(1.0f, 0.70f, 0.42f));
+			attacker._followTarget.PostSystemMessage(LocaleText.F("system.combat.defeated", attacker.LocalizedDisplayName, LocalizedDisplayName), new Color(1.0f, 0.70f, 0.42f));
 			attacker._followTarget.GrantCombatExperience(ExperienceReward);
+			if (ActorKind == "monster")
+			{
+				DropMonsterLoot(attacker._followTarget);
+			}
 		}
+	}
+
+	private void DropMonsterLoot(PlayerController player)
+	{
+		Vector3 origin = GlobalPosition;
+		int goldAmount = Mathf.Max(GoldReward + _rng.RandiRange(1, Mathf.Max(Level + 2, 3)), 1);
+		SpawnWorldDrop(origin + RandomDropOffset(0.45f), string.Empty, 1, goldAmount);
+		SpawnWorldDrop(origin + RandomDropOffset(0.78f), "monster_trophy", 1, 0);
+
+		if (_rng.Randf() < 0.36f)
+		{
+			SpawnWorldDrop(origin + RandomDropOffset(1.05f), PickEquipmentDropId(), 1, 0);
+		}
+
+		if (_rng.Randf() < 0.22f)
+		{
+			SpawnWorldDrop(origin + RandomDropOffset(1.18f), PickGemDropId(), 1, 0);
+		}
+
+		player.PostSystemMessage(LocaleText.F("system.drop.loot", LocalizedDisplayName), new Color(1.0f, 0.86f, 0.48f));
+	}
+
+	private void SpawnWorldDrop(Vector3 position, string itemId, int amount, int goldAmount)
+	{
+		var drop = new WorldDrop
+		{
+			ItemId = itemId,
+			Amount = Mathf.Max(amount, 1),
+			GoldAmount = Mathf.Max(goldAmount, 0),
+		};
+
+		Node parent = GetTree().CurrentScene ?? GetParent();
+		parent.AddChild(drop);
+		drop.GlobalPosition = new Vector3(position.X, 0.04f, position.Z);
+	}
+
+	private Vector3 RandomDropOffset(float radius)
+	{
+		float angle = (float)_rng.RandfRange(0.0f, Mathf.Tau);
+		float distance = (float)_rng.RandfRange(radius * 0.35f, radius);
+		return new Vector3(Mathf.Cos(angle) * distance, 0.0f, Mathf.Sin(angle) * distance);
+	}
+
+	private string PickEquipmentDropId()
+	{
+		EquipmentSlot[] slots =
+		{
+			EquipmentSlot.Helmet,
+			EquipmentSlot.Weapon,
+			EquipmentSlot.Armor,
+			EquipmentSlot.Accessory,
+		};
+		EquipmentSlot slot = slots[_rng.RandiRange(0, slots.Length - 1)];
+		var definitions = BuildCatalog.GetEquipmentDefinitions(slot);
+		return definitions[_rng.RandiRange(0, definitions.Count - 1)].Id;
+	}
+
+	private string PickGemDropId()
+	{
+		int kind = _rng.RandiRange(0, 2);
+		if (kind == 0)
+		{
+			var gems = BuildCatalog.GetAttributeGemDefinitions();
+			return PickNonFreeAttributeGem(gems);
+		}
+
+		if (kind == 1)
+		{
+			var gems = BuildCatalog.GetSkillGemDefinitions();
+			return PickNonFreeSkillGem(gems);
+		}
+
+		var aiGems = BuildCatalog.GetAiGemDefinitions();
+		return aiGems[_rng.RandiRange(0, aiGems.Count - 1)].Id;
+	}
+
+	private int PickValidGemIndex(int count)
+	{
+		return Mathf.Clamp(_rng.RandiRange(1, Mathf.Max(count - 1, 1)), 0, Mathf.Max(count - 1, 0));
+	}
+
+	private string PickNonFreeAttributeGem(System.Collections.Generic.List<AttributeGemDefinition> gems)
+	{
+		for (int attempt = 0; attempt < 12; attempt++)
+		{
+			string id = gems[PickValidGemIndex(gems.Count)].Id;
+			if (!BuildCatalog.IsFreeItem(id))
+			{
+				return id;
+			}
+		}
+
+		return "gem.attribute.fire";
+	}
+
+	private string PickNonFreeSkillGem(System.Collections.Generic.List<SkillGemDefinition> gems)
+	{
+		for (int attempt = 0; attempt < 12; attempt++)
+		{
+			string id = gems[PickValidGemIndex(gems.Count)].Id;
+			if (!BuildCatalog.IsFreeItem(id))
+			{
+				return id;
+			}
+		}
+
+		return "gem.skill.fireball";
 	}
 
 	private void ApplyDefeatedPose()

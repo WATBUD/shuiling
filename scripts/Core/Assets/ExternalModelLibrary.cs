@@ -2,38 +2,30 @@ using Godot;
 
 public static class ExternalModelLibrary
 {
+	private static readonly string[] PlayerModels =
+	{
+		"res://assets/models/player/player_rogue_hooded.glb",
+		"res://assets/models/player/player_knight.glb",
+		"res://assets/models/player/player_mage.glb",
+		"res://assets/models/player/player_barbarian.glb",
+	};
+
 	private static readonly string[] NpcMelee =
 	{
 		"res://assets/models/characters/knight.glb",
 		"res://assets/models/characters/barbarian.glb",
 		"res://assets/models/characters/rogue.glb",
-		"res://assets/models/characters/warrior.glb",
-		"res://assets/models/characters/guard.glb",
-		"res://assets/models/characters/adventurer.glb",
-		"res://assets/models/characters/warrior.gltf",
-		"res://assets/models/characters/guard.gltf",
-		"res://assets/models/characters/adventurer.gltf",
 	};
 
 	private static readonly string[] NpcRanged =
 	{
 		"res://assets/models/characters/archer.glb",
 		"res://assets/models/characters/rogue.glb",
-		"res://assets/models/characters/hunter.glb",
-		"res://assets/models/characters/ranger.glb",
-		"res://assets/models/characters/bowman.glb",
-		"res://assets/models/characters/guard.gltf",
-		"res://assets/models/characters/adventurer.gltf",
 	};
 
 	private static readonly string[] NpcSupport =
 	{
 		"res://assets/models/characters/mage.glb",
-		"res://assets/models/characters/healer.glb",
-		"res://assets/models/characters/wizard.glb",
-		"res://assets/models/characters/apprentice.glb",
-		"res://assets/models/characters/adventurer.gltf",
-		"res://assets/models/characters/guard.gltf",
 	};
 
 	private static readonly string[] MonsterMelee =
@@ -85,6 +77,45 @@ public static class ExternalModelLibrary
 			: actor.CombatRole == "Support" ? NpcSupport : actor.IsRangedCombatant ? NpcRanged : NpcMelee;
 		Vector3 scale = actor.ActorKind == "monster" ? new Vector3(1.05f, 1.05f, 1.05f) : new Vector3(1.05f, 1.05f, 1.05f);
 		return TryAddFirstExisting(actor, paths, "ExternalModel", Vector3.Zero, new Vector3(0.0f, 180.0f, 0.0f), scale, (int)actor.GetInstanceId());
+	}
+
+	public static Node3D? TryAddPlayerModel(Node3D player)
+	{
+		if (player.GetNodeOrNull<Node3D>("PlayerExternalModel") != null)
+		{
+			return player.GetNode<Node3D>("PlayerExternalModel");
+		}
+
+		foreach (string path in PlayerModels)
+		{
+			if (!ResourceLoader.Exists(path))
+			{
+				continue;
+			}
+
+			var packedScene = ResourceLoader.Load<PackedScene>(path);
+			if (packedScene == null)
+			{
+				continue;
+			}
+
+			Node instance = packedScene.Instantiate();
+			if (instance is not Node3D model)
+			{
+				instance.QueueFree();
+				continue;
+			}
+
+			model.Name = "PlayerExternalModel";
+			model.Position = Vector3.Zero;
+			model.RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f);
+			model.Scale = new Vector3(1.08f, 1.08f, 1.08f);
+			player.AddChild(model);
+			TryPlayActorAnimation(model, "idle");
+			return model;
+		}
+
+		return null;
 	}
 
 	public static bool TryAddPropModel(Node3D parent, string propKind, int variantSeed, Vector3 position, Vector3 scale)
@@ -153,6 +184,11 @@ public static class ExternalModelLibrary
 		for (int offset = 0; offset < paths.Length; offset++)
 		{
 			string path = paths[(startIndex + offset) % paths.Length];
+			if (IsBlockedActorPath(parent, path))
+			{
+				continue;
+			}
+
 			if (!ResourceLoader.Exists(path))
 			{
 				continue;
@@ -181,6 +217,16 @@ public static class ExternalModelLibrary
 		}
 
 		return false;
+	}
+
+	private static bool IsBlockedActorPath(Node3D parent, string path)
+	{
+		if (parent is not SimpleActor actor || actor.ActorKind != "npc")
+		{
+			return false;
+		}
+
+		return path.Contains("/monsters/") || path.Contains("Atlas_Monsters") || path.EndsWith(".gltf");
 	}
 
 	private static AnimationPlayer? FindAnimationPlayer(Node root)
