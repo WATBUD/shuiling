@@ -15,15 +15,34 @@ public partial class InventoryPanel : PanelContainer
 		SkillGem3,
 	}
 
+	private enum InventoryCategory
+	{
+		All,
+		Equipment,
+		Gems,
+		Materials,
+	}
+
 	private PlayerController? _player;
 	private SimpleActor? _selectedActor;
 	private EquipTarget _selectedTarget = EquipTarget.Weapon;
+	private InventoryCategory _selectedCategory = InventoryCategory.All;
+	private string _selectedItemId = string.Empty;
+	private readonly Dictionary<InventoryCategory, Button> _categoryButtons = new();
 	private VBoxContainer _companionList = null!;
-	private VBoxContainer _itemList = null!;
+	private GridContainer _itemGrid = null!;
 	private Label _titleLabel = null!;
+	private Label _goldLabel = null!;
 	private Label _selectedActorLabel = null!;
+	private Label _companionInfoTitleLabel = null!;
+	private Label _companionInfoBodyLabel = null!;
 	private Label _selectedSlotLabel = null!;
 	private Label _buildSummaryLabel = null!;
+	private Label _bagCountLabel = null!;
+	private Label _itemDetailTitleLabel = null!;
+	private Label _itemDetailBodyLabel = null!;
+	private Button _equipSelectedButton = null!;
+	private Button _useSelectedButton = null!;
 	private Button _helmetButton = null!;
 	private Button _weaponButton = null!;
 	private Button _armorButton = null!;
@@ -101,22 +120,25 @@ public partial class InventoryPanel : PanelContainer
 			return;
 		}
 
+		RefreshText();
 		RefreshCompanionList();
 		RefreshSlotButtons();
 		RefreshItemList();
 		RefreshDetails();
+		RefreshSelectedItemDetails();
 	}
 
 	private void BuildPanel()
 	{
 		Name = "InventoryPanel";
+		_categoryButtons.Clear();
 		MouseFilter = MouseFilterEnum.Stop;
-		SetAnchorsPreset(LayoutPreset.Center);
-		OffsetLeft = -560.0f;
-		OffsetRight = 560.0f;
-		OffsetTop = -340.0f;
-		OffsetBottom = 340.0f;
-		CustomMinimumSize = new Vector2(1120.0f, 680.0f);
+		SetAnchorsPreset(LayoutPreset.FullRect);
+		OffsetLeft = 34.0f;
+		OffsetRight = -34.0f;
+		OffsetTop = 34.0f;
+		OffsetBottom = -34.0f;
+		CustomMinimumSize = new Vector2(920.0f, 560.0f);
 
 		var style = new StyleBoxFlat
 		{
@@ -146,6 +168,11 @@ public partial class InventoryPanel : PanelContainer
 		_titleLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 		header.AddChild(_titleLabel);
 
+		_goldLabel = MakeLabel(16, new Color(1.0f, 0.84f, 0.34f));
+		_goldLabel.HorizontalAlignment = HorizontalAlignment.Right;
+		_goldLabel.CustomMinimumSize = new Vector2(160.0f, 36.0f);
+		header.AddChild(_goldLabel);
+
 		var closeButton = MakeButton(LocaleText.T("ui.close"));
 		closeButton.CustomMinimumSize = new Vector2(96.0f, 36.0f);
 		closeButton.Pressed += OnClosePressed;
@@ -156,11 +183,28 @@ public partial class InventoryPanel : PanelContainer
 		content.AddThemeConstantOverride("separation", 14);
 		root.AddChild(content);
 
-		var companionSection = MakeSection(LocaleText.T("inventory.companions"), new Vector2(260.0f, 0.0f));
+		var companionSection = MakeSection(LocaleText.T("inventory.companions"), new Vector2(200.0f, 0.0f));
 		content.AddChild(companionSection);
 		_companionList = MakeScrollableList(companionSection);
 
-		var equipmentSection = MakeSection(LocaleText.T("inventory.equipment_slots"), new Vector2(420.0f, 0.0f));
+		var companionInfoPanel = MakeInfoPanel(new Vector2(0.0f, 142.0f));
+		companionSection.AddChild(companionInfoPanel);
+		var companionInfoMargin = new MarginContainer();
+		companionInfoMargin.AddThemeConstantOverride("margin_left", 10);
+		companionInfoMargin.AddThemeConstantOverride("margin_right", 10);
+		companionInfoMargin.AddThemeConstantOverride("margin_top", 8);
+		companionInfoMargin.AddThemeConstantOverride("margin_bottom", 8);
+		companionInfoPanel.AddChild(companionInfoMargin);
+		var companionInfoRows = new VBoxContainer();
+		companionInfoRows.AddThemeConstantOverride("separation", 5);
+		companionInfoMargin.AddChild(companionInfoRows);
+		_companionInfoTitleLabel = MakeLabel(15, new Color(1.0f, 0.92f, 0.58f));
+		companionInfoRows.AddChild(_companionInfoTitleLabel);
+		_companionInfoBodyLabel = MakeLabel(12, new Color(0.80f, 0.87f, 0.93f));
+		_companionInfoBodyLabel.CustomMinimumSize = new Vector2(0.0f, 80.0f);
+		companionInfoRows.AddChild(_companionInfoBodyLabel);
+
+		var equipmentSection = MakeSection(LocaleText.T("inventory.equipment_slots"), new Vector2(300.0f, 0.0f));
 		content.AddChild(equipmentSection);
 
 		_selectedActorLabel = MakeLabel(22, new Color(1.0f, 0.96f, 0.76f));
@@ -187,11 +231,83 @@ public partial class InventoryPanel : PanelContainer
 		_selectedSlotLabel = MakeLabel(14, new Color(0.98f, 0.98f, 0.98f));
 		equipmentSection.AddChild(_selectedSlotLabel);
 
-		var itemSection = MakeSection(LocaleText.T("inventory.items"), new Vector2(390.0f, 0.0f));
+		var itemSection = MakeSection(LocaleText.T("inventory.items"), new Vector2(320.0f, 0.0f));
+		itemSection.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 		content.AddChild(itemSection);
-		_itemList = MakeScrollableList(itemSection);
+
+		var tabRow = new HBoxContainer();
+		tabRow.AddThemeConstantOverride("separation", 6);
+		itemSection.AddChild(tabRow);
+		AddCategoryButton(tabRow, InventoryCategory.All, "inventory.tab.all");
+		AddCategoryButton(tabRow, InventoryCategory.Equipment, "inventory.tab.equipment");
+		AddCategoryButton(tabRow, InventoryCategory.Gems, "inventory.tab.gems");
+		AddCategoryButton(tabRow, InventoryCategory.Materials, "inventory.tab.materials");
+
+		_bagCountLabel = MakeLabel(13, new Color(0.72f, 0.80f, 0.86f));
+		itemSection.AddChild(_bagCountLabel);
+
+		var itemScroll = new ScrollContainer
+		{
+			HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+			SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+			CustomMinimumSize = new Vector2(0.0f, 270.0f),
+		};
+		itemSection.AddChild(itemScroll);
+
+		_itemGrid = new GridContainer
+		{
+			Columns = 5,
+			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+		};
+		_itemGrid.AddThemeConstantOverride("h_separation", 6);
+		_itemGrid.AddThemeConstantOverride("v_separation", 6);
+		itemScroll.AddChild(_itemGrid);
+
+		var detailPanel = MakeInfoPanel(new Vector2(0.0f, 145.0f));
+		itemSection.AddChild(detailPanel);
+
+		var detailMargin = new MarginContainer();
+		detailMargin.AddThemeConstantOverride("margin_left", 10);
+		detailMargin.AddThemeConstantOverride("margin_right", 10);
+		detailMargin.AddThemeConstantOverride("margin_top", 8);
+		detailMargin.AddThemeConstantOverride("margin_bottom", 8);
+		detailPanel.AddChild(detailMargin);
+
+		var detailRows = new VBoxContainer();
+		detailRows.AddThemeConstantOverride("separation", 6);
+		detailMargin.AddChild(detailRows);
+
+		_itemDetailTitleLabel = MakeLabel(16, new Color(1.0f, 0.92f, 0.58f));
+		detailRows.AddChild(_itemDetailTitleLabel);
+
+		_itemDetailBodyLabel = MakeLabel(12, new Color(0.82f, 0.88f, 0.94f));
+		_itemDetailBodyLabel.CustomMinimumSize = new Vector2(0.0f, 58.0f);
+		detailRows.AddChild(_itemDetailBodyLabel);
+
+		var actionRow = new HBoxContainer();
+		actionRow.AddThemeConstantOverride("separation", 8);
+		detailRows.AddChild(actionRow);
+		_equipSelectedButton = MakeButton(LocaleText.T("inventory.action.equip"));
+		_equipSelectedButton.CustomMinimumSize = new Vector2(120.0f, 34.0f);
+		_equipSelectedButton.Pressed += OnEquipSelectedPressed;
+		actionRow.AddChild(_equipSelectedButton);
+		_useSelectedButton = MakeButton(LocaleText.T("inventory.action.use"));
+		_useSelectedButton.CustomMinimumSize = new Vector2(120.0f, 34.0f);
+		_useSelectedButton.Pressed += OnUseSelectedPressed;
+		actionRow.AddChild(_useSelectedButton);
 		BuildTooltip();
 		RefreshText();
+	}
+
+	private void AddCategoryButton(HBoxContainer parent, InventoryCategory category, string labelKey)
+	{
+		var button = MakeButton(LocaleText.T(labelKey));
+		button.ToggleMode = true;
+		button.CustomMinimumSize = new Vector2(76.0f, 34.0f);
+		button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		button.Pressed += () => SelectCategory(category);
+		parent.AddChild(button);
+		_categoryButtons[category] = button;
 	}
 
 	private void BuildTooltip()
@@ -240,6 +356,7 @@ public partial class InventoryPanel : PanelContainer
 		var section = new VBoxContainer
 		{
 			CustomMinimumSize = minSize,
+			SizeFlagsVertical = Control.SizeFlags.ExpandFill,
 		};
 		section.AddThemeConstantOverride("separation", 10);
 
@@ -247,6 +364,23 @@ public partial class InventoryPanel : PanelContainer
 		label.Text = title;
 		section.AddChild(label);
 		return section;
+	}
+
+	private static PanelContainer MakeInfoPanel(Vector2 minSize)
+	{
+		var panel = new PanelContainer
+		{
+			CustomMinimumSize = minSize,
+		};
+		var style = new StyleBoxFlat
+		{
+			BgColor = new Color(0.018f, 0.024f, 0.032f, 0.78f),
+			BorderColor = new Color(0.22f, 0.30f, 0.38f, 0.8f),
+		};
+		style.SetBorderWidthAll(1);
+		style.SetCornerRadiusAll(5);
+		panel.AddThemeStyleboxOverride("panel", style);
+		return panel;
 	}
 
 	private static VBoxContainer MakeScrollableList(VBoxContainer section)
@@ -314,6 +448,20 @@ public partial class InventoryPanel : PanelContainer
 		RefreshSlotButtons();
 		RefreshItemList();
 		RefreshDetails();
+		RefreshSelectedItemDetails();
+	}
+
+	private void SelectCategory(InventoryCategory category)
+	{
+		_selectedCategory = category;
+		if (!string.IsNullOrEmpty(_selectedItemId) && !ShouldShowItemInCategory(_selectedItemId, category))
+		{
+			_selectedItemId = string.Empty;
+		}
+
+		HideItemTooltip();
+		RefreshItemList();
+		RefreshSelectedItemDetails();
 	}
 
 	private void RefreshCompanionList()
@@ -398,23 +546,19 @@ public partial class InventoryPanel : PanelContainer
 
 	private void RefreshItemList()
 	{
-		ClearChildren(_itemList);
-		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor))
+		ClearChildren(_itemGrid);
+		RefreshCategoryButtons();
+		if (_player == null)
 		{
-			AddItemListMessage("inventory.no_companions");
+			AddItemListMessage("inventory.no_items");
 			return;
 		}
 
-		List<string> itemIds = GetCompatibleInventoryItems();
+		List<string> itemIds = GetVisibleInventoryItems();
 		int added = 0;
 		foreach (string itemId in itemIds)
 		{
-			if (!_player.HasInventoryItem(itemId))
-			{
-				continue;
-			}
-
-			AddItemButton(itemId);
+			AddItemSlotButton(itemId);
 			added++;
 		}
 
@@ -422,65 +566,83 @@ public partial class InventoryPanel : PanelContainer
 		{
 			AddItemListMessage("inventory.no_items");
 		}
-	}
 
-	private List<string> GetCompatibleInventoryItems()
-	{
-		var ids = new List<string>();
-		switch (_selectedTarget)
+		int totalCount = 0;
+		foreach (KeyValuePair<string, int> item in _player.InventoryItems)
 		{
-			case EquipTarget.Helmet:
-				foreach (EquipmentDefinition item in BuildCatalog.GetEquipmentDefinitions(EquipmentSlot.Helmet))
-				{
-					ids.Add(item.Id);
-				}
-				break;
-			case EquipTarget.Weapon:
-				foreach (EquipmentDefinition item in BuildCatalog.GetEquipmentDefinitions(EquipmentSlot.Weapon))
-				{
-					ids.Add(item.Id);
-				}
-				break;
-			case EquipTarget.Armor:
-				foreach (EquipmentDefinition item in BuildCatalog.GetEquipmentDefinitions(EquipmentSlot.Armor))
-				{
-					ids.Add(item.Id);
-				}
-				break;
-			case EquipTarget.Accessory:
-				foreach (EquipmentDefinition item in BuildCatalog.GetEquipmentDefinitions(EquipmentSlot.Accessory))
-				{
-					ids.Add(item.Id);
-				}
-				break;
-			case EquipTarget.AttributeGem:
-				foreach (AttributeGemDefinition item in BuildCatalog.GetAttributeGemDefinitions())
-				{
-					ids.Add(item.Id);
-				}
-				break;
-			default:
-				foreach (SkillGemDefinition item in BuildCatalog.GetSkillGemDefinitions())
-				{
-					ids.Add(item.Id);
-				}
-				break;
+			if (item.Value > 0)
+			{
+				totalCount++;
+			}
 		}
 
+		_bagCountLabel.Text = LocaleText.F("inventory.bag_count", totalCount);
+	}
+
+	private List<string> GetVisibleInventoryItems()
+	{
+		var ids = new List<string>();
+		if (_player == null)
+		{
+			return ids;
+		}
+
+		foreach (KeyValuePair<string, int> item in _player.InventoryItems)
+		{
+			if (item.Value > 0 && ShouldShowItemInCategory(item.Key, _selectedCategory))
+			{
+				ids.Add(item.Key);
+			}
+		}
+
+		AddCompatibleFreeItems(ids);
+		SortItemIds(ids);
 		return ids;
 	}
 
-	private void AddItemButton(string itemId)
+	private void AddCompatibleFreeItems(List<string> ids)
+	{
+		switch (_selectedTarget)
+		{
+			case EquipTarget.AttributeGem:
+				foreach (AttributeGemDefinition item in BuildCatalog.GetAttributeGemDefinitions())
+				{
+					if (BuildCatalog.IsFreeItem(item.Id) && ShouldShowItemInCategory(item.Id, _selectedCategory) && !ids.Contains(item.Id))
+					{
+						ids.Add(item.Id);
+					}
+				}
+				break;
+			case EquipTarget.SkillGem1:
+			case EquipTarget.SkillGem2:
+			case EquipTarget.SkillGem3:
+				foreach (SkillGemDefinition item in BuildCatalog.GetSkillGemDefinitions())
+				{
+					if (BuildCatalog.IsFreeItem(item.Id) && ShouldShowItemInCategory(item.Id, _selectedCategory) && !ids.Contains(item.Id))
+					{
+						ids.Add(item.Id);
+					}
+				}
+				break;
+		}
+	}
+
+	private void AddItemSlotButton(string itemId)
 	{
 		int count = _player?.GetInventoryCount(itemId) ?? 0;
-		string countText = BuildCatalog.IsFreeItem(itemId) ? string.Empty : $"  x{count}";
-		var button = MakeButton($"{GetInventoryItemName(itemId)}{countText}");
-		button.Alignment = HorizontalAlignment.Left;
-		button.CustomMinimumSize = new Vector2(0.0f, 42.0f);
-		button.MouseEntered += () => ShowItemTooltip(itemId, GetTargetName(_selectedTarget));
+		string countText = BuildCatalog.IsFreeItem(itemId) ? string.Empty : $"\nx{count}";
+		var button = MakeButton($"{GetItemIconText(itemId)}\n{GetInventoryItemName(itemId)}{countText}");
+		button.CustomMinimumSize = new Vector2(64.0f, 72.0f);
+		button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		button.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
+		button.Alignment = HorizontalAlignment.Center;
+		button.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+		button.AddThemeFontSizeOverride("font_size", 11);
+		button.AddThemeColorOverride("font_color", itemId == _selectedItemId ? new Color(1.0f, 0.92f, 0.50f) : new Color(0.92f, 0.96f, 1.0f));
+		button.MouseEntered += () => ShowItemTooltip(itemId, LocaleText.T("inventory.items"));
 		button.MouseExited += HideItemTooltip;
-		button.Pressed += () => EquipItem(itemId);
-		_itemList.AddChild(button);
+		button.Pressed += () => SelectInventoryItem(itemId);
+		_itemGrid.AddChild(button);
 	}
 
 	private static string GetInventoryItemName(string itemId)
@@ -490,10 +652,174 @@ public partial class InventoryPanel : PanelContainer
 			: LocaleText.T(BuildCatalog.GetItemNameKey(itemId));
 	}
 
+	private void SelectInventoryItem(string itemId)
+	{
+		_selectedItemId = itemId;
+		HideItemTooltip();
+		RefreshItemList();
+		RefreshSelectedItemDetails();
+	}
+
+	private void RefreshCategoryButtons()
+	{
+		foreach (KeyValuePair<InventoryCategory, Button> entry in _categoryButtons)
+		{
+			entry.Value.ButtonPressed = entry.Key == _selectedCategory;
+			entry.Value.AddThemeColorOverride("font_color", entry.Key == _selectedCategory ? new Color(1.0f, 0.92f, 0.54f) : new Color(0.86f, 0.91f, 0.96f));
+		}
+	}
+
+	private void RefreshSelectedItemDetails()
+	{
+		if (_player == null || string.IsNullOrEmpty(_selectedItemId) || !_player.HasInventoryItem(_selectedItemId))
+		{
+			_selectedItemId = string.Empty;
+			_itemDetailTitleLabel.Text = LocaleText.T("inventory.detail.empty_title");
+			_itemDetailBodyLabel.Text = LocaleText.T("inventory.detail.empty_body");
+			_equipSelectedButton.Disabled = true;
+			_useSelectedButton.Disabled = true;
+			return;
+		}
+
+		int count = _player.GetInventoryCount(_selectedItemId);
+		_itemDetailTitleLabel.Text = $"{GetInventoryItemName(_selectedItemId)} x{count}";
+		_itemDetailBodyLabel.Text = BuildItemTooltipBody(_selectedItemId, LocaleText.T("inventory.items"));
+		_equipSelectedButton.Disabled = !CanEquipSelectedItem();
+		_useSelectedButton.Disabled = true;
+	}
+
+	private bool CanEquipSelectedItem()
+	{
+		return _selectedActor != null
+			&& IsInstanceValid(_selectedActor)
+			&& !string.IsNullOrEmpty(_selectedItemId)
+			&& IsCompatibleItemForTarget(_selectedItemId, _selectedTarget);
+	}
+
+	private bool IsCompatibleItemForTarget(string itemId, EquipTarget target)
+	{
+		if (MonsterLootCatalog.IsMonsterLoot(itemId))
+		{
+			return false;
+		}
+
+		switch (target)
+		{
+			case EquipTarget.Helmet:
+				return BuildCatalog.GetItemKind(itemId) == InventoryItemKind.Equipment && BuildCatalog.GetEquipment(itemId).Slot == EquipmentSlot.Helmet;
+			case EquipTarget.Weapon:
+				return BuildCatalog.GetItemKind(itemId) == InventoryItemKind.Equipment && BuildCatalog.GetEquipment(itemId).Slot == EquipmentSlot.Weapon;
+			case EquipTarget.Armor:
+				return BuildCatalog.GetItemKind(itemId) == InventoryItemKind.Equipment && BuildCatalog.GetEquipment(itemId).Slot == EquipmentSlot.Armor;
+			case EquipTarget.Accessory:
+				return BuildCatalog.GetItemKind(itemId) == InventoryItemKind.Equipment && BuildCatalog.GetEquipment(itemId).Slot == EquipmentSlot.Accessory;
+			case EquipTarget.AttributeGem:
+				return BuildCatalog.GetItemKind(itemId) == InventoryItemKind.AttributeGem;
+			case EquipTarget.SkillGem1:
+			case EquipTarget.SkillGem2:
+			case EquipTarget.SkillGem3:
+				return BuildCatalog.GetItemKind(itemId) == InventoryItemKind.SkillGem;
+			default:
+				return false;
+		}
+	}
+
+	private bool TrySelectCompatibleTarget(string itemId)
+	{
+		foreach (EquipTarget target in new[]
+		{
+			EquipTarget.Helmet,
+			EquipTarget.Weapon,
+			EquipTarget.Armor,
+			EquipTarget.Accessory,
+			EquipTarget.AttributeGem,
+			EquipTarget.SkillGem1,
+			EquipTarget.SkillGem2,
+			EquipTarget.SkillGem3,
+		})
+		{
+			if (IsCompatibleItemForTarget(itemId, target))
+			{
+				_selectedTarget = target;
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static bool ShouldShowItemInCategory(string itemId, InventoryCategory category)
+	{
+		if (category == InventoryCategory.All)
+		{
+			return true;
+		}
+
+		if (MonsterLootCatalog.IsMonsterLoot(itemId))
+		{
+			return category == InventoryCategory.Materials;
+		}
+
+		InventoryItemKind kind = BuildCatalog.GetItemKind(itemId);
+		return category switch
+		{
+			InventoryCategory.Equipment => kind == InventoryItemKind.Equipment,
+			InventoryCategory.Gems => kind is InventoryItemKind.AttributeGem or InventoryItemKind.SkillGem,
+			_ => false,
+		};
+	}
+
+	private static void SortItemIds(List<string> itemIds)
+	{
+		itemIds.Sort((left, right) =>
+		{
+			int categoryCompare = GetSortCategory(left).CompareTo(GetSortCategory(right));
+			return categoryCompare != 0 ? categoryCompare : string.Compare(GetInventoryItemName(left), GetInventoryItemName(right), System.StringComparison.Ordinal);
+		});
+	}
+
+	private static int GetSortCategory(string itemId)
+	{
+		if (MonsterLootCatalog.IsMonsterLoot(itemId))
+		{
+			return 3;
+		}
+
+		return BuildCatalog.GetItemKind(itemId) switch
+		{
+			InventoryItemKind.Equipment => 0,
+			InventoryItemKind.AttributeGem => 1,
+			InventoryItemKind.SkillGem => 2,
+			_ => 9,
+		};
+	}
+
+	private static string GetItemIconText(string itemId)
+	{
+		if (MonsterLootCatalog.IsMonsterLoot(itemId))
+		{
+			return "[M]";
+		}
+
+		return BuildCatalog.GetItemKind(itemId) switch
+		{
+			InventoryItemKind.Equipment => "[E]",
+			InventoryItemKind.AttributeGem => "[A]",
+			InventoryItemKind.SkillGem => "[S]",
+			_ => "[?]",
+		};
+	}
+
 	private void EquipItem(string itemId)
 	{
 		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor) || !_player.HasInventoryItem(itemId))
 		{
+			return;
+		}
+
+		if (!IsCompatibleItemForTarget(itemId, _selectedTarget) && !TrySelectCompatibleTarget(itemId))
+		{
+			RefreshAll();
 			return;
 		}
 
@@ -529,17 +855,45 @@ public partial class InventoryPanel : PanelContainer
 		RefreshAll();
 	}
 
+	private void OnEquipSelectedPressed()
+	{
+		if (string.IsNullOrEmpty(_selectedItemId))
+		{
+			return;
+		}
+
+		EquipItem(_selectedItemId);
+	}
+
+	private void OnUseSelectedPressed()
+	{
+		RefreshSelectedItemDetails();
+	}
+
 	private void RefreshDetails()
 	{
 		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
 		{
 			_selectedActorLabel.Text = LocaleText.T("inventory.no_companions");
+			_companionInfoTitleLabel.Text = LocaleText.T("inventory.companion_info");
+			_companionInfoBodyLabel.Text = LocaleText.T("inventory.no_companions");
 			_selectedSlotLabel.Text = string.Empty;
 			_buildSummaryLabel.Text = string.Empty;
 			return;
 		}
 
 		_selectedActorLabel.Text = _selectedActor.LocalizedDisplayName;
+		_companionInfoTitleLabel.Text = _selectedActor.LocalizedDisplayName;
+		_companionInfoBodyLabel.Text = LocaleText.F(
+			"inventory.companion_summary",
+			_selectedActor.Level,
+			_selectedActor.CurrentHealth,
+			_selectedActor.EffectiveMaxHealth,
+			_selectedActor.Affinity,
+			_selectedActor.AttackModeName,
+			_selectedActor.EffectiveAttack,
+			_selectedActor.EffectiveDefense
+		);
 		_buildSummaryLabel.Text = LocaleText.F(
 			"inventory.build_summary",
 			_selectedActor.CurrentBuildStats.BuildPower,
@@ -584,7 +938,7 @@ public partial class InventoryPanel : PanelContainer
 
 	private void ShowItemTooltip(string itemId, string slotName)
 	{
-		if (string.IsNullOrEmpty(itemId) || MonsterLootCatalog.IsMonsterLoot(itemId))
+		if (string.IsNullOrEmpty(itemId))
 		{
 			HideItemTooltip();
 			return;
@@ -635,6 +989,12 @@ public partial class InventoryPanel : PanelContainer
 			LocaleText.F("tooltip.meta_line", slotName, LocaleText.T(GetItemKindKey(itemId))),
 		};
 
+		if (MonsterLootCatalog.IsMonsterLoot(itemId))
+		{
+			lines.Add(LocaleText.T("inventory.material_hint"));
+			return FormatTooltipLines(lines);
+		}
+
 		switch (BuildCatalog.GetItemKind(itemId))
 		{
 			case InventoryItemKind.Equipment:
@@ -674,6 +1034,11 @@ public partial class InventoryPanel : PanelContainer
 
 	private static string GetItemKindKey(string itemId)
 	{
+		if (MonsterLootCatalog.IsMonsterLoot(itemId))
+		{
+			return "tooltip.type.material";
+		}
+
 		return BuildCatalog.GetItemKind(itemId) switch
 		{
 			InventoryItemKind.Equipment => "tooltip.type.equipment",
@@ -797,7 +1162,8 @@ public partial class InventoryPanel : PanelContainer
 	{
 		var label = MakeLabel(14, new Color(0.72f, 0.78f, 0.84f));
 		label.Text = LocaleText.T(key);
-		_itemList.AddChild(label);
+		label.CustomMinimumSize = new Vector2(360.0f, 48.0f);
+		_itemGrid.AddChild(label);
 	}
 
 	private void RefreshText()
@@ -808,6 +1174,25 @@ public partial class InventoryPanel : PanelContainer
 		}
 
 		_titleLabel.Text = LocaleText.T("inventory.title");
+		_goldLabel.Text = LocaleText.F("inventory.gold", _player?.Gold ?? 0);
+		if (_categoryButtons.TryGetValue(InventoryCategory.All, out Button? allButton))
+		{
+			allButton.Text = LocaleText.T("inventory.tab.all");
+		}
+		if (_categoryButtons.TryGetValue(InventoryCategory.Equipment, out Button? equipmentButton))
+		{
+			equipmentButton.Text = LocaleText.T("inventory.tab.equipment");
+		}
+		if (_categoryButtons.TryGetValue(InventoryCategory.Gems, out Button? gemsButton))
+		{
+			gemsButton.Text = LocaleText.T("inventory.tab.gems");
+		}
+		if (_categoryButtons.TryGetValue(InventoryCategory.Materials, out Button? materialsButton))
+		{
+			materialsButton.Text = LocaleText.T("inventory.tab.materials");
+		}
+		_equipSelectedButton.Text = LocaleText.T("inventory.action.equip");
+		_useSelectedButton.Text = LocaleText.T("inventory.action.use");
 	}
 
 	private void OnClosePressed()

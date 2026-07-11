@@ -3,6 +3,15 @@ using System.Collections.Generic;
 
 public partial class PlayerController : CharacterBody3D
 {
+	public sealed record ContractCompanionOffer(string Id, string NameKey, string RoleNameKey, string CombatRole, string SummaryKey, int Level, int Cost, int MaxHealth, int Attack, int Defense);
+	public enum MerchantShopKind
+	{
+		Blacksmith,
+		ItemShop,
+	}
+
+	public sealed record ShopTradeEntry(string ItemId, string DisplayName, string Detail, int Price);
+
 	private const int FormationGridSideLength = 5;
 	private const int FormationCenterSlotIndex = 12;
 	private const float FormationSlotSpacing = 2.35f;
@@ -10,6 +19,8 @@ public partial class PlayerController : CharacterBody3D
 	private const int NpcRecruitQuestItemCount = 3;
 	private const int NpcQuestAffinityReward = 25;
 	private const int NpcRecruitAffinityRequirement = 80;
+	private const float MercenaryBrokerInteractRange = 4.6f;
+	private const float MerchantInteractRange = 4.6f;
 
 	private static readonly int[] FormationFillOrder =
 	{
@@ -55,6 +66,14 @@ public partial class PlayerController : CharacterBody3D
 	private readonly Dictionary<SimpleActor, int> _formationSlotsByActor = new();
 	private readonly HashSet<SimpleActor> _acceptedNpcQuests = new();
 	private readonly HashSet<SimpleActor> _completedNpcQuests = new();
+	private static readonly ContractCompanionOffer[] ContractCompanionOfferCatalog =
+	{
+		new("mercenary.offer.vanguard", "name.mercenary.vanguard", "role.tank", "Tank", "mercenary.summary.vanguard", 3, 260, 185, 18, 24),
+		new("mercenary.offer.ranger", "name.mercenary.ranger", "role.ranged", "Ranged", "mercenary.summary.ranger", 4, 320, 145, 28, 15),
+		new("mercenary.offer.mender", "name.mercenary.mender", "role.support", "Support", "mercenary.summary.mender", 3, 300, 132, 16, 18),
+		new("mercenary.offer.duelist", "name.mercenary.duelist", "role.dps", "DPS", "mercenary.summary.duelist", 5, 420, 160, 36, 16),
+		new("mercenary.offer.scout", "name.mercenary.scout", "role.gatherer", "Gatherer", "mercenary.summary.scout", 2, 180, 118, 17, 12),
+	};
 	private float _cameraYaw;
 	private float _cameraPitch = 0.08f;
 	private Vector3 _lastSafePosition = new(0.0f, 0.2f, 8.0f);
@@ -68,6 +87,8 @@ public partial class PlayerController : CharacterBody3D
 	private PartyPanel _partyPanel = null!;
 	private InventoryPanel _inventoryPanel = null!;
 	private FormationPanel _formationPanel = null!;
+	private MerchantShopPanel _merchantShopPanel = null!;
+	private MercenaryShopPanel _mercenaryShopPanel = null!;
 	private SettingsPanel _settingsPanel = null!;
 	private MinimapPanel _minimapPanel = null!;
 	private SystemLogPanel _systemLogPanel = null!;
@@ -103,6 +124,7 @@ public partial class PlayerController : CharacterBody3D
 
 	public IReadOnlyList<SimpleActor> CapturedCollection => _capturedCollection;
 	public IReadOnlyList<SimpleActor> ActiveParty => _activeParty;
+	public IReadOnlyList<ContractCompanionOffer> ContractCompanionOffers => ContractCompanionOfferCatalog;
 	public SimpleActor? FocusedTarget => IsValidFocusedTarget(_focusedTarget) ? _focusedTarget : null;
 	public IReadOnlyDictionary<string, int> InventoryItems => _inventoryItems;
 	public int FormationGridSide => FormationGridSideLength;
@@ -125,6 +147,8 @@ public partial class PlayerController : CharacterBody3D
 		CreatePartyPanel();
 		CreateInventoryPanel();
 		CreateFormationPanel();
+		CreateMerchantShopPanel();
+		CreateMercenaryShopPanel();
 		CreateSettingsPanel();
 		InitializeStarterInventory();
 		InitializeCaptureNetAmmo();
@@ -177,6 +201,14 @@ public partial class PlayerController : CharacterBody3D
 			{
 				SetFormationPanelVisible(false);
 			}
+			else if (_merchantShopPanel.Visible)
+			{
+				SetMerchantShopPanelVisible(false);
+			}
+			else if (_mercenaryShopPanel.Visible)
+			{
+				SetMercenaryShopPanelVisible(false);
+			}
 			else if (_partyPanel.Visible)
 			{
 				SetPartyPanelVisible(false);
@@ -194,7 +226,7 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
-		if (_settingsPanel.Visible)
+		if (_settingsPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible)
 		{
 			return;
 		}
@@ -445,6 +477,123 @@ public partial class PlayerController : CharacterBody3D
 		actor.OnFormationLayoutChanged();
 		_partyPanel.RefreshParty();
 		_formationPanel.RefreshAll();
+		return true;
+	}
+
+	public bool TryHireContractCompanion(ContractCompanionOffer offer)
+	{
+		if (Gold < offer.Cost)
+		{
+			PostSystemMessage(LocaleText.F("system.mercenary.not_enough_gold", offer.Cost, Gold), new Color(1.0f, 0.62f, 0.48f));
+			return false;
+		}
+
+		if (GetParent() is not World world)
+		{
+			return false;
+		}
+
+		SimpleActor actor = world.SpawnContractCompanion(offer);
+		Gold = Mathf.Max(Gold - offer.Cost, 0);
+		PostSystemMessage(LocaleText.F("system.mercenary.hired", LocaleText.T(offer.NameKey), offer.Cost, Gold), new Color(1.0f, 0.86f, 0.46f));
+		RecruitNpc(actor);
+		_inventoryPanel.RefreshAll();
+		_mercenaryShopPanel.RefreshAll();
+		return true;
+	}
+
+	public List<ShopTradeEntry> GetShopBuyEntries(MerchantShopKind shopKind)
+	{
+		var entries = new List<ShopTradeEntry>();
+		if (shopKind == MerchantShopKind.Blacksmith)
+		{
+			foreach (EquipmentSlot slot in new[] { EquipmentSlot.Helmet, EquipmentSlot.Weapon, EquipmentSlot.Armor, EquipmentSlot.Accessory })
+			{
+				foreach (EquipmentDefinition equipment in BuildCatalog.GetEquipmentDefinitions(slot))
+				{
+					entries.Add(new ShopTradeEntry(equipment.Id, LocaleText.T(equipment.NameKey), LocaleText.T(equipment.SummaryKey), GetShopBuyPrice(equipment.Id)));
+				}
+			}
+		}
+		else
+		{
+			foreach (AttributeGemDefinition gem in BuildCatalog.GetAttributeGemDefinitions())
+			{
+				if (!BuildCatalog.IsFreeItem(gem.Id))
+				{
+					entries.Add(new ShopTradeEntry(gem.Id, LocaleText.T(gem.NameKey), LocaleText.T(gem.SummaryKey), GetShopBuyPrice(gem.Id)));
+				}
+			}
+
+			foreach (SkillGemDefinition gem in BuildCatalog.GetSkillGemDefinitions())
+			{
+				if (!BuildCatalog.IsFreeItem(gem.Id))
+				{
+					entries.Add(new ShopTradeEntry(gem.Id, LocaleText.T(gem.NameKey), LocaleText.T(gem.SummaryKey), GetShopBuyPrice(gem.Id)));
+				}
+			}
+
+			foreach (string materialId in GetShopMaterialIds())
+			{
+				entries.Add(new ShopTradeEntry(materialId, GetInventoryItemDisplayName(materialId), LocaleText.T("shop.detail.material"), GetShopBuyPrice(materialId)));
+			}
+		}
+
+		return entries;
+	}
+
+	public List<ShopTradeEntry> GetShopSellEntries(MerchantShopKind shopKind)
+	{
+		var entries = new List<ShopTradeEntry>();
+		foreach (KeyValuePair<string, int> item in _inventoryItems)
+		{
+			if (item.Value <= 0 || !CanTradeInShop(shopKind, item.Key))
+			{
+				continue;
+			}
+
+			string detail = LocaleText.F("shop.sell.count", item.Value);
+			entries.Add(new ShopTradeEntry(item.Key, GetInventoryItemDisplayName(item.Key), detail, GetShopSellPrice(item.Key)));
+		}
+
+		entries.Sort((left, right) => string.Compare(left.DisplayName, right.DisplayName, System.StringComparison.Ordinal));
+		return entries;
+	}
+
+	public bool TryBuyShopItem(MerchantShopKind shopKind, string itemId, int price)
+	{
+		int safePrice = Mathf.Max(price, 1);
+		if (!CanTradeInShop(shopKind, itemId))
+		{
+			return false;
+		}
+
+		if (Gold < safePrice)
+		{
+			PostSystemMessage(LocaleText.F("system.shop.not_enough_gold", safePrice, Gold), new Color(1.0f, 0.62f, 0.48f));
+			return false;
+		}
+
+		Gold -= safePrice;
+		AddInventoryItem(itemId);
+		PostSystemMessage(LocaleText.F("system.shop.bought", GetInventoryItemDisplayName(itemId), safePrice, Gold), new Color(1.0f, 0.86f, 0.46f));
+		_merchantShopPanel.RefreshAll();
+		return true;
+	}
+
+	public bool TrySellShopItem(MerchantShopKind shopKind, string itemId, int price)
+	{
+		int safePrice = Mathf.Max(price, 1);
+		if (!CanTradeInShop(shopKind, itemId) || GetInventoryCount(itemId) <= 0)
+		{
+			return false;
+		}
+
+		RemoveInventoryItemSilently(itemId, 1);
+		Gold += safePrice;
+		PostSystemMessage(LocaleText.F("system.shop.sold", GetInventoryItemDisplayName(itemId), safePrice, Gold), new Color(0.86f, 1.0f, 0.62f));
+		_inventoryPanel.RefreshAll();
+		_merchantShopPanel.RefreshAll();
 		return true;
 	}
 
@@ -796,6 +945,7 @@ public partial class PlayerController : CharacterBody3D
 
 		Gold += gainedGold;
 		PostSystemMessage(LocaleText.F("system.pickup.gold", gainedGold, Gold), new Color(1.0f, 0.82f, 0.26f));
+		_mercenaryShopPanel?.RefreshAll();
 	}
 
 	public void AddInventoryItem(string itemId, int amount = 1)
@@ -847,6 +997,21 @@ public partial class PlayerController : CharacterBody3D
 		return true;
 	}
 
+	private void RemoveInventoryItemSilently(string itemId, int amount)
+	{
+		int requestedAmount = Mathf.Max(amount, 1);
+		int currentCount = GetInventoryCount(itemId);
+		int nextCount = currentCount - requestedAmount;
+		if (nextCount <= 0)
+		{
+			_inventoryItems.Remove(itemId);
+		}
+		else
+		{
+			_inventoryItems[itemId] = nextCount;
+		}
+	}
+
 	private void CollectNearbyWorldDrops()
 	{
 		foreach (Node node in GetTree().GetNodesInGroup("world_drops"))
@@ -863,6 +1028,80 @@ public partial class PlayerController : CharacterBody3D
 		return MonsterLootCatalog.IsMonsterLoot(itemId)
 			? LocaleText.T(MonsterLootCatalog.GetNameKey(itemId))
 			: LocaleText.T(BuildCatalog.GetItemNameKey(itemId));
+	}
+
+	private static bool CanTradeInShop(MerchantShopKind shopKind, string itemId)
+	{
+		if (shopKind == MerchantShopKind.Blacksmith)
+		{
+			return BuildCatalog.GetItemKind(itemId) == InventoryItemKind.Equipment;
+		}
+
+		if (MonsterLootCatalog.IsMonsterLoot(itemId))
+		{
+			return true;
+		}
+
+		InventoryItemKind kind = BuildCatalog.GetItemKind(itemId);
+		return kind is InventoryItemKind.AttributeGem or InventoryItemKind.SkillGem;
+	}
+
+	private static int GetShopBuyPrice(string itemId)
+	{
+		if (MonsterLootCatalog.IsMonsterLoot(itemId))
+		{
+			return itemId switch
+			{
+				"loot.dragon_scale" => 95,
+				"loot.water_core" => 70,
+				"loot.red_horn" => 62,
+				"loot.venom_sac" => 55,
+				"loot.sharp_claw" => 42,
+				"loot.beast_hide" => 34,
+				"loot.slime_mucus" => 24,
+				_ => 30,
+			};
+		}
+
+		return BuildCatalog.GetItemKind(itemId) switch
+		{
+			InventoryItemKind.Equipment => 120 + GetEquipmentPriceBonus(itemId),
+			InventoryItemKind.AttributeGem => 90,
+			InventoryItemKind.SkillGem => 115,
+			_ => 50,
+		};
+	}
+
+	private static int GetShopSellPrice(string itemId)
+	{
+		return Mathf.Max(Mathf.RoundToInt(GetShopBuyPrice(itemId) * 0.45f), 1);
+	}
+
+	private static int GetEquipmentPriceBonus(string itemId)
+	{
+		EquipmentDefinition equipment = BuildCatalog.GetEquipment(itemId);
+		return equipment.MaxHealthBonus * 2
+			+ equipment.AttackBonus * 8
+			+ equipment.DefenseBonus * 7
+			+ Mathf.RoundToInt(equipment.AttackRangeBonus * 18.0f)
+			+ Mathf.RoundToInt(equipment.MoveSpeedBonus * 180.0f)
+			+ Mathf.RoundToInt(equipment.CritChanceBonus * 300.0f)
+			+ equipment.SocketCount * 45;
+	}
+
+	private static string[] GetShopMaterialIds()
+	{
+		return new[]
+		{
+			"loot.slime_mucus",
+			"loot.beast_hide",
+			"loot.sharp_claw",
+			"loot.red_horn",
+			"loot.venom_sac",
+			"loot.water_core",
+			"loot.dragon_scale",
+			"loot.cracked_core",
+		};
 	}
 
 	private static string GetNpcQuestItemId(SimpleActor actor)
@@ -1393,6 +1632,23 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
+		SimpleActor? merchant = GetNearestMerchantShopkeeper(out MerchantShopKind merchantShopKind);
+		if (merchant != null)
+		{
+			_interactionPromptLabel.Visible = true;
+			string promptKey = merchantShopKind == MerchantShopKind.Blacksmith ? "prompt.shop.blacksmith" : "prompt.shop.item";
+			_interactionPromptLabel.Text = LocaleText.F(promptKey, "E", merchant.LocalizedDisplayName);
+			return;
+		}
+
+		SimpleActor? mercenaryBroker = GetNearestMercenaryBroker();
+		if (mercenaryBroker != null)
+		{
+			_interactionPromptLabel.Visible = true;
+			_interactionPromptLabel.Text = LocaleText.F("prompt.mercenary_shop", "E", mercenaryBroker.LocalizedDisplayName);
+			return;
+		}
+
 		SimpleActor? recruitNpc = GetNearestRecruitableNpc();
 		_interactionPromptLabel.Visible = recruitNpc != null;
 		if (recruitNpc == null)
@@ -1434,6 +1690,19 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
+		if (GetNearestMerchantShopkeeper(out MerchantShopKind merchantShopKind) != null)
+		{
+			_merchantShopPanel.Open(merchantShopKind);
+			UpdateMouseModeForPanels();
+			return;
+		}
+
+		if (GetNearestMercenaryBroker() != null)
+		{
+			SetMercenaryShopPanelVisible(true);
+			return;
+		}
+
 		SimpleActor? recruitNpc = GetNearestRecruitableNpc();
 		if (recruitNpc != null)
 		{
@@ -1443,7 +1712,7 @@ public partial class PlayerController : CharacterBody3D
 
 	private void TryInteractWithRecruitNpc(SimpleActor actor)
 	{
-		if (!IsInstanceValid(actor) || !actor.IsNpcRecruitCandidate)
+		if (!CanInteractWithRecruitNpc(actor))
 		{
 			return;
 		}
@@ -1483,7 +1752,7 @@ public partial class PlayerController : CharacterBody3D
 
 	private void ShowNpcQuestDialog(SimpleActor actor)
 	{
-		if (!IsInstanceValid(actor) || _npcQuestDialog == null)
+		if (!CanInteractWithRecruitNpc(actor) || _npcQuestDialog == null)
 		{
 			return;
 		}
@@ -1534,7 +1803,7 @@ public partial class PlayerController : CharacterBody3D
 		}
 
 		SimpleActor? actor = _pendingQuestNpc;
-		if (actor == null || !IsInstanceValid(actor) || !actor.IsNpcRecruitCandidate)
+		if (actor == null || !CanInteractWithRecruitNpc(actor))
 		{
 			CloseNpcQuestDialog();
 			return;
@@ -1763,7 +2032,12 @@ public partial class PlayerController : CharacterBody3D
 
 	private SimpleActor? GetNearestRecruitableNpc()
 	{
-		if (_selectedActor != null && IsInstanceValid(_selectedActor) && _selectedActor.IsNpcRecruitCandidate && GlobalPosition.DistanceTo(_selectedActor.GlobalPosition) <= NpcRecruitInteractRange)
+		if (!IsInCityMap())
+		{
+			return null;
+		}
+
+		if (_selectedActor != null && CanInteractWithRecruitNpc(_selectedActor) && GlobalPosition.DistanceTo(_selectedActor.GlobalPosition) <= NpcRecruitInteractRange)
 		{
 			return _selectedActor;
 		}
@@ -1772,7 +2046,7 @@ public partial class PlayerController : CharacterBody3D
 		float bestDistance = NpcRecruitInteractRange;
 		foreach (Node node in GetTree().GetNodesInGroup("npcs"))
 		{
-			if (node is not SimpleActor actor || !IsInstanceValid(actor) || !actor.IsNpcRecruitCandidate)
+			if (node is not SimpleActor actor || !CanInteractWithRecruitNpc(actor))
 			{
 				continue;
 			}
@@ -1786,6 +2060,106 @@ public partial class PlayerController : CharacterBody3D
 		}
 
 		return nearest;
+	}
+
+	private bool CanInteractWithRecruitNpc(SimpleActor actor)
+	{
+		return IsInCityMap()
+			&& IsInstanceValid(actor)
+			&& !IsMerchantShopkeeper(actor)
+			&& !IsMercenaryBroker(actor)
+			&& actor.IsNpcRecruitCandidate
+			&& actor.MapId == "city"
+			&& actor.IsActiveWorldTarget;
+	}
+
+	private SimpleActor? GetNearestMercenaryBroker()
+	{
+		if (!IsInCityMap())
+		{
+			return null;
+		}
+
+		SimpleActor? nearest = null;
+		float bestDistance = MercenaryBrokerInteractRange;
+		foreach (Node node in GetTree().GetNodesInGroup("npcs"))
+		{
+			if (node is not SimpleActor actor || !IsMercenaryBroker(actor) || !actor.IsActiveWorldTarget)
+			{
+				continue;
+			}
+
+			float distance = GlobalPosition.DistanceTo(actor.GlobalPosition);
+			if (distance <= bestDistance)
+			{
+				nearest = actor;
+				bestDistance = distance;
+			}
+		}
+
+		return nearest;
+	}
+
+	private static bool IsMercenaryBroker(SimpleActor actor)
+	{
+		return actor.DisplayName == "name.npc.mercenary_broker";
+	}
+
+	private SimpleActor? GetNearestMerchantShopkeeper(out MerchantShopKind shopKind)
+	{
+		shopKind = MerchantShopKind.ItemShop;
+		if (!IsInCityMap())
+		{
+			return null;
+		}
+
+		SimpleActor? nearest = null;
+		float bestDistance = MerchantInteractRange;
+		foreach (Node node in GetTree().GetNodesInGroup("npcs"))
+		{
+			if (node is not SimpleActor actor || !TryGetMerchantShopKind(actor, out MerchantShopKind candidateKind) || !actor.IsActiveWorldTarget)
+			{
+				continue;
+			}
+
+			float distance = GlobalPosition.DistanceTo(actor.GlobalPosition);
+			if (distance <= bestDistance)
+			{
+				nearest = actor;
+				shopKind = candidateKind;
+				bestDistance = distance;
+			}
+		}
+
+		return nearest;
+	}
+
+	private static bool IsMerchantShopkeeper(SimpleActor actor)
+	{
+		return TryGetMerchantShopKind(actor, out _);
+	}
+
+	private static bool TryGetMerchantShopKind(SimpleActor actor, out MerchantShopKind shopKind)
+	{
+		if (actor.DisplayName == "name.npc.blacksmith")
+		{
+			shopKind = MerchantShopKind.Blacksmith;
+			return true;
+		}
+
+		if (actor.DisplayName == "name.npc.item_merchant")
+		{
+			shopKind = MerchantShopKind.ItemShop;
+			return true;
+		}
+
+		shopKind = MerchantShopKind.ItemShop;
+		return false;
+	}
+
+	private bool IsInCityMap()
+	{
+		return GetParent() is World world && world.ActiveMapId == "city";
 	}
 
 	private void TrySelectActorTarget()
@@ -1855,7 +2229,7 @@ public partial class PlayerController : CharacterBody3D
 
 	private bool IsAttackCommandTarget(SimpleActor actor)
 	{
-		return IsInstanceValid(actor) && !actor.IsDefeated && !actor.IsCaptured;
+		return IsInstanceValid(actor) && actor.IsActiveWorldTarget;
 	}
 
 	private void EnsureSelectedTargetMarker()
@@ -2496,6 +2870,36 @@ public partial class PlayerController : CharacterBody3D
 		_formationPanel.CloseRequested = () => SetFormationPanelVisible(false);
 	}
 
+	private void CreateMerchantShopPanel()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "MerchantShopLayer",
+			Layer = 39,
+		};
+
+		AddChild(layer);
+		_merchantShopPanel = new MerchantShopPanel();
+		layer.AddChild(_merchantShopPanel);
+		_merchantShopPanel.Bind(this);
+		_merchantShopPanel.CloseRequested = () => SetMerchantShopPanelVisible(false);
+	}
+
+	private void CreateMercenaryShopPanel()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "MercenaryShopLayer",
+			Layer = 40,
+		};
+
+		AddChild(layer);
+		_mercenaryShopPanel = new MercenaryShopPanel();
+		layer.AddChild(_mercenaryShopPanel);
+		_mercenaryShopPanel.Bind(this);
+		_mercenaryShopPanel.CloseRequested = () => SetMercenaryShopPanelVisible(false);
+	}
+
 	private void CreateSettingsPanel()
 	{
 		var layer = new CanvasLayer
@@ -2519,6 +2923,8 @@ public partial class PlayerController : CharacterBody3D
 			_settingsPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
+			_merchantShopPanel.SetPanelVisible(false);
+			_mercenaryShopPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
 		}
@@ -2534,6 +2940,8 @@ public partial class PlayerController : CharacterBody3D
 			_partyPanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
+			_merchantShopPanel.SetPanelVisible(false);
+			_mercenaryShopPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
 		}
@@ -2549,6 +2957,8 @@ public partial class PlayerController : CharacterBody3D
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
+			_merchantShopPanel.SetPanelVisible(false);
+			_mercenaryShopPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
 		}
@@ -2564,6 +2974,42 @@ public partial class PlayerController : CharacterBody3D
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
+			_merchantShopPanel.SetPanelVisible(false);
+			_mercenaryShopPanel.SetPanelVisible(false);
+			CloseNpcQuestDialog();
+			CloseMapTravelDialog();
+		}
+
+		UpdateMouseModeForPanels();
+	}
+
+	private void SetMerchantShopPanelVisible(bool visible)
+	{
+		_merchantShopPanel.SetPanelVisible(visible);
+		if (visible)
+		{
+			_partyPanel.SetPanelVisible(false);
+			_inventoryPanel.SetPanelVisible(false);
+			_formationPanel.SetPanelVisible(false);
+			_mercenaryShopPanel.SetPanelVisible(false);
+			_settingsPanel.SetPanelVisible(false);
+			CloseNpcQuestDialog();
+			CloseMapTravelDialog();
+		}
+
+		UpdateMouseModeForPanels();
+	}
+
+	private void SetMercenaryShopPanelVisible(bool visible)
+	{
+		_mercenaryShopPanel.SetPanelVisible(visible);
+		if (visible)
+		{
+			_partyPanel.SetPanelVisible(false);
+			_inventoryPanel.SetPanelVisible(false);
+			_formationPanel.SetPanelVisible(false);
+			_merchantShopPanel.SetPanelVisible(false);
+			_settingsPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
 		}
@@ -2573,7 +3019,7 @@ public partial class PlayerController : CharacterBody3D
 
 	private void UpdateMouseModeForPanels()
 	{
-		Input.MouseMode = _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _settingsPanel.Visible || (_npcQuestDialog != null && _npcQuestDialog.Visible) || (_mapTravelDialog != null && _mapTravelDialog.Visible)
+		Input.MouseMode = _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _settingsPanel.Visible || (_npcQuestDialog != null && _npcQuestDialog.Visible) || (_mapTravelDialog != null && _mapTravelDialog.Visible)
 			? Input.MouseModeEnum.Visible
 			: Input.MouseModeEnum.Captured;
 	}

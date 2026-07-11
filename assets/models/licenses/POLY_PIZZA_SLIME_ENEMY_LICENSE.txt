@@ -1,0 +1,10 @@
+Asset: Slime Enemy
+Creator: Quaternius
+Source: https://poly.pizza/m/eSLKTsbl7F
+Downloaded file: https://static.poly.pizza/93e6c3e3-75f8-441f-86d0-b223f7829005.glb
+License: Public Domain (CC0 1.0)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+
+Notes:
+This model is used as the primary slime monster visual so monsters named
+slime match their in-game appearance more closely.
