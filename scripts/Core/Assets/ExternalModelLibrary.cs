@@ -126,7 +126,7 @@ public static class ExternalModelLibrary
 
 	public static bool TryAddModel(Node3D parent, string path, string nodeName, Vector3 position, Vector3 rotationDegrees, Vector3 scale)
 	{
-		if (!ResourceLoader.Exists(path))
+		if (!ResourceLoader.Exists(path) || HasInvalidImportRemap(path))
 		{
 			return false;
 		}
@@ -152,6 +152,18 @@ public static class ExternalModelLibrary
 		return true;
 	}
 
+	private static bool HasInvalidImportRemap(string path)
+	{
+		string importPath = $"{path}.import";
+		if (!FileAccess.FileExists(importPath))
+		{
+			return false;
+		}
+
+		string importText = FileAccess.GetFileAsString(importPath);
+		return importText.Contains("valid=false");
+	}
+
 	public static bool TryPlayActorAnimation(Node root, string state)
 	{
 		if (FindAnimationPlayer(root) is not AnimationPlayer player)
@@ -165,12 +177,38 @@ public static class ExternalModelLibrary
 			return false;
 		}
 
+		ConfigureAnimationLoop(player, animationName, state);
 		if (player.CurrentAnimation != animationName || !player.IsPlaying())
 		{
 			player.Play(animationName);
 		}
 
 		return true;
+	}
+
+	public static void StabilizeRootMotion(Node3D model, Vector3 localPosition, Vector3 localRotationDegrees)
+	{
+		model.Position = localPosition;
+		model.RotationDegrees = localRotationDegrees;
+
+		if (FindRootMotionNode(model) is Node3D rootMotionNode)
+		{
+			rootMotionNode.Position = Vector3.Zero;
+			rootMotionNode.Rotation = Vector3.Zero;
+		}
+	}
+
+	private static void ConfigureAnimationLoop(AnimationPlayer player, string animationName, string state)
+	{
+		Animation? animation = player.GetAnimation(animationName);
+		if (animation == null)
+		{
+			return;
+		}
+
+		animation.LoopMode = state is "walk" or "run" or "idle"
+			? Animation.LoopModeEnum.Linear
+			: Animation.LoopModeEnum.None;
 	}
 
 	private static bool TryAddFirstExisting(Node3D parent, string[] paths, string nodeName, Vector3 position, Vector3 rotationDegrees, Vector3 scale, int variantSeed)
@@ -246,6 +284,34 @@ public static class ExternalModelLibrary
 		}
 
 		return null;
+	}
+
+	private static Node3D? FindRootMotionNode(Node root)
+	{
+		foreach (Node child in root.GetChildren())
+		{
+			if (child is Node3D childNode3D && IsRootMotionNodeName(childNode3D.Name.ToString()))
+			{
+				return childNode3D;
+			}
+
+			Node3D? found = FindRootMotionNode(child);
+			if (found != null)
+			{
+				return found;
+			}
+		}
+
+		return null;
+	}
+
+	private static bool IsRootMotionNodeName(string name)
+	{
+		string lowerName = name.ToLowerInvariant();
+		return lowerName is "root" or "armature" or "skeleton3d" or "scene root"
+			|| lowerName.Contains("root")
+			|| lowerName.Contains("armature")
+			|| lowerName.Contains("mixamorig");
 	}
 
 	private static string? FindAnimationName(AnimationPlayer player, string state)

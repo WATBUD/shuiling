@@ -34,6 +34,9 @@ public partial class InventoryPanel : PanelContainer
 	private Button _skill2Button = null!;
 	private Button _skill3Button = null!;
 	private Button _aiButton = null!;
+	private PanelContainer _tooltipPanel = null!;
+	private Label _tooltipTitleLabel = null!;
+	private Label _tooltipBodyLabel = null!;
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -49,6 +52,14 @@ public partial class InventoryPanel : PanelContainer
 		LocaleText.LanguageChanged -= OnLanguageChanged;
 	}
 
+	public override void _Process(double delta)
+	{
+		if (_tooltipPanel != null && _tooltipPanel.Visible)
+		{
+			PositionTooltip();
+		}
+	}
+
 	public void Bind(PlayerController player)
 	{
 		_player = player;
@@ -62,6 +73,11 @@ public partial class InventoryPanel : PanelContainer
 	public void SetPanelVisible(bool visible)
 	{
 		Visible = visible;
+		if (!visible)
+		{
+			HideItemTooltip();
+		}
+
 		if (visible)
 		{
 			SelectDefaultActor();
@@ -177,7 +193,49 @@ public partial class InventoryPanel : PanelContainer
 		var itemSection = MakeSection(LocaleText.T("inventory.items"), new Vector2(390.0f, 0.0f));
 		content.AddChild(itemSection);
 		_itemList = MakeScrollableList(itemSection);
+		BuildTooltip();
 		RefreshText();
+	}
+
+	private void BuildTooltip()
+	{
+		_tooltipPanel = new PanelContainer
+		{
+			Visible = false,
+			MouseFilter = MouseFilterEnum.Ignore,
+			CustomMinimumSize = new Vector2(280.0f, 0.0f),
+			TopLevel = true,
+			ZIndex = 100,
+		};
+		var style = new StyleBoxFlat
+		{
+			BgColor = new Color(0.025f, 0.030f, 0.040f, 0.97f),
+			BorderColor = new Color(0.98f, 0.78f, 0.34f, 0.95f),
+		};
+		style.SetBorderWidthAll(2);
+		style.SetCornerRadiusAll(5);
+		_tooltipPanel.AddThemeStyleboxOverride("panel", style);
+
+		var margin = new MarginContainer();
+		margin.AddThemeConstantOverride("margin_left", 12);
+		margin.AddThemeConstantOverride("margin_right", 12);
+		margin.AddThemeConstantOverride("margin_top", 10);
+		margin.AddThemeConstantOverride("margin_bottom", 10);
+		_tooltipPanel.AddChild(margin);
+
+		var rows = new VBoxContainer();
+		rows.AddThemeConstantOverride("separation", 6);
+		margin.AddChild(rows);
+
+		_tooltipTitleLabel = MakeLabel(17, new Color(1.0f, 0.91f, 0.55f));
+		_tooltipTitleLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		rows.AddChild(_tooltipTitleLabel);
+
+		_tooltipBodyLabel = MakeLabel(13, new Color(0.86f, 0.91f, 0.96f));
+		_tooltipBodyLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		rows.AddChild(_tooltipBodyLabel);
+
+		AddChild(_tooltipPanel);
 	}
 
 	private VBoxContainer MakeSection(string title, Vector2 minSize)
@@ -215,6 +273,8 @@ public partial class InventoryPanel : PanelContainer
 		button.CustomMinimumSize = new Vector2(0.0f, 54.0f);
 		button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 		button.Pressed += () => SelectTarget(target);
+		button.MouseEntered += () => ShowTooltipForTarget(target);
+		button.MouseExited += HideItemTooltip;
 		parent.AddChild(button);
 		return button;
 	}
@@ -252,6 +312,7 @@ public partial class InventoryPanel : PanelContainer
 
 	private void SelectTarget(EquipTarget target)
 	{
+		HideItemTooltip();
 		_selectedTarget = target;
 		RefreshSlotButtons();
 		RefreshItemList();
@@ -423,11 +484,18 @@ public partial class InventoryPanel : PanelContainer
 	{
 		int count = _player?.GetInventoryCount(itemId) ?? 0;
 		string countText = BuildCatalog.IsFreeItem(itemId) ? string.Empty : $"  x{count}";
-		var button = MakeButton($"{LocaleText.T(BuildCatalog.GetItemNameKey(itemId))}{countText}");
+		var button = MakeButton($"{GetInventoryItemName(itemId)}{countText}");
 		button.Alignment = HorizontalAlignment.Left;
 		button.CustomMinimumSize = new Vector2(0.0f, 42.0f);
+		button.MouseEntered += () => ShowItemTooltip(itemId, GetTargetName(_selectedTarget));
+		button.MouseExited += HideItemTooltip;
 		button.Pressed += () => EquipItem(itemId);
 		_itemList.AddChild(button);
+	}
+
+	private static string GetInventoryItemName(string itemId)
+	{
+		return itemId == "monster_trophy" ? LocaleText.T("item.monster_trophy") : LocaleText.T(BuildCatalog.GetItemNameKey(itemId));
 	}
 
 	private void EquipItem(string itemId)
@@ -468,6 +536,7 @@ public partial class InventoryPanel : PanelContainer
 				break;
 		}
 
+		HideItemTooltip();
 		RefreshAll();
 	}
 
@@ -490,6 +559,228 @@ public partial class InventoryPanel : PanelContainer
 			_selectedActor.BuildElementName
 		);
 		_selectedSlotLabel.Text = LocaleText.F("inventory.selected_slot", GetTargetName(_selectedTarget));
+	}
+
+	private void ShowTooltipForTarget(EquipTarget target)
+	{
+		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
+		{
+			return;
+		}
+
+		ShowItemTooltip(GetEquippedItemId(target), GetTargetName(target));
+	}
+
+	private string GetEquippedItemId(EquipTarget target)
+	{
+		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
+		{
+			return string.Empty;
+		}
+
+		CompanionBuildLoadout loadout = _selectedActor.BuildLoadout;
+		return target switch
+		{
+			EquipTarget.Helmet => loadout.HelmetId,
+			EquipTarget.Weapon => loadout.WeaponId,
+			EquipTarget.Armor => loadout.ArmorId,
+			EquipTarget.Accessory => loadout.AccessoryId,
+			EquipTarget.AttributeGem => loadout.AttributeGemId,
+			EquipTarget.AiGem => loadout.AiGemId,
+			EquipTarget.SkillGem1 => loadout.SkillGemIds[0],
+			EquipTarget.SkillGem2 => loadout.SkillGemIds[1],
+			EquipTarget.SkillGem3 => loadout.SkillGemIds[2],
+			_ => string.Empty,
+		};
+	}
+
+	private void ShowItemTooltip(string itemId, string slotName)
+	{
+		if (string.IsNullOrEmpty(itemId) || itemId == "monster_trophy")
+		{
+			HideItemTooltip();
+			return;
+		}
+
+		_tooltipTitleLabel.Text = GetInventoryItemName(itemId);
+		_tooltipBodyLabel.Text = BuildItemTooltipBody(itemId, slotName);
+		_tooltipPanel.Visible = true;
+		PositionTooltip();
+	}
+
+	private void HideItemTooltip()
+	{
+		if (_tooltipPanel != null)
+		{
+			_tooltipPanel.Visible = false;
+		}
+	}
+
+	private void PositionTooltip()
+	{
+		Vector2 localMouse = GetLocalMousePosition();
+		Vector2 desired = localMouse + new Vector2(18.0f, 18.0f);
+		Vector2 panelSize = _tooltipPanel.Size;
+		if (panelSize == Vector2.Zero)
+		{
+			panelSize = _tooltipPanel.GetCombinedMinimumSize();
+		}
+
+		Vector2 bounds = Size;
+		if (desired.X + panelSize.X > bounds.X - 10.0f)
+		{
+			desired.X = Mathf.Max(10.0f, localMouse.X - panelSize.X - 18.0f);
+		}
+
+		if (desired.Y + panelSize.Y > bounds.Y - 10.0f)
+		{
+			desired.Y = Mathf.Max(10.0f, bounds.Y - panelSize.Y - 10.0f);
+		}
+
+		_tooltipPanel.GlobalPosition = GlobalPosition + desired;
+	}
+
+	private string BuildItemTooltipBody(string itemId, string slotName)
+	{
+		var lines = new List<string>
+		{
+			LocaleText.F("tooltip.slot", slotName),
+			LocaleText.F("tooltip.type", LocaleText.T(GetItemKindKey(itemId))),
+		};
+
+		switch (BuildCatalog.GetItemKind(itemId))
+		{
+			case InventoryItemKind.Equipment:
+				AppendEquipmentTooltip(lines, BuildCatalog.GetEquipment(itemId));
+				break;
+			case InventoryItemKind.AttributeGem:
+				AppendAttributeGemTooltip(lines, BuildCatalog.GetAttributeGem(itemId));
+				break;
+			case InventoryItemKind.SkillGem:
+				AppendSkillGemTooltip(lines, BuildCatalog.GetSkillGem(itemId));
+				break;
+			case InventoryItemKind.AiGem:
+				AppendAiGemTooltip(lines, BuildCatalog.GetAiGem(itemId));
+				break;
+		}
+
+		return string.Join("\n", lines);
+	}
+
+	private static string GetItemKindKey(string itemId)
+	{
+		return BuildCatalog.GetItemKind(itemId) switch
+		{
+			InventoryItemKind.Equipment => "tooltip.type.equipment",
+			InventoryItemKind.AttributeGem => "tooltip.type.attribute",
+			InventoryItemKind.SkillGem => "tooltip.type.skill",
+			_ => "tooltip.type.ai",
+		};
+	}
+
+	private static void AppendEquipmentTooltip(List<string> lines, EquipmentDefinition item)
+	{
+		AddSummaryLine(lines, item.SummaryKey);
+		AddStatLine(lines, "stat.health", item.MaxHealthBonus);
+		AddStatLine(lines, "stat.attack", item.AttackBonus);
+		AddStatLine(lines, "stat.defense", item.DefenseBonus);
+		AddPercentLine(lines, "tooltip.move_speed", item.MoveSpeedBonus);
+		AddPercentLine(lines, "tooltip.attack_cooldown", item.AttackCooldownReduction);
+		AddDecimalLine(lines, "tooltip.attack_range", item.AttackRangeBonus);
+		AddPercentLine(lines, "tooltip.crit_chance", item.CritChanceBonus);
+		AddStatLine(lines, "tooltip.socket_count", item.SocketCount);
+	}
+
+	private static void AppendAttributeGemTooltip(List<string> lines, AttributeGemDefinition item)
+	{
+		AddSummaryLine(lines, item.SummaryKey);
+		lines.Add(LocaleText.F("tooltip.element", LocaleText.T(item.ElementNameKey)));
+		AddStatLine(lines, "stat.attack", item.AttackBonus);
+		AddStatLine(lines, "stat.defense", item.DefenseBonus);
+		AddPercentLine(lines, "tooltip.move_speed", item.MoveSpeedBonus);
+		AddDecimalLine(lines, "tooltip.attack_range", item.AttackRangeBonus);
+		AddPercentLine(lines, "tooltip.crit_chance", item.CritChanceBonus);
+		AddPercentLine(lines, "tooltip.life_steal", item.LifeStealPercent);
+		AddPercentLine(lines, "tooltip.control_chance", item.ControlChance);
+		AddDecimalLine(lines, "tooltip.knockback", item.KnockbackForce);
+	}
+
+	private static void AppendSkillGemTooltip(List<string> lines, SkillGemDefinition item)
+	{
+		AddSummaryLine(lines, item.SummaryKey);
+		AddStatLine(lines, "stat.health", item.MaxHealthBonus);
+		AddStatLine(lines, "stat.attack", item.AttackBonus);
+		AddStatLine(lines, "stat.defense", item.DefenseBonus);
+		AddPercentLine(lines, "tooltip.move_speed", item.MoveSpeedBonus);
+		AddPercentLine(lines, "tooltip.attack_cooldown", item.AttackCooldownReduction);
+		AddDecimalLine(lines, "tooltip.attack_range", item.AttackRangeBonus);
+		AddDecimalLine(lines, "tooltip.detection_radius", item.DetectionRadiusBonus);
+		AddPercentLine(lines, "tooltip.follow_distance", item.FollowDistanceMultiplier - 1.0f);
+		AddPercentLine(lines, "tooltip.crit_chance", item.CritChanceBonus);
+		AddPercentLine(lines, "tooltip.life_steal", item.LifeStealPercent);
+		AddFlagLine(lines, "tooltip.enable_heal", item.EnablesHeal);
+		AddFlagLine(lines, "tooltip.enable_shield", item.EnablesShield);
+	}
+
+	private static void AppendAiGemTooltip(List<string> lines, AiGemDefinition item)
+	{
+		AddSummaryLine(lines, item.SummaryKey);
+		AddStatLine(lines, "stat.defense", item.DefenseBonus);
+		AddPercentLine(lines, "tooltip.move_speed", item.MoveSpeedBonus);
+		AddPercentLine(lines, "tooltip.attack_cooldown", item.AttackCooldownReduction);
+		AddDecimalLine(lines, "tooltip.attack_range", item.AttackRangeBonus);
+		AddDecimalLine(lines, "tooltip.detection_radius", item.DetectionRadiusBonus);
+		AddPercentLine(lines, "tooltip.follow_distance", item.FollowDistanceMultiplier - 1.0f);
+	}
+
+	private static void AddSummaryLine(List<string> lines, string summaryKey)
+	{
+		if (!string.IsNullOrEmpty(summaryKey))
+		{
+			lines.Add(LocaleText.T(summaryKey));
+		}
+	}
+
+	private static void AddStatLine(List<string> lines, string labelKey, int value)
+	{
+		if (value != 0)
+		{
+			lines.Add(LocaleText.F("tooltip.stat_line", LocaleText.T(labelKey), Signed(value)));
+		}
+	}
+
+	private static void AddDecimalLine(List<string> lines, string labelKey, float value)
+	{
+		if (Mathf.Abs(value) > 0.001f)
+		{
+			lines.Add(LocaleText.F("tooltip.stat_line", LocaleText.T(labelKey), Signed(value, "0.0")));
+		}
+	}
+
+	private static void AddPercentLine(List<string> lines, string labelKey, float value)
+	{
+		if (Mathf.Abs(value) > 0.001f)
+		{
+			lines.Add(LocaleText.F("tooltip.stat_line", LocaleText.T(labelKey), Signed(Mathf.RoundToInt(value * 100.0f)) + "%"));
+		}
+	}
+
+	private static void AddFlagLine(List<string> lines, string labelKey, bool enabled)
+	{
+		if (enabled)
+		{
+			lines.Add(LocaleText.F("tooltip.stat_line", LocaleText.T(labelKey), LocaleText.T("tooltip.enabled")));
+		}
+	}
+
+	private static string Signed(int value)
+	{
+		return value > 0 ? $"+{value}" : value.ToString();
+	}
+
+	private static string Signed(float value, string format)
+	{
+		return value > 0.0f ? $"+{value.ToString(format)}" : value.ToString(format);
 	}
 
 	private string GetTargetName(EquipTarget target)

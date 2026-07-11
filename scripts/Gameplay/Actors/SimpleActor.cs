@@ -56,7 +56,6 @@ public partial class SimpleActor : CharacterBody3D
 	private Tween? _attackPoseTween;
 	private Node3D? _attackPoseTarget;
 	private Vector3 _attackPoseBaseScale = Vector3.One;
-	private Node3D? _externalModelRootMotionNode;
 	private SimpleActor? _combatTarget;
 	private SimpleActor? _retaliationTarget;
 	private float _retaliationTargetRemaining;
@@ -138,7 +137,7 @@ public partial class SimpleActor : CharacterBody3D
 	public string BuildRareComboName => BuildCatalog.LocalizedRareCombo(CurrentBuildStats);
 	public string BuildElementName => LocaleText.T(CurrentBuildStats.DamageElementNameKey);
 	public bool IsRangedCombatant => CombatRole == "Ranged" || CombatRole == "Support" || EffectiveAttackRange > 3.0f;
-	public string CombatRangeName => IsRangedCombatant ? "Ranged" : "Melee";
+	public string CombatRangeName => LocaleText.T(IsRangedCombatant ? "combat.range.ranged" : "combat.range.melee");
 	public string CombatSummary => $"{LocaleText.F("combat.summary", CombatRoleName, LocalizedPersonality, Affinity)} / {CombatRangeName} / {LocaleText.F("stat.affinity_value", Affinity)}";
 	public Color AttackFxColor => GetAttackColor();
 	public int ExperienceToNextLevel => 35 + Level * 18 + EvolutionStage * 20;
@@ -168,6 +167,11 @@ public partial class SimpleActor : CharacterBody3D
 	public override void _ExitTree()
 	{
 		LocaleText.LanguageChanged -= RefreshNameplate;
+	}
+
+	public override void _Process(double delta)
+	{
+		StabilizeExternalModelRootMotion();
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -694,7 +698,6 @@ public partial class SimpleActor : CharacterBody3D
 			GlobalPosition = GetFollowDestination();
 		}
 
-		SpawnCombatEffect(LocaleText.T("effect.revive"), new Color(0.42f, 1.0f, 0.66f, 0.94f), GlobalPosition + new Vector3(0.0f, 1.25f, 0.0f), 0.9f, 0.76f);
 		RefreshNameplate();
 		return true;
 	}
@@ -1829,46 +1832,10 @@ public partial class SimpleActor : CharacterBody3D
 		Node3D? model = GetNodeOrNull<Node3D>("ExternalModel");
 		if (model == null)
 		{
-			_externalModelRootMotionNode = null;
 			return;
 		}
 
-		model.Position = Vector3.Zero;
-		model.RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f);
-
-		Node3D? rootMotionNode = _externalModelRootMotionNode;
-		if (rootMotionNode == null || !IsInstanceValid(rootMotionNode))
-		{
-			rootMotionNode = FindDescendantNode3D(model, "root") ?? FindDescendantNode3D(model, "Root");
-			_externalModelRootMotionNode = rootMotionNode;
-		}
-
-		if (rootMotionNode == null)
-		{
-			return;
-		}
-
-		rootMotionNode.Position = Vector3.Zero;
-		rootMotionNode.Rotation = Vector3.Zero;
-	}
-
-	private static Node3D? FindDescendantNode3D(Node node, string nodeName)
-	{
-		foreach (Node child in node.GetChildren())
-		{
-			if (child is Node3D childNode3D && childNode3D.Name == nodeName)
-			{
-				return childNode3D;
-			}
-
-			Node3D? found = FindDescendantNode3D(child, nodeName);
-			if (found != null)
-			{
-				return found;
-			}
-		}
-
-		return null;
+		ExternalModelLibrary.StabilizeRootMotion(model, Vector3.Zero, new Vector3(0.0f, 180.0f, 0.0f));
 	}
 
 	private void FaceDirection(Vector3 direction, float step)
