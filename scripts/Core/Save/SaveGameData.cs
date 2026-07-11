@@ -43,6 +43,7 @@ public sealed class ActorSaveData
 	public string Personality { get; set; } = "personality.calm";
 	public string PassiveAbility { get; set; } = "ability.none";
 	public int Affinity { get; set; } = 50;
+	public string AttackModeId { get; set; } = "attack_nearest";
 	public CompanionBuildSaveData BuildLoadout { get; set; } = new();
 }
 
@@ -59,7 +60,6 @@ public sealed class CompanionBuildSaveData
 		"gem.skill.none",
 		"gem.skill.none",
 	};
-	public string AiGemId { get; set; } = "gem.ai.attack_nearest";
 }
 
 public sealed class SaveVector3

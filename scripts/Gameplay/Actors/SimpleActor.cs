@@ -13,6 +13,7 @@ public partial class SimpleActor : CharacterBody3D
 	}
 
 	[Export] public string ActorKind { get; set; } = "npc";
+	[Export] public string MapId { get; set; } = "wild_forest";
 	[Export] public float MoveSpeed { get; set; } = 1.6f;
 	[Export] public float WanderRadius { get; set; } = 10.0f;
 	[Export] public float ChaseRadius { get; set; } = 20.0f;
@@ -33,6 +34,7 @@ public partial class SimpleActor : CharacterBody3D
 	[Export] public string Personality { get; set; } = "personality.calm";
 	[Export] public string PassiveAbility { get; set; } = "ability.none";
 	[Export] public int Affinity { get; set; } = 50;
+	[Export] public string AttackModeId { get; set; } = BuildCatalog.AiAttackNearest;
 	[Export] public float DetectionRadius { get; set; } = 12.0f;
 	[Export] public float AttackRange { get; set; } = 1.8f;
 	[Export] public float AttackCooldown { get; set; } = 1.35f;
@@ -133,7 +135,7 @@ public partial class SimpleActor : CharacterBody3D
 	public string BuildEquipmentSummary => BuildCatalog.LocalizedEquipmentSet(BuildLoadout);
 	public string BuildSkillSummary => BuildCatalog.LocalizedSkillGems(BuildLoadout);
 	public string BuildAttributeGemName => LocaleText.T(BuildCatalog.GetAttributeGem(BuildLoadout.AttributeGemId).NameKey);
-	public string BuildAiGemName => LocaleText.T(BuildCatalog.GetAiGem(BuildLoadout.AiGemId).NameKey);
+	public string AttackModeName => LocaleText.T(BuildCatalog.GetAttackMode(AttackModeId).NameKey);
 	public string BuildRareComboName => BuildCatalog.LocalizedRareCombo(CurrentBuildStats);
 	public string BuildElementName => LocaleText.T(CurrentBuildStats.DamageElementNameKey);
 	public bool IsRangedCombatant => CombatRole == "Ranged" || CombatRole == "Support" || EffectiveAttackRange > 3.0f;
@@ -392,15 +394,15 @@ public partial class SimpleActor : CharacterBody3D
 		MarkBuildChanged();
 	}
 
-	public void CycleAiGem()
+	public void CycleAttackMode()
 	{
-		BuildLoadout.CycleAiGem();
+		AttackModeId = BuildCatalog.GetNextAttackModeId(AttackModeId);
 		MarkBuildChanged();
 	}
 
-	public void EquipAiGem(string gemId)
+	public void SetAttackMode(string modeId)
 	{
-		BuildLoadout.AiGemId = BuildCatalog.GetAiGem(gemId).Id;
+		AttackModeId = BuildCatalog.GetAttackMode(modeId).Id;
 		MarkBuildChanged();
 	}
 
@@ -470,6 +472,7 @@ public partial class SimpleActor : CharacterBody3D
 				break;
 		}
 
+		AttackModeId = BuildCatalog.GetDefaultAttackModeId(this);
 		_buildConfigured = false;
 		EnsureBuildLoadout();
 		RecalculateBuildStats();
@@ -504,6 +507,7 @@ public partial class SimpleActor : CharacterBody3D
 			Personality = Personality,
 			PassiveAbility = PassiveAbility,
 			Affinity = Affinity,
+			AttackModeId = AttackModeId,
 			BuildLoadout = new CompanionBuildSaveData
 			{
 				HelmetId = loadout.HelmetId,
@@ -512,7 +516,6 @@ public partial class SimpleActor : CharacterBody3D
 				AccessoryId = loadout.AccessoryId,
 				AttributeGemId = loadout.AttributeGemId,
 				SkillGemIds = new[] { loadout.SkillGemIds[0], loadout.SkillGemIds[1], loadout.SkillGemIds[2] },
-				AiGemId = loadout.AiGemId,
 			},
 		};
 	}
@@ -536,6 +539,9 @@ public partial class SimpleActor : CharacterBody3D
 		Personality = string.IsNullOrWhiteSpace(data.Personality) ? "personality.calm" : data.Personality;
 		PassiveAbility = string.IsNullOrWhiteSpace(data.PassiveAbility) ? "ability.none" : data.PassiveAbility;
 		Affinity = Mathf.Clamp(data.Affinity, 0, 100);
+		AttackModeId = string.IsNullOrWhiteSpace(data.AttackModeId)
+			? BuildCatalog.GetDefaultAttackModeId(this)
+			: BuildCatalog.GetAttackMode(data.AttackModeId).Id;
 		_buildLoadout = new CompanionBuildLoadout
 		{
 			HelmetId = data.BuildLoadout.HelmetId,
@@ -546,7 +552,6 @@ public partial class SimpleActor : CharacterBody3D
 			SkillGemIds = data.BuildLoadout.SkillGemIds.Length >= 3
 				? new[] { data.BuildLoadout.SkillGemIds[0], data.BuildLoadout.SkillGemIds[1], data.BuildLoadout.SkillGemIds[2] }
 				: new[] { "gem.skill.none", "gem.skill.none", "gem.skill.none" },
-			AiGemId = data.BuildLoadout.AiGemId,
 		};
 		_buildConfigured = true;
 		_buildStatsDirty = true;
@@ -563,6 +568,7 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		_buildLoadout = BuildCatalog.CreateStarterLoadout(this);
+		AttackModeId = BuildCatalog.GetAttackMode(AttackModeId).Id;
 		_buildConfigured = true;
 		_buildStatsDirty = true;
 	}
@@ -1357,19 +1363,27 @@ public partial class SimpleActor : CharacterBody3D
 		Vector3 origin = GlobalPosition;
 		int goldAmount = Mathf.Max(GoldReward + _rng.RandiRange(1, Mathf.Max(Level + 2, 3)), 1);
 		SpawnWorldDrop(origin + RandomDropOffset(0.45f), string.Empty, 1, goldAmount);
-		SpawnWorldDrop(origin + RandomDropOffset(0.78f), "monster_trophy", 1, 0);
+		string primaryLootId = MonsterLootCatalog.PickPrimaryDropForMonster(LocalizedDisplayName, IsRangedCombatant, Level);
+		int primaryAmount = Level >= 6 && _rng.Randf() < 0.42f ? 2 : 1;
+		SpawnWorldDrop(origin + RandomDropOffset(0.78f), primaryLootId, primaryAmount, 0);
+
+		if (_rng.Randf() < 0.34f)
+		{
+			string secondaryLootId = MonsterLootCatalog.PickSecondaryDropForMonster(primaryLootId, Level);
+			SpawnWorldDrop(origin + RandomDropOffset(0.95f), secondaryLootId, 1, 0);
+		}
 
 		if (_rng.Randf() < 0.36f)
 		{
-			SpawnWorldDrop(origin + RandomDropOffset(1.05f), PickEquipmentDropId(), 1, 0);
+			SpawnWorldDrop(origin + RandomDropOffset(1.18f), PickEquipmentDropId(), 1, 0);
 		}
 
 		if (_rng.Randf() < 0.22f)
 		{
-			SpawnWorldDrop(origin + RandomDropOffset(1.18f), PickGemDropId(), 1, 0);
+			SpawnWorldDrop(origin + RandomDropOffset(1.32f), PickGemDropId(), 1, 0);
 		}
 
-		player.PostSystemMessage(LocaleText.F("system.drop.loot", LocalizedDisplayName), new Color(1.0f, 0.86f, 0.48f));
+		player.PostSystemMessage(LocaleText.F("system.drop.loot", LocalizedDisplayName, LocaleText.T(MonsterLootCatalog.GetNameKey(primaryLootId))), new Color(1.0f, 0.86f, 0.48f));
 	}
 
 	private void SpawnWorldDrop(Vector3 position, string itemId, int amount, int goldAmount)
@@ -1409,21 +1423,15 @@ public partial class SimpleActor : CharacterBody3D
 
 	private string PickGemDropId()
 	{
-		int kind = _rng.RandiRange(0, 2);
+		int kind = _rng.RandiRange(0, 1);
 		if (kind == 0)
 		{
 			var gems = BuildCatalog.GetAttributeGemDefinitions();
 			return PickNonFreeAttributeGem(gems);
 		}
 
-		if (kind == 1)
-		{
-			var gems = BuildCatalog.GetSkillGemDefinitions();
-			return PickNonFreeSkillGem(gems);
-		}
-
-		var aiGems = BuildCatalog.GetAiGemDefinitions();
-		return aiGems[_rng.RandiRange(0, aiGems.Count - 1)].Id;
+		var skillGems = BuildCatalog.GetSkillGemDefinitions();
+		return PickNonFreeSkillGem(skillGems);
 	}
 
 	private int PickValidGemIndex(int count)

@@ -6,8 +6,8 @@ public partial class PlayerController : CharacterBody3D
 	private const int FormationGridSideLength = 5;
 	private const int FormationCenterSlotIndex = 12;
 	private const float FormationSlotSpacing = 2.35f;
-	private const string NpcRecruitQuestItemId = "monster_trophy";
-	private const int NpcRecruitQuestItemCount = 2;
+	private const float PlayerVisualScale = 0.88f;
+	private const int NpcRecruitQuestItemCount = 3;
 	private const int NpcQuestAffinityReward = 25;
 	private const int NpcRecruitAffinityRequirement = 80;
 
@@ -20,8 +20,8 @@ public partial class PlayerController : CharacterBody3D
 		0, 4, 20, 24,
 	};
 
-	[Export] public float WalkSpeed { get; set; } = 6.5f;
-	[Export] public float SprintSpeed { get; set; } = 10.0f;
+	[Export] public float WalkSpeed { get; set; } = 7.8f;
+	[Export] public float SprintSpeed { get; set; } = 12.8f;
 	[Export] public float JumpVelocity { get; set; } = 5.2f;
 	[Export] public float ThirdPersonDistance { get; set; } = 6.2f;
 	[Export] public float ThirdPersonCameraHeight { get; set; } = 3.35f;
@@ -73,6 +73,8 @@ public partial class PlayerController : CharacterBody3D
 	private SystemLogPanel _systemLogPanel = null!;
 	private PanelContainer _captureAmmoPanel = null!;
 	private PanelContainer _npcQuestDialog = null!;
+	private PanelContainer _mapTravelDialog = null!;
+	private VBoxContainer _mapTravelButtonList = null!;
 	private Label _captureAmmoCaptionLabel = null!;
 	private Label _captureAmmoCountLabel = null!;
 	private ProgressBar _captureAmmoRechargeBar = null!;
@@ -131,6 +133,7 @@ public partial class PlayerController : CharacterBody3D
 		CreateInteractionPromptHud();
 		CreateSystemLogPanel();
 		CreateNpcQuestDialog();
+		CreateMapTravelDialog();
 
 		AddToGroup("player");
 		EnsureInputActions();
@@ -154,7 +157,11 @@ public partial class PlayerController : CharacterBody3D
 	{
 		if (@event.IsActionPressed("ui_cancel"))
 		{
-			if (_npcQuestDialog.Visible)
+			if (_mapTravelDialog != null && _mapTravelDialog.Visible)
+			{
+				CloseMapTravelDialog();
+			}
+			else if (_npcQuestDialog.Visible)
 			{
 				CloseNpcQuestDialog();
 			}
@@ -853,7 +860,14 @@ public partial class PlayerController : CharacterBody3D
 
 	private static string GetInventoryItemDisplayName(string itemId)
 	{
-		return itemId == "monster_trophy" ? LocaleText.T("item.monster_trophy") : LocaleText.T(BuildCatalog.GetItemNameKey(itemId));
+		return MonsterLootCatalog.IsMonsterLoot(itemId)
+			? LocaleText.T(MonsterLootCatalog.GetNameKey(itemId))
+			: LocaleText.T(BuildCatalog.GetItemNameKey(itemId));
+	}
+
+	private static string GetNpcQuestItemId(SimpleActor actor)
+	{
+		return MonsterLootCatalog.GetQuestItemIdForNpc(actor.DisplayName);
 	}
 
 	public void OpenInventoryForActor(SimpleActor actor)
@@ -1386,11 +1400,12 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
+		string questItemId = GetNpcQuestItemId(recruitNpc);
 		if (!_acceptedNpcQuests.Contains(recruitNpc))
 		{
 			_interactionPromptLabel.Text = LocaleText.F("prompt.npc.accept_task", "E", recruitNpc.LocalizedDisplayName);
 		}
-		else if (GetInventoryCount(NpcRecruitQuestItemId) >= NpcRecruitQuestItemCount)
+		else if (GetInventoryCount(questItemId) >= NpcRecruitQuestItemCount)
 		{
 			_interactionPromptLabel.Text = LocaleText.F("prompt.npc.deliver_task", "E", recruitNpc.LocalizedDisplayName);
 		}
@@ -1400,7 +1415,7 @@ public partial class PlayerController : CharacterBody3D
 		}
 		else
 		{
-			_interactionPromptLabel.Text = LocaleText.F("prompt.npc.quest_progress", "E", GetInventoryCount(NpcRecruitQuestItemId), NpcRecruitQuestItemCount, recruitNpc.Affinity, NpcRecruitAffinityRequirement);
+			_interactionPromptLabel.Text = LocaleText.F("prompt.npc.quest_progress", "E", GetInventoryCount(questItemId), NpcRecruitQuestItemCount, recruitNpc.Affinity, NpcRecruitAffinityRequirement);
 		}
 	}
 
@@ -1445,9 +1460,10 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
-		if (!TryConsumeInventoryItem(NpcRecruitQuestItemId, NpcRecruitQuestItemCount))
+		string questItemId = GetNpcQuestItemId(actor);
+		if (!TryConsumeInventoryItem(questItemId, NpcRecruitQuestItemCount))
 		{
-			PostSystemMessage(LocaleText.F("system.npc.waiting_items", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, LocaleText.T("item.monster_trophy")), new Color(0.86f, 0.84f, 0.72f));
+			PostSystemMessage(LocaleText.F("system.npc.waiting_items", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, GetInventoryItemDisplayName(questItemId)), new Color(0.86f, 0.84f, 0.72f));
 			return;
 		}
 
@@ -1474,8 +1490,9 @@ public partial class PlayerController : CharacterBody3D
 
 		_pendingQuestNpc = actor;
 		_npcQuestDialogIsNotice = false;
+		string questItemId = GetNpcQuestItemId(actor);
 		_npcQuestTitleLabel.Text = LocaleText.F("quest.dialog.title", actor.LocalizedDisplayName);
-		_npcQuestBodyLabel.Text = LocaleText.F("quest.dialog.body", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, LocaleText.T("item.monster_trophy"));
+		_npcQuestBodyLabel.Text = LocaleText.F("quest.dialog.body", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, GetInventoryItemDisplayName(questItemId));
 		_npcQuestRewardLabel.Text = LocaleText.F("quest.dialog.reward", NpcQuestAffinityReward, NpcRecruitAffinityRequirement);
 		_npcQuestRewardLabel.Visible = true;
 		_npcQuestAcceptButton.Text = LocaleText.T("quest.button.accept");
@@ -1524,7 +1541,8 @@ public partial class PlayerController : CharacterBody3D
 		}
 
 		_acceptedNpcQuests.Add(actor);
-		PostSystemMessage(LocaleText.F("system.npc.task_posted", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, LocaleText.T("item.monster_trophy")), new Color(0.82f, 0.92f, 1.0f));
+		string questItemId = GetNpcQuestItemId(actor);
+		PostSystemMessage(LocaleText.F("system.npc.task_posted", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, GetInventoryItemDisplayName(questItemId)), new Color(0.82f, 0.92f, 1.0f));
 		CloseNpcQuestDialog();
 	}
 
@@ -1559,6 +1577,110 @@ public partial class PlayerController : CharacterBody3D
 		}
 
 		UpdateMouseModeForPanels();
+	}
+
+	private void CreateMapTravelDialog()
+	{
+		var layer = new CanvasLayer { Name = "MapTravelDialogLayer" };
+		AddChild(layer);
+
+		_mapTravelDialog = new PanelContainer
+		{
+			Name = "MapTravelDialog",
+			Visible = false,
+			AnchorLeft = 0.5f,
+			AnchorRight = 0.5f,
+			AnchorTop = 0.5f,
+			AnchorBottom = 0.5f,
+			OffsetLeft = -210.0f,
+			OffsetRight = 210.0f,
+			OffsetTop = -150.0f,
+			OffsetBottom = 150.0f,
+		};
+		_mapTravelDialog.AddThemeStyleboxOverride("panel", MakeDialogStyle(new Color(0.05f, 0.07f, 0.09f, 0.94f), new Color(0.35f, 0.82f, 1.0f, 0.72f)));
+		layer.AddChild(_mapTravelDialog);
+
+		var margin = new MarginContainer();
+		margin.AddThemeConstantOverride("margin_left", 18);
+		margin.AddThemeConstantOverride("margin_right", 18);
+		margin.AddThemeConstantOverride("margin_top", 16);
+		margin.AddThemeConstantOverride("margin_bottom", 16);
+		_mapTravelDialog.AddChild(margin);
+
+		var root = new VBoxContainer { SizeFlagsVertical = Control.SizeFlags.ExpandFill };
+		root.AddThemeConstantOverride("separation", 10);
+		margin.AddChild(root);
+
+		var title = new Label
+		{
+			Text = LocaleText.T("map.travel.title"),
+			HorizontalAlignment = HorizontalAlignment.Center,
+		};
+		title.AddThemeFontSizeOverride("font_size", 24);
+		title.AddThemeColorOverride("font_color", new Color(1.0f, 0.94f, 0.78f));
+		root.AddChild(title);
+
+		_mapTravelButtonList = new VBoxContainer();
+		_mapTravelButtonList.AddThemeConstantOverride("separation", 8);
+		root.AddChild(_mapTravelButtonList);
+
+		var cancelButton = MakeQuestDialogButton("dialog.button.cancel");
+		cancelButton.Pressed += CloseMapTravelDialog;
+		root.AddChild(cancelButton);
+	}
+
+	private void ShowMapTravelDialog(World world)
+	{
+		ClearChildren(_mapTravelButtonList);
+		foreach ((string id, string label) in world.GetWildMapTravelOptions())
+		{
+			var button = new Button
+			{
+				Text = label,
+				CustomMinimumSize = new Vector2(0.0f, 42.0f),
+			};
+			button.Pressed += () =>
+			{
+				CloseMapTravelDialog();
+				world.RequestMapTravel(id);
+			};
+			_mapTravelButtonList.AddChild(button);
+		}
+
+		_mapTravelDialog.Visible = true;
+		_interactionPromptLabel.Visible = false;
+		UpdateMouseModeForPanels();
+	}
+
+	private void CloseMapTravelDialog()
+	{
+		if (_mapTravelDialog != null)
+		{
+			_mapTravelDialog.Visible = false;
+		}
+
+		UpdateMouseModeForPanels();
+	}
+
+	private static StyleBoxFlat MakeDialogStyle(Color backgroundColor, Color borderColor)
+	{
+		var style = new StyleBoxFlat
+		{
+			BgColor = backgroundColor,
+			BorderColor = borderColor,
+		};
+		style.SetBorderWidthAll(2);
+		style.SetCornerRadiusAll(8);
+		return style;
+	}
+
+	private static void ClearChildren(Node parent)
+	{
+		foreach (Node child in parent.GetChildren())
+		{
+			parent.RemoveChild(child);
+			child.QueueFree();
+		}
 	}
 
 	private Node3D? GetNearestRevivalNpc()
@@ -1629,6 +1751,12 @@ public partial class PlayerController : CharacterBody3D
 		string targetMapId = portal.GetMeta("target_map").AsString();
 		if (GetParent() is World world)
 		{
+			if (targetMapId == "wild_select")
+			{
+				ShowMapTravelDialog(world);
+				return;
+			}
+
 			world.RequestMapTravel(targetMapId);
 		}
 	}
@@ -1770,9 +1898,9 @@ public partial class PlayerController : CharacterBody3D
 		{
 			Name = nodeName,
 			Mesh = mesh,
-			Position = position,
+			Position = position * PlayerVisualScale,
 			RotationDegrees = rotationDegrees,
-			Scale = scale,
+			Scale = scale * PlayerVisualScale,
 		};
 		meshInstance.SetSurfaceOverrideMaterial(0, material);
 		_selectedTargetMarker.AddChild(meshInstance);
@@ -2205,6 +2333,7 @@ public partial class PlayerController : CharacterBody3D
 		{
 			Name = "PlayerExternalEquipment",
 			Position = Vector3.Zero,
+			Scale = new Vector3(0.88f, 0.88f, 0.88f),
 		};
 		AddChild(equipmentRoot);
 
@@ -2391,6 +2520,7 @@ public partial class PlayerController : CharacterBody3D
 			_inventoryPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
+			CloseMapTravelDialog();
 		}
 
 		UpdateMouseModeForPanels();
@@ -2405,6 +2535,7 @@ public partial class PlayerController : CharacterBody3D
 			_settingsPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
+			CloseMapTravelDialog();
 		}
 
 		UpdateMouseModeForPanels();
@@ -2419,6 +2550,7 @@ public partial class PlayerController : CharacterBody3D
 			_inventoryPanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
+			CloseMapTravelDialog();
 		}
 
 		UpdateMouseModeForPanels();
@@ -2433,6 +2565,7 @@ public partial class PlayerController : CharacterBody3D
 			_inventoryPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
+			CloseMapTravelDialog();
 		}
 
 		UpdateMouseModeForPanels();
@@ -2440,7 +2573,7 @@ public partial class PlayerController : CharacterBody3D
 
 	private void UpdateMouseModeForPanels()
 	{
-		Input.MouseMode = _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _settingsPanel.Visible || (_npcQuestDialog != null && _npcQuestDialog.Visible)
+		Input.MouseMode = _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _settingsPanel.Visible || (_npcQuestDialog != null && _npcQuestDialog.Visible) || (_mapTravelDialog != null && _mapTravelDialog.Visible)
 			? Input.MouseModeEnum.Visible
 			: Input.MouseModeEnum.Captured;
 	}

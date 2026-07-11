@@ -14,7 +14,6 @@ public enum InventoryItemKind
 	Equipment,
 	AttributeGem,
 	SkillGem,
-	AiGem,
 }
 
 public sealed class CompanionIdentity
@@ -91,18 +90,11 @@ public sealed class SkillGemDefinition
 	public bool EnablesShield { get; set; }
 }
 
-public sealed class AiGemDefinition
+public sealed class AttackModeDefinition
 {
 	public string Id { get; set; } = string.Empty;
 	public string NameKey { get; set; } = string.Empty;
-	public string SummaryKey { get; set; } = string.Empty;
 	public string BehaviorId { get; set; } = BuildCatalog.AiAttackNearest;
-	public int DefenseBonus { get; set; }
-	public float MoveSpeedBonus { get; set; }
-	public float AttackCooldownReduction { get; set; }
-	public float AttackRangeBonus { get; set; }
-	public float DetectionRadiusBonus { get; set; }
-	public float FollowDistanceMultiplier { get; set; } = 1.0f;
 }
 
 public sealed class BuildStats
@@ -147,7 +139,6 @@ public sealed class CompanionBuildLoadout
 		"gem.skill.none",
 		"gem.skill.none",
 	};
-	public string AiGemId { get; set; } = "gem.ai.attack_nearest";
 
 	public string GetEquipmentId(EquipmentSlot slot)
 	{
@@ -194,11 +185,6 @@ public sealed class CompanionBuildLoadout
 		EnsureSkillSlots();
 		int slot = Mathf.Clamp(index, 0, SkillGemIds.Length - 1);
 		SkillGemIds[slot] = BuildCatalog.GetNextSkillGemId(SkillGemIds[slot]);
-	}
-
-	public void CycleAiGem()
-	{
-		AiGemId = BuildCatalog.GetNextAiGemId(AiGemId);
 	}
 
 	public bool HasSkill(string skillId)
@@ -392,20 +378,15 @@ public static class BuildCatalog
 		new SkillGemDefinition { Id = "gem.skill.life_steal", NameKey = "gem.skill.life_steal", SummaryKey = "gem.skill.summary.life_steal", LifeStealPercent = 0.08f, DefenseBonus = 2 },
 	};
 
-	private static readonly List<AiGemDefinition> AiGems = new()
+	private static readonly List<AttackModeDefinition> AttackModes = new()
 	{
-		new AiGemDefinition { Id = "gem.ai.protect_player", NameKey = "gem.ai.protect_player", SummaryKey = "gem.ai.summary.protect_player", BehaviorId = AiProtectPlayer, DefenseBonus = 4, DetectionRadiusBonus = 2.0f, FollowDistanceMultiplier = 0.82f },
-		new AiGemDefinition { Id = "gem.ai.attack_nearest", NameKey = "gem.ai.attack_nearest", SummaryKey = "gem.ai.summary.attack_nearest", BehaviorId = AiAttackNearest },
-		new AiGemDefinition { Id = "gem.ai.attack_boss_first", NameKey = "gem.ai.attack_boss_first", SummaryKey = "gem.ai.summary.attack_boss_first", BehaviorId = AiAttackBossFirst, AttackRangeBonus = 0.4f, DetectionRadiusBonus = 4.0f },
-		new AiGemDefinition { Id = "gem.ai.attack_lowest_hp", NameKey = "gem.ai.attack_lowest_hp", SummaryKey = "gem.ai.summary.attack_lowest_hp", BehaviorId = AiAttackLowestHp, AttackCooldownReduction = 0.04f, DetectionRadiusBonus = 2.0f },
-		new AiGemDefinition { Id = "gem.ai.keep_distance", NameKey = "gem.ai.keep_distance", SummaryKey = "gem.ai.summary.keep_distance", BehaviorId = AiKeepDistance, DefenseBonus = 2, AttackRangeBonus = 3.0f, FollowDistanceMultiplier = 1.18f },
-		new AiGemDefinition { Id = "gem.ai.aggressive", NameKey = "gem.ai.aggressive", SummaryKey = "gem.ai.summary.aggressive", BehaviorId = AiAggressive, MoveSpeedBonus = 0.12f, AttackCooldownReduction = 0.08f, DetectionRadiusBonus = 5.0f },
-		new AiGemDefinition { Id = "gem.ai.defensive", NameKey = "gem.ai.defensive", SummaryKey = "gem.ai.summary.defensive", BehaviorId = AiDefensive, DefenseBonus = 7, FollowDistanceMultiplier = 0.92f },
-		new AiGemDefinition { Id = "gem.ai.heal_allies", NameKey = "gem.ai.heal_allies", SummaryKey = "gem.ai.summary.heal_allies", BehaviorId = AiHealAllies, DefenseBonus = 4, AttackCooldownReduction = 0.06f, FollowDistanceMultiplier = 0.86f },
-		new AiGemDefinition { Id = "gem.ai.gather_resources", NameKey = "gem.ai.gather_resources", SummaryKey = "gem.ai.summary.gather_resources", BehaviorId = AiGatherResources, MoveSpeedBonus = 0.10f, FollowDistanceMultiplier = 1.05f },
-		new AiGemDefinition { Id = "gem.ai.loot_nearby", NameKey = "gem.ai.loot_nearby", SummaryKey = "gem.ai.summary.loot_nearby", BehaviorId = AiLootNearby, MoveSpeedBonus = 0.08f, DetectionRadiusBonus = 1.5f },
-		new AiGemDefinition { Id = "gem.ai.follow_closely", NameKey = "gem.ai.follow_closely", SummaryKey = "gem.ai.summary.follow_closely", BehaviorId = AiFollowClosely, DefenseBonus = 2, FollowDistanceMultiplier = 0.62f },
-		new AiGemDefinition { Id = "gem.ai.roam_freely", NameKey = "gem.ai.roam_freely", SummaryKey = "gem.ai.summary.roam_freely", BehaviorId = AiRoamFreely, MoveSpeedBonus = 0.18f, DetectionRadiusBonus = 3.0f, FollowDistanceMultiplier = 1.55f },
+		new AttackModeDefinition { Id = AiAttackNearest, NameKey = "attack_mode.attack_nearest", BehaviorId = AiAttackNearest },
+		new AttackModeDefinition { Id = AiAttackBossFirst, NameKey = "attack_mode.attack_boss_first", BehaviorId = AiAttackBossFirst },
+		new AttackModeDefinition { Id = AiAttackLowestHp, NameKey = "attack_mode.attack_lowest_hp", BehaviorId = AiAttackLowestHp },
+		new AttackModeDefinition { Id = AiKeepDistance, NameKey = "attack_mode.keep_distance", BehaviorId = AiKeepDistance },
+		new AttackModeDefinition { Id = AiAggressive, NameKey = "attack_mode.aggressive", BehaviorId = AiAggressive },
+		new AttackModeDefinition { Id = AiDefensive, NameKey = "attack_mode.defensive", BehaviorId = AiDefensive },
+		new AttackModeDefinition { Id = AiHealAllies, NameKey = "attack_mode.heal_allies", BehaviorId = AiHealAllies },
 	};
 
 	public static CompanionIdentity GetIdentity(SimpleActor actor)
@@ -427,7 +408,6 @@ public static class BuildCatalog
 			loadout.ArmorId = "equip.armor.spirit_robe";
 			loadout.AttributeGemId = "gem.attribute.light";
 			loadout.SkillGemIds = new[] { "gem.skill.heal", "gem.skill.shield", "gem.skill.none" };
-			loadout.AiGemId = "gem.ai.heal_allies";
 		}
 		else if (actor.CombatRole == "Tank")
 		{
@@ -437,7 +417,6 @@ public static class BuildCatalog
 			loadout.AccessoryId = "equip.accessory.turtle_amulet";
 			loadout.AttributeGemId = "gem.attribute.ice";
 			loadout.SkillGemIds = new[] { "gem.skill.shield", "gem.skill.whirlwind", "gem.skill.none" };
-			loadout.AiGemId = "gem.ai.protect_player";
 		}
 		else if (actor.CombatRole == "Ranged")
 		{
@@ -447,7 +426,6 @@ public static class BuildCatalog
 			loadout.AccessoryId = "equip.accessory.focus_lens";
 			loadout.AttributeGemId = "gem.attribute.lightning";
 			loadout.SkillGemIds = new[] { "gem.skill.laser", "gem.skill.chain", "gem.skill.none" };
-			loadout.AiGemId = "gem.ai.keep_distance";
 		}
 		else if (identityId == "identity.wolf")
 		{
@@ -455,7 +433,6 @@ public static class BuildCatalog
 			loadout.AccessoryId = "equip.accessory.crit_charm";
 			loadout.AttributeGemId = "gem.attribute.lightning";
 			loadout.SkillGemIds = new[] { "gem.skill.dash", "gem.skill.chain", "gem.skill.none" };
-			loadout.AiGemId = "gem.ai.aggressive";
 		}
 		else if (identityId == "identity.dragon")
 		{
@@ -464,7 +441,6 @@ public static class BuildCatalog
 			loadout.ArmorId = "equip.armor.plate";
 			loadout.AttributeGemId = "gem.attribute.fire";
 			loadout.SkillGemIds = new[] { "gem.skill.meteor", "gem.skill.explosion", "gem.skill.none" };
-			loadout.AiGemId = "gem.ai.attack_boss_first";
 		}
 		else if (identityId == "identity.water_spirit")
 		{
@@ -472,14 +448,12 @@ public static class BuildCatalog
 			loadout.ArmorId = "equip.armor.spirit_robe";
 			loadout.AttributeGemId = "gem.attribute.ice";
 			loadout.SkillGemIds = new[] { "gem.skill.heal", "gem.skill.piercing", "gem.skill.none" };
-			loadout.AiGemId = "gem.ai.heal_allies";
 		}
 		else if (identityId == "identity.venom_imp")
 		{
 			loadout.WeaponId = "equip.weapon.claws";
 			loadout.AttributeGemId = "gem.attribute.poison";
 			loadout.SkillGemIds = new[] { "gem.skill.life_steal", "gem.skill.dash", "gem.skill.none" };
-			loadout.AiGemId = "gem.ai.attack_lowest_hp";
 		}
 
 		return loadout;
@@ -527,14 +501,7 @@ public static class BuildCatalog
 			ApplySkillGem(stats, GetSkillGem(skillId));
 		}
 
-		AiGemDefinition aiGem = GetAiGem(loadout.AiGemId);
-		stats.AiBehaviorId = aiGem.BehaviorId;
-		stats.Defense += aiGem.DefenseBonus;
-		stats.MoveSpeedMultiplier += aiGem.MoveSpeedBonus;
-		stats.AttackCooldownMultiplier -= aiGem.AttackCooldownReduction;
-		stats.AttackRangeBonus += aiGem.AttackRangeBonus;
-		stats.DetectionRadiusBonus += aiGem.DetectionRadiusBonus;
-		stats.FollowDistanceMultiplier *= aiGem.FollowDistanceMultiplier;
+		stats.AiBehaviorId = GetAttackMode(actor.AttackModeId).BehaviorId;
 
 		if (!string.IsNullOrEmpty(identity.ElementAffinityId) && identity.ElementAffinityId == stats.DamageElementId)
 		{
@@ -592,17 +559,17 @@ public static class BuildCatalog
 		return SkillGems[0];
 	}
 
-	public static AiGemDefinition GetAiGem(string id)
+	public static AttackModeDefinition GetAttackMode(string id)
 	{
-		foreach (AiGemDefinition gem in AiGems)
+		foreach (AttackModeDefinition mode in AttackModes)
 		{
-			if (gem.Id == id)
+			if (mode.Id == id)
 			{
-				return gem;
+				return mode;
 			}
 		}
 
-		return AiGems[1];
+		return AttackModes[0];
 	}
 
 	public static List<EquipmentDefinition> GetEquipmentDefinitions(EquipmentSlot slot)
@@ -629,9 +596,9 @@ public static class BuildCatalog
 		return new List<SkillGemDefinition>(SkillGems);
 	}
 
-	public static List<AiGemDefinition> GetAiGemDefinitions()
+	public static List<AttackModeDefinition> GetAttackModeDefinitions()
 	{
-		return new List<AiGemDefinition>(AiGems);
+		return new List<AttackModeDefinition>(AttackModes);
 	}
 
 	public static List<string> GetStarterInventoryItemIds()
@@ -656,11 +623,6 @@ public static class BuildCatalog
 			{
 				ids.Add(gem.Id);
 			}
-		}
-
-		foreach (AiGemDefinition gem in AiGems)
-		{
-			ids.Add(gem.Id);
 		}
 
 		return ids;
@@ -697,14 +659,6 @@ public static class BuildCatalog
 			}
 		}
 
-		foreach (AiGemDefinition gem in AiGems)
-		{
-			if (gem.Id == id)
-			{
-				return gem.NameKey;
-			}
-		}
-
 		return id;
 	}
 
@@ -734,7 +688,7 @@ public static class BuildCatalog
 			}
 		}
 
-		return InventoryItemKind.AiGem;
+		return InventoryItemKind.SkillGem;
 	}
 
 	public static string GetNextEquipmentId(EquipmentSlot slot, string currentId)
@@ -785,17 +739,36 @@ public static class BuildCatalog
 		return SkillGems[0].Id;
 	}
 
-	public static string GetNextAiGemId(string currentId)
+	public static string GetNextAttackModeId(string currentId)
 	{
-		for (int index = 0; index < AiGems.Count; index++)
+		for (int index = 0; index < AttackModes.Count; index++)
 		{
-			if (AiGems[index].Id == currentId)
+			if (AttackModes[index].Id == currentId)
 			{
-				return AiGems[(index + 1) % AiGems.Count].Id;
+				return AttackModes[(index + 1) % AttackModes.Count].Id;
 			}
 		}
 
-		return AiGems[0].Id;
+		return AttackModes[0].Id;
+	}
+
+	public static string GetDefaultAttackModeId(SimpleActor actor)
+	{
+		string identityId = GetIdentity(actor).Id;
+		return actor.CombatRole switch
+		{
+			"Support" => AiHealAllies,
+			"Tank" => AiDefensive,
+			"Ranged" => AiKeepDistance,
+			_ => identityId switch
+			{
+				"identity.wolf" => AiAggressive,
+				"identity.dragon" => AiAttackBossFirst,
+				"identity.water_spirit" => AiHealAllies,
+				"identity.venom_imp" => AiAttackLowestHp,
+				_ => AiAttackNearest,
+			},
+		};
 	}
 
 	public static string LocalizedList(string[] keys)
