@@ -226,6 +226,7 @@ public partial class SettingsPanel : PanelContainer
 		AddShortcutRow(section, "shortcut.capture_net", "R");
 		AddShortcutTextRow(section, LocaleText.CurrentLanguage == LocaleText.En ? "Select / Focus Target" : "選取 / 集火目標", "Left Mouse");
 		AddShortcutTextRow(section, LocaleText.CurrentLanguage == LocaleText.En ? "Interact / Revive" : "互動 / 復活", "E");
+		AddShortcutRow(section, "shortcut.save_game", "F5");
 		AddShortcutRow(section, "shortcut.party", "P");
 		AddShortcutRow(section, "shortcut.inventory", "I");
 		AddShortcutRow(section, "shortcut.formation_panel", "F");

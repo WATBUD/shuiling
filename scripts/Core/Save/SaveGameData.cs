@@ -1,0 +1,70 @@
+using System.Collections.Generic;
+
+public sealed class SaveGameData
+{
+	public int Version { get; set; } = 1;
+	public string SavedAt { get; set; } = string.Empty;
+	public string ActiveMapId { get; set; } = "city";
+	public SaveVector3 PlayerPosition { get; set; } = new();
+	public PlayerSaveData Player { get; set; } = new();
+}
+
+public sealed class PlayerSaveData
+{
+	public int Level { get; set; } = 1;
+	public int MaxHealth { get; set; } = 150;
+	public int CurrentHealth { get; set; } = 150;
+	public int Attack { get; set; } = 16;
+	public int Defense { get; set; } = 10;
+	public int Gold { get; set; }
+	public Dictionary<string, int> InventoryItems { get; set; } = new();
+	public List<string> AcceptedNpcQuestNames { get; set; } = new();
+	public List<string> CompletedNpcQuestNames { get; set; } = new();
+	public List<ActorSaveData> Companions { get; set; } = new();
+	public List<int> ActivePartyIndexes { get; set; } = new();
+}
+
+public sealed class ActorSaveData
+{
+	public string ActorKind { get; set; } = "monster";
+	public string DisplayName { get; set; } = "name.actor.traveler";
+	public int Level { get; set; } = 1;
+	public int MaxHealth { get; set; } = 100;
+	public int CurrentHealth { get; set; } = 100;
+	public int Attack { get; set; } = 10;
+	public int Defense { get; set; } = 6;
+	public int ExperienceReward { get; set; } = 6;
+	public int GoldReward { get; set; } = 2;
+	public int Experience { get; set; }
+	public int EvolutionStage { get; set; }
+	public string SpecialAbility { get; set; } = "ability.none";
+	public int AbilityRank { get; set; } = 1;
+	public string CombatRole { get; set; } = "DPS";
+	public string Personality { get; set; } = "personality.calm";
+	public string PassiveAbility { get; set; } = "ability.none";
+	public int Affinity { get; set; } = 50;
+	public CompanionBuildSaveData BuildLoadout { get; set; } = new();
+}
+
+public sealed class CompanionBuildSaveData
+{
+	public string HelmetId { get; set; } = "equip.helmet.traveler";
+	public string WeaponId { get; set; } = "equip.weapon.sword";
+	public string ArmorId { get; set; } = "equip.armor.scout";
+	public string AccessoryId { get; set; } = "equip.accessory.swift_ring";
+	public string AttributeGemId { get; set; } = "gem.attribute.none";
+	public string[] SkillGemIds { get; set; } =
+	{
+		"gem.skill.none",
+		"gem.skill.none",
+		"gem.skill.none",
+	};
+	public string AiGemId { get; set; } = "gem.ai.attack_nearest";
+}
+
+public sealed class SaveVector3
+{
+	public float X { get; set; }
+	public float Y { get; set; }
+	public float Z { get; set; }
+}

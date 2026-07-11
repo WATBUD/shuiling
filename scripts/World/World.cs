@@ -84,15 +84,25 @@ public partial class World : Node3D
 	[Export] public float MapSize { get; set; } = 150.0f;
 	[Export] public int PropCount { get; set; } = 110;
 	[Export] public int ActorCount { get; set; } = 36;
-	[Export(PropertyHint.Range, "0,1,0.05")] public float MonsterRatio { get; set; } = 0.45f;
+	[Export] public int CityNpcCount { get; set; } = 9;
 	[Export] public int SeedValue { get; set; }
 
 	private readonly RandomNumberGenerator _rng = new();
 	private readonly List<Vector3> _obstaclePositions = new();
+	private readonly List<Vector3> _wildObstaclePositions = new();
+	private readonly Vector3 _spawnCampCenter = new(0.0f, 0.0f, 8.0f);
+	private readonly Vector3 _mainCityCenter = new(0.0f, 0.0f, -20.0f);
+	private readonly Vector3 _citySpawnPosition = new(0.0f, 0.0f, -6.0f);
+	private readonly Vector3 _wildSpawnPosition = new(0.0f, 0.0f, 8.0f);
 
 	private Node3D _mapRoot = null!;
 	private Node3D _propsRoot = null!;
 	private Node3D _actorsRoot = null!;
+	private Node3D _mapsRoot = null!;
+	private Node3D _wildMapRoot = null!;
+	private Node3D _cityMapRoot = null!;
+	private string _activeMapId = "city";
+	private PlayerController _player = null!;
 
 	private StandardMaterial3D _matGround = null!;
 	private StandardMaterial3D _matPath = null!;
@@ -142,6 +152,11 @@ public partial class World : Node3D
 		CreatePlayer();
 		SpawnActors();
 		AddCrosshair();
+		if (GameLaunchOptions.LoadSaveOnWorldReady)
+		{
+			LoadRequestedSave();
+			GameLaunchOptions.StartNewGame();
+		}
 	}
 
 	private void CreateMaterials()
@@ -209,24 +224,60 @@ public partial class World : Node3D
 
 	private void BuildMap()
 	{
-		_mapRoot = new Node3D { Name = "Map" };
-		AddChild(_mapRoot);
-
-		_propsRoot = new Node3D { Name = "Props" };
-		_mapRoot.AddChild(_propsRoot);
+		_mapsRoot = new Node3D { Name = "Maps" };
+		AddChild(_mapsRoot);
 
 		_actorsRoot = new Node3D { Name = "Actors" };
 		AddChild(_actorsRoot);
+
+		BuildWildMapScene();
+		BuildCityMapScene();
+		SetMapVisibility("city");
+	}
+
+	private void BuildWildMapScene()
+	{
+		_obstaclePositions.Clear();
+		_wildMapRoot = new Node3D { Name = "WildMonsterMap" };
+		_mapsRoot.AddChild(_wildMapRoot);
+		_mapRoot = _wildMapRoot;
+
+		_propsRoot = new Node3D { Name = "WildProps" };
+		_mapRoot.AddChild(_propsRoot);
 
 		CreateStaticBox(_mapRoot, "Ground", new Vector3(0.0f, -0.5f, 0.0f), new Vector3(MapSize, 1.0f, MapSize), _matGround);
 		CreateBoundaries();
 		CreateLandmarks();
 		CreateSpawnCamp();
-		CreateMainCity();
 		CreateRuinSite();
 		CreateMonsterDen();
+		CreateMapPortal("ReturnToCityPortal", _wildSpawnPosition + new Vector3(0.0f, 0.0f, 5.0f), "city", "portal.return_city");
 		ScatterProps();
 		ScatterDetailProps();
+
+		_wildObstaclePositions.Clear();
+		_wildObstaclePositions.AddRange(_obstaclePositions);
+	}
+
+	private void BuildCityMapScene()
+	{
+		_obstaclePositions.Clear();
+		_cityMapRoot = new Node3D { Name = "MainCityMap" };
+		_mapsRoot.AddChild(_cityMapRoot);
+		_mapRoot = _cityMapRoot;
+
+		_propsRoot = new Node3D { Name = "CityProps" };
+		_mapRoot.AddChild(_propsRoot);
+
+		CreateStaticBox(_mapRoot, "CityGround", new Vector3(0.0f, -0.5f, 0.0f), new Vector3(MapSize, 1.0f, MapSize), _matGround);
+		CreateBoundaries();
+		CreateMesh(_mapRoot, "CityMainRoad", BoxMeshFor(new Vector3(9.0f, 0.08f, 46.0f)), _mainCityCenter + new Vector3(0.0f, 0.05f, 8.0f), _matPath);
+		CreateMesh(_mapRoot, "CityOuterPlaza", CylinderMeshFor(10.0f, 10.0f, 0.10f), _citySpawnPosition + new Vector3(0.0f, 0.08f, 0.0f), _matPath);
+		CreateMainCity();
+		CreateMapPortal("WildMapGate", _mainCityCenter + new Vector3(0.0f, 0.0f, -13.2f), "wild", "portal.travel_wild");
+
+		_obstaclePositions.Clear();
+		_obstaclePositions.AddRange(_wildObstaclePositions);
 	}
 
 	private void CreateBoundaries()
@@ -277,7 +328,7 @@ public partial class World : Node3D
 
 	private void CreateMainCity()
 	{
-		Vector3 center = new(0.0f, 0.0f, -20.0f);
+		Vector3 center = _mainCityCenter;
 		CreateMesh(_mapRoot, "MainCityPlaza", CylinderMeshFor(15.5f, 15.5f, 0.12f), center + new Vector3(0.0f, 0.11f, 0.0f), _matPath);
 		CreateStaticBox(_propsRoot, "CityNorthGate", center + new Vector3(0.0f, 1.85f, -10.2f), new Vector3(8.5f, 3.7f, 1.1f), _matWall);
 		CreateStaticBox(_propsRoot, "CityLeftHouse", center + new Vector3(-9.4f, 1.35f, -1.6f), new Vector3(5.0f, 2.7f, 5.6f), _matWood);
@@ -666,7 +717,7 @@ public partial class World : Node3D
 		var player = new PlayerController
 		{
 			Name = "Player",
-			Position = new Vector3(0.0f, 0.0f, 8.0f),
+			Position = _citySpawnPosition + new Vector3(0.0f, 0.2f, 0.0f),
 		};
 
 		var collisionShape = new CollisionShape3D
@@ -694,17 +745,59 @@ public partial class World : Node3D
 		cameraPivot.AddChild(camera);
 
 		AddChild(player);
+		_player = player;
 	}
 
 	private void SpawnActors()
 	{
+		_obstaclePositions.Clear();
+		_obstaclePositions.AddRange(_wildObstaclePositions);
+
 		for (int index = 0; index < ActorCount; index++)
 		{
-			bool isMonster = _rng.Randf() < MonsterRatio;
-			SimpleActor actor = CreateActor(isMonster);
-			Vector3 spawnPosition = FindOpenSpawnPosition();
+			SimpleActor actor = CreateActor(true);
+			Vector3 spawnPosition = FindOpenMonsterSpawnPosition();
 			actor.Position = spawnPosition;
 			actor.HomePosition = spawnPosition;
+			_actorsRoot.AddChild(actor);
+		}
+
+		SpawnCityNpcs();
+		UpdateActorMapActivity();
+	}
+
+	private void SpawnCityNpcs()
+	{
+		Vector3[] citySlots =
+		{
+			new(-4.4f, 0.0f, 2.6f),
+			new(4.4f, 0.0f, 2.4f),
+			new(-6.4f, 0.0f, -2.6f),
+			new(6.4f, 0.0f, -2.4f),
+			new(-2.8f, 0.0f, -7.0f),
+			new(2.8f, 0.0f, -7.2f),
+			new(-10.8f, 0.0f, 4.2f),
+			new(10.8f, 0.0f, 4.2f),
+			new(0.0f, 0.0f, 9.6f),
+			new(-8.8f, 0.0f, -7.8f),
+			new(8.8f, 0.0f, -7.8f),
+		};
+
+		int npcCount = Mathf.Max(CityNpcCount, 0);
+		for (int index = 0; index < npcCount; index++)
+		{
+			SimpleActor actor = CreateActor(false);
+			Vector3 offset = citySlots[index % citySlots.Length];
+			if (index >= citySlots.Length)
+			{
+				offset += new Vector3((float)_rng.RandfRange(-2.2f, 2.2f), 0.0f, (float)_rng.RandfRange(-2.2f, 2.2f));
+			}
+
+			Vector3 spawnPosition = _mainCityCenter + offset;
+			actor.Position = spawnPosition;
+			actor.HomePosition = spawnPosition;
+			actor.WanderRadius = (float)_rng.RandfRange(2.5f, 5.2f);
+			actor.MoveSpeed = (float)_rng.RandfRange(0.9f, 1.35f);
 			_actorsRoot.AddChild(actor);
 		}
 	}
@@ -959,7 +1052,7 @@ public partial class World : Node3D
 		string combatRole = rolePool[_rng.RandiRange(0, rolePool.Length - 1)];
 		string personality = Personalities[_rng.RandiRange(0, Personalities.Length - 1)];
 		string passiveAbility = PassiveAbilities[_rng.RandiRange(0, PassiveAbilities.Length - 1)];
-		int affinity = _rng.RandiRange(isMonster ? 24 : 42, isMonster ? 72 : 88);
+		int affinity = _rng.RandiRange(isMonster ? 24 : 35, isMonster ? 72 : 55);
 
 		actor.ConfigureStats(displayName, level, maxHealth, attack, defense, experience, gold);
 		actor.ConfigureGrowth(specialAbility, _rng.RandiRange(1, 2));
@@ -979,7 +1072,7 @@ public partial class World : Node3D
 		actor.AddChild(horn);
 	}
 
-	private Vector3 FindOpenSpawnPosition()
+	private Vector3 FindOpenMonsterSpawnPosition()
 	{
 		float half = MapSize * 0.5f - 9.0f;
 
@@ -991,7 +1084,7 @@ public partial class World : Node3D
 				(float)_rng.RandfRange(-half, half)
 			);
 
-			if (position.DistanceTo(new Vector3(0.0f, 0.0f, 8.0f)) < 18.0f)
+			if (position.DistanceTo(_spawnCampCenter) < 20.0f || position.DistanceTo(_mainCityCenter) < 26.0f)
 			{
 				continue;
 			}
@@ -1002,7 +1095,7 @@ public partial class World : Node3D
 			}
 		}
 
-		return new Vector3((float)_rng.RandfRange(-half, half), 0.0f, (float)_rng.RandfRange(-half, half));
+		return new Vector3((float)_rng.RandfRange(-half, half), 0.0f, (float)_rng.RandfRange(12.0f, half));
 	}
 
 	private bool IsPositionClear(Vector3 position, float minDistance)
@@ -1016,6 +1109,160 @@ public partial class World : Node3D
 		}
 
 		return true;
+	}
+
+	private void CreateMapPortal(string name, Vector3 position, string targetMapId, string labelKey)
+	{
+		var portal = new StaticBody3D
+		{
+			Name = name,
+			Position = position,
+		};
+		portal.AddToGroup("map_portal");
+		portal.SetMeta("target_map", targetMapId);
+		portal.SetMeta("label", labelKey);
+		_propsRoot.AddChild(portal);
+
+		AddMesh(portal, "PortalBase", CylinderMeshFor(1.45f, 1.45f, 0.16f), new Vector3(0.0f, 0.08f, 0.0f), Vector3.Zero, Vector3.One, _matRune);
+		AddMesh(portal, "PortalArchLeft", BoxMeshFor(new Vector3(0.26f, 2.4f, 0.32f)), new Vector3(-1.0f, 1.25f, 0.0f), Vector3.Zero, Vector3.One, _matCrystal);
+		AddMesh(portal, "PortalArchRight", BoxMeshFor(new Vector3(0.26f, 2.4f, 0.32f)), new Vector3(1.0f, 1.25f, 0.0f), Vector3.Zero, Vector3.One, _matCrystal);
+		AddMesh(portal, "PortalArchTop", BoxMeshFor(new Vector3(2.25f, 0.28f, 0.34f)), new Vector3(0.0f, 2.35f, 0.0f), Vector3.Zero, Vector3.One, _matCrystal);
+		AddMesh(portal, "PortalGlow", CylinderMeshFor(0.92f, 0.92f, 0.04f), new Vector3(0.0f, 1.22f, 0.0f), new Vector3(90.0f, 0.0f, 0.0f), new Vector3(1.0f, 1.45f, 1.0f), _matWater);
+
+		var label = new Label3D
+		{
+			Name = "PortalLabel",
+			Text = LocaleText.T(labelKey),
+			Position = new Vector3(0.0f, 2.95f, 0.0f),
+			Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+			FontSize = 22,
+			PixelSize = 0.008f,
+			OutlineSize = 6,
+			HorizontalAlignment = HorizontalAlignment.Center,
+			Width = 300.0f,
+		};
+		label.OutlineModulate = new Color(0.02f, 0.03f, 0.025f, 0.95f);
+		label.Modulate = new Color(0.72f, 0.92f, 1.0f);
+		portal.AddChild(label);
+
+		var collisionShape = new CollisionShape3D
+		{
+			Position = new Vector3(0.0f, 1.1f, 0.0f),
+			Shape = new BoxShape3D { Size = new Vector3(2.7f, 2.2f, 1.5f) },
+		};
+		portal.AddChild(collisionShape);
+	}
+
+	public void RequestMapTravel(string targetMapId)
+	{
+		if ((targetMapId != "city" && targetMapId != "wild") || _activeMapId == targetMapId)
+		{
+			return;
+		}
+
+		SetMapVisibility(targetMapId);
+		Vector3 spawnPosition = targetMapId == "city" ? _citySpawnPosition : _wildSpawnPosition;
+		if (_player != null && IsInstanceValid(_player))
+		{
+			_player.TeleportPartyTo(spawnPosition + new Vector3(0.0f, 0.2f, 0.0f));
+			_player.PostSystemMessage(LocaleText.T(targetMapId == "city" ? "system.map.enter_city" : "system.map.enter_wild"), new Color(0.72f, 0.92f, 1.0f));
+		}
+
+		UpdateActorMapActivity();
+	}
+
+	public SaveGameData ExportSaveData()
+	{
+		return new SaveGameData
+		{
+			ActiveMapId = _activeMapId,
+			PlayerPosition = ToSaveVector(_player.GlobalPosition),
+			Player = _player.ExportSaveData(),
+		};
+	}
+
+	private void LoadRequestedSave()
+	{
+		if (!SaveGameManager.TryLoad(out SaveGameData data, out string error))
+		{
+			_player.PostSystemMessage(LocaleText.F("system.load.failed", error), new Color(1.0f, 0.42f, 0.34f));
+			return;
+		}
+
+		ApplySaveData(data);
+		_player.PostSystemMessage(LocaleText.T("system.load.success"), new Color(0.72f, 1.0f, 0.78f));
+	}
+
+	private void ApplySaveData(SaveGameData data)
+	{
+		string mapId = data.ActiveMapId == "wild" ? "wild" : "city";
+		SetMapVisibility(mapId);
+		var loadedCompanions = new List<SimpleActor>();
+		foreach (ActorSaveData actorData in data.Player.Companions)
+		{
+			SimpleActor actor = CreateActor(actorData.ActorKind == "monster");
+			actor.Position = FromSaveVector(data.PlayerPosition);
+			actor.HomePosition = actor.Position;
+			_actorsRoot.AddChild(actor);
+			actor.ApplySaveData(actorData);
+			loadedCompanions.Add(actor);
+		}
+
+		_player.ApplySaveData(data.Player, loadedCompanions);
+		_player.TeleportPartyTo(FromSaveVector(data.PlayerPosition));
+		UpdateActorMapActivity();
+	}
+
+	private static SaveVector3 ToSaveVector(Vector3 vector)
+	{
+		return new SaveVector3
+		{
+			X = vector.X,
+			Y = vector.Y,
+			Z = vector.Z,
+		};
+	}
+
+	private static Vector3 FromSaveVector(SaveVector3 vector)
+	{
+		return new Vector3(vector.X, vector.Y, vector.Z);
+	}
+
+	private void SetMapVisibility(string mapId)
+	{
+		_activeMapId = mapId;
+		if (_cityMapRoot != null)
+		{
+			_cityMapRoot.Visible = mapId == "city";
+			_cityMapRoot.ProcessMode = mapId == "city" ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
+		}
+
+		if (_wildMapRoot != null)
+		{
+			_wildMapRoot.Visible = mapId == "wild";
+			_wildMapRoot.ProcessMode = mapId == "wild" ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
+		}
+	}
+
+	private void UpdateActorMapActivity()
+	{
+		bool wildActive = _activeMapId == "wild";
+		bool cityActive = _activeMapId == "city";
+		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
+		{
+			if (node is SimpleActor actor && IsInstanceValid(actor))
+			{
+				actor.SetWorldMapActive(wildActive);
+			}
+		}
+
+		foreach (Node node in GetTree().GetNodesInGroup("npcs"))
+		{
+			if (node is SimpleActor actor && IsInstanceValid(actor))
+			{
+				actor.SetWorldMapActive(cityActive);
+			}
+		}
 	}
 
 	private void CreateTree(Vector3 position)
