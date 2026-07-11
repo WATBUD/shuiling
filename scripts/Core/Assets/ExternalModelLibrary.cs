@@ -33,6 +33,7 @@ public static class ExternalModelLibrary
 		"res://assets/models/monsters/orc.gltf",
 		"res://assets/models/monsters/golem.gltf",
 		"res://assets/models/monsters/beast.gltf",
+		"res://assets/models/monsters/slime_enemy_poly_pizza.glb",
 		"res://assets/models/monsters/slime.gltf",
 		"res://assets/models/monsters/demon.gltf",
 		"res://assets/models/monsters/orc.glb",
@@ -54,6 +55,33 @@ public static class ExternalModelLibrary
 		"res://assets/models/monsters/ghost.glb",
 	};
 
+	private static readonly string[] SlimeMonsterModels =
+	{
+		"res://assets/models/monsters/slime_enemy_poly_pizza.glb",
+		"res://assets/models/monsters/slime.gltf",
+	};
+
+	private static readonly string[] ForestMonsterModels =
+	{
+		"res://assets/models/monsters/beast.gltf",
+		"res://assets/models/monsters/orc.gltf",
+	};
+
+	private static readonly string[] MarshMonsterModels =
+	{
+		"res://assets/models/monsters/slime_enemy_poly_pizza.glb",
+		"res://assets/models/monsters/slime.gltf",
+		"res://assets/models/monsters/spitter.gltf",
+		"res://assets/models/monsters/imp.gltf",
+	};
+
+	private static readonly string[] BadlandsMonsterModels =
+	{
+		"res://assets/models/monsters/golem.gltf",
+		"res://assets/models/monsters/demon.gltf",
+		"res://assets/models/monsters/blue_demon.gltf",
+	};
+
 	private static readonly string[] TreeModels =
 	{
 		"res://assets/models/environment/tree.glb",
@@ -73,10 +101,53 @@ public static class ExternalModelLibrary
 	public static bool TryAddActorModel(SimpleActor actor)
 	{
 		string[] paths = actor.ActorKind == "monster"
-			? actor.IsRangedCombatant ? MonsterRanged : MonsterMelee
+			? GetMonsterModelPool(actor)
 			: actor.CombatRole == "Support" ? NpcSupport : actor.IsRangedCombatant ? NpcRanged : NpcMelee;
-		Vector3 scale = actor.ActorKind == "monster" ? new Vector3(1.05f, 1.05f, 1.05f) : new Vector3(1.05f, 1.05f, 1.05f);
-		return TryAddFirstExisting(actor, paths, "ExternalModel", Vector3.Zero, new Vector3(0.0f, 180.0f, 0.0f), scale, (int)actor.GetInstanceId());
+		Vector3 scale = GetActorModelScale(actor);
+		return TryAddFirstExisting(actor, paths, "ExternalModel", Vector3.Zero, new Vector3(0.0f, 180.0f, 0.0f), scale, GetActorVariantSeed(actor));
+	}
+
+	private static string[] GetMonsterModelPool(SimpleActor actor)
+	{
+		string displayName = actor.DisplayName ?? string.Empty;
+		if (displayName.Contains("slime", System.StringComparison.OrdinalIgnoreCase) || displayName.Contains("史萊姆"))
+		{
+			return SlimeMonsterModels;
+		}
+
+		return actor.MapId switch
+		{
+			"wild_forest" => ForestMonsterModels,
+			"wild_marsh" => MarshMonsterModels,
+			"wild_badlands" => BadlandsMonsterModels,
+			_ => actor.IsRangedCombatant ? MonsterRanged : MonsterMelee,
+		};
+	}
+
+	private static Vector3 GetActorModelScale(SimpleActor actor)
+	{
+		if (actor.ActorKind != "monster")
+		{
+			return new Vector3(1.05f, 1.05f, 1.05f);
+		}
+
+		return actor.MapId switch
+		{
+			"wild_marsh" => new Vector3(0.96f, 0.96f, 0.96f),
+			"wild_badlands" => new Vector3(1.12f, 1.12f, 1.12f),
+			_ => new Vector3(1.04f, 1.04f, 1.04f),
+		};
+	}
+
+	private static int GetActorVariantSeed(SimpleActor actor)
+	{
+		unchecked
+		{
+			int seed = (int)actor.GetInstanceId();
+			seed = seed * 397 ^ StableStringHash(actor.MapId);
+			seed = seed * 397 ^ StableStringHash(actor.DisplayName);
+			return seed;
+		}
 	}
 
 	public static Node3D? TryAddPlayerModel(Node3D player)
@@ -520,5 +591,19 @@ public static class ExternalModelLibrary
 	{
 		int result = value % divisor;
 		return result < 0 ? result + divisor : result;
+	}
+
+	private static int StableStringHash(string value)
+	{
+		unchecked
+		{
+			int hash = 23;
+			for (int index = 0; index < value.Length; index++)
+			{
+				hash = hash * 31 + value[index];
+			}
+
+			return hash;
+		}
 	}
 }

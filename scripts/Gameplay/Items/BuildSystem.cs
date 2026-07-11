@@ -19,7 +19,6 @@ public enum InventoryItemKind
 public sealed class CompanionIdentity
 {
 	public string Id { get; set; } = "identity.traveler";
-	public string NameKey { get; set; } = "identity.traveler";
 	public string[] PassiveKeys { get; set; } = System.Array.Empty<string>();
 	public string[] UniqueSkillKeys { get; set; } = System.Array.Empty<string>();
 	public int MaxHealthBonus { get; set; }
@@ -116,14 +115,12 @@ public sealed class BuildStats
 	public bool HasHealSkill { get; set; }
 	public bool HasShieldSkill { get; set; }
 	public string IdentityId { get; set; } = string.Empty;
-	public string IdentityNameKey { get; set; } = string.Empty;
 	public string DamageElementId { get; set; } = "physical";
 	public string DamageElementNameKey { get; set; } = "element.physical";
 	public string AiBehaviorId { get; set; } = BuildCatalog.AiAttackNearest;
 	public string RareComboKey { get; set; } = string.Empty;
 	public Color AttackColor { get; set; } = new(1.0f, 0.54f, 0.24f, 0.92f);
-	public string[] PassiveKeys { get; set; } = System.Array.Empty<string>();
-	public string[] UniqueSkillKeys { get; set; } = System.Array.Empty<string>();
+	public string[] TraitKeys { get; set; } = System.Array.Empty<string>();
 }
 
 public sealed class CompanionBuildLoadout
@@ -237,7 +234,6 @@ public static class BuildCatalog
 		["identity.water_spirit"] = new CompanionIdentity
 		{
 			Id = "identity.water_spirit",
-			NameKey = "identity.water_spirit",
 			PassiveKeys = new[] { "identity.passive.water_damage", "identity.passive.swim_fast", "identity.passive.water_aoe" },
 			UniqueSkillKeys = new[] { "identity.skill.water_cannon" },
 			MaxHealthBonus = 18,
@@ -250,7 +246,6 @@ public static class BuildCatalog
 		["identity.wolf"] = new CompanionIdentity
 		{
 			Id = "identity.wolf",
-			NameKey = "identity.wolf",
 			PassiveKeys = new[] { "identity.passive.move_speed", "identity.passive.crit_rate" },
 			UniqueSkillKeys = new[] { "identity.skill.bite", "identity.skill.howl" },
 			AttackBonus = 4,
@@ -261,7 +256,6 @@ public static class BuildCatalog
 		["identity.dragon"] = new CompanionIdentity
 		{
 			Id = "identity.dragon",
-			NameKey = "identity.dragon",
 			PassiveKeys = new[] { "identity.passive.fly", "identity.passive.fire_resist", "identity.passive.fire_damage" },
 			UniqueSkillKeys = new[] { "identity.skill.dragon_breath" },
 			MaxHealthMultiplier = 1.18f,
@@ -275,7 +269,6 @@ public static class BuildCatalog
 		["identity.redhorn"] = new CompanionIdentity
 		{
 			Id = "identity.redhorn",
-			NameKey = "identity.redhorn",
 			PassiveKeys = new[] { "identity.passive.horn_charge", "identity.passive.thick_hide" },
 			UniqueSkillKeys = new[] { "identity.skill.horn_crash" },
 			MaxHealthMultiplier = 1.12f,
@@ -286,7 +279,6 @@ public static class BuildCatalog
 		["identity.venom_imp"] = new CompanionIdentity
 		{
 			Id = "identity.venom_imp",
-			NameKey = "identity.venom_imp",
 			PassiveKeys = new[] { "identity.passive.poison_mastery", "identity.passive.small_target" },
 			UniqueSkillKeys = new[] { "identity.skill.venom_spit" },
 			AttackBonus = 5,
@@ -297,7 +289,6 @@ public static class BuildCatalog
 		["identity.guardian"] = new CompanionIdentity
 		{
 			Id = "identity.guardian",
-			NameKey = "identity.guardian",
 			PassiveKeys = new[] { "identity.passive.guard_oath", "identity.passive.team_defense" },
 			UniqueSkillKeys = new[] { "identity.skill.guardian_stance" },
 			MaxHealthBonus = 24,
@@ -306,7 +297,6 @@ public static class BuildCatalog
 		["identity.traveler"] = new CompanionIdentity
 		{
 			Id = "identity.traveler",
-			NameKey = "identity.traveler",
 			PassiveKeys = new[] { "identity.passive.adaptable", "identity.passive.fast_growth" },
 			UniqueSkillKeys = new[] { "identity.skill.quick_order" },
 			MaxHealthBonus = 10,
@@ -465,9 +455,7 @@ public static class BuildCatalog
 		var stats = new BuildStats
 		{
 			IdentityId = identity.Id,
-			IdentityNameKey = identity.NameKey,
-			PassiveKeys = identity.PassiveKeys,
-			UniqueSkillKeys = identity.UniqueSkillKeys,
+			TraitKeys = CombineTraitKeys(identity),
 			MaxHealth = Mathf.Max(Mathf.RoundToInt(actor.MaxHealth * identity.MaxHealthMultiplier) + identity.MaxHealthBonus, 1),
 			Attack = Mathf.Max(Mathf.RoundToInt(actor.Attack * identity.AttackMultiplier) + identity.AttackBonus, 1),
 			Defense = Mathf.Max(Mathf.RoundToInt(actor.Defense * identity.DefenseMultiplier) + identity.DefenseBonus, 0),
@@ -518,6 +506,14 @@ public static class BuildCatalog
 		stats.Defense = Mathf.Max(stats.Defense, 0);
 		stats.BuildPower = Mathf.RoundToInt(stats.MaxHealth * 0.22f + stats.Attack * 3.0f + stats.Defense * 2.1f + stats.CritChance * 120.0f + stats.AttackRangeBonus * 9.0f);
 		return stats;
+	}
+
+	private static string[] CombineTraitKeys(CompanionIdentity identity)
+	{
+		var keys = new List<string>();
+		keys.AddRange(identity.PassiveKeys);
+		keys.AddRange(identity.UniqueSkillKeys);
+		return keys.ToArray();
 	}
 
 	public static EquipmentDefinition GetEquipment(string id)

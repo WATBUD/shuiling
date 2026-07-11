@@ -43,6 +43,7 @@ public partial class SimpleActor : CharacterBody3D
 	private bool _isCaptured;
 	private bool _isInActiveParty;
 	private bool _isDefeated;
+	private bool _isWorldMapActive = true;
 	private uint _defaultCollisionLayer;
 	private uint _defaultCollisionMask;
 	private PlayerController? _followTarget;
@@ -77,7 +78,8 @@ public partial class SimpleActor : CharacterBody3D
 	public bool IsCaptured => _isCaptured;
 	public bool IsInActiveParty => _isInActiveParty;
 	public bool IsDefeated => _isDefeated;
-	public bool IsHostileToPlayer => !_isCaptured && !_isDefeated && ActorKind == "monster";
+	public bool IsActiveWorldTarget => !_isCaptured && !_isDefeated && _isWorldMapActive && IsVisibleInTree();
+	public bool IsHostileToPlayer => ActorKind == "monster" && IsActiveWorldTarget;
 	public CompanionBuildLoadout BuildLoadout
 	{
 		get
@@ -129,14 +131,24 @@ public partial class SimpleActor : CharacterBody3D
 	public string LocalizedSpecialAbility => LocaleText.T(SpecialAbility);
 	public string LocalizedPersonality => LocaleText.T(Personality);
 	public string LocalizedPassiveAbility => LocaleText.T(PassiveAbility);
-	public string IdentityName => LocaleText.T(CurrentBuildStats.IdentityNameKey);
-	public string IdentityPassives => BuildCatalog.LocalizedList(CurrentBuildStats.PassiveKeys);
-	public string IdentityUniqueSkills => BuildCatalog.LocalizedList(CurrentBuildStats.UniqueSkillKeys);
+	public string TraitSummary => BuildCatalog.LocalizedList(GetTraitKeys());
 	public string BuildEquipmentSummary => BuildCatalog.LocalizedEquipmentSet(BuildLoadout);
 	public string BuildSkillSummary => BuildCatalog.LocalizedSkillGems(BuildLoadout);
 	public string BuildAttributeGemName => LocaleText.T(BuildCatalog.GetAttributeGem(BuildLoadout.AttributeGemId).NameKey);
 	public string AttackModeName => LocaleText.T(BuildCatalog.GetAttackMode(AttackModeId).NameKey);
 	public string BuildRareComboName => BuildCatalog.LocalizedRareCombo(CurrentBuildStats);
+
+	private string[] GetTraitKeys()
+	{
+		var keys = new System.Collections.Generic.List<string>();
+		if (!string.IsNullOrWhiteSpace(PassiveAbility) && PassiveAbility != "ability.none")
+		{
+			keys.Add(PassiveAbility);
+		}
+
+		keys.AddRange(CurrentBuildStats.TraitKeys);
+		return keys.ToArray();
+	}
 	public string BuildElementName => LocaleText.T(CurrentBuildStats.DamageElementNameKey);
 	public bool IsRangedCombatant => CombatRole == "Ranged" || CombatRole == "Support" || EffectiveAttackRange > 3.0f;
 	public string CombatRangeName => LocaleText.T(IsRangedCombatant ? "combat.range.ranged" : "combat.range.melee");
@@ -293,6 +305,7 @@ public partial class SimpleActor : CharacterBody3D
 			return;
 		}
 
+		_isWorldMapActive = active;
 		Visible = active;
 		SetPhysicsProcess(active && !_isDefeated);
 		if (active && !_isDefeated)
@@ -304,6 +317,9 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			CollisionLayer = 0;
 			CollisionMask = 0;
+			_combatTarget = null;
+			_retaliationTarget = null;
+			_retaliationTargetRemaining = 0.0f;
 		}
 	}
 
@@ -1219,7 +1235,7 @@ public partial class SimpleActor : CharacterBody3D
 
 	private bool IsValidCommandTarget(SimpleActor? actor)
 	{
-		return actor != null && IsInstanceValid(actor) && !actor.IsDefeated && !actor.IsCaptured && actor != this;
+		return actor != null && IsInstanceValid(actor) && actor.IsActiveWorldTarget && actor != this;
 	}
 
 	private void AttackActor(SimpleActor target)
@@ -1289,7 +1305,7 @@ public partial class SimpleActor : CharacterBody3D
 
 	private void RememberAttacker(SimpleActor? attacker)
 	{
-		if (ActorKind != "monster" || attacker == null || !IsInstanceValid(attacker) || attacker == this || attacker.IsDefeated)
+		if (ActorKind != "monster" || !IsActiveWorldTarget || !IsValidRetaliationTarget(attacker))
 		{
 			return;
 		}
@@ -1302,21 +1318,32 @@ public partial class SimpleActor : CharacterBody3D
 	private bool TryGetRetaliationTarget(out SimpleActor target)
 	{
 		target = null!;
-		if (_retaliationTargetRemaining <= 0.0f || _retaliationTarget == null || !IsInstanceValid(_retaliationTarget) || _retaliationTarget.IsDefeated)
+		SimpleActor? retaliationTarget = _retaliationTarget;
+		if (_retaliationTargetRemaining <= 0.0f || !IsValidRetaliationTarget(retaliationTarget))
 		{
 			_retaliationTarget = null;
 			return false;
 		}
 
-		if (GlobalPosition.DistanceTo(_retaliationTarget.GlobalPosition) > ChaseRadius * 1.65f)
+		if (GlobalPosition.DistanceTo(retaliationTarget!.GlobalPosition) > ChaseRadius * 1.65f)
 		{
 			_retaliationTarget = null;
 			_retaliationTargetRemaining = 0.0f;
 			return false;
 		}
 
-		target = _retaliationTarget;
+		target = retaliationTarget;
 		return true;
+	}
+
+	private bool IsValidRetaliationTarget(SimpleActor? actor)
+	{
+		if (actor == null || !IsInstanceValid(actor) || actor == this || actor.IsDefeated || !actor.IsVisibleInTree())
+		{
+			return false;
+		}
+
+		return actor.IsInActiveParty || actor.IsActiveWorldTarget;
 	}
 
 	private void Defeat(SimpleActor? attacker)
