@@ -13,7 +13,6 @@ public partial class InventoryPanel : PanelContainer
 		SkillGem1,
 		SkillGem2,
 		SkillGem3,
-		AiGem,
 	}
 
 	private PlayerController? _player;
@@ -33,7 +32,6 @@ public partial class InventoryPanel : PanelContainer
 	private Button _skill1Button = null!;
 	private Button _skill2Button = null!;
 	private Button _skill3Button = null!;
-	private Button _aiButton = null!;
 	private PanelContainer _tooltipPanel = null!;
 	private Label _tooltipTitleLabel = null!;
 	private Label _tooltipBodyLabel = null!;
@@ -182,7 +180,6 @@ public partial class InventoryPanel : PanelContainer
 		_armorButton = AddSlotButton(slotGrid, EquipTarget.Armor);
 		_accessoryButton = AddSlotButton(slotGrid, EquipTarget.Accessory);
 		_attributeButton = AddSlotButton(slotGrid, EquipTarget.AttributeGem);
-		_aiButton = AddSlotButton(slotGrid, EquipTarget.AiGem);
 		_skill1Button = AddSlotButton(slotGrid, EquipTarget.SkillGem1);
 		_skill2Button = AddSlotButton(slotGrid, EquipTarget.SkillGem2);
 		_skill3Button = AddSlotButton(slotGrid, EquipTarget.SkillGem3);
@@ -203,7 +200,7 @@ public partial class InventoryPanel : PanelContainer
 		{
 			Visible = false,
 			MouseFilter = MouseFilterEnum.Ignore,
-			CustomMinimumSize = new Vector2(280.0f, 0.0f),
+			CustomMinimumSize = new Vector2(360.0f, 0.0f),
 			TopLevel = true,
 			ZIndex = 100,
 		};
@@ -217,21 +214,21 @@ public partial class InventoryPanel : PanelContainer
 		_tooltipPanel.AddThemeStyleboxOverride("panel", style);
 
 		var margin = new MarginContainer();
-		margin.AddThemeConstantOverride("margin_left", 12);
-		margin.AddThemeConstantOverride("margin_right", 12);
-		margin.AddThemeConstantOverride("margin_top", 10);
-		margin.AddThemeConstantOverride("margin_bottom", 10);
+		margin.AddThemeConstantOverride("margin_left", 10);
+		margin.AddThemeConstantOverride("margin_right", 10);
+		margin.AddThemeConstantOverride("margin_top", 8);
+		margin.AddThemeConstantOverride("margin_bottom", 8);
 		_tooltipPanel.AddChild(margin);
 
 		var rows = new VBoxContainer();
-		rows.AddThemeConstantOverride("separation", 6);
+		rows.AddThemeConstantOverride("separation", 4);
 		margin.AddChild(rows);
 
-		_tooltipTitleLabel = MakeLabel(17, new Color(1.0f, 0.91f, 0.55f));
+		_tooltipTitleLabel = MakeLabel(16, new Color(1.0f, 0.91f, 0.55f));
 		_tooltipTitleLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
 		rows.AddChild(_tooltipTitleLabel);
 
-		_tooltipBodyLabel = MakeLabel(13, new Color(0.86f, 0.91f, 0.96f));
+		_tooltipBodyLabel = MakeLabel(12, new Color(0.86f, 0.91f, 0.96f));
 		_tooltipBodyLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
 		rows.AddChild(_tooltipBodyLabel);
 
@@ -376,7 +373,6 @@ public partial class InventoryPanel : PanelContainer
 		SetSlotButton(_armorButton, EquipTarget.Armor, BuildCatalog.GetEquipment(loadout.ArmorId).NameKey);
 		SetSlotButton(_accessoryButton, EquipTarget.Accessory, BuildCatalog.GetEquipment(loadout.AccessoryId).NameKey);
 		SetSlotButton(_attributeButton, EquipTarget.AttributeGem, BuildCatalog.GetAttributeGem(loadout.AttributeGemId).NameKey);
-		SetSlotButton(_aiButton, EquipTarget.AiGem, BuildCatalog.GetAiGem(loadout.AiGemId).NameKey);
 		SetSlotButton(_skill1Button, EquipTarget.SkillGem1, BuildCatalog.GetSkillGem(loadout.SkillGemIds[0]).NameKey);
 		SetSlotButton(_skill2Button, EquipTarget.SkillGem2, BuildCatalog.GetSkillGem(loadout.SkillGemIds[1]).NameKey);
 		SetSlotButton(_skill3Button, EquipTarget.SkillGem3, BuildCatalog.GetSkillGem(loadout.SkillGemIds[2]).NameKey);
@@ -390,7 +386,7 @@ public partial class InventoryPanel : PanelContainer
 
 	private void SetSlotsDisabled(bool disabled)
 	{
-		foreach (Button button in new[] { _helmetButton, _weaponButton, _armorButton, _accessoryButton, _attributeButton, _skill1Button, _skill2Button, _skill3Button, _aiButton })
+		foreach (Button button in new[] { _helmetButton, _weaponButton, _armorButton, _accessoryButton, _attributeButton, _skill1Button, _skill2Button, _skill3Button })
 		{
 			button.Disabled = disabled;
 			if (disabled)
@@ -463,12 +459,6 @@ public partial class InventoryPanel : PanelContainer
 					ids.Add(item.Id);
 				}
 				break;
-			case EquipTarget.AiGem:
-				foreach (AiGemDefinition item in BuildCatalog.GetAiGemDefinitions())
-				{
-					ids.Add(item.Id);
-				}
-				break;
 			default:
 				foreach (SkillGemDefinition item in BuildCatalog.GetSkillGemDefinitions())
 				{
@@ -495,7 +485,9 @@ public partial class InventoryPanel : PanelContainer
 
 	private static string GetInventoryItemName(string itemId)
 	{
-		return itemId == "monster_trophy" ? LocaleText.T("item.monster_trophy") : LocaleText.T(BuildCatalog.GetItemNameKey(itemId));
+		return MonsterLootCatalog.IsMonsterLoot(itemId)
+			? LocaleText.T(MonsterLootCatalog.GetNameKey(itemId))
+			: LocaleText.T(BuildCatalog.GetItemNameKey(itemId));
 	}
 
 	private void EquipItem(string itemId)
@@ -521,9 +513,6 @@ public partial class InventoryPanel : PanelContainer
 				break;
 			case EquipTarget.AttributeGem:
 				_selectedActor.EquipAttributeGem(itemId);
-				break;
-			case EquipTarget.AiGem:
-				_selectedActor.EquipAiGem(itemId);
 				break;
 			case EquipTarget.SkillGem1:
 				_selectedActor.EquipSkillGem(0, itemId);
@@ -586,7 +575,6 @@ public partial class InventoryPanel : PanelContainer
 			EquipTarget.Armor => loadout.ArmorId,
 			EquipTarget.Accessory => loadout.AccessoryId,
 			EquipTarget.AttributeGem => loadout.AttributeGemId,
-			EquipTarget.AiGem => loadout.AiGemId,
 			EquipTarget.SkillGem1 => loadout.SkillGemIds[0],
 			EquipTarget.SkillGem2 => loadout.SkillGemIds[1],
 			EquipTarget.SkillGem3 => loadout.SkillGemIds[2],
@@ -596,7 +584,7 @@ public partial class InventoryPanel : PanelContainer
 
 	private void ShowItemTooltip(string itemId, string slotName)
 	{
-		if (string.IsNullOrEmpty(itemId) || itemId == "monster_trophy")
+		if (string.IsNullOrEmpty(itemId) || MonsterLootCatalog.IsMonsterLoot(itemId))
 		{
 			HideItemTooltip();
 			return;
@@ -644,8 +632,7 @@ public partial class InventoryPanel : PanelContainer
 	{
 		var lines = new List<string>
 		{
-			LocaleText.F("tooltip.slot", slotName),
-			LocaleText.F("tooltip.type", LocaleText.T(GetItemKindKey(itemId))),
+			LocaleText.F("tooltip.meta_line", slotName, LocaleText.T(GetItemKindKey(itemId))),
 		};
 
 		switch (BuildCatalog.GetItemKind(itemId))
@@ -659,12 +646,30 @@ public partial class InventoryPanel : PanelContainer
 			case InventoryItemKind.SkillGem:
 				AppendSkillGemTooltip(lines, BuildCatalog.GetSkillGem(itemId));
 				break;
-			case InventoryItemKind.AiGem:
-				AppendAiGemTooltip(lines, BuildCatalog.GetAiGem(itemId));
-				break;
 		}
 
-		return string.Join("\n", lines);
+		return FormatTooltipLines(lines);
+	}
+
+	private static string FormatTooltipLines(List<string> lines)
+	{
+		if (lines.Count <= 3)
+		{
+			return string.Join("\n", lines);
+		}
+
+		var compactLines = new List<string>
+		{
+			lines[0],
+			lines[1],
+		};
+		for (int index = 2; index < lines.Count; index += 3)
+		{
+			int count = Mathf.Min(3, lines.Count - index);
+			compactLines.Add(string.Join("  /  ", lines.GetRange(index, count)));
+		}
+
+		return string.Join("\n", compactLines);
 	}
 
 	private static string GetItemKindKey(string itemId)
@@ -674,7 +679,7 @@ public partial class InventoryPanel : PanelContainer
 			InventoryItemKind.Equipment => "tooltip.type.equipment",
 			InventoryItemKind.AttributeGem => "tooltip.type.attribute",
 			InventoryItemKind.SkillGem => "tooltip.type.skill",
-			_ => "tooltip.type.ai",
+			_ => "tooltip.type.skill",
 		};
 	}
 
@@ -720,17 +725,6 @@ public partial class InventoryPanel : PanelContainer
 		AddPercentLine(lines, "tooltip.life_steal", item.LifeStealPercent);
 		AddFlagLine(lines, "tooltip.enable_heal", item.EnablesHeal);
 		AddFlagLine(lines, "tooltip.enable_shield", item.EnablesShield);
-	}
-
-	private static void AppendAiGemTooltip(List<string> lines, AiGemDefinition item)
-	{
-		AddSummaryLine(lines, item.SummaryKey);
-		AddStatLine(lines, "stat.defense", item.DefenseBonus);
-		AddPercentLine(lines, "tooltip.move_speed", item.MoveSpeedBonus);
-		AddPercentLine(lines, "tooltip.attack_cooldown", item.AttackCooldownReduction);
-		AddDecimalLine(lines, "tooltip.attack_range", item.AttackRangeBonus);
-		AddDecimalLine(lines, "tooltip.detection_radius", item.DetectionRadiusBonus);
-		AddPercentLine(lines, "tooltip.follow_distance", item.FollowDistanceMultiplier - 1.0f);
 	}
 
 	private static void AddSummaryLine(List<string> lines, string summaryKey)
@@ -795,7 +789,7 @@ public partial class InventoryPanel : PanelContainer
 			EquipTarget.SkillGem1 => LocaleText.T("build.slot.skill1"),
 			EquipTarget.SkillGem2 => LocaleText.T("build.slot.skill2"),
 			EquipTarget.SkillGem3 => LocaleText.T("build.slot.skill3"),
-			_ => LocaleText.T("build.slot.ai"),
+			_ => LocaleText.T("build.slot.skill1"),
 		};
 	}
 

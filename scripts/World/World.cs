@@ -84,12 +84,14 @@ public partial class World : Node3D
 	[Export] public float MapSize { get; set; } = 150.0f;
 	[Export] public int PropCount { get; set; } = 110;
 	[Export] public int ActorCount { get; set; } = 36;
-	[Export] public int CityNpcCount { get; set; } = 9;
+	[Export] public int CityNpcCount { get; set; } = 28;
 	[Export] public int SeedValue { get; set; }
 
 	private readonly RandomNumberGenerator _rng = new();
 	private readonly List<Vector3> _obstaclePositions = new();
 	private readonly List<Vector3> _wildObstaclePositions = new();
+	private readonly Dictionary<string, Node3D> _wildMapRootsById = new();
+	private readonly Dictionary<string, List<Vector3>> _wildObstaclePositionsById = new();
 	private readonly Vector3 _spawnCampCenter = new(0.0f, 0.0f, 8.0f);
 	private readonly Vector3 _mainCityCenter = new(0.0f, 0.0f, -20.0f);
 	private readonly Vector3 _citySpawnPosition = new(0.0f, 0.0f, -6.0f);
@@ -104,13 +106,27 @@ public partial class World : Node3D
 	private string _activeMapId = "city";
 	private PlayerController _player = null!;
 
+	private static readonly WildMapDefinition[] WildMaps =
+	{
+		new("wild_forest", "map.wild.forest", "WildForestMap", new Color(0.24f, 0.46f, 0.29f)),
+		new("wild_marsh", "map.wild.marsh", "WildMarshMap", new Color(0.18f, 0.38f, 0.34f)),
+		new("wild_badlands", "map.wild.badlands", "WildBadlandsMap", new Color(0.42f, 0.30f, 0.20f)),
+	};
+
+	private readonly record struct WildMapDefinition(string Id, string NameKey, string RootName, Color GroundColor);
+
 	private StandardMaterial3D _matGround = null!;
+	private StandardMaterial3D _matMeadow = null!;
+	private StandardMaterial3D _matField = null!;
 	private StandardMaterial3D _matPath = null!;
+	private StandardMaterial3D _matCobblestone = null!;
+	private StandardMaterial3D _matRoadEdge = null!;
 	private StandardMaterial3D _matWall = null!;
 	private StandardMaterial3D _matTrunk = null!;
 	private StandardMaterial3D _matLeaf = null!;
 	private StandardMaterial3D _matRock = null!;
 	private StandardMaterial3D _matWater = null!;
+	private StandardMaterial3D _matShallowWater = null!;
 	private StandardMaterial3D _matNpc = null!;
 	private StandardMaterial3D _matMonster = null!;
 	private StandardMaterial3D _matActorDark = null!;
@@ -161,13 +177,18 @@ public partial class World : Node3D
 
 	private void CreateMaterials()
 	{
-		_matGround = MakeMaterial(new Color(0.24f, 0.48f, 0.30f));
-		_matPath = MakeMaterial(new Color(0.44f, 0.36f, 0.25f));
+		_matGround = MakeMaterial(new Color(0.24f, 0.46f, 0.29f));
+		_matMeadow = MakeMaterial(new Color(0.31f, 0.56f, 0.26f));
+		_matField = MakeMaterial(new Color(0.50f, 0.43f, 0.24f));
+		_matPath = MakeMaterial(new Color(0.47f, 0.36f, 0.22f));
+		_matCobblestone = MakeMaterial(new Color(0.48f, 0.46f, 0.40f));
+		_matRoadEdge = MakeMaterial(new Color(0.24f, 0.22f, 0.18f));
 		_matWall = MakeMaterial(new Color(0.36f, 0.38f, 0.40f));
 		_matTrunk = MakeMaterial(new Color(0.33f, 0.21f, 0.12f));
 		_matLeaf = MakeMaterial(new Color(0.12f, 0.44f, 0.22f));
 		_matRock = MakeMaterial(new Color(0.43f, 0.44f, 0.43f));
-		_matWater = MakeMaterial(new Color(0.16f, 0.43f, 0.70f, 0.72f), 0.08f);
+		_matWater = MakeMaterial(new Color(0.13f, 0.38f, 0.66f, 0.72f), 0.08f);
+		_matShallowWater = MakeMaterial(new Color(0.34f, 0.62f, 0.78f, 0.52f), 0.06f);
 		_matNpc = MakeMaterial(new Color(0.18f, 0.68f, 0.92f));
 		_matMonster = MakeMaterial(new Color(0.84f, 0.16f, 0.13f));
 		_matActorDark = MakeMaterial(new Color(0.08f, 0.08f, 0.09f));
@@ -230,33 +251,45 @@ public partial class World : Node3D
 		_actorsRoot = new Node3D { Name = "Actors" };
 		AddChild(_actorsRoot);
 
-		BuildWildMapScene();
+		foreach (WildMapDefinition wildMap in WildMaps)
+		{
+			BuildWildMapScene(wildMap);
+		}
 		BuildCityMapScene();
 		SetMapVisibility("city");
 	}
 
-	private void BuildWildMapScene()
+	private void BuildWildMapScene(WildMapDefinition wildMap)
 	{
 		_obstaclePositions.Clear();
-		_wildMapRoot = new Node3D { Name = "WildMonsterMap" };
+		_wildMapRoot = new Node3D { Name = wildMap.RootName };
 		_mapsRoot.AddChild(_wildMapRoot);
+		_wildMapRootsById[wildMap.Id] = _wildMapRoot;
 		_mapRoot = _wildMapRoot;
 
 		_propsRoot = new Node3D { Name = "WildProps" };
 		_mapRoot.AddChild(_propsRoot);
 
-		CreateStaticBox(_mapRoot, "Ground", new Vector3(0.0f, -0.5f, 0.0f), new Vector3(MapSize, 1.0f, MapSize), _matGround);
+		CreateStaticBox(_mapRoot, "Ground", new Vector3(0.0f, -0.5f, 0.0f), new Vector3(MapSize, 1.0f, MapSize), MakeMaterial(wildMap.GroundColor));
 		CreateBoundaries();
+		CreateWildTerrainDressing();
 		CreateLandmarks();
 		CreateSpawnCamp();
 		CreateRuinSite();
 		CreateMonsterDen();
+		CreateWildMapThemeDressing(wildMap.Id);
 		CreateMapPortal("ReturnToCityPortal", _wildSpawnPosition + new Vector3(0.0f, 0.0f, 5.0f), "city", "portal.return_city");
 		ScatterProps();
 		ScatterDetailProps();
+		CreateWildScenicEdges();
 
-		_wildObstaclePositions.Clear();
-		_wildObstaclePositions.AddRange(_obstaclePositions);
+		var obstacleCopy = new List<Vector3>(_obstaclePositions);
+		_wildObstaclePositionsById[wildMap.Id] = obstacleCopy;
+		if (wildMap.Id == "wild_forest")
+		{
+			_wildObstaclePositions.Clear();
+			_wildObstaclePositions.AddRange(obstacleCopy);
+		}
 	}
 
 	private void BuildCityMapScene()
@@ -271,13 +304,184 @@ public partial class World : Node3D
 
 		CreateStaticBox(_mapRoot, "CityGround", new Vector3(0.0f, -0.5f, 0.0f), new Vector3(MapSize, 1.0f, MapSize), _matGround);
 		CreateBoundaries();
-		CreateMesh(_mapRoot, "CityMainRoad", BoxMeshFor(new Vector3(9.0f, 0.08f, 46.0f)), _mainCityCenter + new Vector3(0.0f, 0.05f, 8.0f), _matPath);
-		CreateMesh(_mapRoot, "CityOuterPlaza", CylinderMeshFor(10.0f, 10.0f, 0.10f), _citySpawnPosition + new Vector3(0.0f, 0.08f, 0.0f), _matPath);
+		CreateCityTerrainDressing();
+		CreateMesh(_mapRoot, "CityMainRoadEdge", BoxMeshFor(new Vector3(10.8f, 0.075f, 48.0f)), _mainCityCenter + new Vector3(0.0f, 0.048f, 8.0f), _matRoadEdge);
+		CreateMesh(_mapRoot, "CityMainRoad", BoxMeshFor(new Vector3(8.6f, 0.08f, 46.0f)), _mainCityCenter + new Vector3(0.0f, 0.055f, 8.0f), _matCobblestone);
+		CreateMesh(_mapRoot, "CityOuterPlazaEdge", CylinderMeshFor(11.4f, 11.4f, 0.09f), _citySpawnPosition + new Vector3(0.0f, 0.07f, 0.0f), _matRoadEdge);
+		CreateMesh(_mapRoot, "CityOuterPlaza", CylinderMeshFor(9.8f, 9.8f, 0.10f), _citySpawnPosition + new Vector3(0.0f, 0.085f, 0.0f), _matCobblestone);
 		CreateMainCity();
-		CreateMapPortal("WildMapGate", _mainCityCenter + new Vector3(0.0f, 0.0f, -13.2f), "wild", "portal.travel_wild");
+		CreateCityScenicEdges();
+		CreateMapPortal("WildMapGate", _mainCityCenter + new Vector3(0.0f, 0.0f, -28.0f), "wild_select", "portal.travel_wild");
 
 		_obstaclePositions.Clear();
 		_obstaclePositions.AddRange(_wildObstaclePositions);
+	}
+
+	private void CreateWildTerrainDressing()
+	{
+		CreateTerrainPatch("WildNorthMeadow", new Vector3(-28.0f, 0.0f, -46.0f), 17.0f, new Vector3(1.55f, 1.0f, 0.72f), -18.0f, _matMeadow, 0.035f);
+		CreateTerrainPatch("WildEastMeadow", new Vector3(42.0f, 0.0f, 7.0f), 20.0f, new Vector3(1.2f, 1.0f, 0.88f), 22.0f, _matMeadow, 0.034f);
+		CreateTerrainPatch("WildSouthField", new Vector3(25.0f, 0.0f, 50.0f), 16.0f, new Vector3(1.35f, 1.0f, 0.62f), -34.0f, _matField, 0.036f);
+		CreateTerrainPatch("WildWestField", new Vector3(-50.0f, 0.0f, 3.0f), 15.0f, new Vector3(1.0f, 1.0f, 0.68f), 12.0f, _matField, 0.036f);
+
+		CreateTerrainPatch("WildRiverBankA", new Vector3(-58.0f, 0.0f, -44.0f), 9.0f, new Vector3(1.85f, 1.0f, 0.42f), 34.0f, _matPondBank, 0.052f);
+		CreateTerrainPatch("WildRiverBankB", new Vector3(-43.0f, 0.0f, -33.0f), 9.0f, new Vector3(1.9f, 1.0f, 0.44f), 34.0f, _matPondBank, 0.052f);
+		CreateTerrainPatch("WildRiverBankC", new Vector3(-27.0f, 0.0f, -22.0f), 9.0f, new Vector3(1.8f, 1.0f, 0.43f), 34.0f, _matPondBank, 0.052f);
+		CreateTerrainPatch("WildRiverA", new Vector3(-58.0f, 0.0f, -44.0f), 7.0f, new Vector3(1.76f, 1.0f, 0.30f), 34.0f, _matShallowWater, 0.068f);
+		CreateTerrainPatch("WildRiverB", new Vector3(-43.0f, 0.0f, -33.0f), 7.0f, new Vector3(1.82f, 1.0f, 0.31f), 34.0f, _matWater, 0.07f);
+		CreateTerrainPatch("WildRiverC", new Vector3(-27.0f, 0.0f, -22.0f), 7.0f, new Vector3(1.72f, 1.0f, 0.30f), 34.0f, _matShallowWater, 0.068f);
+
+		CreateTerrainPatch("WildCampClearing", _spawnCampCenter + new Vector3(0.0f, 0.0f, 6.0f), 16.0f, new Vector3(1.18f, 1.0f, 0.82f), 0.0f, _matPath, 0.042f);
+		CreateTerrainPatch("WildRuinOvergrowth", new Vector3(-45.0f, 0.0f, -34.0f), 12.0f, new Vector3(1.0f, 1.0f, 0.72f), -8.0f, _matMeadow, 0.038f);
+		CreateTerrainPatch("WildDenAsh", new Vector3(43.0f, 0.0f, 37.0f), 13.0f, new Vector3(1.05f, 1.0f, 0.78f), 12.0f, _matNest, 0.039f);
+
+		for (int index = 0; index < 10; index++)
+		{
+			float x = -62.0f + index * 13.5f;
+			float z = index % 2 == 0 ? -62.0f : 62.0f;
+			CreateTerrainPatch($"WildTreeLinePatch{index}", new Vector3(x, 0.0f, z), 8.0f, new Vector3(1.4f, 1.0f, 0.5f), index * 17.0f, _matMeadow, 0.033f);
+		}
+	}
+
+	private void CreateWildMapThemeDressing(string mapId)
+	{
+		if (mapId == "wild_marsh")
+		{
+			CreateTerrainPatch("MarshMirrorWaterA", new Vector3(28.0f, 0.0f, -28.0f), 16.0f, new Vector3(1.25f, 1.0f, 0.62f), -18.0f, _matShallowWater, 0.062f);
+			CreateTerrainPatch("MarshMirrorWaterB", new Vector3(-22.0f, 0.0f, 44.0f), 13.0f, new Vector3(1.2f, 1.0f, 0.58f), 22.0f, _matShallowWater, 0.062f);
+			for (int index = 0; index < 18; index++)
+			{
+				Vector3 position = new((float)_rng.RandfRange(-62.0f, 62.0f), 0.0f, (float)_rng.RandfRange(-62.0f, 62.0f));
+				if (position.DistanceTo(Vector3.Zero) > 12.0f)
+				{
+					CreateMushroom(position);
+					CreateGrassPatch(position + new Vector3(0.6f, 0.0f, -0.4f));
+				}
+			}
+			return;
+		}
+
+		if (mapId == "wild_badlands")
+		{
+			CreateTerrainPatch("BadlandsAshFieldA", new Vector3(-30.0f, 0.0f, -28.0f), 18.0f, new Vector3(1.35f, 1.0f, 0.66f), 18.0f, _matNest, 0.04f);
+			CreateTerrainPatch("BadlandsAshFieldB", new Vector3(38.0f, 0.0f, 32.0f), 16.0f, new Vector3(1.25f, 1.0f, 0.62f), -28.0f, _matNest, 0.04f);
+			for (int index = 0; index < 16; index++)
+			{
+				Vector3 position = new((float)_rng.RandfRange(-64.0f, 64.0f), 0.0f, (float)_rng.RandfRange(-64.0f, 64.0f));
+				if (position.DistanceTo(Vector3.Zero) > 14.0f && IsPositionClear(position, 3.0f))
+				{
+					CreateRock(position);
+					_obstaclePositions.Add(position);
+				}
+			}
+			return;
+		}
+	}
+
+	private void CreateCityTerrainDressing()
+	{
+		CreateTerrainPatch("CityDistrictGreenNorth", _mainCityCenter + new Vector3(0.0f, 0.0f, -8.0f), 34.0f, new Vector3(1.55f, 1.0f, 0.95f), 0.0f, _matMeadow, 0.033f);
+		CreateTerrainPatch("CityDistrictGreenSouth", _mainCityCenter + new Vector3(0.0f, 0.0f, 22.0f), 29.0f, new Vector3(0.95f, 1.0f, 1.34f), 0.0f, _matMeadow, 0.034f);
+		CreateTerrainPatch("CityWestField", _mainCityCenter + new Vector3(-43.0f, 0.0f, 18.0f), 16.0f, new Vector3(1.2f, 1.0f, 0.64f), 18.0f, _matField, 0.036f);
+		CreateTerrainPatch("CityEastField", _mainCityCenter + new Vector3(43.0f, 0.0f, 14.0f), 16.0f, new Vector3(1.14f, 1.0f, 0.66f), -18.0f, _matField, 0.036f);
+		CreateTerrainPatch("CityWaterBank", _mainCityCenter + new Vector3(-31.0f, 0.0f, 10.0f), 13.0f, new Vector3(1.35f, 1.0f, 0.65f), 20.0f, _matPondBank, 0.043f);
+		CreateTerrainPatch("CityMillPond", _mainCityCenter + new Vector3(-31.0f, 0.0f, 10.0f), 10.0f, new Vector3(1.25f, 1.0f, 0.52f), 20.0f, _matWater, 0.06f);
+
+		CreateTerrainPatch("CityWestPocketPlazaEdge", _mainCityCenter + new Vector3(-19.0f, 0.0f, -2.0f), 9.4f, new Vector3(1.2f, 1.0f, 0.68f), 12.0f, _matRoadEdge, 0.056f);
+		CreateTerrainPatch("CityWestPocketPlaza", _mainCityCenter + new Vector3(-19.0f, 0.0f, -2.0f), 8.0f, new Vector3(1.12f, 1.0f, 0.58f), 12.0f, _matCobblestone, 0.074f);
+		CreateTerrainPatch("CityEastPocketPlazaEdge", _mainCityCenter + new Vector3(19.0f, 0.0f, -2.0f), 9.4f, new Vector3(1.2f, 1.0f, 0.68f), -12.0f, _matRoadEdge, 0.056f);
+		CreateTerrainPatch("CityEastPocketPlaza", _mainCityCenter + new Vector3(19.0f, 0.0f, -2.0f), 8.0f, new Vector3(1.12f, 1.0f, 0.58f), -12.0f, _matCobblestone, 0.074f);
+	}
+
+	private void CreateWildScenicEdges()
+	{
+		Vector3[] riverRocks =
+		{
+			new(-63.0f, 0.0f, -39.0f),
+			new(-53.0f, 0.0f, -47.0f),
+			new(-45.0f, 0.0f, -27.0f),
+			new(-34.0f, 0.0f, -34.0f),
+			new(-23.0f, 0.0f, -17.0f),
+		};
+
+		foreach (Vector3 position in riverRocks)
+		{
+			if (IsPositionClear(position, 2.8f))
+			{
+				CreateRock(position);
+				_obstaclePositions.Add(position);
+			}
+		}
+
+		for (int index = 0; index < 12; index++)
+		{
+			float angle = index / 12.0f * Mathf.Tau;
+			Vector3 position = new(Mathf.Cos(angle) * 58.0f, 0.0f, Mathf.Sin(angle) * 58.0f);
+			if (IsPositionClear(position, 4.0f))
+			{
+				CreateTree(position);
+				_obstaclePositions.Add(position);
+			}
+		}
+
+		for (int index = 0; index < 18; index++)
+		{
+			Vector3 position = new(
+				(float)_rng.RandfRange(-58.0f, 58.0f),
+				0.0f,
+				(float)_rng.RandfRange(-58.0f, 58.0f)
+			);
+
+			if (Mathf.Abs(position.X) < 10.0f || Mathf.Abs(position.Z) < 10.0f)
+			{
+				continue;
+			}
+
+			if (_rng.Randf() < 0.6f)
+			{
+				CreateGrassPatch(position);
+			}
+			else
+			{
+				CreateFlowerPatch(position);
+			}
+		}
+	}
+
+	private void CreateCityScenicEdges()
+	{
+		Vector3 center = _mainCityCenter;
+		Vector3[] treePositions =
+		{
+			center + new Vector3(-36.0f, 0.0f, -12.0f),
+			center + new Vector3(-38.0f, 0.0f, 2.0f),
+			center + new Vector3(-34.0f, 0.0f, 23.0f),
+			center + new Vector3(36.0f, 0.0f, -12.0f),
+			center + new Vector3(38.0f, 0.0f, 2.0f),
+			center + new Vector3(34.0f, 0.0f, 23.0f),
+			center + new Vector3(-12.0f, 0.0f, 25.0f),
+			center + new Vector3(12.0f, 0.0f, 25.0f),
+		};
+
+		foreach (Vector3 position in treePositions)
+		{
+			CreateTree(position);
+			_obstaclePositions.Add(position);
+		}
+
+		for (int side = -1; side <= 1; side += 2)
+		{
+			for (int index = 0; index < 5; index++)
+			{
+				Vector3 flowerPosition = center + new Vector3(side * (26.0f + index * 2.3f), 0.0f, 12.0f + (index % 2) * 2.4f);
+				CreateFlowerPatch(flowerPosition);
+			}
+
+			CreateCrateStack(center + new Vector3(side * 28.5f, 0.0f, -7.4f), side * -12.0f);
+			CreateBanner(center + new Vector3(side * 27.5f, 0.0f, 2.5f), side * -18.0f, _matNpcAccent);
+			CreateExternalProp($"CityOuterFence{side}A", "res://assets/models/environment/fence.glb", center + new Vector3(side * 31.0f, 0.0f, 13.0f), new Vector3(0.0f, 90.0f, 0.0f), new Vector3(1.25f, 1.25f, 1.25f), new Vector3(0.45f, 1.0f, 2.8f), new Vector3(0.0f, 0.5f, 0.0f));
+			CreateExternalProp($"CityOuterFence{side}B", "res://assets/models/environment/fence.glb", center + new Vector3(side * 34.0f, 0.0f, 13.0f), new Vector3(0.0f, 90.0f, 0.0f), new Vector3(1.25f, 1.25f, 1.25f), new Vector3(0.45f, 1.0f, 2.8f), new Vector3(0.0f, 0.5f, 0.0f));
+		}
 	}
 
 	private void CreateBoundaries()
@@ -294,11 +498,15 @@ public partial class World : Node3D
 
 	private void CreateLandmarks()
 	{
-		CreateMesh(_mapRoot, "MainPathNS", BoxMeshFor(new Vector3(8.0f, 0.08f, MapSize - 12.0f)), new Vector3(0.0f, 0.04f, 0.0f), _matPath);
-		CreateMesh(_mapRoot, "MainPathEW", BoxMeshFor(new Vector3(MapSize - 12.0f, 0.08f, 8.0f)), new Vector3(0.0f, 0.05f, 0.0f), _matPath);
-		CreateMesh(_mapRoot, "SpawnPlaza", CylinderMeshFor(12.0f, 12.0f, 0.12f), new Vector3(0.0f, 0.09f, 0.0f), _matPath);
-		CreateMesh(_mapRoot, "PondBank", CylinderMeshFor(16.0f, 16.0f, 0.08f), new Vector3(-34.0f, 0.10f, 28.0f), _matPondBank);
-		CreateMesh(_mapRoot, "Pond", CylinderMeshFor(13.0f, 13.0f, 0.08f), new Vector3(-34.0f, 0.13f, 28.0f), _matWater);
+		CreateMesh(_mapRoot, "MainPathNSEdge", BoxMeshFor(new Vector3(10.4f, 0.07f, MapSize - 12.0f)), new Vector3(0.0f, 0.038f, 0.0f), _matRoadEdge);
+		CreateMesh(_mapRoot, "MainPathNS", BoxMeshFor(new Vector3(7.4f, 0.08f, MapSize - 15.0f)), new Vector3(0.0f, 0.05f, 0.0f), _matPath);
+		CreateMesh(_mapRoot, "MainPathEWEdge", BoxMeshFor(new Vector3(MapSize - 12.0f, 0.07f, 10.4f)), new Vector3(0.0f, 0.04f, 0.0f), _matRoadEdge);
+		CreateMesh(_mapRoot, "MainPathEW", BoxMeshFor(new Vector3(MapSize - 15.0f, 0.08f, 7.4f)), new Vector3(0.0f, 0.055f, 0.0f), _matPath);
+		CreateMesh(_mapRoot, "SpawnPlazaEdge", CylinderMeshFor(13.6f, 13.6f, 0.09f), new Vector3(0.0f, 0.075f, 0.0f), _matRoadEdge);
+		CreateMesh(_mapRoot, "SpawnPlaza", CylinderMeshFor(11.6f, 11.6f, 0.12f), new Vector3(0.0f, 0.095f, 0.0f), _matPath);
+		CreateMesh(_mapRoot, "PondBank", CylinderMeshFor(18.0f, 18.0f, 0.08f), new Vector3(-34.0f, 0.10f, 28.0f), _matPondBank);
+		CreateMesh(_mapRoot, "PondShallowRing", CylinderMeshFor(15.0f, 15.0f, 0.075f), new Vector3(-34.0f, 0.125f, 28.0f), _matShallowWater);
+		CreateMesh(_mapRoot, "Pond", CylinderMeshFor(11.7f, 11.7f, 0.08f), new Vector3(-34.0f, 0.145f, 28.0f), _matWater);
 		CreateStaticBox(_mapRoot, "WatchTowerBase", new Vector3(34.0f, 1.0f, -31.0f), new Vector3(7.0f, 2.0f, 7.0f), _matWall);
 
 		Vector3 towerPosition = new(34.0f, 0.0f, -31.0f);
@@ -329,36 +537,147 @@ public partial class World : Node3D
 	private void CreateMainCity()
 	{
 		Vector3 center = _mainCityCenter;
-		CreateMesh(_mapRoot, "MainCityPlaza", CylinderMeshFor(15.5f, 15.5f, 0.12f), center + new Vector3(0.0f, 0.11f, 0.0f), _matPath);
-		CreateStaticBox(_propsRoot, "CityNorthGate", center + new Vector3(0.0f, 1.85f, -10.2f), new Vector3(8.5f, 3.7f, 1.1f), _matWall);
-		CreateStaticBox(_propsRoot, "CityLeftHouse", center + new Vector3(-9.4f, 1.35f, -1.6f), new Vector3(5.0f, 2.7f, 5.6f), _matWood);
-		CreateStaticBox(_propsRoot, "CityRightHouse", center + new Vector3(9.4f, 1.35f, -1.6f), new Vector3(5.0f, 2.7f, 5.6f), _matWood);
-		AddMesh(_propsRoot, "CityLeftRoof", CylinderMeshFor(0.0f, 3.8f, 2.1f), center + new Vector3(-9.4f, 3.45f, -1.6f), Vector3.Zero, new Vector3(1.0f, 0.72f, 1.0f), _matTentCloth);
-		AddMesh(_propsRoot, "CityRightRoof", CylinderMeshFor(0.0f, 3.8f, 2.1f), center + new Vector3(9.4f, 3.45f, -1.6f), Vector3.Zero, new Vector3(1.0f, 0.72f, 1.0f), _matTentCloth);
-		CreateStaticBox(_propsRoot, "CityClinic", center + new Vector3(0.0f, 1.25f, 7.0f), new Vector3(6.4f, 2.5f, 4.6f), _matWall);
-		AddMesh(_propsRoot, "ClinicRoof", CylinderMeshFor(0.0f, 4.0f, 1.8f), center + new Vector3(0.0f, 3.15f, 7.0f), Vector3.Zero, new Vector3(1.0f, 0.68f, 0.78f), _matNpcAccent);
+		CreateMesh(_mapRoot, "MainCityPlazaEdge", CylinderMeshFor(25.0f, 25.0f, 0.10f), center + new Vector3(0.0f, 0.095f, 0.0f), _matRoadEdge);
+		CreateMesh(_mapRoot, "MainCityPlaza", CylinderMeshFor(22.8f, 22.8f, 0.12f), center + new Vector3(0.0f, 0.115f, 0.0f), _matCobblestone);
+		CreateMesh(_mapRoot, "CityEastRoadEdge", BoxMeshFor(new Vector3(58.0f, 0.075f, 7.0f)), center + new Vector3(27.0f, 0.072f, -1.4f), _matRoadEdge);
+		CreateMesh(_mapRoot, "CityEastRoad", BoxMeshFor(new Vector3(56.0f, 0.08f, 5.0f)), center + new Vector3(27.0f, 0.09f, -1.4f), _matCobblestone);
+		CreateMesh(_mapRoot, "CityWestRoadEdge", BoxMeshFor(new Vector3(58.0f, 0.075f, 7.0f)), center + new Vector3(-27.0f, 0.072f, -1.4f), _matRoadEdge);
+		CreateMesh(_mapRoot, "CityWestRoad", BoxMeshFor(new Vector3(56.0f, 0.08f, 5.0f)), center + new Vector3(-27.0f, 0.09f, -1.4f), _matCobblestone);
+		CreateMesh(_mapRoot, "CitySouthRoadEdge", BoxMeshFor(new Vector3(9.4f, 0.075f, 36.0f)), center + new Vector3(0.0f, 0.07f, 23.0f), _matRoadEdge);
+		CreateMesh(_mapRoot, "CitySouthRoad", BoxMeshFor(new Vector3(7.2f, 0.08f, 34.0f)), center + new Vector3(0.0f, 0.09f, 23.0f), _matCobblestone);
+		CreateMesh(_mapRoot, "CityPortalRoadEdge", BoxMeshFor(new Vector3(8.6f, 0.075f, 22.0f)), center + new Vector3(0.0f, 0.072f, -19.0f), _matRoadEdge);
+		CreateMesh(_mapRoot, "CityPortalRoad", BoxMeshFor(new Vector3(6.2f, 0.08f, 21.0f)), center + new Vector3(0.0f, 0.09f, -19.0f), _matCobblestone);
+		CreateMesh(_mapRoot, "CityPortalPlazaEdge", CylinderMeshFor(9.4f, 9.4f, 0.09f), center + new Vector3(0.0f, 0.08f, -28.0f), _matRoadEdge);
+		CreateMesh(_mapRoot, "CityPortalPlaza", CylinderMeshFor(7.8f, 7.8f, 0.10f), center + new Vector3(0.0f, 0.105f, -28.0f), _matCobblestone);
+		CreateBanner(center + new Vector3(-5.2f, 0.0f, -27.6f), 8.0f, _matCrystal);
+		CreateBanner(center + new Vector3(5.2f, 0.0f, -27.6f), -8.0f, _matCrystal);
+		CreateTorch(center + new Vector3(-7.1f, 0.0f, -24.4f));
+		CreateTorch(center + new Vector3(7.1f, 0.0f, -24.4f));
+
+		CreateCityHouse("CityLeftGuildHouse", center + new Vector3(-11.0f, 0.0f, -1.8f), 8.0f, new Vector3(6.0f, 3.1f, 6.2f), _matWood, _matTentCloth, true);
+		CreateCityHouse("CityRightMerchantHouse", center + new Vector3(11.0f, 0.0f, -1.8f), -8.0f, new Vector3(6.0f, 3.0f, 6.2f), _matWall, _matNpcAccent, true);
+		CreateCityHouse("CityWestResidenceA", center + new Vector3(-20.5f, 0.0f, -5.5f), 18.0f, new Vector3(5.2f, 2.7f, 5.2f), _matWood, _matTentCloth, false);
+		CreateCityHouse("CityWestResidenceB", center + new Vector3(-22.5f, 0.0f, 5.8f), -18.0f, new Vector3(5.4f, 2.9f, 5.4f), _matWall, _matNpcAccent, false);
+		CreateCityHouse("CityEastResidenceA", center + new Vector3(20.5f, 0.0f, -5.5f), -18.0f, new Vector3(5.2f, 2.7f, 5.2f), _matWood, _matTentCloth, false);
+		CreateCityHouse("CityEastResidenceB", center + new Vector3(22.5f, 0.0f, 5.8f), 18.0f, new Vector3(5.4f, 2.9f, 5.4f), _matWall, _matNpcAccent, false);
+		CreateCityOuterDistricts(center);
+
+		CreateStaticBox(_propsRoot, "CityClinic", center + new Vector3(0.0f, 1.35f, 8.5f), new Vector3(7.4f, 2.7f, 5.2f), _matWall);
+		AddMesh(_propsRoot, "ClinicRoof", CylinderMeshFor(0.0f, 4.55f, 1.95f), center + new Vector3(0.0f, 3.38f, 8.5f), Vector3.Zero, new Vector3(1.0f, 0.68f, 0.78f), _matNpcAccent);
 		AddMesh(_propsRoot, "ClinicCrossVertical", BoxMeshFor(new Vector3(0.18f, 0.72f, 0.06f)), center + new Vector3(0.0f, 2.0f, 4.66f), Vector3.Zero, Vector3.One, _matCrystal);
 		AddMesh(_propsRoot, "ClinicCrossHorizontal", BoxMeshFor(new Vector3(0.58f, 0.18f, 0.065f)), center + new Vector3(0.0f, 2.0f, 4.62f), Vector3.Zero, Vector3.One, _matCrystal);
 		CreateRevivalNpc(center + new Vector3(0.0f, 0.0f, 2.7f));
+
 		CreateBanner(center + new Vector3(-5.2f, 0.0f, 2.6f), 18.0f, _matCrystal);
 		CreateBanner(center + new Vector3(5.2f, 0.0f, 2.6f), -18.0f, _matCrystal);
 		CreateTorch(center + new Vector3(-6.9f, 0.0f, 6.0f));
 		CreateTorch(center + new Vector3(6.9f, 0.0f, 6.0f));
-		CreateExternalProp("CityFountain", "res://assets/models/environment/fountain.glb", center + new Vector3(0.0f, 0.0f, -4.0f), Vector3.Zero, new Vector3(1.45f, 1.45f, 1.45f), new Vector3(2.4f, 1.0f, 2.4f), new Vector3(0.0f, 0.5f, 0.0f));
-		CreateExternalProp("CityMarketStallLeft", "res://assets/models/environment/stall.glb", center + new Vector3(-6.3f, 0.0f, -6.2f), new Vector3(0.0f, 32.0f, 0.0f), new Vector3(1.15f, 1.15f, 1.15f), new Vector3(2.4f, 1.7f, 1.8f), new Vector3(0.0f, 0.85f, 0.0f));
-		CreateExternalProp("CityMarketStallRight", "res://assets/models/environment/stall.glb", center + new Vector3(6.3f, 0.0f, -6.2f), new Vector3(0.0f, -32.0f, 0.0f), new Vector3(1.15f, 1.15f, 1.15f), new Vector3(2.4f, 1.7f, 1.8f), new Vector3(0.0f, 0.85f, 0.0f));
+		CreateExternalProp("CityFountain", "res://assets/models/environment/fountain-round-detail.glb", center + new Vector3(0.0f, 0.0f, -4.0f), Vector3.Zero, new Vector3(1.55f, 1.55f, 1.55f), new Vector3(2.6f, 1.0f, 2.6f), new Vector3(0.0f, 0.5f, 0.0f));
+		CreateCityMarket(center);
+		CreateCityGardens(center);
+
 		CreateExternalProp("CityLanternLeft", "res://assets/models/environment/lantern.glb", center + new Vector3(-3.4f, 0.0f, -7.5f), Vector3.Zero, new Vector3(1.35f, 1.35f, 1.35f), new Vector3(0.6f, 2.2f, 0.6f), new Vector3(0.0f, 1.1f, 0.0f));
 		CreateExternalProp("CityLanternRight", "res://assets/models/environment/lantern.glb", center + new Vector3(3.4f, 0.0f, -7.5f), Vector3.Zero, new Vector3(1.35f, 1.35f, 1.35f), new Vector3(0.6f, 2.2f, 0.6f), new Vector3(0.0f, 1.1f, 0.0f));
+		CreateExternalProp("CityLanternWest", "res://assets/models/environment/lantern.glb", center + new Vector3(-15.5f, 0.0f, 0.6f), Vector3.Zero, new Vector3(1.2f, 1.2f, 1.2f), new Vector3(0.6f, 2.2f, 0.6f), new Vector3(0.0f, 1.1f, 0.0f));
+		CreateExternalProp("CityLanternEast", "res://assets/models/environment/lantern.glb", center + new Vector3(15.5f, 0.0f, 0.6f), Vector3.Zero, new Vector3(1.2f, 1.2f, 1.2f), new Vector3(0.6f, 2.2f, 0.6f), new Vector3(0.0f, 1.1f, 0.0f));
 		CreateExternalProp("CityTreeLeft", "res://assets/models/environment/tree_01.glb", center + new Vector3(-12.0f, 0.0f, 5.2f), Vector3.Zero, new Vector3(1.55f, 1.55f, 1.55f), new Vector3(1.3f, 3.2f, 1.3f), new Vector3(0.0f, 1.6f, 0.0f));
 		CreateExternalProp("CityTreeRight", "res://assets/models/environment/oak_tree.glb", center + new Vector3(12.0f, 0.0f, 5.2f), Vector3.Zero, new Vector3(1.45f, 1.45f, 1.45f), new Vector3(1.3f, 3.0f, 1.3f), new Vector3(0.0f, 1.5f, 0.0f));
+		CreateExternalProp("CityWindmill", "res://assets/models/environment/windmill.glb", center + new Vector3(31.0f, 0.0f, -4.0f), new Vector3(0.0f, -18.0f, 0.0f), new Vector3(1.9f, 1.9f, 1.9f), new Vector3(4.6f, 7.2f, 4.6f), new Vector3(0.0f, 3.6f, 0.0f));
+		CreateExternalProp("CityWatermill", "res://assets/models/environment/watermill.glb", center + new Vector3(-31.0f, 0.0f, 8.8f), new Vector3(0.0f, 18.0f, 0.0f), new Vector3(1.75f, 1.75f, 1.75f), new Vector3(5.4f, 4.0f, 5.4f), new Vector3(0.0f, 2.0f, 0.0f));
 
 		_obstaclePositions.Add(center);
-		_obstaclePositions.Add(center + new Vector3(-9.4f, 0.0f, -1.6f));
-		_obstaclePositions.Add(center + new Vector3(9.4f, 0.0f, -1.6f));
-		_obstaclePositions.Add(center + new Vector3(0.0f, 0.0f, 7.0f));
 		_obstaclePositions.Add(center + new Vector3(0.0f, 0.0f, -4.0f));
-		_obstaclePositions.Add(center + new Vector3(-6.3f, 0.0f, -6.2f));
-		_obstaclePositions.Add(center + new Vector3(6.3f, 0.0f, -6.2f));
+	}
+
+	private void CreateCityHouse(string name, Vector3 position, float yawDegrees, Vector3 size, Material wallMaterial, Material roofMaterial, bool twoStorey)
+	{
+		var house = new StaticBody3D
+		{
+			Name = name,
+			Position = position,
+			RotationDegrees = new Vector3(0.0f, yawDegrees, 0.0f),
+		};
+		_propsRoot.AddChild(house);
+
+		AddMesh(house, "Body", BoxMeshFor(size), new Vector3(0.0f, size.Y * 0.5f, 0.0f), Vector3.Zero, Vector3.One, wallMaterial);
+		if (twoStorey)
+		{
+			AddMesh(house, "UpperFloor", BoxMeshFor(new Vector3(size.X * 0.82f, 1.7f, size.Z * 0.82f)), new Vector3(0.0f, size.Y + 0.82f, 0.0f), Vector3.Zero, Vector3.One, wallMaterial);
+		}
+
+		float roofY = twoStorey ? size.Y + 2.05f : size.Y + 0.95f;
+		AddMesh(house, "Roof", CylinderMeshFor(0.0f, Mathf.Max(size.X, size.Z) * 0.62f, 1.6f), new Vector3(0.0f, roofY, 0.0f), Vector3.Zero, new Vector3(1.0f, 0.56f, 0.78f), roofMaterial);
+		AddMesh(house, "Door", BoxMeshFor(new Vector3(0.86f, 1.45f, 0.08f)), new Vector3(0.0f, 0.78f, -size.Z * 0.51f), Vector3.Zero, Vector3.One, _matActorDark);
+		AddMesh(house, "WindowLeft", BoxMeshFor(new Vector3(0.78f, 0.56f, 0.07f)), new Vector3(-size.X * 0.27f, 1.62f, -size.Z * 0.515f), Vector3.Zero, Vector3.One, _matCrystal);
+		AddMesh(house, "WindowRight", BoxMeshFor(new Vector3(0.78f, 0.56f, 0.07f)), new Vector3(size.X * 0.27f, 1.62f, -size.Z * 0.515f), Vector3.Zero, Vector3.One, _matCrystal);
+		AddMesh(house, "WindowTrimLeft", BoxMeshFor(new Vector3(0.92f, 0.08f, 0.08f)), new Vector3(-size.X * 0.27f, 1.28f, -size.Z * 0.525f), Vector3.Zero, Vector3.One, _matWood);
+		AddMesh(house, "WindowTrimRight", BoxMeshFor(new Vector3(0.92f, 0.08f, 0.08f)), new Vector3(size.X * 0.27f, 1.28f, -size.Z * 0.525f), Vector3.Zero, Vector3.One, _matWood);
+		AddMesh(house, "Chimney", BoxMeshFor(new Vector3(0.48f, 1.05f, 0.48f)), new Vector3(size.X * 0.27f, roofY + 0.5f, size.Z * 0.08f), Vector3.Zero, Vector3.One, _matWall);
+
+		var collisionShape = new CollisionShape3D
+		{
+			Position = new Vector3(0.0f, size.Y * 0.5f, 0.0f),
+			Shape = new BoxShape3D { Size = size },
+		};
+		house.AddChild(collisionShape);
+		_obstaclePositions.Add(position);
+	}
+
+	private void CreateCityOuterDistricts(Vector3 center)
+	{
+		(Vector3 Offset, float Yaw, Vector3 Size, Material Wall, Material Roof, bool TwoStorey)[] houses =
+		{
+			(new Vector3(-37.5f, 0.0f, -8.8f), 12.0f, new Vector3(5.8f, 2.9f, 5.6f), _matWood, _matTentCloth, false),
+			(new Vector3(-42.0f, 0.0f, 3.6f), -12.0f, new Vector3(6.0f, 3.1f, 5.8f), _matWall, _matNpcAccent, true),
+			(new Vector3(-34.0f, 0.0f, 17.5f), 20.0f, new Vector3(5.4f, 2.8f, 5.2f), _matWood, _matTentCloth, false),
+			(new Vector3(37.5f, 0.0f, -8.8f), -12.0f, new Vector3(5.8f, 2.9f, 5.6f), _matWood, _matTentCloth, false),
+			(new Vector3(42.0f, 0.0f, 3.6f), 12.0f, new Vector3(6.0f, 3.1f, 5.8f), _matWall, _matNpcAccent, true),
+			(new Vector3(34.0f, 0.0f, 17.5f), -20.0f, new Vector3(5.4f, 2.8f, 5.2f), _matWood, _matTentCloth, false),
+			(new Vector3(-14.0f, 0.0f, 23.8f), -8.0f, new Vector3(5.8f, 3.0f, 5.4f), _matWall, _matNpcAccent, false),
+			(new Vector3(14.0f, 0.0f, 23.8f), 8.0f, new Vector3(5.8f, 3.0f, 5.4f), _matWall, _matNpcAccent, false),
+			(new Vector3(-8.0f, 0.0f, -20.5f), -18.0f, new Vector3(5.0f, 2.7f, 4.8f), _matWood, _matTentCloth, false),
+			(new Vector3(8.0f, 0.0f, -20.5f), 18.0f, new Vector3(5.0f, 2.7f, 4.8f), _matWood, _matTentCloth, false),
+		};
+
+		for (int index = 0; index < houses.Length; index++)
+		{
+			var house = houses[index];
+			CreateCityHouse($"CityOuterHouse{index}", center + house.Offset, house.Yaw, house.Size, house.Wall, house.Roof, house.TwoStorey);
+		}
+
+		CreateExternalProp("CityOuterCartNorthWest", "res://assets/models/environment/cart.glb", center + new Vector3(-18.5f, 0.0f, -18.2f), new Vector3(0.0f, 38.0f, 0.0f), new Vector3(1.15f, 1.15f, 1.15f), new Vector3(1.9f, 1.2f, 2.8f), new Vector3(0.0f, 0.6f, 0.0f));
+		CreateExternalProp("CityOuterCartNorthEast", "res://assets/models/environment/cart-high.glb", center + new Vector3(18.5f, 0.0f, -18.2f), new Vector3(0.0f, -38.0f, 0.0f), new Vector3(1.1f, 1.1f, 1.1f), new Vector3(1.9f, 1.5f, 2.8f), new Vector3(0.0f, 0.75f, 0.0f));
+		CreateExternalProp("CitySouthStallRed", "res://assets/models/environment/stall-red.glb", center + new Vector3(-8.5f, 0.0f, 28.5f), new Vector3(0.0f, 18.0f, 0.0f), new Vector3(1.25f, 1.25f, 1.25f), new Vector3(2.8f, 1.8f, 2.0f), new Vector3(0.0f, 0.9f, 0.0f));
+		CreateExternalProp("CitySouthStallGreen", "res://assets/models/environment/stall-green.glb", center + new Vector3(8.5f, 0.0f, 28.5f), new Vector3(0.0f, -18.0f, 0.0f), new Vector3(1.25f, 1.25f, 1.25f), new Vector3(2.8f, 1.8f, 2.0f), new Vector3(0.0f, 0.9f, 0.0f));
+		CreateCrateStack(center + new Vector3(-30.0f, 0.0f, -2.0f), 12.0f);
+		CreateCrateStack(center + new Vector3(30.0f, 0.0f, -2.0f), -12.0f);
+	}
+
+	private void CreateCityMarket(Vector3 center)
+	{
+		CreateExternalProp("CityMarketStallLeft", "res://assets/models/environment/stall-red.glb", center + new Vector3(-7.2f, 0.0f, -7.2f), new Vector3(0.0f, 32.0f, 0.0f), new Vector3(1.35f, 1.35f, 1.35f), new Vector3(2.8f, 1.8f, 2.0f), new Vector3(0.0f, 0.9f, 0.0f));
+		CreateExternalProp("CityMarketStallRight", "res://assets/models/environment/stall-green.glb", center + new Vector3(7.2f, 0.0f, -7.2f), new Vector3(0.0f, -32.0f, 0.0f), new Vector3(1.35f, 1.35f, 1.35f), new Vector3(2.8f, 1.8f, 2.0f), new Vector3(0.0f, 0.9f, 0.0f));
+		CreateExternalProp("CityCartWest", "res://assets/models/environment/cart.glb", center + new Vector3(-12.5f, 0.0f, -8.2f), new Vector3(0.0f, 58.0f, 0.0f), new Vector3(1.3f, 1.3f, 1.3f), new Vector3(1.9f, 1.2f, 2.8f), new Vector3(0.0f, 0.6f, 0.0f));
+		CreateExternalProp("CityCartEast", "res://assets/models/environment/cart-high.glb", center + new Vector3(12.5f, 0.0f, -8.2f), new Vector3(0.0f, -58.0f, 0.0f), new Vector3(1.2f, 1.2f, 1.2f), new Vector3(1.9f, 1.5f, 2.8f), new Vector3(0.0f, 0.75f, 0.0f));
+		CreateCrateStack(center + new Vector3(-9.6f, 0.0f, -5.0f), 18.0f);
+		CreateCrateStack(center + new Vector3(9.6f, 0.0f, -5.0f), -18.0f);
+		_obstaclePositions.Add(center + new Vector3(-7.2f, 0.0f, -7.2f));
+		_obstaclePositions.Add(center + new Vector3(7.2f, 0.0f, -7.2f));
+	}
+
+	private void CreateCityGardens(Vector3 center)
+	{
+		for (int side = -1; side <= 1; side += 2)
+		{
+			for (int index = 0; index < 4; index++)
+			{
+				CreateExternalProp($"CityHedge{side}_{index}", "res://assets/models/environment/hedge-large.glb", center + new Vector3(side * (14.0f + index * 3.0f), 0.0f, 10.8f), Vector3.Zero, new Vector3(1.15f, 1.15f, 1.15f), new Vector3(2.6f, 1.1f, 0.85f), new Vector3(0.0f, 0.55f, 0.0f));
+			}
+
+			CreateExternalProp($"CityFenceGate{side}", "res://assets/models/environment/fence-gate.glb", center + new Vector3(side * 18.0f, 0.0f, 2.2f), new Vector3(0.0f, 90.0f, 0.0f), new Vector3(1.25f, 1.25f, 1.25f), new Vector3(0.8f, 1.2f, 2.4f), new Vector3(0.0f, 0.6f, 0.0f));
+			CreateFlowerPatch(center + new Vector3(side * 15.5f, 0.0f, 8.8f));
+			CreateFlowerPatch(center + new Vector3(side * 18.0f, 0.0f, 9.4f));
+		}
 	}
 
 	private void CreateRevivalNpc(Vector3 position)
@@ -723,15 +1042,15 @@ public partial class World : Node3D
 		var collisionShape = new CollisionShape3D
 		{
 			Name = "CollisionShape3D",
-			Position = new Vector3(0.0f, 0.9f, 0.0f),
-			Shape = new CapsuleShape3D { Radius = 0.38f, Height = 1.8f },
+			Position = new Vector3(0.0f, 0.76f, 0.0f),
+			Shape = new CapsuleShape3D { Radius = 0.31f, Height = 1.52f },
 		};
 		player.AddChild(collisionShape);
 
 		var cameraPivot = new Node3D
 		{
 			Name = "CameraPivot",
-			Position = new Vector3(0.0f, 1.58f, 0.0f),
+			Position = new Vector3(0.0f, 1.38f, 0.0f),
 		};
 		player.AddChild(cameraPivot);
 
@@ -750,16 +1069,24 @@ public partial class World : Node3D
 
 	private void SpawnActors()
 	{
-		_obstaclePositions.Clear();
-		_obstaclePositions.AddRange(_wildObstaclePositions);
-
-		for (int index = 0; index < ActorCount; index++)
+		foreach (WildMapDefinition wildMap in WildMaps)
 		{
-			SimpleActor actor = CreateActor(true);
-			Vector3 spawnPosition = FindOpenMonsterSpawnPosition();
-			actor.Position = spawnPosition;
-			actor.HomePosition = spawnPosition;
-			_actorsRoot.AddChild(actor);
+			_obstaclePositions.Clear();
+			if (_wildObstaclePositionsById.TryGetValue(wildMap.Id, out List<Vector3>? obstacles))
+			{
+				_obstaclePositions.AddRange(obstacles);
+			}
+
+			int mapActorCount = Mathf.Max(ActorCount / WildMaps.Length, 8);
+			for (int index = 0; index < mapActorCount; index++)
+			{
+				SimpleActor actor = CreateActor(true);
+				actor.MapId = wildMap.Id;
+				Vector3 spawnPosition = FindOpenMonsterSpawnPosition();
+				actor.Position = spawnPosition;
+				actor.HomePosition = spawnPosition;
+				_actorsRoot.AddChild(actor);
+			}
 		}
 
 		SpawnCityNpcs();
@@ -781,6 +1108,30 @@ public partial class World : Node3D
 			new(0.0f, 0.0f, 9.6f),
 			new(-8.8f, 0.0f, -7.8f),
 			new(8.8f, 0.0f, -7.8f),
+			new(-13.6f, 0.0f, -7.4f),
+			new(13.6f, 0.0f, -7.4f),
+			new(-17.4f, 0.0f, -1.0f),
+			new(17.4f, 0.0f, -1.0f),
+			new(-18.2f, 0.0f, 7.2f),
+			new(18.2f, 0.0f, 7.2f),
+			new(-26.5f, 0.0f, 8.6f),
+			new(27.0f, 0.0f, -3.6f),
+			new(-22.0f, 0.0f, -10.0f),
+			new(22.0f, 0.0f, -10.0f),
+			new(-12.0f, 0.0f, 12.0f),
+			new(12.0f, 0.0f, 12.0f),
+			new(-36.0f, 0.0f, -6.0f),
+			new(36.0f, 0.0f, -6.0f),
+			new(-42.0f, 0.0f, 5.0f),
+			new(42.0f, 0.0f, 5.0f),
+			new(-31.0f, 0.0f, 16.0f),
+			new(31.0f, 0.0f, 16.0f),
+			new(-15.0f, 0.0f, 24.0f),
+			new(15.0f, 0.0f, 24.0f),
+			new(-7.0f, 0.0f, -21.0f),
+			new(7.0f, 0.0f, -21.0f),
+			new(-3.5f, 0.0f, -29.0f),
+			new(3.5f, 0.0f, -29.0f),
 		};
 
 		int npcCount = Mathf.Max(CityNpcCount, 0);
@@ -816,11 +1167,11 @@ public partial class World : Node3D
 		var collisionShape = new CollisionShape3D
 		{
 			Name = "CollisionShape3D",
-			Position = new Vector3(0.0f, 0.9f, 0.0f),
+			Position = new Vector3(0.0f, isMonster ? 0.78f : 0.74f, 0.0f),
 			Shape = new CapsuleShape3D
 			{
-				Radius = isMonster ? 0.52f : 0.34f,
-				Height = isMonster ? 1.72f : 1.78f,
+				Radius = isMonster ? 0.44f : 0.29f,
+				Height = isMonster ? 1.46f : 1.48f,
 			},
 		};
 		actor.AddChild(collisionShape);
@@ -834,7 +1185,25 @@ public partial class World : Node3D
 			BuildNpcVisual(actor);
 		}
 
+		ScaleActorVisualChildren(actor, isMonster ? 0.88f : 0.86f);
 		return actor;
+	}
+
+	private static void ScaleActorVisualChildren(Node3D actor, float visualScale)
+	{
+		foreach (Node child in actor.GetChildren())
+		{
+			if (child is CollisionShape3D || child is Label3D)
+			{
+				continue;
+			}
+
+			if (child is Node3D visualNode)
+			{
+				visualNode.Position *= visualScale;
+				visualNode.Scale *= visualScale;
+			}
+		}
 	}
 
 	private void BuildNpcVisual(Node3D actor)
@@ -1113,6 +1482,10 @@ public partial class World : Node3D
 
 	private void CreateMapPortal(string name, Vector3 position, string targetMapId, string labelKey)
 	{
+		var portalGlowMaterial = MakeEmissiveMaterial(new Color(0.30f, 0.88f, 1.0f, 0.58f), 1.75f, 0.24f);
+		var portalCoreMaterial = MakeEmissiveMaterial(new Color(0.62f, 0.42f, 1.0f, 0.46f), 1.25f, 0.18f);
+		var portalSparkMaterial = MakeEmissiveMaterial(new Color(0.82f, 0.96f, 1.0f, 0.86f), 2.1f, 0.12f);
+
 		var portal = new StaticBody3D
 		{
 			Name = name,
@@ -1124,16 +1497,39 @@ public partial class World : Node3D
 		_propsRoot.AddChild(portal);
 
 		AddMesh(portal, "PortalBase", CylinderMeshFor(1.45f, 1.45f, 0.16f), new Vector3(0.0f, 0.08f, 0.0f), Vector3.Zero, Vector3.One, _matRune);
-		AddMesh(portal, "PortalArchLeft", BoxMeshFor(new Vector3(0.26f, 2.4f, 0.32f)), new Vector3(-1.0f, 1.25f, 0.0f), Vector3.Zero, Vector3.One, _matCrystal);
-		AddMesh(portal, "PortalArchRight", BoxMeshFor(new Vector3(0.26f, 2.4f, 0.32f)), new Vector3(1.0f, 1.25f, 0.0f), Vector3.Zero, Vector3.One, _matCrystal);
-		AddMesh(portal, "PortalArchTop", BoxMeshFor(new Vector3(2.25f, 0.28f, 0.34f)), new Vector3(0.0f, 2.35f, 0.0f), Vector3.Zero, Vector3.One, _matCrystal);
-		AddMesh(portal, "PortalGlow", CylinderMeshFor(0.92f, 0.92f, 0.04f), new Vector3(0.0f, 1.22f, 0.0f), new Vector3(90.0f, 0.0f, 0.0f), new Vector3(1.0f, 1.45f, 1.0f), _matWater);
+		var groundAura = AddMesh(portal, "PortalGroundAura", CylinderMeshFor(2.25f, 2.25f, 0.025f), new Vector3(0.0f, 0.13f, 0.0f), Vector3.Zero, Vector3.One, portalGlowMaterial);
+		AddMesh(portal, "PortalOuterRune", CylinderMeshFor(1.62f, 1.62f, 0.030f), new Vector3(0.0f, 0.155f, 0.0f), Vector3.Zero, new Vector3(1.0f, 1.0f, 1.0f), portalGlowMaterial);
+		var outerRing = AddMesh(portal, "PortalOuterHalo", CylinderMeshFor(1.12f, 1.12f, 0.028f), new Vector3(0.0f, 0.19f, 0.0f), Vector3.Zero, new Vector3(1.0f, 1.0f, 1.0f), portalCoreMaterial);
+		var innerRing = AddMesh(portal, "PortalInnerHalo", CylinderMeshFor(0.68f, 0.68f, 0.032f), new Vector3(0.0f, 0.225f, 0.0f), Vector3.Zero, new Vector3(1.0f, 1.0f, 1.0f), portalGlowMaterial);
+		AddMesh(portal, "PortalCenterGlow", new SphereMesh { Radius = 0.50f, Height = 0.26f }, new Vector3(0.0f, 0.32f, 0.0f), Vector3.Zero, new Vector3(1.25f, 0.24f, 1.25f), portalCoreMaterial);
+		AddPortalRuneStones(portal, portalGlowMaterial);
+		AddPortalParticles(portal, portalSparkMaterial);
+
+		var portalLight = new OmniLight3D
+		{
+			Name = "PortalLight",
+			LightColor = new Color(0.45f, 0.86f, 1.0f),
+			LightEnergy = 1.8f,
+			OmniRange = 8.5f,
+			Position = new Vector3(0.0f, 0.75f, 0.0f),
+		};
+		portal.AddChild(portalLight);
+
+		var effect = new MapPortalEffect
+		{
+			Name = "PortalEffect",
+			OuterRing = outerRing,
+			InnerRing = innerRing,
+			GroundAura = groundAura,
+			PortalLight = portalLight,
+		};
+		portal.AddChild(effect);
 
 		var label = new Label3D
 		{
 			Name = "PortalLabel",
 			Text = LocaleText.T(labelKey),
-			Position = new Vector3(0.0f, 2.95f, 0.0f),
+			Position = new Vector3(0.0f, 1.65f, 0.0f),
 			Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
 			FontSize = 22,
 			PixelSize = 0.008f,
@@ -1147,15 +1543,103 @@ public partial class World : Node3D
 
 		var collisionShape = new CollisionShape3D
 		{
-			Position = new Vector3(0.0f, 1.1f, 0.0f),
-			Shape = new BoxShape3D { Size = new Vector3(2.7f, 2.2f, 1.5f) },
+			Position = new Vector3(0.0f, 0.35f, 0.0f),
+			Shape = new CylinderShape3D { Radius = 1.8f, Height = 0.7f },
 		};
 		portal.AddChild(collisionShape);
 	}
 
+	private void AddPortalParticles(Node3D portal, Material particleMaterial)
+	{
+		var particleMesh = new SphereMesh { Radius = 0.045f, Height = 0.09f };
+		particleMesh.SurfaceSetMaterial(0, particleMaterial);
+
+		var processMaterial = new ParticleProcessMaterial
+		{
+			EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere,
+			EmissionSphereRadius = 1.1f,
+			Direction = new Vector3(0.0f, 1.0f, 0.0f),
+			Spread = 58.0f,
+			Gravity = new Vector3(0.0f, 0.18f, 0.0f),
+			InitialVelocityMin = 0.35f,
+			InitialVelocityMax = 1.15f,
+			AngularVelocityMin = -90.0f,
+			AngularVelocityMax = 90.0f,
+			ScaleMin = 0.55f,
+			ScaleMax = 1.35f,
+			Color = new Color(0.72f, 0.94f, 1.0f, 0.86f),
+		};
+
+		var risingParticles = new GpuParticles3D
+		{
+			Name = "PortalRisingParticles",
+			Amount = 72,
+			Lifetime = 2.2f,
+			Randomness = 0.58f,
+			Explosiveness = 0.0f,
+			VisibilityAabb = new Aabb(new Vector3(-2.4f, -0.2f, -2.4f), new Vector3(4.8f, 4.2f, 4.8f)),
+			ProcessMaterial = processMaterial,
+			DrawPass1 = particleMesh,
+			Emitting = true,
+			Position = new Vector3(0.0f, 0.35f, 0.0f),
+		};
+		portal.AddChild(risingParticles);
+
+		var orbitMaterial = new ParticleProcessMaterial
+		{
+			EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Ring,
+			EmissionRingRadius = 1.25f,
+			EmissionRingInnerRadius = 0.85f,
+			EmissionRingHeight = 0.12f,
+			Direction = new Vector3(0.0f, 0.35f, 1.0f),
+			Spread = 90.0f,
+			Gravity = Vector3.Zero,
+			InitialVelocityMin = 0.12f,
+			InitialVelocityMax = 0.45f,
+			ScaleMin = 0.35f,
+			ScaleMax = 0.9f,
+			Color = new Color(0.94f, 0.84f, 1.0f, 0.78f),
+		};
+
+		var orbitParticles = new GpuParticles3D
+		{
+			Name = "PortalOrbitParticles",
+			Amount = 42,
+			Lifetime = 1.7f,
+			Randomness = 0.42f,
+			VisibilityAabb = new Aabb(new Vector3(-2.2f, -0.4f, -1.6f), new Vector3(4.4f, 3.4f, 3.2f)),
+			ProcessMaterial = orbitMaterial,
+			DrawPass1 = particleMesh,
+			Emitting = true,
+			Position = new Vector3(0.0f, 0.34f, 0.0f),
+			RotationDegrees = Vector3.Zero,
+		};
+		portal.AddChild(orbitParticles);
+	}
+
+	private void AddPortalRuneStones(Node3D portal, Material material)
+	{
+		for (int index = 0; index < 12; index++)
+		{
+			float angle = index / 12.0f * Mathf.Tau;
+			float radius = index % 2 == 0 ? 1.42f : 1.18f;
+			Vector3 position = new(Mathf.Cos(angle) * radius, 0.245f, Mathf.Sin(angle) * radius);
+			AddMesh(
+				portal,
+				$"PortalRune{index}",
+				BoxMeshFor(new Vector3(0.28f, 0.026f, 0.07f)),
+				position,
+				new Vector3(0.0f, Mathf.RadToDeg(-angle), 0.0f),
+				Vector3.One,
+				material
+			);
+		}
+	}
+
 	public void RequestMapTravel(string targetMapId)
 	{
-		if ((targetMapId != "city" && targetMapId != "wild") || _activeMapId == targetMapId)
+		targetMapId = NormalizeMapId(targetMapId);
+		if (!IsKnownMapId(targetMapId) || _activeMapId == targetMapId)
 		{
 			return;
 		}
@@ -1195,7 +1679,11 @@ public partial class World : Node3D
 
 	private void ApplySaveData(SaveGameData data)
 	{
-		string mapId = data.ActiveMapId == "wild" ? "wild" : "city";
+		string mapId = NormalizeMapId(data.ActiveMapId);
+		if (!IsKnownMapId(mapId))
+		{
+			mapId = "city";
+		}
 		SetMapVisibility(mapId);
 		var loadedCompanions = new List<SimpleActor>();
 		foreach (ActorSaveData actorData in data.Player.Companions)
@@ -1237,22 +1725,22 @@ public partial class World : Node3D
 			_cityMapRoot.ProcessMode = mapId == "city" ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
 		}
 
-		if (_wildMapRoot != null)
+		foreach (KeyValuePair<string, Node3D> entry in _wildMapRootsById)
 		{
-			_wildMapRoot.Visible = mapId == "wild";
-			_wildMapRoot.ProcessMode = mapId == "wild" ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
+			bool active = mapId == entry.Key;
+			entry.Value.Visible = active;
+			entry.Value.ProcessMode = active ? ProcessModeEnum.Inherit : ProcessModeEnum.Disabled;
 		}
 	}
 
 	private void UpdateActorMapActivity()
 	{
-		bool wildActive = _activeMapId == "wild";
 		bool cityActive = _activeMapId == "city";
 		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
 		{
 			if (node is SimpleActor actor && IsInstanceValid(actor))
 			{
-				actor.SetWorldMapActive(wildActive);
+				actor.SetWorldMapActive(actor.MapId == _activeMapId);
 			}
 		}
 
@@ -1263,6 +1751,27 @@ public partial class World : Node3D
 				actor.SetWorldMapActive(cityActive);
 			}
 		}
+	}
+
+	public IReadOnlyList<(string Id, string Label)> GetWildMapTravelOptions()
+	{
+		var options = new List<(string Id, string Label)>();
+		foreach (WildMapDefinition wildMap in WildMaps)
+		{
+			options.Add((wildMap.Id, LocaleText.T(wildMap.NameKey)));
+		}
+
+		return options;
+	}
+
+	private bool IsKnownMapId(string mapId)
+	{
+		return mapId == "city" || _wildMapRootsById.ContainsKey(mapId);
+	}
+
+	private static string NormalizeMapId(string mapId)
+	{
+		return mapId == "wild" ? "wild_forest" : mapId;
 	}
 
 	private void CreateTree(Vector3 position)
@@ -1404,7 +1913,10 @@ public partial class World : Node3D
 		};
 		_propsRoot.AddChild(body);
 
-		ExternalModelLibrary.TryAddModel(body, modelPath, "ExternalModel", Vector3.Zero, Vector3.Zero, modelScale);
+		if (!ExternalModelLibrary.TryAddModel(body, modelPath, "ExternalModel", Vector3.Zero, Vector3.Zero, modelScale))
+		{
+			AddMesh(body, "FallbackMesh", BoxMeshFor(collisionSize), collisionPosition, Vector3.Zero, Vector3.One, _matWood);
+		}
 
 		var collisionShape = new CollisionShape3D
 		{
@@ -1426,6 +1938,21 @@ public partial class World : Node3D
 		};
 		meshInstance.SetSurfaceOverrideMaterial(0, material);
 		parent.AddChild(meshInstance);
+		return meshInstance;
+	}
+
+	private MeshInstance3D CreateTerrainPatch(string nodeName, Vector3 position, float radius, Vector3 scale, float yawDegrees, Material material, float height)
+	{
+		var meshInstance = new MeshInstance3D
+		{
+			Name = nodeName,
+			Mesh = CylinderMeshFor(radius, radius, height),
+			Position = position + new Vector3(0.0f, height * 0.5f, 0.0f),
+			RotationDegrees = new Vector3(0.0f, yawDegrees, 0.0f),
+			Scale = scale,
+		};
+		meshInstance.SetSurfaceOverrideMaterial(0, material);
+		_mapRoot.AddChild(meshInstance);
 		return meshInstance;
 	}
 
@@ -1488,5 +2015,20 @@ public partial class World : Node3D
 		}
 
 		return material;
+	}
+
+	private static StandardMaterial3D MakeEmissiveMaterial(Color color, float emissionEnergy, float roughness = 0.35f)
+	{
+		return new StandardMaterial3D
+		{
+			AlbedoColor = color,
+			Roughness = roughness,
+			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			BlendMode = BaseMaterial3D.BlendModeEnum.Add,
+			EmissionEnabled = true,
+			Emission = color,
+			EmissionEnergyMultiplier = emissionEnergy,
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+		};
 	}
 }

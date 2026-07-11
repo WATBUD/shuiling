@@ -133,7 +133,9 @@ public partial class WorldDrop : Node3D
 			return LocaleText.F("drop.gold", GoldAmount);
 		}
 
-		string name = ItemId == "monster_trophy" ? LocaleText.T("item.monster_trophy") : LocaleText.T(BuildCatalog.GetItemNameKey(ItemId));
+		string name = MonsterLootCatalog.IsMonsterLoot(ItemId)
+			? LocaleText.T(MonsterLootCatalog.GetNameKey(ItemId))
+			: LocaleText.T(BuildCatalog.GetItemNameKey(ItemId));
 		return Amount > 1 ? $"{name} x{Amount}" : name;
 	}
 
@@ -154,9 +156,9 @@ public partial class WorldDrop : Node3D
 			return new Color(0.40f, 1.0f, 0.66f, 0.95f);
 		}
 
-		if (itemId.StartsWith("gem.ai."))
+		if (MonsterLootCatalog.IsMonsterLoot(itemId))
 		{
-			return new Color(1.0f, 0.62f, 0.34f, 0.95f);
+			return MonsterLootCatalog.GetDropColor(itemId);
 		}
 
 		return new Color(0.82f, 0.92f, 1.0f, 0.95f);

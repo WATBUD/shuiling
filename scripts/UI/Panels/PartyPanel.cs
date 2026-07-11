@@ -27,7 +27,7 @@ public partial class PartyPanel : PanelContainer
 	private Label _elementLabel = null!;
 	private Label _equipmentLabel = null!;
 	private Label _skillGemsLabel = null!;
-	private Label _aiGemLabel = null!;
+	private Label _attackModeLabel = null!;
 	private Button _helmetButton = null!;
 	private Button _weaponButton = null!;
 	private Button _armorButton = null!;
@@ -36,7 +36,7 @@ public partial class PartyPanel : PanelContainer
 	private Button _skillGem1Button = null!;
 	private Button _skillGem2Button = null!;
 	private Button _skillGem3Button = null!;
-	private Button _aiGemButton = null!;
+	private Button _attackModeButton = null!;
 	private ProgressBar _healthBar = null!;
 	private PopupMenu _memberContextMenu = null!;
 	private SimpleActor? _contextActor;
@@ -237,7 +237,7 @@ public partial class PartyPanel : PanelContainer
 		_elementLabel = AddStatRow(detailRows, "build.element");
 		_equipmentLabel = AddStatRow(detailRows, "build.equipment");
 		_skillGemsLabel = AddStatRow(detailRows, "build.skill_gems");
-		_aiGemLabel = AddStatRow(detailRows, "build.ai_gem");
+		_attackModeLabel = AddStatRow(detailRows, "build.attack_mode");
 
 		var buildButtonGrid = new GridContainer
 		{
@@ -252,7 +252,7 @@ public partial class PartyPanel : PanelContainer
 		_armorButton = AddBuildButton(buildButtonGrid, OnArmorPressed);
 		_accessoryButton = AddBuildButton(buildButtonGrid, OnAccessoryPressed);
 		_attributeGemButton = AddBuildButton(buildButtonGrid, OnAttributeGemPressed);
-		_aiGemButton = AddBuildButton(buildButtonGrid, OnAiGemPressed);
+		_attackModeButton = AddBuildButton(buildButtonGrid, OnAttackModePressed);
 		_skillGem1Button = AddBuildButton(buildButtonGrid, () => OnSkillGemPressed(0));
 		_skillGem2Button = AddBuildButton(buildButtonGrid, () => OnSkillGemPressed(1));
 		_skillGem3Button = AddBuildButton(buildButtonGrid, () => OnSkillGemPressed(2));
@@ -363,7 +363,7 @@ public partial class PartyPanel : PanelContainer
 			_elementLabel.Text = $"{actor.BuildElementName} / {actor.BuildRareComboName}";
 			_equipmentLabel.Text = LocaleText.F("build.equipment_summary", actor.BuildEquipmentSummary, actor.CurrentBuildStats.EquipmentSocketCount);
 			_skillGemsLabel.Text = actor.BuildSkillSummary;
-			_aiGemLabel.Text = actor.BuildAiGemName;
+			_attackModeLabel.Text = actor.AttackModeName;
 			UpdateBuildButtons(actor);
 			return;
 		}
@@ -391,7 +391,7 @@ public partial class PartyPanel : PanelContainer
 		_elementLabel.Text = "-";
 		_equipmentLabel.Text = "-";
 		_skillGemsLabel.Text = "-";
-		_aiGemLabel.Text = "-";
+		_attackModeLabel.Text = "-";
 		SetBuildButtonsDisabled(true);
 	}
 
@@ -404,7 +404,7 @@ public partial class PartyPanel : PanelContainer
 		_armorButton.Text = BuildButtonText("build.slot.armor", LocaleText.T(BuildCatalog.GetEquipment(loadout.ArmorId).NameKey));
 		_accessoryButton.Text = BuildButtonText("build.slot.accessory", LocaleText.T(BuildCatalog.GetEquipment(loadout.AccessoryId).NameKey));
 		_attributeGemButton.Text = BuildButtonText("build.slot.attribute", LocaleText.T(BuildCatalog.GetAttributeGem(loadout.AttributeGemId).NameKey));
-		_aiGemButton.Text = BuildButtonText("build.slot.ai", LocaleText.T(BuildCatalog.GetAiGem(loadout.AiGemId).NameKey));
+		_attackModeButton.Text = BuildButtonText("build.slot.attack_mode", actor.AttackModeName);
 		_skillGem1Button.Text = BuildButtonText("build.slot.skill1", LocaleText.T(BuildCatalog.GetSkillGem(loadout.SkillGemIds[0]).NameKey));
 		_skillGem2Button.Text = BuildButtonText("build.slot.skill2", LocaleText.T(BuildCatalog.GetSkillGem(loadout.SkillGemIds[1]).NameKey));
 		_skillGem3Button.Text = BuildButtonText("build.slot.skill3", LocaleText.T(BuildCatalog.GetSkillGem(loadout.SkillGemIds[2]).NameKey));
@@ -425,7 +425,7 @@ public partial class PartyPanel : PanelContainer
 		_skillGem1Button.Disabled = disabled;
 		_skillGem2Button.Disabled = disabled;
 		_skillGem3Button.Disabled = disabled;
-		_aiGemButton.Disabled = disabled;
+		_attackModeButton.Disabled = disabled;
 
 		if (disabled)
 		{
@@ -437,7 +437,7 @@ public partial class PartyPanel : PanelContainer
 			_skillGem1Button.Text = "-";
 			_skillGem2Button.Text = "-";
 			_skillGem3Button.Text = "-";
-			_aiGemButton.Text = "-";
+			_attackModeButton.Text = "-";
 		}
 	}
 
@@ -549,9 +549,15 @@ public partial class PartyPanel : PanelContainer
 		OpenInventoryForSelectedActor();
 	}
 
-	private void OnAiGemPressed()
+	private void OnAttackModePressed()
 	{
-		OpenInventoryForSelectedActor();
+		if (_selected is not SimpleActor actor || !IsInstanceValid(actor))
+		{
+			return;
+		}
+
+		actor.CycleAttackMode();
+		UpdateDetails();
 	}
 
 	private void OpenInventoryForSelectedActor()
