@@ -224,14 +224,14 @@ public partial class SettingsPanel : PanelContainer
 		AddShortcutRow(section, "shortcut.jump", "Space");
 		AddShortcutRow(section, "shortcut.sprint", "Shift");
 		AddShortcutRow(section, "shortcut.capture_net", "R");
-		AddShortcutTextRow(section, LocaleText.CurrentLanguage == LocaleText.En ? "Select / Focus Target" : "選取 / 集火目標", "Left Mouse");
-		AddShortcutTextRow(section, LocaleText.CurrentLanguage == LocaleText.En ? "Interact / Revive" : "互動 / 復活", "E");
+		AddShortcutTextRow(section, LocaleText.T("shortcut.select_focus"), "Left Mouse");
+		AddShortcutTextRow(section, LocaleText.T("shortcut.interact_revive"), "E");
 		AddShortcutRow(section, "shortcut.save_game", "F5");
 		AddShortcutRow(section, "shortcut.party", "P");
 		AddShortcutRow(section, "shortcut.inventory", "I");
 		AddShortcutRow(section, "shortcut.formation_panel", "F");
 		AddShortcutRow(section, "shortcut.settings", "Esc");
-		AddShortcutRow(section, "shortcut.camera", LocaleText.CurrentLanguage == LocaleText.En ? "Mouse Look" : "滑鼠上下左右");
+		AddShortcutRow(section, "shortcut.camera", LocaleText.T("shortcut.mouse_look"));
 	}
 
 	private void ApplyDisplaySettings()

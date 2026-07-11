@@ -92,6 +92,7 @@ public partial class PlayerController : CharacterBody3D
 	private SimpleActor? _selectedActor;
 	private SimpleActor? _focusedTarget;
 	private SimpleActor? _pendingQuestNpc;
+	private bool _npcQuestDialogIsNotice;
 	private Node3D? _playerExternalModel;
 	private string _playerExternalAnimationState = string.Empty;
 	private float _damageFlashRemaining;
@@ -146,6 +147,7 @@ public partial class PlayerController : CharacterBody3D
 		UpdateMovementAnimation((float)delta);
 		UpdateFocusedTargetMarker((float)delta);
 		UpdateInteractionPrompt();
+		StabilizePlayerExternalModel();
 	}
 
 	public override void _UnhandledInput(InputEvent @event)
@@ -615,12 +617,10 @@ public partial class PlayerController : CharacterBody3D
 			ReassignFollowSlots();
 			_partyPanel.RefreshParty();
 			_formationPanel.RefreshAll();
-			SpawnWorldCombatEffect(LocaleText.F("effect.revive_count", revivedCount), new Color(0.42f, 1.0f, 0.66f, 0.94f), GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 1.0f, 0.82f);
 			PostSystemMessage(LocaleText.F("system.revive.count", revivedCount), new Color(0.54f, 1.0f, 0.70f));
 		}
 		else
 		{
-			SpawnWorldCombatEffect(LocaleText.T("effect.no_fallen_pets"), new Color(0.72f, 0.86f, 1.0f, 0.9f), GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 0.8f, 0.58f);
 			PostSystemMessage(LocaleText.T("system.revive.no_fallen"), new Color(0.78f, 0.88f, 1.0f));
 		}
 
@@ -1408,7 +1408,7 @@ public partial class PlayerController : CharacterBody3D
 	{
 		if (GetNearestRevivalNpc() != null)
 		{
-			ReviveDefeatedCompanions();
+			ShowRevivalDialog(ReviveDefeatedCompanions());
 			return;
 		}
 
@@ -1473,11 +1473,36 @@ public partial class PlayerController : CharacterBody3D
 		}
 
 		_pendingQuestNpc = actor;
+		_npcQuestDialogIsNotice = false;
 		_npcQuestTitleLabel.Text = LocaleText.F("quest.dialog.title", actor.LocalizedDisplayName);
 		_npcQuestBodyLabel.Text = LocaleText.F("quest.dialog.body", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, LocaleText.T("item.monster_trophy"));
 		_npcQuestRewardLabel.Text = LocaleText.F("quest.dialog.reward", NpcQuestAffinityReward, NpcRecruitAffinityRequirement);
+		_npcQuestRewardLabel.Visible = true;
 		_npcQuestAcceptButton.Text = LocaleText.T("quest.button.accept");
 		_npcQuestDeclineButton.Text = LocaleText.T("quest.button.decline");
+		_npcQuestDeclineButton.Visible = true;
+		_npcQuestDialog.Visible = true;
+		_interactionPromptLabel.Visible = false;
+		UpdateMouseModeForPanels();
+	}
+
+	private void ShowRevivalDialog(int revivedCount)
+	{
+		if (_npcQuestDialog == null)
+		{
+			return;
+		}
+
+		_pendingQuestNpc = null;
+		_npcQuestDialogIsNotice = true;
+		_npcQuestTitleLabel.Text = LocaleText.T("revival.dialog.title");
+		_npcQuestBodyLabel.Text = revivedCount > 0
+			? LocaleText.F("revival.dialog.count", revivedCount)
+			: LocaleText.T("revival.dialog.no_fallen");
+		_npcQuestRewardLabel.Text = string.Empty;
+		_npcQuestRewardLabel.Visible = false;
+		_npcQuestAcceptButton.Text = LocaleText.T("dialog.button.ok");
+		_npcQuestDeclineButton.Visible = false;
 		_npcQuestDialog.Visible = true;
 		_interactionPromptLabel.Visible = false;
 		UpdateMouseModeForPanels();
@@ -1485,6 +1510,12 @@ public partial class PlayerController : CharacterBody3D
 
 	private void AcceptNpcQuestDialog()
 	{
+		if (_npcQuestDialogIsNotice)
+		{
+			CloseNpcQuestDialog();
+			return;
+		}
+
 		SimpleActor? actor = _pendingQuestNpc;
 		if (actor == null || !IsInstanceValid(actor) || !actor.IsNpcRecruitCandidate)
 		{
@@ -1511,9 +1542,20 @@ public partial class PlayerController : CharacterBody3D
 	private void CloseNpcQuestDialog()
 	{
 		_pendingQuestNpc = null;
+		_npcQuestDialogIsNotice = false;
 		if (_npcQuestDialog != null)
 		{
 			_npcQuestDialog.Visible = false;
+		}
+
+		if (_npcQuestRewardLabel != null)
+		{
+			_npcQuestRewardLabel.Visible = true;
+		}
+
+		if (_npcQuestDeclineButton != null)
+		{
+			_npcQuestDeclineButton.Visible = true;
 		}
 
 		UpdateMouseModeForPanels();
@@ -1890,8 +1932,7 @@ public partial class PlayerController : CharacterBody3D
 		{
 			string state = !isMoving ? "idle" : moveRatio > 0.72f ? "run" : "walk";
 			SetPlayerExternalAnimationState(state);
-			_playerExternalModel.Position = Vector3.Zero;
-			_playerExternalModel.RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f);
+			StabilizePlayerExternalModel();
 			return;
 		}
 
@@ -1942,6 +1983,15 @@ public partial class PlayerController : CharacterBody3D
 
 		_playerExternalAnimationState = state;
 		ExternalModelLibrary.TryPlayActorAnimation(_playerExternalModel, state);
+		StabilizePlayerExternalModel();
+	}
+
+	private void StabilizePlayerExternalModel()
+	{
+		if (_playerExternalModel != null)
+		{
+			ExternalModelLibrary.StabilizeRootMotion(_playerExternalModel, Vector3.Zero, new Vector3(0.0f, 180.0f, 0.0f));
+		}
 	}
 
 	private void SetVisualPosition(string nodeName, Vector3 position)
@@ -2158,7 +2208,7 @@ public partial class PlayerController : CharacterBody3D
 		};
 		AddChild(equipmentRoot);
 
-		ExternalModelLibrary.TryAddModel(
+		bool swordAdded = ExternalModelLibrary.TryAddModel(
 			equipmentRoot,
 			"res://assets/models/player/sword_2handed_color.gltf",
 			"BackSword",
@@ -2166,7 +2216,12 @@ public partial class PlayerController : CharacterBody3D
 			new Vector3(12.0f, 0.0f, -28.0f),
 			new Vector3(0.82f, 0.82f, 0.82f)
 		);
-		ExternalModelLibrary.TryAddModel(
+		if (!swordAdded)
+		{
+			AddFallbackBackSword(equipmentRoot);
+		}
+
+		bool shieldAdded = ExternalModelLibrary.TryAddModel(
 			equipmentRoot,
 			"res://assets/models/player/shield_badge_color.gltf",
 			"BackShield",
@@ -2174,6 +2229,42 @@ public partial class PlayerController : CharacterBody3D
 			new Vector3(8.0f, 180.0f, 18.0f),
 			new Vector3(0.82f, 0.82f, 0.82f)
 		);
+		if (!shieldAdded)
+		{
+			AddFallbackBackShield(equipmentRoot);
+		}
+	}
+
+	private void AddFallbackBackSword(Node3D parent)
+	{
+		var matMetal = MakeMaterial(new Color(0.72f, 0.76f, 0.78f), 0.36f);
+		var matTrim = MakeMaterial(new Color(0.95f, 0.72f, 0.26f));
+		AddEquipmentMesh(parent, "BackSwordBlade", new BoxMesh { Size = new Vector3(0.07f, 0.92f, 0.045f) }, new Vector3(0.34f, 1.10f, 0.34f), new Vector3(12.0f, 0.0f, -28.0f), Vector3.One, matMetal);
+		AddEquipmentMesh(parent, "BackSwordGuard", new BoxMesh { Size = new Vector3(0.30f, 0.055f, 0.055f) }, new Vector3(0.23f, 0.72f, 0.28f), new Vector3(12.0f, 0.0f, -28.0f), Vector3.One, matTrim);
+		AddEquipmentMesh(parent, "BackSwordGrip", new BoxMesh { Size = new Vector3(0.055f, 0.25f, 0.055f) }, new Vector3(0.16f, 0.58f, 0.25f), new Vector3(12.0f, 0.0f, -28.0f), Vector3.One, matTrim);
+	}
+
+	private void AddFallbackBackShield(Node3D parent)
+	{
+		var matMetal = MakeMaterial(new Color(0.58f, 0.64f, 0.70f), 0.28f);
+		var matTrim = MakeMaterial(new Color(0.95f, 0.72f, 0.26f));
+		AddEquipmentMesh(parent, "BackShieldPlate", new CylinderMesh { TopRadius = 0.31f, BottomRadius = 0.31f, Height = 0.075f, RadialSegments = 28 }, new Vector3(-0.34f, 1.08f, 0.34f), new Vector3(90.0f, 0.0f, 18.0f), new Vector3(0.92f, 1.18f, 0.92f), matMetal);
+		AddEquipmentMesh(parent, "BackShieldBoss", new SphereMesh { Radius = 0.095f, Height = 0.12f }, new Vector3(-0.34f, 1.08f, 0.29f), new Vector3(0.0f, 0.0f, 18.0f), new Vector3(1.0f, 0.55f, 1.0f), matTrim);
+		AddEquipmentMesh(parent, "BackShieldBand", new BoxMesh { Size = new Vector3(0.11f, 0.55f, 0.045f) }, new Vector3(-0.34f, 1.08f, 0.27f), new Vector3(0.0f, 0.0f, 18.0f), Vector3.One, matTrim);
+	}
+
+	private static void AddEquipmentMesh(Node3D parent, string nodeName, Mesh mesh, Vector3 position, Vector3 rotationDegrees, Vector3 scale, Material material)
+	{
+		var meshInstance = new MeshInstance3D
+		{
+			Name = nodeName,
+			Mesh = mesh,
+			Position = position,
+			RotationDegrees = rotationDegrees,
+			Scale = scale,
+		};
+		meshInstance.SetSurfaceOverrideMaterial(0, material);
+		parent.AddChild(meshInstance);
 	}
 
 	private void AddPlayerEye(string side, Vector3 position, float radius, Material eyeMaterial, Material pupilMaterial)

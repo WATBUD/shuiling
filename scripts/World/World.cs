@@ -381,7 +381,7 @@ public partial class World : Node3D
 		var label = new Label3D
 		{
 			Name = "RevivalNpcLabel",
-			Text = "Pet Revival",
+			Text = LocaleText.T("npc.revival.name"),
 			Position = new Vector3(0.0f, 2.35f, 0.0f),
 			Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
 			FontSize = 22,
