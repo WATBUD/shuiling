@@ -376,7 +376,7 @@ public partial class FormationPanel : PanelContainer
 		int added = 0;
 		foreach (SimpleActor actor in _player.ActiveParty)
 		{
-			if (IsInstanceValid(actor) && actor.IsCaptured)
+			if (IsInstanceValid(actor) && actor.IsCaptured && _player.GetFormationSlot(actor) < 0)
 			{
 				AddRosterChip(actor);
 				added++;
@@ -401,10 +401,7 @@ public partial class FormationPanel : PanelContainer
 			return;
 		}
 
-		int slotIndex = _player.GetFormationSlot(actor);
-		string slotText = slotIndex >= 0
-			? LocaleText.F("formation.slot_value", slotIndex + 1)
-			: LocaleText.T("formation.unassigned");
+		string slotText = LocaleText.T("formation.unassigned");
 
 		var chip = new FormationActorChip
 		{
@@ -416,19 +413,11 @@ public partial class FormationPanel : PanelContainer
 			SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
 		};
 		chip.AddThemeFontSizeOverride("font_size", 12);
-		chip.AddThemeColorOverride("font_color", slotIndex >= 0 ? new Color(1.0f, 0.94f, 0.62f) : new Color(0.92f, 0.96f, 1.0f));
+		chip.AddThemeColorOverride("font_color", new Color(0.92f, 0.96f, 1.0f));
 		chip.Pressed += () =>
 		{
-			if (_player == null)
-			{
-				return;
-			}
-
-			int actorSlot = _player.GetFormationSlot(actor);
-			if (actorSlot >= 0)
-			{
-				SelectSlot(actorSlot);
-			}
+			_selectedSlot = -1;
+			RefreshGrid();
 		};
 		_rosterList.AddChild(chip);
 	}
