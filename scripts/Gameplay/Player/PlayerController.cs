@@ -20,7 +20,6 @@ public partial class PlayerController : CharacterBody3D
 	private const float FormationSlotSpacing = 2.35f;
 	private const float PlayerVisualScale = 0.88f;
 	private const int NpcRecruitQuestItemCount = 3;
-	private const int NpcQuestAffinityReward = 25;
 	private const int NpcRecruitAffinityRequirement = 80;
 	private const float MercenaryBrokerInteractRange = 4.6f;
 	private const float MerchantInteractRange = 4.6f;
@@ -2190,9 +2189,10 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
+		int affinityReward = GetNpcQuestAffinityReward(questItemId, NpcRecruitQuestItemCount);
 		_completedNpcQuests.Add(actor);
-		actor.IncreaseAffinity(NpcQuestAffinityReward);
-		SpawnWorldCombatEffect(LocaleText.F("effect.affinity_gain", NpcQuestAffinityReward), new Color(0.62f, 1.0f, 0.78f, 0.92f), actor.GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 0.85f, 0.62f);
+		actor.IncreaseAffinity(affinityReward);
+		SpawnWorldCombatEffect(LocaleText.F("effect.affinity_gain", affinityReward), new Color(0.62f, 1.0f, 0.78f, 0.92f), actor.GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 0.85f, 0.62f);
 		PostSystemMessage(LocaleText.F("system.npc.task_complete", actor.LocalizedDisplayName, actor.Affinity, NpcRecruitAffinityRequirement), new Color(0.78f, 1.0f, 0.82f));
 		if (actor.Affinity >= NpcRecruitAffinityRequirement)
 		{
@@ -2214,9 +2214,10 @@ public partial class PlayerController : CharacterBody3D
 		_pendingQuestNpc = actor;
 		_npcQuestDialogIsNotice = false;
 		string questItemId = GetNpcQuestItemId(actor);
+		int affinityReward = GetNpcQuestAffinityReward(questItemId, NpcRecruitQuestItemCount);
 		_npcQuestTitleLabel.Text = LocaleText.F("quest.dialog.title", actor.LocalizedDisplayName);
 		_npcQuestBodyLabel.Text = LocaleText.F("quest.dialog.body", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, GetInventoryItemDisplayName(questItemId));
-		_npcQuestRewardLabel.Text = LocaleText.F("quest.dialog.reward", NpcQuestAffinityReward, NpcRecruitAffinityRequirement);
+		_npcQuestRewardLabel.Text = LocaleText.F("quest.dialog.reward", affinityReward, NpcRecruitAffinityRequirement);
 		_npcQuestRewardLabel.Visible = true;
 		_npcQuestAcceptButton.Text = LocaleText.T("quest.button.accept");
 		_npcQuestDeclineButton.Text = LocaleText.T("quest.button.decline");
@@ -2267,6 +2268,27 @@ public partial class PlayerController : CharacterBody3D
 		string questItemId = GetNpcQuestItemId(actor);
 		PostSystemMessage(LocaleText.F("system.npc.task_posted", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, GetInventoryItemDisplayName(questItemId)), new Color(0.82f, 0.92f, 1.0f));
 		CloseNpcQuestDialog();
+	}
+
+	private static int GetNpcQuestAffinityReward(string questItemId, int amount)
+	{
+		int materialDifficulty = questItemId switch
+		{
+			"loot.slime_mucus" => 8,
+			"loot.soft_fur" => 9,
+			"loot.beast_hide" => 10,
+			"loot.small_bone" => 11,
+			"loot.insect_wing" => 12,
+			"loot.sharp_claw" => 13,
+			"loot.venom_sac" => 16,
+			"loot.water_core" => 18,
+			"loot.cracked_core" => 20,
+			"loot.red_horn" => 22,
+			"loot.dragon_scale" => 28,
+			_ => 10,
+		};
+
+		return Mathf.Clamp(materialDifficulty + Mathf.Max(amount - 1, 0) * 4, 8, 45);
 	}
 
 	private void DeclineNpcQuestDialog()
@@ -2454,14 +2476,14 @@ public partial class PlayerController : CharacterBody3D
 	{
 		if (portal.HasMeta("label"))
 		{
-			string label = portal.GetMeta("label").AsString();
-			if (!string.IsNullOrWhiteSpace(label))
+			string labelKey = portal.GetMeta("label").AsString();
+			if (!string.IsNullOrWhiteSpace(labelKey))
 			{
-				return label;
+				return LocaleText.T(labelKey);
 			}
 		}
 
-		return "Travel";
+		return LocaleText.T("portal.travel_wild");
 	}
 
 	private void TryUseMapPortal(Node3D portal)
