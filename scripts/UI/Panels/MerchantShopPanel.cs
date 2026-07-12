@@ -5,12 +5,27 @@ public partial class MerchantShopPanel : PanelContainer
 {
 	private PlayerController? _player;
 	private PlayerController.MerchantShopKind _shopKind;
+	private VBoxContainer _buySection = null!;
+	private VBoxContainer _sellSection = null!;
 	private VBoxContainer _buyList = null!;
 	private VBoxContainer _sellList = null!;
 	private Label _titleLabel = null!;
 	private Label _goldLabel = null!;
+	private Label _noticeLabel = null!;
+	private PanelContainer _tooltipPanel = null!;
+	private Label _tooltipTitleLabel = null!;
+	private Label _tooltipBodyLabel = null!;
+	private ScrollContainer _tooltipBodyScroll = null!;
 
 	public System.Action? CloseRequested { get; set; }
+
+	public override void _Process(double delta)
+	{
+		if (_tooltipPanel != null && _tooltipPanel.Visible)
+		{
+			PositionTooltip();
+		}
+	}
 
 	public override void _Ready()
 	{
@@ -59,8 +74,13 @@ public partial class MerchantShopPanel : PanelContainer
 			_ => "shop.item.trade",
 		});
 		_goldLabel.Text = LocaleText.F("inventory.gold", _player?.Gold ?? 0);
+		_noticeLabel.Visible = _shopKind == PlayerController.MerchantShopKind.PetShop;
+		_noticeLabel.Text = _noticeLabel.Visible ? LocaleText.T("shop.pet.notice") : string.Empty;
+		_buySection.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+		_sellSection.Visible = false;
 		ClearChildren(_buyList);
 		ClearChildren(_sellList);
+		HideTradeTooltip();
 
 		if (_player == null)
 		{
@@ -72,17 +92,6 @@ public partial class MerchantShopPanel : PanelContainer
 			AddTradeRow(_buyList, entry, true);
 		}
 
-		foreach (PlayerController.ShopTradeEntry entry in _player.GetShopSellEntries(_shopKind))
-		{
-			AddTradeRow(_sellList, entry, false);
-		}
-
-		if (_sellList.GetChildCount() == 0)
-		{
-			var empty = MakeLabel(14, new Color(0.70f, 0.76f, 0.82f));
-			empty.Text = LocaleText.T("shop.sell.empty");
-			_sellList.AddChild(empty);
-		}
 	}
 
 	private void BuildPanel()
@@ -90,11 +99,11 @@ public partial class MerchantShopPanel : PanelContainer
 		Name = "MerchantShopPanel";
 		MouseFilter = MouseFilterEnum.Stop;
 		SetAnchorsPreset(LayoutPreset.Center);
-		OffsetLeft = -455.0f;
-		OffsetRight = 455.0f;
-		OffsetTop = -315.0f;
-		OffsetBottom = 315.0f;
-		CustomMinimumSize = new Vector2(910.0f, 630.0f);
+		OffsetLeft = -560.0f;
+		OffsetRight = 560.0f;
+		OffsetTop = -340.0f;
+		OffsetBottom = 340.0f;
+		CustomMinimumSize = new Vector2(1120.0f, 680.0f);
 
 		var style = new StyleBoxFlat
 		{
@@ -129,13 +138,21 @@ public partial class MerchantShopPanel : PanelContainer
 		_goldLabel.CustomMinimumSize = new Vector2(170.0f, 0.0f);
 		header.AddChild(_goldLabel);
 
+		_noticeLabel = MakeLabel(15, new Color(0.76f, 0.88f, 1.0f));
+		_noticeLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		_noticeLabel.CustomMinimumSize = new Vector2(0.0f, 34.0f);
+		root.AddChild(_noticeLabel);
+
 		var columns = new HBoxContainer();
+		columns.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		columns.SizeFlagsVertical = SizeFlags.ExpandFill;
 		columns.AddThemeConstantOverride("separation", 14);
 		root.AddChild(columns);
 
-		_buyList = CreateTradeColumn(columns, "shop.buy");
-		_sellList = CreateTradeColumn(columns, "shop.sell");
+		_buyList = CreateTradeColumn(columns, "shop.buy", out _buySection);
+		_sellList = CreateTradeColumn(columns, "shop.sell", out _sellSection);
+
+		BuildTooltipPanel();
 
 		var closeButton = new Button
 		{
@@ -146,9 +163,9 @@ public partial class MerchantShopPanel : PanelContainer
 		root.AddChild(closeButton);
 	}
 
-	private VBoxContainer CreateTradeColumn(HBoxContainer parent, string titleKey)
+	private VBoxContainer CreateTradeColumn(HBoxContainer parent, string titleKey, out VBoxContainer section)
 	{
-		var section = new VBoxContainer
+		section = new VBoxContainer
 		{
 			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 			SizeFlagsVertical = SizeFlags.ExpandFill,
@@ -163,11 +180,13 @@ public partial class MerchantShopPanel : PanelContainer
 		var scroll = new ScrollContainer
 		{
 			HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 			SizeFlagsVertical = SizeFlags.ExpandFill,
 		};
 		section.AddChild(scroll);
 
 		var list = new VBoxContainer();
+		list.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		list.AddThemeConstantOverride("separation", 8);
 		scroll.AddChild(list);
 		return list;
@@ -176,6 +195,10 @@ public partial class MerchantShopPanel : PanelContainer
 	private void AddTradeRow(VBoxContainer parent, PlayerController.ShopTradeEntry entry, bool isBuy)
 	{
 		var row = new PanelContainer();
+		bool isPetBuyRow = _shopKind == PlayerController.MerchantShopKind.PetShop && isBuy;
+		row.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+		row.CustomMinimumSize = new Vector2(0.0f, 64.0f);
+
 		var style = new StyleBoxFlat
 		{
 			BgColor = new Color(0.075f, 0.085f, 0.10f, 0.94f),
@@ -184,17 +207,20 @@ public partial class MerchantShopPanel : PanelContainer
 		style.SetBorderWidthAll(1);
 		style.SetCornerRadiusAll(6);
 		row.AddThemeStyleboxOverride("panel", style);
+		row.MouseFilter = MouseFilterEnum.Stop;
+		row.MouseEntered += () => ShowTradeTooltip(entry);
+		row.MouseExited += HideTradeTooltip;
 		parent.AddChild(row);
 
 		var margin = new MarginContainer();
-		margin.AddThemeConstantOverride("margin_left", 10);
-		margin.AddThemeConstantOverride("margin_right", 10);
-		margin.AddThemeConstantOverride("margin_top", 8);
-		margin.AddThemeConstantOverride("margin_bottom", 8);
+		margin.AddThemeConstantOverride("margin_left", isPetBuyRow ? 14 : 10);
+		margin.AddThemeConstantOverride("margin_right", isPetBuyRow ? 14 : 10);
+		margin.AddThemeConstantOverride("margin_top", isPetBuyRow ? 12 : 8);
+		margin.AddThemeConstantOverride("margin_bottom", isPetBuyRow ? 12 : 8);
 		row.AddChild(margin);
 
 		var line = new HBoxContainer();
-		line.AddThemeConstantOverride("separation", 10);
+		line.AddThemeConstantOverride("separation", isPetBuyRow ? 16 : 10);
 		margin.AddChild(line);
 
 		var info = new VBoxContainer();
@@ -202,19 +228,16 @@ public partial class MerchantShopPanel : PanelContainer
 		info.AddThemeConstantOverride("separation", 4);
 		line.AddChild(info);
 
-		var name = MakeLabel(16, new Color(0.96f, 0.98f, 1.0f));
+		var name = MakeLabel(isPetBuyRow ? 18 : 16, new Color(0.96f, 0.98f, 1.0f));
 		name.Text = entry.DisplayName;
+		name.VerticalAlignment = VerticalAlignment.Center;
+		name.SizeFlagsVertical = SizeFlags.ExpandFill;
 		info.AddChild(name);
-
-		var detail = MakeLabel(13, new Color(0.72f, 0.80f, 0.88f));
-		detail.Text = entry.Detail;
-		detail.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-		info.AddChild(detail);
 
 		var action = new Button
 		{
 			Text = isBuy ? LocaleText.F("shop.button.buy", entry.Price) : LocaleText.F("shop.button.sell", entry.Price),
-			CustomMinimumSize = new Vector2(105.0f, 48.0f),
+			CustomMinimumSize = new Vector2(isPetBuyRow ? 132.0f : 118.0f, 48.0f),
 			Disabled = _player == null || (isBuy && _player.Gold < entry.Price),
 		};
 		action.Pressed += () =>
@@ -233,6 +256,120 @@ public partial class MerchantShopPanel : PanelContainer
 			}
 		};
 		line.AddChild(action);
+	}
+
+	private void BuildTooltipPanel()
+	{
+		_tooltipPanel = new PanelContainer
+		{
+			Visible = false,
+			MouseFilter = MouseFilterEnum.Ignore,
+			CustomMinimumSize = new Vector2(420.0f, 120.0f),
+		};
+
+		var style = new StyleBoxFlat
+		{
+			BgColor = new Color(0.035f, 0.040f, 0.050f, 0.98f),
+			BorderColor = new Color(0.78f, 0.68f, 0.42f, 0.96f),
+		};
+		style.SetBorderWidthAll(2);
+		style.SetCornerRadiusAll(6);
+		_tooltipPanel.AddThemeStyleboxOverride("panel", style);
+
+		var margin = new MarginContainer();
+		margin.AddThemeConstantOverride("margin_left", 12);
+		margin.AddThemeConstantOverride("margin_right", 12);
+		margin.AddThemeConstantOverride("margin_top", 10);
+		margin.AddThemeConstantOverride("margin_bottom", 10);
+		_tooltipPanel.AddChild(margin);
+
+		var rows = new VBoxContainer();
+		rows.AddThemeConstantOverride("separation", 6);
+		margin.AddChild(rows);
+
+		_tooltipTitleLabel = MakeLabel(16, new Color(1.0f, 0.91f, 0.55f));
+		_tooltipTitleLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		rows.AddChild(_tooltipTitleLabel);
+
+		_tooltipBodyScroll = new ScrollContainer
+		{
+			HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+			VerticalScrollMode = ScrollContainer.ScrollMode.Auto,
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		rows.AddChild(_tooltipBodyScroll);
+
+		_tooltipBodyLabel = MakeLabel(13, new Color(0.86f, 0.91f, 0.96f));
+		_tooltipBodyLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		_tooltipBodyLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+		_tooltipBodyScroll.AddChild(_tooltipBodyLabel);
+
+		AddChild(_tooltipPanel);
+	}
+
+	private void ShowTradeTooltip(PlayerController.ShopTradeEntry entry)
+	{
+		if (string.IsNullOrWhiteSpace(entry.Detail))
+		{
+			return;
+		}
+
+		_tooltipTitleLabel.Text = entry.DisplayName;
+		_tooltipBodyLabel.Text = entry.Detail;
+		ApplyTooltipHeightLimit();
+		_tooltipPanel.Visible = true;
+		PositionTooltip();
+	}
+
+	private void HideTradeTooltip()
+	{
+		if (_tooltipPanel != null)
+		{
+			_tooltipPanel.Visible = false;
+		}
+	}
+
+	private void PositionTooltip()
+	{
+		ApplyTooltipHeightLimit();
+		Vector2 panelSize = _tooltipPanel.Size;
+		if (panelSize.X <= 1.0f || panelSize.Y <= 1.0f)
+		{
+			panelSize = _tooltipPanel.GetCombinedMinimumSize();
+		}
+
+		Vector2 available = Size;
+		if (available.X <= 1.0f || available.Y <= 1.0f)
+		{
+			available = CustomMinimumSize;
+		}
+
+		Vector2 desired = new(
+			(available.X - panelSize.X) * 0.5f,
+			(available.Y - panelSize.Y) * 0.5f
+		);
+		desired.X = Mathf.Clamp(desired.X, 18.0f, Mathf.Max(18.0f, available.X - panelSize.X - 18.0f));
+		desired.Y = Mathf.Clamp(desired.Y, 18.0f, Mathf.Max(18.0f, available.Y - panelSize.Y - 18.0f));
+
+		_tooltipPanel.Position = desired;
+	}
+
+	private void ApplyTooltipHeightLimit()
+	{
+		Vector2 available = Size;
+		if (available.X <= 1.0f || available.Y <= 1.0f)
+		{
+			available = CustomMinimumSize;
+		}
+
+		float maxPanelHeight = Mathf.Max(180.0f, available.Y * 0.50f);
+		float maxBodyHeight = Mathf.Max(80.0f, maxPanelHeight - 74.0f);
+		float desiredBodyHeight = Mathf.Clamp(_tooltipBodyLabel.GetCombinedMinimumSize().Y + 8.0f, 56.0f, maxBodyHeight);
+		_tooltipBodyScroll.CustomMinimumSize = new Vector2(0.0f, desiredBodyHeight);
+		_tooltipBodyScroll.Size = new Vector2(_tooltipBodyScroll.Size.X, desiredBodyHeight);
+
+		_tooltipPanel.CustomMinimumSize = new Vector2(420.0f, 0.0f);
+		_tooltipPanel.Size = new Vector2(420.0f, Mathf.Min(_tooltipPanel.GetCombinedMinimumSize().Y, maxPanelHeight));
 	}
 
 	private static Label MakeLabel(int fontSize, Color color)
