@@ -1228,7 +1228,10 @@ public partial class PlayerController : CharacterBody3D
 				"loot.venom_sac" => 55,
 				"loot.sharp_claw" => 42,
 				"loot.beast_hide" => 34,
+				"loot.small_bone" => 28,
 				"loot.slime_mucus" => 24,
+				"loot.soft_fur" => 22,
+				"loot.insect_wing" => 30,
 				_ => 30,
 			};
 		}
@@ -1266,6 +1269,9 @@ public partial class PlayerController : CharacterBody3D
 			"loot.slime_mucus",
 			"loot.beast_hide",
 			"loot.sharp_claw",
+			"loot.soft_fur",
+			"loot.small_bone",
+			"loot.insect_wing",
 			"loot.red_horn",
 			"loot.venom_sac",
 			"loot.water_core",

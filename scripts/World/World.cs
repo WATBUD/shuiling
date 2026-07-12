@@ -20,24 +20,51 @@ public partial class World : Node3D
 		"name.monster.wolf",
 		"name.monster.imp",
 		"name.monster.dragon",
+		"name.monster.rat",
+		"name.monster.fox",
+		"name.monster.deer",
+		"name.monster.bunny",
+		"name.monster.beaver",
+		"name.monster.boar",
+		"name.monster.crab",
+		"name.monster.fish",
+		"name.monster.caterpillar",
+		"name.monster.bee",
+		"name.monster.lion",
+		"name.monster.tiger",
+		"name.monster.bear",
+		"name.monster.elephant",
 	};
 
 	private static readonly string[] ForestMonsterNames =
 	{
+		"name.monster.rat",
+		"name.monster.fox",
+		"name.monster.deer",
+		"name.monster.bunny",
+		"name.monster.beaver",
+		"name.monster.boar",
 		"name.monster.wolf",
 		"name.monster.hunter",
-		"name.monster.redhorn",
 	};
 
 	private static readonly string[] MarshMonsterNames =
 	{
+		"name.monster.rat",
+		"name.monster.crab",
+		"name.monster.fish",
+		"name.monster.caterpillar",
+		"name.monster.bee",
 		"name.monster.slime",
 		"name.monster.water_spirit",
-		"name.monster.imp",
 	};
 
 	private static readonly string[] BadlandsMonsterNames =
 	{
+		"name.monster.lion",
+		"name.monster.tiger",
+		"name.monster.bear",
+		"name.monster.elephant",
 		"name.monster.redhorn",
 		"name.monster.imp",
 		"name.monster.dragon",
@@ -119,7 +146,7 @@ public partial class World : Node3D
 	private readonly Dictionary<CollisionObject3D, (uint Layer, uint Mask)> _mapCollisionDefaults = new();
 	private readonly Vector3 _spawnCampCenter = new(0.0f, 0.0f, 8.0f);
 	private readonly Vector3 _mainCityCenter = new(0.0f, 0.0f, -20.0f);
-	private readonly Vector3 _citySpawnPosition = new(0.0f, 0.0f, 8.0f);
+	private readonly Vector3 _citySpawnPosition = new(5.2f, 0.0f, -16.2f);
 	private readonly Vector3 _wildSpawnPosition = new(0.0f, 0.0f, 8.0f);
 	private Vector3 CityPortalPosition => _mainCityCenter + new Vector3(0.0f, 0.0f, -28.0f);
 	private Vector3 CityPortalArrivalPosition => CityPortalPosition + new Vector3(0.0f, 0.0f, 4.2f);
@@ -1624,13 +1651,13 @@ public partial class World : Node3D
 			new("name.npc.pet_trainer", RingFrontOffset(234.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(234.0f, shopRadius)), 0.7f, "Support"),
 			new("name.npc.mercenary_broker", RingFrontOffset(126.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(126.0f, shopRadius)), 0.7f, "DPS"),
 			new("name.npc.gatherer", RingFrontOffset(180.0f, 24.0f, 1.8f), YawFacingCenter(RingOffset(180.0f, 24.0f)), 1.1f, "Gatherer"),
-			new("name.npc.guard", new Vector3(-5.2f, 0.0f, -27.6f), 180.0f, 0.9f, "Tank"),
-			new("name.npc.guard", new Vector3(5.2f, 0.0f, -27.6f), 180.0f, 0.9f, "Tank"),
+			new("name.npc.guard", new Vector3(-36.0f, 0.0f, -35.0f), 135.0f, 0.0f, "Tank"),
+			new("name.npc.guard", new Vector3(36.0f, 0.0f, -35.0f), -135.0f, 0.0f, "Tank"),
 			new("name.npc.hunter", RingFrontOffset(270.0f, 24.0f, 1.8f), YawFacingCenter(RingOffset(270.0f, 24.0f)), 1.2f, "Ranged"),
 			new("name.npc.apprentice", RingFrontOffset(90.0f, 24.0f, 1.8f), YawFacingCenter(RingOffset(90.0f, 24.0f)), 0.9f, "DPS"),
 			new("name.npc.gatherer", RingFrontOffset(0.0f, 24.0f, 1.8f), YawFacingCenter(RingOffset(0.0f, 24.0f)), 1.0f, "Gatherer"),
-			new("name.npc.guard", new Vector3(-3.5f, 0.0f, -29.0f), 180.0f, 0.8f, "Tank"),
-			new("name.npc.guard", new Vector3(3.5f, 0.0f, -29.0f), 180.0f, 0.8f, "Tank"),
+			new("name.npc.guard", new Vector3(-36.0f, 0.0f, 35.0f), 45.0f, 0.0f, "Tank"),
+			new("name.npc.guard", new Vector3(36.0f, 0.0f, 35.0f), -45.0f, 0.0f, "Tank"),
 		};
 
 		int npcCount = Mathf.Max(CityNpcCount, 0);
@@ -1656,14 +1683,12 @@ public partial class World : Node3D
 	{
 		string[] names =
 		{
-			"name.npc.guard",
 			"name.npc.hunter",
 			"name.npc.gatherer",
 			"name.npc.apprentice",
 		};
 		string[] roles =
 		{
-			"Tank",
 			"Ranged",
 			"Gatherer",
 			"DPS",
@@ -1958,7 +1983,7 @@ public partial class World : Node3D
 		string specialAbility = abilityPool[_rng.RandiRange(0, abilityPool.Length - 1)];
 		string[] rolePool = isMonster ? MonsterRoles : NpcRoles;
 		string combatRole = string.IsNullOrWhiteSpace(forcedCombatRole)
-			? rolePool[_rng.RandiRange(0, rolePool.Length - 1)]
+			? isMonster ? GetMonsterRoleForName(displayName) : rolePool[_rng.RandiRange(0, rolePool.Length - 1)]
 			: forcedCombatRole;
 		string personality = Personalities[_rng.RandiRange(0, Personalities.Length - 1)];
 		string passiveAbility = PassiveAbilities[_rng.RandiRange(0, PassiveAbilities.Length - 1)];
@@ -1977,6 +2002,17 @@ public partial class World : Node3D
 			"wild_marsh" => MarshMonsterNames,
 			"wild_badlands" => BadlandsMonsterNames,
 			_ => MonsterNames,
+		};
+	}
+
+	private static string GetMonsterRoleForName(string displayName)
+	{
+		return displayName switch
+		{
+			"name.monster.bee" or "name.monster.fish" or "name.monster.water_spirit" or "name.monster.imp" or "name.monster.dragon" => "Ranged",
+			"name.monster.elephant" or "name.monster.bear" or "name.monster.redhorn" or "name.monster.crab" => "Tank",
+			"name.monster.slime" or "name.monster.caterpillar" => "Support",
+			_ => "DPS",
 		};
 	}
 
@@ -2034,9 +2070,11 @@ public partial class World : Node3D
 
 	private void CreateMapPortal(string name, Vector3 position, string targetMapId, string labelKey)
 	{
-		var portalGlowMaterial = MakeEmissiveMaterial(new Color(0.30f, 0.88f, 1.0f, 0.58f), 1.75f, 0.24f);
-		var portalCoreMaterial = MakeEmissiveMaterial(new Color(0.62f, 0.42f, 1.0f, 0.46f), 1.25f, 0.18f);
-		var portalSparkMaterial = MakeEmissiveMaterial(new Color(0.82f, 0.96f, 1.0f, 0.86f), 2.1f, 0.12f);
+		bool isCityGate = targetMapId == "wild_select";
+		float portalScale = isCityGate ? 1.55f : 1.0f;
+		var portalGlowMaterial = MakeEmissiveMaterial(new Color(0.30f, 0.88f, 1.0f, isCityGate ? 0.70f : 0.58f), isCityGate ? 2.85f : 1.75f, 0.20f);
+		var portalCoreMaterial = MakeEmissiveMaterial(new Color(0.62f, 0.42f, 1.0f, isCityGate ? 0.62f : 0.46f), isCityGate ? 2.25f : 1.25f, 0.15f);
+		var portalSparkMaterial = MakeEmissiveMaterial(new Color(0.82f, 0.96f, 1.0f, 0.92f), isCityGate ? 3.6f : 2.1f, 0.10f);
 
 		var portal = new StaticBody3D
 		{
@@ -2048,22 +2086,28 @@ public partial class World : Node3D
 		portal.SetMeta("label", labelKey);
 		_propsRoot.AddChild(portal);
 
-		AddMesh(portal, "PortalBase", CylinderMeshFor(1.45f, 1.45f, 0.16f), new Vector3(0.0f, 0.08f, 0.0f), Vector3.Zero, Vector3.One, _matRune);
-		var groundAura = AddMesh(portal, "PortalGroundAura", CylinderMeshFor(2.25f, 2.25f, 0.025f), new Vector3(0.0f, 0.13f, 0.0f), Vector3.Zero, Vector3.One, portalGlowMaterial);
-		AddMesh(portal, "PortalOuterRune", CylinderMeshFor(1.62f, 1.62f, 0.030f), new Vector3(0.0f, 0.155f, 0.0f), Vector3.Zero, new Vector3(1.0f, 1.0f, 1.0f), portalGlowMaterial);
-		var outerRing = AddMesh(portal, "PortalOuterHalo", CylinderMeshFor(1.12f, 1.12f, 0.028f), new Vector3(0.0f, 0.19f, 0.0f), Vector3.Zero, new Vector3(1.0f, 1.0f, 1.0f), portalCoreMaterial);
-		var innerRing = AddMesh(portal, "PortalInnerHalo", CylinderMeshFor(0.68f, 0.68f, 0.032f), new Vector3(0.0f, 0.225f, 0.0f), Vector3.Zero, new Vector3(1.0f, 1.0f, 1.0f), portalGlowMaterial);
-		AddMesh(portal, "PortalCenterGlow", new SphereMesh { Radius = 0.50f, Height = 0.26f }, new Vector3(0.0f, 0.32f, 0.0f), Vector3.Zero, new Vector3(1.25f, 0.24f, 1.25f), portalCoreMaterial);
-		AddPortalRuneStones(portal, portalGlowMaterial);
-		AddPortalParticles(portal, portalSparkMaterial);
+		AddMesh(portal, "PortalBase", CylinderMeshFor(1.45f * portalScale, 1.45f * portalScale, 0.16f), new Vector3(0.0f, 0.08f, 0.0f), Vector3.Zero, Vector3.One, _matRune);
+		var groundAura = AddMesh(portal, "PortalGroundAura", CylinderMeshFor(2.25f * portalScale, 2.25f * portalScale, 0.025f), new Vector3(0.0f, 0.13f, 0.0f), Vector3.Zero, Vector3.One, portalGlowMaterial);
+		AddMesh(portal, "PortalOuterRune", CylinderMeshFor(1.62f * portalScale, 1.62f * portalScale, 0.030f), new Vector3(0.0f, 0.155f, 0.0f), Vector3.Zero, Vector3.One, portalGlowMaterial);
+		AddMesh(portal, "PortalGrandRune", CylinderMeshFor(2.88f * portalScale, 2.88f * portalScale, 0.018f), new Vector3(0.0f, 0.145f, 0.0f), Vector3.Zero, Vector3.One, portalCoreMaterial);
+		var outerRing = AddMesh(portal, "PortalOuterHalo", CylinderMeshFor(1.12f * portalScale, 1.12f * portalScale, 0.028f), new Vector3(0.0f, 0.19f, 0.0f), Vector3.Zero, Vector3.One, portalCoreMaterial);
+		var innerRing = AddMesh(portal, "PortalInnerHalo", CylinderMeshFor(0.68f * portalScale, 0.68f * portalScale, 0.032f), new Vector3(0.0f, 0.225f, 0.0f), Vector3.Zero, Vector3.One, portalGlowMaterial);
+		AddMesh(portal, "PortalCenterGlow", new SphereMesh { Radius = 0.50f * portalScale, Height = 0.26f * portalScale }, new Vector3(0.0f, 0.32f, 0.0f), Vector3.Zero, new Vector3(1.25f, 0.24f, 1.25f), portalCoreMaterial);
+		if (isCityGate)
+		{
+			AddMesh(portal, "PortalLightColumn", CylinderMeshFor(0.34f, 0.72f, 4.8f), new Vector3(0.0f, 2.34f, 0.0f), Vector3.Zero, new Vector3(1.0f, 1.0f, 1.0f), portalCoreMaterial);
+			AddMesh(portal, "PortalCrownGlow", new SphereMesh { Radius = 0.64f, Height = 0.32f }, new Vector3(0.0f, 4.78f, 0.0f), Vector3.Zero, new Vector3(1.8f, 0.28f, 1.8f), portalGlowMaterial);
+		}
+		AddPortalRuneStones(portal, portalGlowMaterial, portalScale);
+		AddPortalParticles(portal, portalSparkMaterial, portalScale, isCityGate);
 
 		var portalLight = new OmniLight3D
 		{
 			Name = "PortalLight",
 			LightColor = new Color(0.45f, 0.86f, 1.0f),
-			LightEnergy = 1.8f,
-			OmniRange = 8.5f,
-			Position = new Vector3(0.0f, 0.75f, 0.0f),
+			LightEnergy = isCityGate ? 4.2f : 1.8f,
+			OmniRange = isCityGate ? 15.0f : 8.5f,
+			Position = new Vector3(0.0f, isCityGate ? 1.6f : 0.75f, 0.0f),
 		};
 		portal.AddChild(portalLight);
 
@@ -2081,9 +2125,9 @@ public partial class World : Node3D
 		{
 			Name = "PortalLabel",
 			Text = LocaleText.T(labelKey),
-			Position = new Vector3(0.0f, 1.65f, 0.0f),
+			Position = new Vector3(0.0f, isCityGate ? 2.72f : 1.65f, 0.0f),
 			Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-			FontSize = 22,
+			FontSize = isCityGate ? 28 : 22,
 			PixelSize = 0.008f,
 			OutlineSize = 6,
 			HorizontalAlignment = HorizontalAlignment.Center,
@@ -2096,40 +2140,42 @@ public partial class World : Node3D
 		var collisionShape = new CollisionShape3D
 		{
 			Position = new Vector3(0.0f, 0.35f, 0.0f),
-			Shape = new CylinderShape3D { Radius = 1.8f, Height = 0.7f },
+			Shape = new CylinderShape3D { Radius = 1.8f * portalScale, Height = 0.7f },
 		};
 		portal.AddChild(collisionShape);
 	}
 
-	private void AddPortalParticles(Node3D portal, Material particleMaterial)
+	private void AddPortalParticles(Node3D portal, Material particleMaterial, float portalScale, bool isCityGate)
 	{
-		var particleMesh = new SphereMesh { Radius = 0.045f, Height = 0.09f };
+		var particleMesh = new SphereMesh { Radius = isCityGate ? 0.065f : 0.045f, Height = isCityGate ? 0.13f : 0.09f };
 		particleMesh.SurfaceSetMaterial(0, particleMaterial);
 
 		var processMaterial = new ParticleProcessMaterial
 		{
 			EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere,
-			EmissionSphereRadius = 1.1f,
+			EmissionSphereRadius = 1.1f * portalScale,
 			Direction = new Vector3(0.0f, 1.0f, 0.0f),
-			Spread = 58.0f,
-			Gravity = new Vector3(0.0f, 0.18f, 0.0f),
-			InitialVelocityMin = 0.35f,
-			InitialVelocityMax = 1.15f,
+			Spread = isCityGate ? 76.0f : 58.0f,
+			Gravity = new Vector3(0.0f, isCityGate ? 0.34f : 0.18f, 0.0f),
+			InitialVelocityMin = isCityGate ? 0.75f : 0.35f,
+			InitialVelocityMax = isCityGate ? 2.45f : 1.15f,
 			AngularVelocityMin = -90.0f,
 			AngularVelocityMax = 90.0f,
-			ScaleMin = 0.55f,
-			ScaleMax = 1.35f,
+			ScaleMin = isCityGate ? 0.75f : 0.55f,
+			ScaleMax = isCityGate ? 2.35f : 1.35f,
 			Color = new Color(0.72f, 0.94f, 1.0f, 0.86f),
 		};
 
 		var risingParticles = new GpuParticles3D
 		{
 			Name = "PortalRisingParticles",
-			Amount = 72,
-			Lifetime = 2.2f,
+			Amount = isCityGate ? 180 : 72,
+			Lifetime = isCityGate ? 3.4f : 2.2f,
 			Randomness = 0.58f,
 			Explosiveness = 0.0f,
-			VisibilityAabb = new Aabb(new Vector3(-2.4f, -0.2f, -2.4f), new Vector3(4.8f, 4.2f, 4.8f)),
+			VisibilityAabb = isCityGate
+				? new Aabb(new Vector3(-5.8f, -0.4f, -5.8f), new Vector3(11.6f, 8.2f, 11.6f))
+				: new Aabb(new Vector3(-2.4f, -0.2f, -2.4f), new Vector3(4.8f, 4.2f, 4.8f)),
 			ProcessMaterial = processMaterial,
 			DrawPass1 = particleMesh,
 			Emitting = true,
@@ -2140,26 +2186,28 @@ public partial class World : Node3D
 		var orbitMaterial = new ParticleProcessMaterial
 		{
 			EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Ring,
-			EmissionRingRadius = 1.25f,
-			EmissionRingInnerRadius = 0.85f,
-			EmissionRingHeight = 0.12f,
+			EmissionRingRadius = 1.25f * portalScale,
+			EmissionRingInnerRadius = 0.85f * portalScale,
+			EmissionRingHeight = isCityGate ? 0.42f : 0.12f,
 			Direction = new Vector3(0.0f, 0.35f, 1.0f),
 			Spread = 90.0f,
 			Gravity = Vector3.Zero,
-			InitialVelocityMin = 0.12f,
-			InitialVelocityMax = 0.45f,
-			ScaleMin = 0.35f,
-			ScaleMax = 0.9f,
+			InitialVelocityMin = isCityGate ? 0.28f : 0.12f,
+			InitialVelocityMax = isCityGate ? 0.86f : 0.45f,
+			ScaleMin = isCityGate ? 0.55f : 0.35f,
+			ScaleMax = isCityGate ? 1.45f : 0.9f,
 			Color = new Color(0.94f, 0.84f, 1.0f, 0.78f),
 		};
 
 		var orbitParticles = new GpuParticles3D
 		{
 			Name = "PortalOrbitParticles",
-			Amount = 42,
-			Lifetime = 1.7f,
+			Amount = isCityGate ? 110 : 42,
+			Lifetime = isCityGate ? 2.4f : 1.7f,
 			Randomness = 0.42f,
-			VisibilityAabb = new Aabb(new Vector3(-2.2f, -0.4f, -1.6f), new Vector3(4.4f, 3.4f, 3.2f)),
+			VisibilityAabb = isCityGate
+				? new Aabb(new Vector3(-5.2f, -0.6f, -5.2f), new Vector3(10.4f, 6.8f, 10.4f))
+				: new Aabb(new Vector3(-2.2f, -0.4f, -1.6f), new Vector3(4.4f, 3.4f, 3.2f)),
 			ProcessMaterial = orbitMaterial,
 			DrawPass1 = particleMesh,
 			Emitting = true,
@@ -2169,17 +2217,17 @@ public partial class World : Node3D
 		portal.AddChild(orbitParticles);
 	}
 
-	private void AddPortalRuneStones(Node3D portal, Material material)
+	private void AddPortalRuneStones(Node3D portal, Material material, float portalScale)
 	{
 		for (int index = 0; index < 12; index++)
 		{
 			float angle = index / 12.0f * Mathf.Tau;
-			float radius = index % 2 == 0 ? 1.42f : 1.18f;
+			float radius = (index % 2 == 0 ? 1.42f : 1.18f) * portalScale;
 			Vector3 position = new(Mathf.Cos(angle) * radius, 0.245f, Mathf.Sin(angle) * radius);
 			AddMesh(
 				portal,
 				$"PortalRune{index}",
-				BoxMeshFor(new Vector3(0.28f, 0.026f, 0.07f)),
+				BoxMeshFor(new Vector3(0.28f * portalScale, 0.026f, 0.07f * portalScale)),
 				position,
 				new Vector3(0.0f, Mathf.RadToDeg(-angle), 0.0f),
 				Vector3.One,

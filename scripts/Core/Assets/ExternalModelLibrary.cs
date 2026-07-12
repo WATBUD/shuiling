@@ -71,6 +71,21 @@ public static class ExternalModelLibrary
 		"res://assets/models/monsters/slime.gltf",
 	};
 
+	private static readonly string[] RatMonsterModels = { "res://assets/models/monsters/street_rat/street_rat_1k.gltf" };
+	private static readonly string[] FoxMonsterModels = { "res://assets/models/pets/cube_pets/animal-fox.glb" };
+	private static readonly string[] DeerMonsterModels = { "res://assets/models/pets/cube_pets/animal-deer.glb" };
+	private static readonly string[] BunnyMonsterModels = { "res://assets/models/pets/cube_pets/animal-bunny.glb" };
+	private static readonly string[] BeaverMonsterModels = { "res://assets/models/pets/cube_pets/animal-beaver.glb" };
+	private static readonly string[] BoarMonsterModels = { "res://assets/models/pets/cube_pets/animal-hog.glb" };
+	private static readonly string[] CrabMonsterModels = { "res://assets/models/pets/cube_pets/animal-crab.glb" };
+	private static readonly string[] FishMonsterModels = { "res://assets/models/pets/cube_pets/animal-fish.glb" };
+	private static readonly string[] CaterpillarMonsterModels = { "res://assets/models/pets/cube_pets/animal-caterpillar.glb" };
+	private static readonly string[] BeeMonsterModels = { "res://assets/models/pets/cube_pets/animal-bee.glb" };
+	private static readonly string[] LionMonsterModels = { "res://assets/models/pets/cube_pets/animal-lion.glb" };
+	private static readonly string[] TigerMonsterModels = { "res://assets/models/pets/cube_pets/animal-tiger.glb" };
+	private static readonly string[] BearMonsterModels = { "res://assets/models/pets/cube_pets/animal-polar.glb" };
+	private static readonly string[] ElephantMonsterModels = { "res://assets/models/pets/cube_pets/animal-elephant.glb" };
+
 	private static readonly string[] ForestMonsterModels =
 	{
 		"res://assets/models/monsters/street_rat/street_rat_1k.gltf",
@@ -135,6 +150,12 @@ public static class ExternalModelLibrary
 	private static string[] GetMonsterModelPool(SimpleActor actor)
 	{
 		string displayName = actor.DisplayName ?? string.Empty;
+		string[]? matchedModels = GetMonsterModelsForName(displayName);
+		if (matchedModels != null)
+		{
+			return matchedModels;
+		}
+
 		if (displayName.Contains("slime", System.StringComparison.OrdinalIgnoreCase) || displayName.Contains("史萊姆"))
 		{
 			return SlimeMonsterModels;
@@ -146,6 +167,29 @@ public static class ExternalModelLibrary
 			"wild_marsh" => MarshMonsterModels,
 			"wild_badlands" => BadlandsMonsterModels,
 			_ => actor.IsRangedCombatant ? MonsterRanged : MonsterMelee,
+		};
+	}
+
+	private static string[]? GetMonsterModelsForName(string displayName)
+	{
+		return displayName switch
+		{
+			"name.monster.slime" => SlimeMonsterModels,
+			"name.monster.rat" => RatMonsterModels,
+			"name.monster.fox" => FoxMonsterModels,
+			"name.monster.deer" => DeerMonsterModels,
+			"name.monster.bunny" => BunnyMonsterModels,
+			"name.monster.beaver" => BeaverMonsterModels,
+			"name.monster.boar" => BoarMonsterModels,
+			"name.monster.crab" => CrabMonsterModels,
+			"name.monster.fish" => FishMonsterModels,
+			"name.monster.caterpillar" => CaterpillarMonsterModels,
+			"name.monster.bee" => BeeMonsterModels,
+			"name.monster.lion" => LionMonsterModels,
+			"name.monster.tiger" => TigerMonsterModels,
+			"name.monster.bear" => BearMonsterModels,
+			"name.monster.elephant" => ElephantMonsterModels,
+			_ => null,
 		};
 	}
 
@@ -499,6 +543,61 @@ public static class ExternalModelLibrary
 		if (key.Contains("barbarian") || key.Contains("warrior"))
 		{
 			return ModelMaterial(surfaceIndex % 2 == 0 ? new Color(0.48f, 0.22f, 0.10f) : new Color(0.24f, 0.13f, 0.08f));
+		}
+
+		if (key.Contains("street_rat"))
+		{
+			return ModelMaterial(surfaceIndex % 2 == 0 ? new Color(0.38f, 0.28f, 0.22f) : new Color(0.72f, 0.58f, 0.48f));
+		}
+
+		if (key.Contains("animal-fox"))
+		{
+			return ModelMaterial(surfaceIndex % 2 == 0 ? new Color(0.92f, 0.34f, 0.12f) : new Color(0.96f, 0.84f, 0.70f));
+		}
+
+		if (key.Contains("animal-deer") || key.Contains("animal-beaver") || key.Contains("animal-hog"))
+		{
+			return ModelMaterial(surfaceIndex % 2 == 0 ? new Color(0.54f, 0.32f, 0.16f) : new Color(0.78f, 0.58f, 0.36f));
+		}
+
+		if (key.Contains("animal-bunny"))
+		{
+			return ModelMaterial(surfaceIndex % 2 == 0 ? new Color(0.90f, 0.80f, 0.72f) : new Color(1.0f, 0.74f, 0.82f));
+		}
+
+		if (key.Contains("animal-crab"))
+		{
+			return ModelMaterial(surfaceIndex % 2 == 0 ? new Color(0.86f, 0.18f, 0.12f) : new Color(1.0f, 0.42f, 0.24f));
+		}
+
+		if (key.Contains("animal-fish"))
+		{
+			return ModelMaterial(surfaceIndex % 2 == 0 ? new Color(0.22f, 0.66f, 0.92f) : new Color(0.76f, 0.92f, 1.0f));
+		}
+
+		if (key.Contains("animal-caterpillar"))
+		{
+			return ModelMaterial(surfaceIndex % 2 == 0 ? new Color(0.32f, 0.70f, 0.18f) : new Color(0.78f, 0.94f, 0.34f));
+		}
+
+		if (key.Contains("animal-bee"))
+		{
+			return ModelMaterial(surfaceIndex % 2 == 0 ? new Color(1.0f, 0.78f, 0.12f) : new Color(0.10f, 0.10f, 0.08f));
+		}
+
+		if (key.Contains("animal-lion") || key.Contains("animal-tiger"))
+		{
+			return ModelMaterial(surfaceIndex % 2 == 0 ? new Color(0.90f, 0.46f, 0.12f) : new Color(0.18f, 0.12f, 0.08f));
+		}
+
+		if (key.Contains("animal-polar"))
+		{
+			return ModelMaterial(surfaceIndex % 2 == 0 ? new Color(0.86f, 0.92f, 1.0f) : new Color(0.56f, 0.64f, 0.72f));
+		}
+
+		if (key.Contains("animal-elephant"))
+		{
+			return ModelMaterial(surfaceIndex % 2 == 0 ? new Color(0.50f, 0.56f, 0.60f) : new Color(0.74f, 0.76f, 0.74f));
 		}
 
 		if (key.Contains("monster") || key.Contains("orc") || key.Contains("demon") || key.Contains("imp") || key.Contains("beast") || key.Contains("wolf"))
