@@ -71,57 +71,6 @@ public static class ExternalModelLibrary
 		"res://assets/models/monsters/slime.gltf",
 	};
 
-	private static readonly string[] RatMonsterModels = { "res://assets/models/monsters/street_rat/street_rat_1k.gltf" };
-	private static readonly string[] FoxMonsterModels = { "res://assets/models/pets/cube_pets/animal-fox.glb" };
-	private static readonly string[] DeerMonsterModels = { "res://assets/models/pets/cube_pets/animal-deer.glb" };
-	private static readonly string[] BunnyMonsterModels = { "res://assets/models/pets/cube_pets/animal-bunny.glb" };
-	private static readonly string[] BeaverMonsterModels = { "res://assets/models/pets/cube_pets/animal-beaver.glb" };
-	private static readonly string[] BoarMonsterModels = { "res://assets/models/pets/cube_pets/animal-hog.glb" };
-	private static readonly string[] CrabMonsterModels = { "res://assets/models/pets/cube_pets/animal-crab.glb" };
-	private static readonly string[] FishMonsterModels = { "res://assets/models/pets/cube_pets/animal-fish.glb" };
-	private static readonly string[] CaterpillarMonsterModels = { "res://assets/models/pets/cube_pets/animal-caterpillar.glb" };
-	private static readonly string[] BeeMonsterModels = { "res://assets/models/pets/cube_pets/animal-bee.glb" };
-	private static readonly string[] LionMonsterModels = { "res://assets/models/pets/cube_pets/animal-lion.glb" };
-	private static readonly string[] TigerMonsterModels = { "res://assets/models/pets/cube_pets/animal-tiger.glb" };
-	private static readonly string[] BearMonsterModels = { "res://assets/models/pets/cube_pets/animal-polar.glb" };
-	private static readonly string[] ElephantMonsterModels = { "res://assets/models/pets/cube_pets/animal-elephant.glb" };
-
-	private static readonly string[] ForestMonsterModels =
-	{
-		"res://assets/models/monsters/street_rat/street_rat_1k.gltf",
-		"res://assets/models/pets/cube_pets/animal-fox.glb",
-		"res://assets/models/pets/cube_pets/animal-deer.glb",
-		"res://assets/models/pets/cube_pets/animal-bunny.glb",
-		"res://assets/models/pets/cube_pets/animal-beaver.glb",
-		"res://assets/models/pets/cube_pets/animal-hog.glb",
-		"res://assets/models/monsters/beast.gltf",
-		"res://assets/models/monsters/orc.gltf",
-	};
-
-	private static readonly string[] MarshMonsterModels =
-	{
-		"res://assets/models/monsters/street_rat/street_rat_1k.gltf",
-		"res://assets/models/pets/cube_pets/animal-crab.glb",
-		"res://assets/models/pets/cube_pets/animal-fish.glb",
-		"res://assets/models/pets/cube_pets/animal-caterpillar.glb",
-		"res://assets/models/pets/cube_pets/animal-bee.glb",
-		"res://assets/models/monsters/slime_enemy_poly_pizza.glb",
-		"res://assets/models/monsters/slime.gltf",
-		"res://assets/models/monsters/spitter.gltf",
-		"res://assets/models/monsters/imp.gltf",
-	};
-
-	private static readonly string[] BadlandsMonsterModels =
-	{
-		"res://assets/models/pets/cube_pets/animal-lion.glb",
-		"res://assets/models/pets/cube_pets/animal-tiger.glb",
-		"res://assets/models/pets/cube_pets/animal-polar.glb",
-		"res://assets/models/pets/cube_pets/animal-elephant.glb",
-		"res://assets/models/monsters/golem.gltf",
-		"res://assets/models/monsters/demon.gltf",
-		"res://assets/models/monsters/blue_demon.gltf",
-	};
-
 	private static readonly string[] TreeModels =
 	{
 		"res://assets/models/environment/tree.glb",
@@ -150,7 +99,7 @@ public static class ExternalModelLibrary
 	private static string[] GetMonsterModelPool(SimpleActor actor)
 	{
 		string displayName = actor.DisplayName ?? string.Empty;
-		string[]? matchedModels = GetMonsterModelsForName(displayName);
+		string[]? matchedModels = MonsterSpeciesCatalog.Current.GetModelPaths(displayName);
 		if (matchedModels != null)
 		{
 			return matchedModels;
@@ -161,36 +110,7 @@ public static class ExternalModelLibrary
 			return SlimeMonsterModels;
 		}
 
-		return actor.MapId switch
-		{
-			"wild_forest" => ForestMonsterModels,
-			"wild_marsh" => MarshMonsterModels,
-			"wild_badlands" => BadlandsMonsterModels,
-			_ => actor.IsRangedCombatant ? MonsterRanged : MonsterMelee,
-		};
-	}
-
-	private static string[]? GetMonsterModelsForName(string displayName)
-	{
-		return displayName switch
-		{
-			"name.monster.slime" => SlimeMonsterModels,
-			"name.monster.rat" => RatMonsterModels,
-			"name.monster.fox" => FoxMonsterModels,
-			"name.monster.deer" => DeerMonsterModels,
-			"name.monster.bunny" => BunnyMonsterModels,
-			"name.monster.beaver" => BeaverMonsterModels,
-			"name.monster.boar" => BoarMonsterModels,
-			"name.monster.crab" => CrabMonsterModels,
-			"name.monster.fish" => FishMonsterModels,
-			"name.monster.caterpillar" => CaterpillarMonsterModels,
-			"name.monster.bee" => BeeMonsterModels,
-			"name.monster.lion" => LionMonsterModels,
-			"name.monster.tiger" => TigerMonsterModels,
-			"name.monster.bear" => BearMonsterModels,
-			"name.monster.elephant" => ElephantMonsterModels,
-			_ => null,
-		};
+		return actor.IsRangedCombatant ? MonsterRanged : MonsterMelee;
 	}
 
 	private static Vector3 GetActorModelScale(SimpleActor actor)

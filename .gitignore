@@ -1,6 +1,8 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+.vs/
+**/.vs/
 
 # Downloaded source asset packs are large staging files.
 # Keep curated runtime assets under assets/models/ in Git.

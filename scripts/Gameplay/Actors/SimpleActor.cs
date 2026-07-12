@@ -841,30 +841,7 @@ public partial class SimpleActor : CharacterBody3D
 			return new Color(0.64f, 0.86f, 1.0f, 0.94f);
 		}
 
-		return GetMonsterNameColor(DisplayName);
-	}
-
-	private static Color GetMonsterNameColor(string displayName)
-	{
-		return displayName switch
-		{
-			"name.monster.slime" => new Color(0.20f, 0.96f, 0.82f, 0.94f),
-			"name.monster.water_spirit" => new Color(0.32f, 0.76f, 1.0f, 0.94f),
-			"name.monster.rat" => new Color(0.62f, 0.48f, 0.36f, 0.94f),
-			"name.monster.fox" => new Color(1.0f, 0.48f, 0.20f, 0.94f),
-			"name.monster.deer" => new Color(0.78f, 0.58f, 0.34f, 0.94f),
-			"name.monster.bunny" => new Color(0.96f, 0.86f, 0.78f, 0.94f),
-			"name.monster.beaver" or "name.monster.boar" => new Color(0.58f, 0.34f, 0.18f, 0.94f),
-			"name.monster.crab" => new Color(1.0f, 0.34f, 0.26f, 0.94f),
-			"name.monster.fish" => new Color(0.28f, 0.82f, 1.0f, 0.94f),
-			"name.monster.caterpillar" => new Color(0.44f, 0.92f, 0.28f, 0.94f),
-			"name.monster.bee" => new Color(1.0f, 0.82f, 0.22f, 0.96f),
-			"name.monster.lion" => new Color(0.95f, 0.66f, 0.26f, 0.96f),
-			"name.monster.tiger" => new Color(1.0f, 0.42f, 0.12f, 0.96f),
-			"name.monster.bear" => new Color(0.84f, 0.92f, 1.0f, 0.94f),
-			"name.monster.elephant" => new Color(0.62f, 0.68f, 0.74f, 0.94f),
-			_ => new Color(1.0f, 0.34f, 0.26f, 0.94f),
-		};
+		return MonsterSpeciesCatalog.Current.GetMarkerColor(DisplayName);
 	}
 
 	private static StandardMaterial3D MakeMarkerMaterial(Color color, float emissionEnergy)

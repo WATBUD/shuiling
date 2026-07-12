@@ -11,65 +11,6 @@ public partial class World : Node3D
 		"name.npc.apprentice",
 	};
 
-	private static readonly string[] MonsterNames =
-	{
-		"name.monster.slime",
-		"name.monster.water_spirit",
-		"name.monster.redhorn",
-		"name.monster.hunter",
-		"name.monster.wolf",
-		"name.monster.imp",
-		"name.monster.dragon",
-		"name.monster.rat",
-		"name.monster.fox",
-		"name.monster.deer",
-		"name.monster.bunny",
-		"name.monster.beaver",
-		"name.monster.boar",
-		"name.monster.crab",
-		"name.monster.fish",
-		"name.monster.caterpillar",
-		"name.monster.bee",
-		"name.monster.lion",
-		"name.monster.tiger",
-		"name.monster.bear",
-		"name.monster.elephant",
-	};
-
-	private static readonly string[] ForestMonsterNames =
-	{
-		"name.monster.rat",
-		"name.monster.fox",
-		"name.monster.deer",
-		"name.monster.bunny",
-		"name.monster.beaver",
-		"name.monster.boar",
-		"name.monster.wolf",
-		"name.monster.hunter",
-	};
-
-	private static readonly string[] MarshMonsterNames =
-	{
-		"name.monster.rat",
-		"name.monster.crab",
-		"name.monster.fish",
-		"name.monster.caterpillar",
-		"name.monster.bee",
-		"name.monster.slime",
-		"name.monster.water_spirit",
-	};
-
-	private static readonly string[] BadlandsMonsterNames =
-	{
-		"name.monster.lion",
-		"name.monster.tiger",
-		"name.monster.bear",
-		"name.monster.elephant",
-		"name.monster.redhorn",
-		"name.monster.imp",
-		"name.monster.dragon",
-	};
-
 	private static readonly string[] NpcAbilities =
 	{
 		"ability.npc.heal",
@@ -97,15 +38,6 @@ public partial class World : Node3D
 		"Gatherer",
 		"Builder",
 		"DPS",
-	};
-
-	private static readonly string[] MonsterRoles =
-	{
-		"DPS",
-		"DPS",
-		"Tank",
-		"Ranged",
-		"Ranged",
 	};
 
 	private static readonly string[] Personalities =
@@ -1028,10 +960,6 @@ public partial class World : Node3D
 			new Color(1.0f, 0.58f, 0.28f)
 		);
 
-		AddMesh(shop, "ForgeHearth", BoxMeshFor(new Vector3(1.25f, 1.0f, 0.92f)), new Vector3(-2.0f, 0.5f, -3.35f), Vector3.Zero, Vector3.One, _matWall);
-		AddMesh(shop, "ForgeFire", CylinderMeshFor(0.16f, 0.32f, 0.34f), new Vector3(-2.0f, 1.12f, -3.36f), Vector3.Zero, new Vector3(1.0f, 0.65f, 1.0f), _matTorchFire);
-		AddMesh(shop, "AnvilBase", BoxMeshFor(new Vector3(0.72f, 0.42f, 0.48f)), new Vector3(1.25f, 0.38f, -3.45f), Vector3.Zero, Vector3.One, _matMetal);
-		AddMesh(shop, "AnvilHorn", CylinderMeshFor(0.0f, 0.22f, 0.52f), new Vector3(1.77f, 0.52f, -3.45f), new Vector3(0.0f, 0.0f, 90.0f), Vector3.One, _matMetal);
 		AddMesh(shop, "ToolRack", BoxMeshFor(new Vector3(1.8f, 0.12f, 0.08f)), new Vector3(0.0f, 1.8f, -3.08f), Vector3.Zero, Vector3.One, _matMetal);
 		AddMesh(shop, "HammerA", BoxMeshFor(new Vector3(0.14f, 0.78f, 0.08f)), new Vector3(-0.55f, 1.45f, -3.14f), new Vector3(0.0f, 0.0f, 16.0f), Vector3.One, _matMetal);
 		AddMesh(shop, "HammerB", BoxMeshFor(new Vector3(0.14f, 0.70f, 0.08f)), new Vector3(0.15f, 1.45f, -3.14f), new Vector3(0.0f, 0.0f, -16.0f), Vector3.One, _matMetal);
@@ -1714,6 +1642,18 @@ public partial class World : Node3D
 		return actor;
 	}
 
+	public SimpleActor SpawnPurchasedPet(string monsterNameKey, int level)
+	{
+		SimpleActor actor = CreateActor(true, "city", monsterNameKey, MonsterSpeciesCatalog.Current.GetDefaultRole(monsterNameKey), level);
+		Vector3 spawnPosition = _mainCityCenter + RingFrontOffset(234.0f, 31.0f, 2.4f);
+		actor.Position = spawnPosition;
+		actor.HomePosition = spawnPosition;
+		actor.WanderRadius = 0.6f;
+		actor.MoveSpeed = 1.05f;
+		_actorsRoot.AddChild(actor);
+		return actor;
+	}
+
 	private SimpleActor CreateActor(bool isMonster, string mapId = "wild_forest", string forcedDisplayName = "", string forcedCombatRole = "", int forcedLevel = 0)
 	{
 		var actor = new SimpleActor
@@ -1975,15 +1915,14 @@ public partial class World : Node3D
 			: 4 + level * 2 + _rng.RandiRange(0, 3);
 		int experience = isMonster ? level * 9 + _rng.RandiRange(3, 12) : level * 4 + _rng.RandiRange(1, 5);
 		int gold = isMonster ? level * 3 + _rng.RandiRange(0, 8) : level + _rng.RandiRange(0, 4);
-		string[] namePool = isMonster ? GetMonsterNamePool(actor.MapId) : NpcNames;
+		string[] namePool = isMonster ? MonsterSpeciesCatalog.Current.GetNamePool(actor.MapId) : NpcNames;
 		string displayName = string.IsNullOrWhiteSpace(forcedDisplayName)
 			? namePool[_rng.RandiRange(0, namePool.Length - 1)]
 			: forcedDisplayName;
 		string[] abilityPool = isMonster ? MonsterAbilities : NpcAbilities;
 		string specialAbility = abilityPool[_rng.RandiRange(0, abilityPool.Length - 1)];
-		string[] rolePool = isMonster ? MonsterRoles : NpcRoles;
 		string combatRole = string.IsNullOrWhiteSpace(forcedCombatRole)
-			? isMonster ? GetMonsterRoleForName(displayName) : rolePool[_rng.RandiRange(0, rolePool.Length - 1)]
+			? isMonster ? MonsterSpeciesCatalog.Current.GetDefaultRole(displayName) : NpcRoles[_rng.RandiRange(0, NpcRoles.Length - 1)]
 			: forcedCombatRole;
 		string personality = Personalities[_rng.RandiRange(0, Personalities.Length - 1)];
 		string passiveAbility = PassiveAbilities[_rng.RandiRange(0, PassiveAbilities.Length - 1)];
@@ -1992,28 +1931,6 @@ public partial class World : Node3D
 		actor.ConfigureStats(displayName, level, maxHealth, attack, defense, experience, gold);
 		actor.ConfigureGrowth(specialAbility, _rng.RandiRange(1, 2));
 		actor.ConfigureCombatProfile(combatRole, personality, passiveAbility, affinity);
-	}
-
-	private static string[] GetMonsterNamePool(string mapId)
-	{
-		return mapId switch
-		{
-			"wild_forest" => ForestMonsterNames,
-			"wild_marsh" => MarshMonsterNames,
-			"wild_badlands" => BadlandsMonsterNames,
-			_ => MonsterNames,
-		};
-	}
-
-	private static string GetMonsterRoleForName(string displayName)
-	{
-		return displayName switch
-		{
-			"name.monster.bee" or "name.monster.fish" or "name.monster.water_spirit" or "name.monster.imp" or "name.monster.dragon" => "Ranged",
-			"name.monster.elephant" or "name.monster.bear" or "name.monster.redhorn" or "name.monster.crab" => "Tank",
-			"name.monster.slime" or "name.monster.caterpillar" => "Support",
-			_ => "DPS",
-		};
 	}
 
 	private void AddHorn(Node3D actor, Vector3 position, Vector3 rotationDegrees)

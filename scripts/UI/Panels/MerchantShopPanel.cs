@@ -52,7 +52,12 @@ public partial class MerchantShopPanel : PanelContainer
 			return;
 		}
 
-		_titleLabel.Text = LocaleText.T(_shopKind == PlayerController.MerchantShopKind.Blacksmith ? "shop.blacksmith.trade" : "shop.item.trade");
+		_titleLabel.Text = LocaleText.T(_shopKind switch
+		{
+			PlayerController.MerchantShopKind.Blacksmith => "shop.blacksmith.trade",
+			PlayerController.MerchantShopKind.PetShop => "shop.pet.trade",
+			_ => "shop.item.trade",
+		});
 		_goldLabel.Text = LocaleText.F("inventory.gold", _player?.Gold ?? 0);
 		ClearChildren(_buyList);
 		ClearChildren(_sellList);
