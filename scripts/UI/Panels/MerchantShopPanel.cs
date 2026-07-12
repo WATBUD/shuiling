@@ -18,19 +18,16 @@ public partial class MerchantShopPanel : PanelContainer
 	private Button _refreshButton = null!;
 	private Button _buyTabButton = null!;
 	private Button _sellTabButton = null!;
-	private PanelContainer _tooltipPanel = null!;
-	private Label _tooltipTitleLabel = null!;
-	private Label _tooltipBodyLabel = null!;
-	private ScrollContainer _tooltipBodyScroll = null!;
+	private FloatingTooltip _tooltip = null!;
 	private bool _showSellList;
 
 	public System.Action? CloseRequested { get; set; }
 
 	public override void _Process(double delta)
 	{
-		if (_tooltipPanel != null && _tooltipPanel.Visible)
+		if (_tooltip != null && _tooltip.Visible)
 		{
-			PositionTooltip();
+			_tooltip.PositionNearMouse(this);
 		}
 
 		if (Visible && _player != null && _player.IsMerchantShopRefreshable(_shopKind))
@@ -361,51 +358,16 @@ public partial class MerchantShopPanel : PanelContainer
 
 	private void BuildTooltipPanel()
 	{
-		_tooltipPanel = new PanelContainer
+		_tooltip = new FloatingTooltip
 		{
-			Visible = false,
-			MouseFilter = MouseFilterEnum.Ignore,
-			CustomMinimumSize = new Vector2(420.0f, 120.0f),
+			Name = "MerchantTradeTooltip",
+			MaxWidth = 420.0f,
+			MinWidth = 220.0f,
+			MaxWidthRatio = 0.55f,
+			MaxHeightRatio = 0.50f,
+			MinBodyHeight = 56.0f,
 		};
-
-		var style = new StyleBoxFlat
-		{
-			BgColor = new Color(0.035f, 0.040f, 0.050f, 0.98f),
-			BorderColor = new Color(0.78f, 0.68f, 0.42f, 0.96f),
-		};
-		style.SetBorderWidthAll(2);
-		style.SetCornerRadiusAll(6);
-		_tooltipPanel.AddThemeStyleboxOverride("panel", style);
-
-		var margin = new MarginContainer();
-		margin.AddThemeConstantOverride("margin_left", 12);
-		margin.AddThemeConstantOverride("margin_right", 12);
-		margin.AddThemeConstantOverride("margin_top", 10);
-		margin.AddThemeConstantOverride("margin_bottom", 10);
-		_tooltipPanel.AddChild(margin);
-
-		var rows = new VBoxContainer();
-		rows.AddThemeConstantOverride("separation", 6);
-		margin.AddChild(rows);
-
-		_tooltipTitleLabel = MakeLabel(16, new Color(1.0f, 0.91f, 0.55f));
-		_tooltipTitleLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-		rows.AddChild(_tooltipTitleLabel);
-
-		_tooltipBodyScroll = new ScrollContainer
-		{
-			HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
-			VerticalScrollMode = ScrollContainer.ScrollMode.Auto,
-			SizeFlagsHorizontal = SizeFlags.ExpandFill,
-		};
-		rows.AddChild(_tooltipBodyScroll);
-
-		_tooltipBodyLabel = MakeLabel(13, new Color(0.86f, 0.91f, 0.96f));
-		_tooltipBodyLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-		_tooltipBodyLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-		_tooltipBodyScroll.AddChild(_tooltipBodyLabel);
-
-		AddChild(_tooltipPanel);
+		AddChild(_tooltip);
 	}
 
 	private void ShowTradeTooltip(PlayerController.ShopTradeEntry entry)
@@ -415,69 +377,15 @@ public partial class MerchantShopPanel : PanelContainer
 			return;
 		}
 
-		_tooltipTitleLabel.Text = entry.DisplayName;
-		_tooltipBodyLabel.Text = entry.Detail;
-		ApplyTooltipHeightLimit();
-		_tooltipPanel.Visible = true;
-		PositionTooltip();
+		_tooltip.ShowTooltip(entry.DisplayName, entry.Detail, this);
 	}
 
 	private void HideTradeTooltip()
 	{
-		if (_tooltipPanel != null)
+		if (_tooltip != null)
 		{
-			_tooltipPanel.Visible = false;
+			_tooltip.HideTooltip();
 		}
-	}
-
-	private void PositionTooltip()
-	{
-		ApplyTooltipHeightLimit();
-		Vector2 panelSize = _tooltipPanel.Size;
-		if (panelSize.X <= 1.0f || panelSize.Y <= 1.0f)
-		{
-			panelSize = _tooltipPanel.GetCombinedMinimumSize();
-		}
-
-		Vector2 available = Size;
-		if (available.X <= 1.0f || available.Y <= 1.0f)
-		{
-			available = CustomMinimumSize;
-		}
-
-		Vector2 mouse = GetViewport().GetMousePosition() - GlobalPosition;
-		Vector2 desired = mouse + new Vector2(18.0f, 18.0f);
-		if (desired.X + panelSize.X + 18.0f > available.X)
-		{
-			desired.X = mouse.X - panelSize.X - 18.0f;
-		}
-		if (desired.Y + panelSize.Y + 18.0f > available.Y)
-		{
-			desired.Y = mouse.Y - panelSize.Y - 18.0f;
-		}
-
-		desired.X = Mathf.Clamp(desired.X, 18.0f, Mathf.Max(18.0f, available.X - panelSize.X - 18.0f));
-		desired.Y = Mathf.Clamp(desired.Y, 18.0f, Mathf.Max(18.0f, available.Y - panelSize.Y - 18.0f));
-
-		_tooltipPanel.Position = desired;
-	}
-
-	private void ApplyTooltipHeightLimit()
-	{
-		Vector2 available = Size;
-		if (available.X <= 1.0f || available.Y <= 1.0f)
-		{
-			available = CustomMinimumSize;
-		}
-
-		float maxPanelHeight = Mathf.Max(180.0f, available.Y * 0.50f);
-		float maxBodyHeight = Mathf.Max(80.0f, maxPanelHeight - 74.0f);
-		float desiredBodyHeight = Mathf.Clamp(_tooltipBodyLabel.GetCombinedMinimumSize().Y + 8.0f, 56.0f, maxBodyHeight);
-		_tooltipBodyScroll.CustomMinimumSize = new Vector2(0.0f, desiredBodyHeight);
-		_tooltipBodyScroll.Size = new Vector2(_tooltipBodyScroll.Size.X, desiredBodyHeight);
-
-		_tooltipPanel.CustomMinimumSize = new Vector2(420.0f, 0.0f);
-		_tooltipPanel.Size = new Vector2(420.0f, Mathf.Min(_tooltipPanel.GetCombinedMinimumSize().Y, maxPanelHeight));
 	}
 
 	private static Label MakeLabel(int fontSize, Color color)

@@ -51,9 +51,7 @@ public partial class InventoryPanel : PanelContainer
 	private Button _skill1Button = null!;
 	private Button _skill2Button = null!;
 	private Button _skill3Button = null!;
-	private PanelContainer _tooltipPanel = null!;
-	private Label _tooltipTitleLabel = null!;
-	private Label _tooltipBodyLabel = null!;
+	private FloatingTooltip _tooltip = null!;
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -71,9 +69,9 @@ public partial class InventoryPanel : PanelContainer
 
 	public override void _Process(double delta)
 	{
-		if (_tooltipPanel != null && _tooltipPanel.Visible)
+		if (_tooltip != null && _tooltip.Visible)
 		{
-			PositionTooltip();
+			_tooltip.PositionNearMouse(this);
 		}
 	}
 
@@ -312,43 +310,17 @@ public partial class InventoryPanel : PanelContainer
 
 	private void BuildTooltip()
 	{
-		_tooltipPanel = new PanelContainer
+		_tooltip = new FloatingTooltip
 		{
-			Visible = false,
-			MouseFilter = MouseFilterEnum.Ignore,
-			CustomMinimumSize = new Vector2(360.0f, 0.0f),
+			Name = "InventoryItemTooltip",
+			MaxWidth = 360.0f,
+			MinWidth = 180.0f,
+			MaxWidthRatio = 0.36f,
+			MaxHeightRatio = 0.50f,
 			TopLevel = true,
 			ZIndex = 100,
 		};
-		var style = new StyleBoxFlat
-		{
-			BgColor = new Color(0.025f, 0.030f, 0.040f, 0.97f),
-			BorderColor = new Color(0.98f, 0.78f, 0.34f, 0.95f),
-		};
-		style.SetBorderWidthAll(2);
-		style.SetCornerRadiusAll(5);
-		_tooltipPanel.AddThemeStyleboxOverride("panel", style);
-
-		var margin = new MarginContainer();
-		margin.AddThemeConstantOverride("margin_left", 10);
-		margin.AddThemeConstantOverride("margin_right", 10);
-		margin.AddThemeConstantOverride("margin_top", 8);
-		margin.AddThemeConstantOverride("margin_bottom", 8);
-		_tooltipPanel.AddChild(margin);
-
-		var rows = new VBoxContainer();
-		rows.AddThemeConstantOverride("separation", 4);
-		margin.AddChild(rows);
-
-		_tooltipTitleLabel = MakeLabel(16, new Color(1.0f, 0.91f, 0.55f));
-		_tooltipTitleLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-		rows.AddChild(_tooltipTitleLabel);
-
-		_tooltipBodyLabel = MakeLabel(12, new Color(0.86f, 0.91f, 0.96f));
-		_tooltipBodyLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-		rows.AddChild(_tooltipBodyLabel);
-
-		AddChild(_tooltipPanel);
+		AddChild(_tooltip);
 	}
 
 	private VBoxContainer MakeSection(string title, Vector2 minSize)
@@ -944,42 +916,15 @@ public partial class InventoryPanel : PanelContainer
 			return;
 		}
 
-		_tooltipTitleLabel.Text = GetInventoryItemName(itemId);
-		_tooltipBodyLabel.Text = BuildItemTooltipBody(itemId, slotName);
-		_tooltipPanel.Visible = true;
-		PositionTooltip();
+		_tooltip.ShowTooltip(GetInventoryItemName(itemId), BuildItemTooltipBody(itemId, slotName), this);
 	}
 
 	private void HideItemTooltip()
 	{
-		if (_tooltipPanel != null)
+		if (_tooltip != null)
 		{
-			_tooltipPanel.Visible = false;
+			_tooltip.HideTooltip();
 		}
-	}
-
-	private void PositionTooltip()
-	{
-		Vector2 localMouse = GetLocalMousePosition();
-		Vector2 desired = localMouse + new Vector2(18.0f, 18.0f);
-		Vector2 panelSize = _tooltipPanel.Size;
-		if (panelSize == Vector2.Zero)
-		{
-			panelSize = _tooltipPanel.GetCombinedMinimumSize();
-		}
-
-		Vector2 bounds = Size;
-		if (desired.X + panelSize.X > bounds.X - 10.0f)
-		{
-			desired.X = Mathf.Max(10.0f, localMouse.X - panelSize.X - 18.0f);
-		}
-
-		if (desired.Y + panelSize.Y > bounds.Y - 10.0f)
-		{
-			desired.Y = Mathf.Max(10.0f, bounds.Y - panelSize.Y - 10.0f);
-		}
-
-		_tooltipPanel.GlobalPosition = GlobalPosition + desired;
 	}
 
 	private string BuildItemTooltipBody(string itemId, string slotName)
