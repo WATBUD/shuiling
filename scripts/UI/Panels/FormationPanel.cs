@@ -21,9 +21,7 @@ public partial class FormationPanel : PanelContainer
 	private Label _countLabel = null!;
 	private Label _selectedLabel = null!;
 	private PopupMenu _slotContextMenu = null!;
-	private PanelContainer _orbTooltipPanel = null!;
-	private Label _orbTooltipTitleLabel = null!;
-	private Label _orbTooltipBodyLabel = null!;
+	private FloatingTooltip _orbTooltip = null!;
 	private readonly List<FormationSlotButton> _slotButtons = new();
 	private int _selectedSlot = -1;
 	private int _contextSlot = -1;
@@ -51,9 +49,9 @@ public partial class FormationPanel : PanelContainer
 
 	public override void _Process(double delta)
 	{
-		if (_orbTooltipPanel != null && _orbTooltipPanel.Visible)
+		if (_orbTooltip != null && _orbTooltip.Visible)
 		{
-			UpdateOrbTooltipPosition();
+			_orbTooltip.PositionNearMouse(this);
 		}
 	}
 
@@ -183,12 +181,7 @@ public partial class FormationPanel : PanelContainer
 		}
 
 		_hoveredOrbActor = actor;
-		_orbTooltipTitleLabel.Text = actor.LocalizedDisplayName;
-		_orbTooltipBodyLabel.Text = BuildOrbTooltipBody(actor);
-		ApplyOrbTooltipSize();
-		_orbTooltipPanel.Visible = true;
-		_orbTooltipPanel.ResetSize();
-		UpdateOrbTooltipPosition();
+		_orbTooltip.ShowTooltip(actor.LocalizedDisplayName, BuildOrbTooltipBody(actor), this);
 	}
 
 	internal void HideOrbTooltip(SimpleActor actor)
@@ -199,9 +192,9 @@ public partial class FormationPanel : PanelContainer
 		}
 
 		_hoveredOrbActor = null;
-		if (_orbTooltipPanel != null)
+		if (_orbTooltip != null)
 		{
-			_orbTooltipPanel.Visible = false;
+			_orbTooltip.HideTooltip();
 		}
 	}
 
@@ -451,34 +444,14 @@ public partial class FormationPanel : PanelContainer
 
 	private void CreateOrbTooltip()
 	{
-		_orbTooltipPanel = new PanelContainer
+		_orbTooltip = new FloatingTooltip
 		{
 			Name = "FormationOrbTooltip",
-			Visible = false,
-			MouseFilter = MouseFilterEnum.Ignore,
-			ZIndex = 80,
+			MaxWidthRatio = 0.34f,
+			MaxWidth = 320.0f,
+			MinWidth = 120.0f,
 		};
-		_orbTooltipPanel.AddThemeStyleboxOverride("panel", MakeStyle(new Color(0.045f, 0.052f, 0.064f, 0.97f), new Color(0.78f, 0.66f, 0.36f, 0.94f), 2));
-		AddChild(_orbTooltipPanel);
-
-		var margin = new MarginContainer();
-		margin.AddThemeConstantOverride("margin_left", 12);
-		margin.AddThemeConstantOverride("margin_right", 12);
-		margin.AddThemeConstantOverride("margin_top", 9);
-		margin.AddThemeConstantOverride("margin_bottom", 9);
-		_orbTooltipPanel.AddChild(margin);
-
-		var root = new VBoxContainer();
-		root.AddThemeConstantOverride("separation", 5);
-		margin.AddChild(root);
-
-		_orbTooltipTitleLabel = MakeLabel(16, new Color(1.0f, 0.92f, 0.58f));
-		_orbTooltipTitleLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-		root.AddChild(_orbTooltipTitleLabel);
-
-		_orbTooltipBodyLabel = MakeLabel(13, new Color(0.86f, 0.91f, 0.96f));
-		_orbTooltipBodyLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-		root.AddChild(_orbTooltipBodyLabel);
+		AddChild(_orbTooltip);
 	}
 
 	private static string BuildOrbTooltipBody(SimpleActor actor)
@@ -490,46 +463,6 @@ public partial class FormationPanel : PanelContainer
 			$"{LocaleText.T("stat.attack")} {actor.EffectiveAttack}",
 			$"{LocaleText.T("stat.defense")} {actor.EffectiveDefense}",
 		});
-	}
-
-	private void UpdateOrbTooltipPosition()
-	{
-		ApplyOrbTooltipSize();
-		Vector2 localMouse = GetGlobalMousePosition() - GlobalPosition;
-		Vector2 tooltipSize = _orbTooltipPanel.Size;
-		if (tooltipSize.LengthSquared() <= 1.0f)
-		{
-			tooltipSize = _orbTooltipPanel.GetCombinedMinimumSize();
-		}
-
-		Vector2 position = localMouse + new Vector2(18.0f, 18.0f);
-		Vector2 panelSize = Size;
-		if (position.X + tooltipSize.X > panelSize.X - 10.0f)
-		{
-			position.X = localMouse.X - tooltipSize.X - 18.0f;
-		}
-
-		if (position.Y + tooltipSize.Y > panelSize.Y - 10.0f)
-		{
-			position.Y = localMouse.Y - tooltipSize.Y - 18.0f;
-		}
-
-		position.X = Mathf.Clamp(position.X, 10.0f, Mathf.Max(10.0f, panelSize.X - tooltipSize.X - 10.0f));
-		position.Y = Mathf.Clamp(position.Y, 10.0f, Mathf.Max(10.0f, panelSize.Y - tooltipSize.Y - 10.0f));
-		_orbTooltipPanel.Position = position;
-	}
-
-	private void ApplyOrbTooltipSize()
-	{
-		float maxWidth = Mathf.Min(320.0f, Mathf.Max(180.0f, Size.X * 0.34f));
-		float titleWidth = _orbTooltipTitleLabel.GetCombinedMinimumSize().X;
-		float bodyWidth = _orbTooltipBodyLabel.GetCombinedMinimumSize().X;
-		float contentWidth = Mathf.Clamp(Mathf.Max(titleWidth, bodyWidth), 120.0f, maxWidth);
-
-		_orbTooltipTitleLabel.CustomMinimumSize = new Vector2(contentWidth, 0.0f);
-		_orbTooltipBodyLabel.CustomMinimumSize = new Vector2(contentWidth, 0.0f);
-		_orbTooltipPanel.CustomMinimumSize = Vector2.Zero;
-		_orbTooltipPanel.Size = _orbTooltipPanel.GetCombinedMinimumSize();
 	}
 
 	private void OnClosePressed()
