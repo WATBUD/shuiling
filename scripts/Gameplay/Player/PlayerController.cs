@@ -13,7 +13,7 @@ public partial class PlayerController : CharacterBody3D
 
 	public sealed record ShopTradeEntry(string ItemId, string DisplayName, string Detail, int Price);
 
-	private readonly record struct PetShopOffer(string MonsterNameKey, int Level, int Price);
+	private readonly record struct PetShopOffer(string MonsterNameKey, int Level, int Price, int MaxHealth, int Attack, int Defense);
 
 	private const int FormationGridSideLength = 5;
 	private const int FormationCenterSlotIndex = 12;
@@ -31,12 +31,12 @@ public partial class PlayerController : CharacterBody3D
 
 	private static readonly PetShopOffer[] PetShopOffers =
 	{
-		new("name.monster.rat", 2, 120),
-		new("name.monster.bunny", 2, 130),
-		new("name.monster.fox", 3, 210),
-		new("name.monster.crab", 3, 240),
-		new("name.monster.bee", 3, 260),
-		new("name.monster.lion", 5, 420),
+		new("name.monster.rat", 2, 120, 145, 22, 12),
+		new("name.monster.bunny", 2, 130, 138, 21, 11),
+		new("name.monster.fox", 3, 210, 172, 31, 15),
+		new("name.monster.crab", 3, 240, 210, 24, 23),
+		new("name.monster.bee", 3, 260, 158, 29, 14),
+		new("name.monster.lion", 5, 420, 260, 44, 25),
 	};
 
 	private static readonly int[] FormationFillOrder =
@@ -110,6 +110,7 @@ public partial class PlayerController : CharacterBody3D
 	private MerchantShopPanel _merchantShopPanel = null!;
 	private MercenaryShopPanel _mercenaryShopPanel = null!;
 	private SettingsPanel _settingsPanel = null!;
+	private PanelContainer _pauseMenuPanel = null!;
 	private MinimapPanel _minimapPanel = null!;
 	private SystemLogPanel _systemLogPanel = null!;
 	private PanelContainer _captureAmmoPanel = null!;
@@ -174,6 +175,7 @@ public partial class PlayerController : CharacterBody3D
 		CreateMerchantShopPanel();
 		CreateMercenaryShopPanel();
 		CreateSettingsPanel();
+		CreatePauseMenuPanel();
 		InitializeStarterInventory();
 		InitializeCaptureNetAmmo();
 		CreateCaptureAmmoHud();
@@ -218,6 +220,10 @@ public partial class PlayerController : CharacterBody3D
 			{
 				SetSettingsPanelVisible(false);
 			}
+			else if (_pauseMenuPanel.Visible)
+			{
+				SetPauseMenuVisible(false);
+			}
 			else if (_inventoryPanel.Visible)
 			{
 				SetInventoryPanelVisible(false);
@@ -240,7 +246,7 @@ public partial class PlayerController : CharacterBody3D
 			}
 			else
 			{
-				SetSettingsPanelVisible(true);
+				SetPauseMenuVisible(true);
 			}
 
 			return;
@@ -251,7 +257,7 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
-		if (_settingsPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible)
+		if (_pauseMenuPanel.Visible || _settingsPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible)
 		{
 			return;
 		}
@@ -633,7 +639,7 @@ public partial class PlayerController : CharacterBody3D
 		{
 			foreach (PetShopOffer offer in PetShopOffers)
 			{
-				entries.Add(new ShopTradeEntry(offer.MonsterNameKey, LocaleText.T(offer.MonsterNameKey), LocaleText.F("shop.detail.pet", offer.Level), offer.Price));
+				entries.Add(new ShopTradeEntry(offer.MonsterNameKey, LocaleText.T(offer.MonsterNameKey), GetPetShopDetail(offer), offer.Price));
 			}
 		}
 		else
@@ -728,7 +734,7 @@ public partial class PlayerController : CharacterBody3D
 			return false;
 		}
 
-		SimpleActor actor = world.SpawnPurchasedPet(offer.MonsterNameKey, offer.Level);
+		SimpleActor actor = world.SpawnPurchasedPet(offer.MonsterNameKey, offer.Level, offer.MaxHealth, offer.Attack, offer.Defense);
 		if (!_capturedCollection.Contains(actor))
 		{
 			_capturedCollection.Add(actor);
@@ -1389,6 +1395,27 @@ public partial class PlayerController : CharacterBody3D
 		}
 
 		return default;
+	}
+
+	private static string GetPetShopDetail(PetShopOffer offer)
+	{
+		string combatRole = MonsterSpeciesCatalog.Current.GetDefaultRole(offer.MonsterNameKey);
+		string roleKey = combatRole switch
+		{
+			"Tank" => "role.tank",
+			"Ranged" => "role.ranged",
+			"Support" => "role.support",
+			_ => "role.dps",
+		};
+		string rangeKey = combatRole is "Ranged" or "Support" ? "shop.pet.range.ranged" : "shop.pet.range.melee";
+		return LocaleText.F(
+			"shop.detail.pet_stats",
+			offer.Level,
+			LocaleText.T(roleKey),
+			offer.MaxHealth,
+			offer.Attack,
+			offer.Defense,
+			LocaleText.T(rangeKey));
 	}
 
 	private static string GetNpcQuestItemId(SimpleActor actor)
@@ -3213,11 +3240,87 @@ public partial class PlayerController : CharacterBody3D
 		_settingsPanel.CloseRequested = () => SetSettingsPanelVisible(false);
 	}
 
+	private void CreatePauseMenuPanel()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "PauseMenuLayer",
+			Layer = 48,
+		};
+
+		AddChild(layer);
+		_pauseMenuPanel = new PanelContainer
+		{
+			Name = "PauseMenuPanel",
+			Visible = false,
+			MouseFilter = Control.MouseFilterEnum.Stop,
+			CustomMinimumSize = new Vector2(440.0f, 360.0f),
+		};
+		_pauseMenuPanel.SetAnchorsPreset(Control.LayoutPreset.Center);
+		_pauseMenuPanel.OffsetLeft = -220.0f;
+		_pauseMenuPanel.OffsetRight = 220.0f;
+		_pauseMenuPanel.OffsetTop = -180.0f;
+		_pauseMenuPanel.OffsetBottom = 180.0f;
+
+		var style = new StyleBoxFlat
+		{
+			BgColor = new Color(0.035f, 0.042f, 0.055f, 0.97f),
+			BorderColor = new Color(0.72f, 0.64f, 0.42f, 0.95f),
+		};
+		style.SetBorderWidthAll(2);
+		style.SetCornerRadiusAll(6);
+		_pauseMenuPanel.AddThemeStyleboxOverride("panel", style);
+		layer.AddChild(_pauseMenuPanel);
+
+		var margin = new MarginContainer();
+		margin.AddThemeConstantOverride("margin_left", 22);
+		margin.AddThemeConstantOverride("margin_right", 22);
+		margin.AddThemeConstantOverride("margin_top", 20);
+		margin.AddThemeConstantOverride("margin_bottom", 20);
+		_pauseMenuPanel.AddChild(margin);
+
+		var root = new VBoxContainer();
+		root.AddThemeConstantOverride("separation", 12);
+		margin.AddChild(root);
+
+		var title = MakeHudLabel(LocaleText.T("pause.title"), 26, new Color(1.0f, 0.92f, 0.68f));
+		title.HorizontalAlignment = HorizontalAlignment.Center;
+		root.AddChild(title);
+
+		var hint = MakeHudLabel(LocaleText.T("pause.load_hint"), 14, new Color(0.74f, 0.84f, 0.94f));
+		hint.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		hint.HorizontalAlignment = HorizontalAlignment.Center;
+		root.AddChild(hint);
+
+		root.AddChild(CreatePauseButton("pause.resume", () => SetPauseMenuVisible(false)));
+		root.AddChild(CreatePauseButton("pause.save", SaveCurrentGame));
+		root.AddChild(CreatePauseButton("pause.settings", () =>
+		{
+			SetPauseMenuVisible(false);
+			SetSettingsPanelVisible(true);
+		}));
+		root.AddChild(CreatePauseButton("pause.main_menu", ReturnToMainMenu));
+	}
+
+	private Button CreatePauseButton(string textKey, System.Action onPressed)
+	{
+		var button = new Button
+		{
+			Text = LocaleText.T(textKey),
+			CustomMinimumSize = new Vector2(0.0f, 46.0f),
+			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+		};
+		button.AddThemeFontSizeOverride("font_size", 18);
+		button.Pressed += onPressed;
+		return button;
+	}
+
 	private void SetPartyPanelVisible(bool visible)
 	{
 		_partyPanel.SetPanelVisible(visible);
 		if (visible)
 		{
+			SetPauseMenuVisible(false, false);
 			_settingsPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
@@ -3235,6 +3338,7 @@ public partial class PlayerController : CharacterBody3D
 		_inventoryPanel.SetPanelVisible(visible);
 		if (visible)
 		{
+			SetPauseMenuVisible(false, false);
 			_partyPanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
@@ -3252,6 +3356,7 @@ public partial class PlayerController : CharacterBody3D
 		_formationPanel.SetPanelVisible(visible);
 		if (visible)
 		{
+			SetPauseMenuVisible(false, false);
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
@@ -3269,6 +3374,7 @@ public partial class PlayerController : CharacterBody3D
 		_settingsPanel.SetPanelVisible(visible);
 		if (visible)
 		{
+			SetPauseMenuVisible(false, false);
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
@@ -3286,6 +3392,7 @@ public partial class PlayerController : CharacterBody3D
 		_merchantShopPanel.SetPanelVisible(visible);
 		if (visible)
 		{
+			SetPauseMenuVisible(false, false);
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
@@ -3303,6 +3410,7 @@ public partial class PlayerController : CharacterBody3D
 		_mercenaryShopPanel.SetPanelVisible(visible);
 		if (visible)
 		{
+			SetPauseMenuVisible(false, false);
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
@@ -3315,9 +3423,37 @@ public partial class PlayerController : CharacterBody3D
 		UpdateMouseModeForPanels();
 	}
 
+	private void SetPauseMenuVisible(bool visible, bool updateMouseMode = true)
+	{
+		_pauseMenuPanel.Visible = visible;
+		if (visible)
+		{
+			_partyPanel.SetPanelVisible(false);
+			_inventoryPanel.SetPanelVisible(false);
+			_formationPanel.SetPanelVisible(false);
+			_merchantShopPanel.SetPanelVisible(false);
+			_mercenaryShopPanel.SetPanelVisible(false);
+			_settingsPanel.SetPanelVisible(false);
+			CloseNpcQuestDialog();
+			CloseMapTravelDialog();
+		}
+
+		if (updateMouseMode)
+		{
+			UpdateMouseModeForPanels();
+		}
+	}
+
+	private void ReturnToMainMenu()
+	{
+		SaveCurrentGame();
+		Input.MouseMode = Input.MouseModeEnum.Visible;
+		GetTree().ChangeSceneToFile("res://main_menu.tscn");
+	}
+
 	private void UpdateMouseModeForPanels()
 	{
-		Input.MouseMode = _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _settingsPanel.Visible || (_npcQuestDialog != null && _npcQuestDialog.Visible) || (_mapTravelDialog != null && _mapTravelDialog.Visible)
+		Input.MouseMode = _pauseMenuPanel.Visible || _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _settingsPanel.Visible || (_npcQuestDialog != null && _npcQuestDialog.Visible) || (_mapTravelDialog != null && _mapTravelDialog.Visible)
 			? Input.MouseModeEnum.Visible
 			: Input.MouseModeEnum.Captured;
 	}
