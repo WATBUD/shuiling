@@ -4,7 +4,7 @@ using System.Collections.Generic;
 public partial class FormationPanel : PanelContainer
 {
 	private const float MaxDiscSize = 430.0f;
-	private const float MinDiscSize = 300.0f;
+	private const float MinDiscSize = 220.0f;
 	private static readonly int[] RingSlotOrder =
 	{
 		7, 11, 13, 17,
@@ -16,13 +16,14 @@ public partial class FormationPanel : PanelContainer
 
 	private PlayerController? _player;
 	private Control _formationGrid = null!;
-	private VBoxContainer _rosterList = null!;
+	private HFlowContainer _rosterList = null!;
 	private Label _titleLabel = null!;
 	private Label _countLabel = null!;
 	private Label _selectedLabel = null!;
-	private Button _clearButton = null!;
+	private PopupMenu _slotContextMenu = null!;
 	private readonly List<FormationSlotButton> _slotButtons = new();
 	private int _selectedSlot = -1;
+	private int _contextSlot = -1;
 	private float _discSize = MaxDiscSize;
 	private float _slotCellSize = 58.0f;
 	private float _playerSlotCellSize = 72.0f;
@@ -146,12 +147,30 @@ public partial class FormationPanel : PanelContainer
 		}
 	}
 
+	internal void ShowSlotContextMenu(int slotIndex, Vector2 globalPosition)
+	{
+		if (_player == null || slotIndex == _player.FormationPlayerSlotIndex || _player.GetFormationActor(slotIndex) == null)
+		{
+			return;
+		}
+
+		_contextSlot = slotIndex;
+		_selectedSlot = slotIndex;
+		RefreshGrid();
+		_slotContextMenu.Clear();
+		_slotContextMenu.AddItem(LocaleText.T("formation.clear_slot"), 1);
+		_slotContextMenu.Position = new Vector2I(Mathf.RoundToInt(globalPosition.X), Mathf.RoundToInt(globalPosition.Y));
+		_slotContextMenu.Popup();
+	}
+
 	private void BuildPanel()
 	{
 		Name = "FormationPanel";
 		MouseFilter = MouseFilterEnum.Stop;
 		UpdateResponsiveDiscMetrics();
 		SetAnchorsPreset(LayoutPreset.Center);
+		GrowHorizontal = GrowDirection.Both;
+		GrowVertical = GrowDirection.Both;
 		OffsetLeft = _panelWidth * -0.5f;
 		OffsetRight = _panelWidth * 0.5f;
 		OffsetTop = _panelHeight * -0.5f;
@@ -191,7 +210,7 @@ public partial class FormationPanel : PanelContainer
 		content.AddThemeConstantOverride("separation", 16);
 		root.AddChild(content);
 
-		var gridSection = MakeSection(LocaleText.T("formation.grid"), new Vector2(_discSize + 28.0f, 0.0f));
+		var gridSection = MakeSection(string.Empty, new Vector2(_discSize + 28.0f, 0.0f));
 		content.AddChild(gridSection);
 
 		_formationGrid = new FormationDiscControl
@@ -224,12 +243,15 @@ public partial class FormationPanel : PanelContainer
 
 		_selectedLabel = MakeLabel(15, new Color(0.94f, 0.97f, 1.0f));
 		_selectedLabel.CustomMinimumSize = new Vector2(0.0f, 52.0f);
+		_selectedLabel.Visible = false;
 		gridSection.AddChild(_selectedLabel);
 
-		_clearButton = MakeButton(LocaleText.T("formation.clear_slot"));
-		_clearButton.CustomMinimumSize = new Vector2(160.0f, 36.0f);
-		_clearButton.Pressed += OnClearPressed;
-		gridSection.AddChild(_clearButton);
+		_slotContextMenu = new PopupMenu
+		{
+			Name = "FormationSlotContextMenu",
+		};
+		_slotContextMenu.IdPressed += OnSlotContextMenuPressed;
+		AddChild(_slotContextMenu);
 
 		var rosterSection = MakeSection(LocaleText.T("formation.roster"), new Vector2(380.0f, 0.0f));
 		content.AddChild(rosterSection);
@@ -241,8 +263,13 @@ public partial class FormationPanel : PanelContainer
 		};
 		rosterSection.AddChild(scroll);
 
-		_rosterList = new VBoxContainer();
-		_rosterList.AddThemeConstantOverride("separation", 8);
+		_rosterList = new HFlowContainer
+		{
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			SizeFlagsVertical = SizeFlags.ExpandFill,
+		};
+		_rosterList.AddThemeConstantOverride("h_separation", 8);
+		_rosterList.AddThemeConstantOverride("v_separation", 8);
 		scroll.AddChild(_rosterList);
 	}
 
@@ -255,7 +282,6 @@ public partial class FormationPanel : PanelContainer
 
 		_titleLabel.Text = LocaleText.T("formation.title");
 		_countLabel.Text = LocaleText.F("formation.count", _player.ActiveParty.Count, _player.ActivePartyLimit, _player.FormationAssignedCount);
-		_clearButton.Text = LocaleText.T("formation.clear_slot");
 	}
 
 	private void RefreshGrid()
@@ -279,28 +305,25 @@ public partial class FormationPanel : PanelContainer
 	{
 		if (_player == null || _selectedSlot < 0)
 		{
-			_selectedLabel.Text = LocaleText.T("formation.select_empty");
-			_clearButton.Disabled = true;
+			_selectedLabel.Visible = false;
 			return;
 		}
 
 		if (_selectedSlot == _player.FormationPlayerSlotIndex)
 		{
-			_selectedLabel.Text = LocaleText.F("formation.selected_player", _player.LocalizedPlayerName);
-			_clearButton.Disabled = true;
+			_selectedLabel.Visible = false;
 			return;
 		}
 
 		SimpleActor? actor = _player.GetFormationActor(_selectedSlot);
 		if (actor == null)
 		{
-			_selectedLabel.Text = LocaleText.F("formation.selected_empty", _selectedSlot + 1);
-			_clearButton.Disabled = true;
+			_selectedLabel.Visible = false;
 			return;
 		}
 
+		_selectedLabel.Visible = true;
 		_selectedLabel.Text = LocaleText.F("formation.selected_actor", actor.LocalizedDisplayName, actor.CombatRoleName, actor.EffectiveAttack, actor.EffectiveDefense);
-		_clearButton.Disabled = false;
 	}
 
 	private void RefreshRoster()
@@ -312,22 +335,11 @@ public partial class FormationPanel : PanelContainer
 		}
 
 		int added = 0;
-		AddRosterHeader("party.active");
 		foreach (SimpleActor actor in _player.ActiveParty)
 		{
 			if (IsInstanceValid(actor) && actor.IsCaptured)
 			{
-				AddRosterChip(actor, "party.active");
-				added++;
-			}
-		}
-
-		AddRosterHeader("party.collection");
-		foreach (SimpleActor actor in _player.CapturedCollection)
-		{
-			if (IsInstanceValid(actor) && actor.IsCaptured && !_player.IsInActiveParty(actor))
-			{
-				AddRosterChip(actor, "party.collection");
+				AddRosterChip(actor);
 				added++;
 			}
 		}
@@ -335,19 +347,15 @@ public partial class FormationPanel : PanelContainer
 		if (added == 0)
 		{
 			var empty = MakeLabel(14, new Color(0.72f, 0.78f, 0.84f));
-			empty.Text = LocaleText.T("inventory.no_companions");
+			empty.Text = LocaleText.T("formation.no_active_companions");
+			empty.AutowrapMode = TextServer.AutowrapMode.Off;
+			empty.HorizontalAlignment = HorizontalAlignment.Left;
+			empty.CustomMinimumSize = new Vector2(260.0f, 28.0f);
 			_rosterList.AddChild(empty);
 		}
 	}
 
-	private void AddRosterHeader(string key)
-	{
-		var label = MakeLabel(13, new Color(0.62f, 0.70f, 0.76f));
-		label.Text = LocaleText.T(key);
-		_rosterList.AddChild(label);
-	}
-
-	private void AddRosterChip(SimpleActor actor, string groupKey)
+	private void AddRosterChip(SimpleActor actor)
 	{
 		if (_player == null)
 		{
@@ -363,12 +371,12 @@ public partial class FormationPanel : PanelContainer
 		{
 			OwnerPanel = this,
 			Actor = actor,
-			Text = $"{actor.LocalizedDisplayName}\n{LocaleText.T(groupKey)} / {slotText}",
+			Text = $"{actor.LocalizedDisplayName}\n{slotText}",
 			Alignment = HorizontalAlignment.Left,
-			CustomMinimumSize = new Vector2(0.0f, 54.0f),
-			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			CustomMinimumSize = new Vector2(116.0f, 54.0f),
+			SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
 		};
-		chip.AddThemeFontSizeOverride("font_size", 13);
+		chip.AddThemeFontSizeOverride("font_size", 12);
 		chip.AddThemeColorOverride("font_color", slotIndex >= 0 ? new Color(1.0f, 0.94f, 0.62f) : new Color(0.92f, 0.96f, 1.0f));
 		chip.Pressed += () =>
 		{
@@ -386,11 +394,12 @@ public partial class FormationPanel : PanelContainer
 		_rosterList.AddChild(chip);
 	}
 
-	private void OnClearPressed()
+	private void OnSlotContextMenuPressed(long id)
 	{
-		if (_selectedSlot >= 0)
+		if (id == 1 && _contextSlot >= 0)
 		{
-			ClearSlot(_selectedSlot);
+			ClearSlot(_contextSlot);
+			_contextSlot = -1;
 		}
 	}
 
@@ -445,13 +454,13 @@ public partial class FormationPanel : PanelContainer
 	{
 		Vector2 viewport = GetViewportRect().Size;
 		_lastViewportSize = viewport;
-		_panelWidth = Mathf.Clamp(viewport.X * 0.78f, 860.0f, 1040.0f);
-		_panelHeight = Mathf.Clamp(viewport.Y * 0.64f, 460.0f, 620.0f);
-		float availableHeight = _panelHeight - 176.0f;
+		_panelWidth = Mathf.Clamp(viewport.X * 0.78f, Mathf.Min(760.0f, viewport.X - 80.0f), 1040.0f);
+		_panelHeight = Mathf.Clamp(viewport.Y * 0.68f, Mathf.Min(420.0f, viewport.Y - 96.0f), viewport.Y - 96.0f);
+		float availableHeight = _panelHeight - 168.0f;
 		float availableWidth = _panelWidth * 0.50f;
 		_discSize = Mathf.Clamp(Mathf.Min(availableHeight, availableWidth), MinDiscSize, MaxDiscSize);
-		_slotCellSize = Mathf.Clamp(_discSize * 0.135f, 40.0f, 58.0f);
-		_playerSlotCellSize = Mathf.Clamp(_discSize * 0.165f, 50.0f, 72.0f);
+		_slotCellSize = Mathf.Clamp(_discSize * 0.092f, 24.0f, 40.0f);
+		_playerSlotCellSize = Mathf.Clamp(_discSize * 0.120f, 30.0f, 52.0f);
 	}
 
 	private Vector2 GetDiscSlotPosition(int slotIndex, float slotSize)
@@ -470,11 +479,11 @@ public partial class FormationPanel : PanelContainer
 
 		int ring = Mathf.Clamp(orderIndex / 8, 0, 2);
 		int ringSlot = orderIndex % 8;
-		float outerRadius = _discSize * 0.43f;
+		float outerRadius = _discSize * 0.44f;
 		float radius = ring switch
 		{
-			0 => outerRadius * 0.42f,
-			1 => outerRadius * 0.73f,
+			0 => outerRadius * 0.38f,
+			1 => outerRadius * 0.69f,
 			_ => outerRadius,
 		};
 		float angle = -Mathf.Pi * 0.5f + ringSlot * (Mathf.Pi * 2.0f / 8.0f);
@@ -490,9 +499,12 @@ public partial class FormationPanel : PanelContainer
 		};
 		section.AddThemeConstantOverride("separation", 10);
 
-		var label = MakeLabel(17, new Color(0.86f, 0.92f, 0.98f));
-		label.Text = title;
-		section.AddChild(label);
+		if (!string.IsNullOrWhiteSpace(title))
+		{
+			var label = MakeLabel(17, new Color(0.86f, 0.92f, 0.98f));
+			label.Text = title;
+			section.AddChild(label);
+		}
 		return section;
 	}
 
@@ -550,14 +562,14 @@ public partial class FormationDiscControl : Control
 	public override void _Draw()
 	{
 		Vector2 center = Size * 0.5f;
-		float outerRadius = DiscSize * 0.43f;
-		float centerRadius = DiscSize * 0.098f;
-		DrawCircle(center, DiscSize * 0.477f, new Color(0.045f, 0.055f, 0.066f, 0.88f));
-		DrawArc(center, outerRadius * 0.42f, 0.0f, Mathf.Tau, 96, new Color(0.34f, 0.62f, 0.78f, 0.38f), 3.0f);
-		DrawArc(center, outerRadius * 0.73f, 0.0f, Mathf.Tau, 96, new Color(0.72f, 0.58f, 0.30f, 0.34f), 3.0f);
-		DrawArc(center, outerRadius, 0.0f, Mathf.Tau, 128, new Color(0.78f, 0.84f, 0.92f, 0.26f), 3.0f);
-		DrawCircle(center, centerRadius, new Color(0.08f, 0.17f, 0.14f, 0.74f));
-		DrawArc(center, centerRadius, 0.0f, Mathf.Tau, 64, new Color(0.42f, 1.0f, 0.74f, 0.50f), 2.0f);
+		float outerRadius = DiscSize * 0.44f;
+		float centerRadius = DiscSize * 0.036f;
+		DrawCircle(center, DiscSize * 0.455f, new Color(0.045f, 0.055f, 0.066f, 0.76f));
+		DrawArc(center, outerRadius * 0.38f, 0.0f, Mathf.Tau, 96, new Color(0.34f, 0.62f, 0.78f, 0.34f), 2.6f);
+		DrawArc(center, outerRadius * 0.69f, 0.0f, Mathf.Tau, 96, new Color(0.72f, 0.58f, 0.30f, 0.32f), 2.6f);
+		DrawArc(center, outerRadius, 0.0f, Mathf.Tau, 128, new Color(0.78f, 0.84f, 0.92f, 0.24f), 2.8f);
+		DrawCircle(center, centerRadius, new Color(0.08f, 0.17f, 0.14f, 0.46f));
+		DrawArc(center, centerRadius, 0.0f, Mathf.Tau, 64, new Color(0.42f, 1.0f, 0.74f, 0.36f), 1.2f);
 	}
 }
 
@@ -604,7 +616,7 @@ public partial class FormationSlotButton : Button
 	{
 		if (@event is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Right } && !IsPlayerSlot)
 		{
-			OwnerPanel?.ClearSlot(SlotIndex);
+			OwnerPanel?.ShowSlotContextMenu(SlotIndex, GetGlobalMousePosition());
 			AcceptEvent();
 		}
 	}
