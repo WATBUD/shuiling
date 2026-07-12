@@ -58,12 +58,17 @@ public partial class FloatingTooltip : PanelContainer
 
 	public void ShowTooltip(string title, string body, Control owner)
 	{
+		SetContent(title, body, owner);
+		PositionNearMouse(owner);
+	}
+
+	public void SetContent(string title, string body, Control owner)
+	{
 		_titleLabel.Text = title;
 		_bodyLabel.Text = body;
 		ApplyContentSize(owner);
 		Visible = true;
 		ResetSize();
-		PositionNearMouse(owner);
 	}
 
 	public void HideTooltip()

@@ -97,20 +97,16 @@ public partial class FormationPanel : PanelContainer
 
 	internal Control MakeDragPreview(SimpleActor actor)
 	{
-		var panel = new PanelContainer();
-		panel.AddThemeStyleboxOverride("panel", MakeStyle(new Color(0.10f, 0.13f, 0.16f, 0.96f), new Color(0.95f, 0.82f, 0.42f, 0.95f), 2));
-
-		var margin = new MarginContainer();
-		margin.AddThemeConstantOverride("margin_left", 10);
-		margin.AddThemeConstantOverride("margin_right", 10);
-		margin.AddThemeConstantOverride("margin_top", 6);
-		margin.AddThemeConstantOverride("margin_bottom", 6);
-		panel.AddChild(margin);
-
-		var label = MakeLabel(14, new Color(1.0f, 0.96f, 0.76f));
-		label.Text = actor.LocalizedDisplayName;
-		margin.AddChild(label);
-		return panel;
+		var tooltip = new FloatingTooltip
+		{
+			MaxWidthRatio = 0.34f,
+			MaxWidth = 320.0f,
+			MinWidth = 120.0f,
+			MouseFilter = MouseFilterEnum.Ignore,
+		};
+		tooltip.SetContent(actor.LocalizedDisplayName, BuildOrbTooltipBody(actor), this);
+		tooltip.Position = Vector2.Zero;
+		return tooltip;
 	}
 
 	internal bool CanDropDataOnSlot(int slotIndex, Variant data)
@@ -671,6 +667,7 @@ public partial class FormationSlotButton : Button
 			return default;
 		}
 
+		OwnerPanel.HideOrbTooltip(Actor);
 		SetDragPreview(OwnerPanel.MakeDragPreview(Actor));
 		return OwnerPanel.MakeDragPayload(Actor, SlotIndex);
 	}
@@ -879,6 +876,7 @@ public partial class FormationActorChip : Button
 			return default;
 		}
 
+		OwnerPanel.HideOrbTooltip(Actor);
 		SetDragPreview(OwnerPanel.MakeDragPreview(Actor));
 		return OwnerPanel.MakeDragPayload(Actor, -1);
 	}
