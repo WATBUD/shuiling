@@ -17,7 +17,9 @@ public partial class PlayerController : CharacterBody3D
 
 	private const int FormationGridSideLength = 5;
 	private const int FormationCenterSlotIndex = 12;
-	private const float FormationSlotSpacing = 2.35f;
+	private const float FormationMinCompanionDistance = 3.6f;
+	private const int FormationRingSlotCount = 8;
+	private const float FormationRingSpacing = 1.75f;
 	private const float PlayerVisualScale = 0.88f;
 	private const int NpcRecruitQuestItemCount = 3;
 	private const int NpcRecruitAffinityRequirement = 80;
@@ -1692,21 +1694,27 @@ public partial class PlayerController : CharacterBody3D
 
 	private Vector3 GetFormationSlotLocalOffset(int slotIndex)
 	{
-		int row = slotIndex / FormationGridSideLength;
-		int column = slotIndex % FormationGridSideLength;
-		int center = FormationGridSideLength / 2;
-		float localX = (column - center) * FormationSlotSpacing;
-		float localZ = (center - row) * FormationSlotSpacing;
-		return new Vector3(localX, 0.0f, localZ);
+		int orderIndex = System.Array.IndexOf(FormationFillOrder, slotIndex);
+		if (orderIndex < 0)
+		{
+			orderIndex = Mathf.Max(slotIndex - (slotIndex > FormationCenterSlotIndex ? 1 : 0), 0);
+		}
+
+		return GetFormationRingOffset(orderIndex);
 	}
 
 	private Vector3 GetFallbackFormationOffset(SimpleActor actor)
 	{
 		int index = Mathf.Max(_activeParty.IndexOf(actor), 0);
-		int ring = index / 8;
-		int ringSlot = index % 8;
-		float radius = 3.0f + ring * 1.35f;
-		float angle = -Mathf.Pi * 0.5f + ringSlot * (Mathf.Pi * 2.0f / 8.0f);
+		return GetFormationRingOffset(index);
+	}
+
+	private static Vector3 GetFormationRingOffset(int orderIndex)
+	{
+		int ring = Mathf.Clamp(orderIndex / FormationRingSlotCount, 0, 2);
+		int ringSlot = orderIndex % FormationRingSlotCount;
+		float radius = FormationMinCompanionDistance + ring * FormationRingSpacing;
+		float angle = Mathf.Pi * 0.5f - ringSlot * (Mathf.Pi * 2.0f / FormationRingSlotCount);
 		return new Vector3(Mathf.Cos(angle) * radius, 0.0f, Mathf.Sin(angle) * radius);
 	}
 
