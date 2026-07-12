@@ -143,6 +143,8 @@ public partial class World : Node3D
 
 	public override void _Ready()
 	{
+		LocaleText.LanguageChanged += RefreshLocalizedWorldLabels;
+
 		if (SeedValue == 0)
 		{
 			_rng.Randomize();
@@ -163,6 +165,11 @@ public partial class World : Node3D
 			LoadRequestedSave();
 			GameLaunchOptions.StartNewGame();
 		}
+	}
+
+	public override void _ExitTree()
+	{
+		LocaleText.LanguageChanged -= RefreshLocalizedWorldLabels;
 	}
 
 	public override void _Process(double delta)
@@ -1653,7 +1660,7 @@ public partial class World : Node3D
 		SimpleActor actor = CreateActor(false, "city", offer.NameKey, offer.CombatRole, offer.Level);
 		actor.ConfigureStats(offer.NameKey, offer.Level, offer.MaxHealth, offer.Attack, offer.Defense, offer.Level * 6, 0);
 		actor.ConfigureGrowth("ability.npc.guard", Mathf.Max(offer.Level / 2, 1));
-		actor.ConfigureCombatProfile(offer.CombatRole, "personality.brave", offer.CombatRole == "Support" ? "passive.protector" : "passive.combo_rhythm", 92);
+		actor.ConfigureCombatProfile(offer.CombatRole, "personality.brave", offer.CombatRole == "Support" ? "passive.protector" : "passive.combo_rhythm", 5);
 		Vector3 spawnPosition = _mainCityCenter + RingFrontOffset(126.0f, 31.0f, 2.6f);
 		actor.Position = spawnPosition;
 		actor.HomePosition = spawnPosition;
@@ -1669,7 +1676,7 @@ public partial class World : Node3D
 		SimpleActor actor = CreateActor(true, "city", monsterNameKey, combatRole, level);
 		actor.ConfigureStats(monsterNameKey, level, maxHealth, attack, defense, level * 8, 0);
 		actor.ConfigureGrowth("ability.monster.track", Mathf.Max(level / 2, 1));
-		actor.ConfigureCombatProfile(combatRole, "personality.friendly", "passive.fast_growth", 70);
+		actor.ConfigureCombatProfile(combatRole, "personality.friendly", "passive.fast_growth", 5);
 		Vector3 spawnPosition = _mainCityCenter + RingFrontOffset(234.0f, 31.0f, 2.4f);
 		actor.Position = spawnPosition;
 		actor.HomePosition = spawnPosition;
@@ -1951,11 +1958,11 @@ public partial class World : Node3D
 			: forcedCombatRole;
 		string personality = Personalities[_rng.RandiRange(0, Personalities.Length - 1)];
 		string passiveAbility = PassiveAbilities[_rng.RandiRange(0, PassiveAbilities.Length - 1)];
-		int affinity = _rng.RandiRange(isMonster ? 24 : 35, isMonster ? 72 : 55);
+		const int initialAffinity = 5;
 
 		actor.ConfigureStats(displayName, level, maxHealth, attack, defense, experience, gold);
 		actor.ConfigureGrowth(specialAbility, _rng.RandiRange(1, 2));
-		actor.ConfigureCombatProfile(combatRole, personality, passiveAbility, affinity);
+		actor.ConfigureCombatProfile(combatRole, personality, passiveAbility, initialAffinity);
 	}
 
 	private void AddHorn(Node3D actor, Vector3 position, Vector3 rotationDegrees)
@@ -2085,6 +2092,29 @@ public partial class World : Node3D
 			Shape = new CylinderShape3D { Radius = 1.8f * portalScale, Height = 0.7f },
 		};
 		portal.AddChild(collisionShape);
+	}
+
+	private void RefreshLocalizedWorldLabels()
+	{
+		foreach (Node node in GetTree().GetNodesInGroup("map_portal"))
+		{
+			if (node is not Node3D portal || !portal.HasMeta("label"))
+			{
+				continue;
+			}
+
+			Label3D? label = portal.GetNodeOrNull<Label3D>("PortalLabel");
+			if (label == null)
+			{
+				continue;
+			}
+
+			string labelKey = portal.GetMeta("label").AsString();
+			if (!string.IsNullOrWhiteSpace(labelKey))
+			{
+				label.Text = LocaleText.T(labelKey);
+			}
+		}
 	}
 
 	private void AddPortalParticles(Node3D portal, Material particleMaterial, float portalScale, bool isCityGate)
