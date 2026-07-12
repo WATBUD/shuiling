@@ -76,7 +76,7 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public int CurrentHealth { get; set; } = 150;
 	[Export] public int Attack { get; set; } = 16;
 	[Export] public int Defense { get; set; } = 10;
-	[Export] public int Gold { get; set; }
+	[Export] public int Gold { get; set; } = 5000;
 	[Export] public int ActivePartyLimit { get; set; } = 20;
 	[Export] public float DamageFlashDuration { get; set; } = 0.32f;
 
@@ -1268,7 +1268,15 @@ public partial class PlayerController : CharacterBody3D
 		}
 
 		SimpleActor? actor = GetFormationActor(slotIndex);
-		return actor != null && StoreCompanion(actor);
+		if (actor == null)
+		{
+			return false;
+		}
+
+		ClearFormationAssignment(actor);
+		actor.OnFormationLayoutChanged();
+		RefreshFormationViews();
+		return true;
 	}
 
 	public Vector3 GetFormationLocalOffset(SimpleActor actor)
