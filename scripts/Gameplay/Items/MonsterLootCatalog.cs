@@ -82,64 +82,38 @@ public static class MonsterLootCatalog
 
 	public static string PickPrimaryDropForMonster(string monsterDisplayName, bool isRangedCombatant, int level)
 	{
-		string nameKey = monsterDisplayName;
-		string lowerName = monsterDisplayName.ToLowerInvariant();
+		if (monsterDisplayName.StartsWith("name.monster.", System.StringComparison.Ordinal))
+		{
+			return MonsterSpeciesCatalog.Current.GetPrimaryLootId(monsterDisplayName, isRangedCombatant, level);
+		}
 
-		if (nameKey == "name.monster.slime" || lowerName.Contains("slime") || lowerName.Contains("史萊姆"))
+		string lowerName = monsterDisplayName.ToLowerInvariant();
+		if (lowerName.Contains("slime"))
 		{
 			return "loot.slime_mucus";
 		}
 
-		if (nameKey == "name.monster.water_spirit" || lowerName.Contains("water") || lowerName.Contains("水靈"))
+		if (lowerName.Contains("water"))
 		{
 			return "loot.water_core";
 		}
 
-		if (nameKey == "name.monster.redhorn" || lowerName.Contains("redhorn") || lowerName.Contains("紅角"))
+		if (lowerName.Contains("redhorn"))
 		{
 			return "loot.red_horn";
 		}
 
-		if (nameKey is "name.monster.bee" or "name.monster.caterpillar"
-			|| lowerName.Contains("bee") || lowerName.Contains("caterpillar") || lowerName.Contains("毒蜂") || lowerName.Contains("毛蟲"))
-		{
-			return "loot.insect_wing";
-		}
-
-		if (nameKey == "name.monster.imp" || lowerName.Contains("imp") || lowerName.Contains("小鬼"))
-		{
-			return "loot.venom_sac";
-		}
-
-		if (nameKey == "name.monster.dragon" || lowerName.Contains("dragon") || lowerName.Contains("幼龍"))
+		if (lowerName.Contains("dragon"))
 		{
 			return "loot.dragon_scale";
 		}
 
-		if (lowerName.Contains("golem") || lowerName.Contains("core") || lowerName.Contains("魔核"))
+		if (lowerName.Contains("bee") || lowerName.Contains("caterpillar"))
 		{
-			return "loot.cracked_core";
+			return "loot.insect_wing";
 		}
 
-		if (nameKey is "name.monster.rat" or "name.monster.bunny" or "name.monster.deer" or "name.monster.beaver"
-			|| lowerName.Contains("rat") || lowerName.Contains("bunny") || lowerName.Contains("deer") || lowerName.Contains("beaver")
-			|| lowerName.Contains("街鼠") || lowerName.Contains("跳兔") || lowerName.Contains("林鹿") || lowerName.Contains("河狸"))
-		{
-			return level >= 6 ? "loot.small_bone" : "loot.soft_fur";
-		}
-
-		if (nameKey is "name.monster.fox" or "name.monster.boar" or "name.monster.wolf" or "name.monster.lion" or "name.monster.tiger" or "name.monster.bear"
-			|| lowerName.Contains("wolf") || lowerName.Contains("beast") || lowerName.Contains("fox") || lowerName.Contains("boar") || lowerName.Contains("lion") || lowerName.Contains("tiger") || lowerName.Contains("bear"))
-		{
-			return "loot.beast_hide";
-		}
-
-		if (nameKey is "name.monster.crab" or "name.monster.fish" or "name.monster.elephant")
-		{
-			return level >= 7 ? "loot.cracked_core" : "loot.small_bone";
-		}
-
-		if (isRangedCombatant)
+		if (lowerName.Contains("imp") || isRangedCombatant)
 		{
 			return "loot.venom_sac";
 		}

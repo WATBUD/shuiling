@@ -8,9 +8,12 @@ public partial class PlayerController : CharacterBody3D
 	{
 		Blacksmith,
 		ItemShop,
+		PetShop,
 	}
 
 	public sealed record ShopTradeEntry(string ItemId, string DisplayName, string Detail, int Price);
+
+	private readonly record struct PetShopOffer(string MonsterNameKey, int Level, int Price);
 
 	private const int FormationGridSideLength = 5;
 	private const int FormationCenterSlotIndex = 12;
@@ -25,6 +28,16 @@ public partial class PlayerController : CharacterBody3D
 	private const int MercenaryOfferCount = 5;
 	private const double MercenaryRefreshSeconds = 6.0 * 60.0 * 60.0;
 	private const int PetReviveGoldCost = 40;
+
+	private static readonly PetShopOffer[] PetShopOffers =
+	{
+		new("name.monster.rat", 2, 120),
+		new("name.monster.bunny", 2, 130),
+		new("name.monster.fox", 3, 210),
+		new("name.monster.crab", 3, 240),
+		new("name.monster.bee", 3, 260),
+		new("name.monster.lion", 5, 420),
+	};
 
 	private static readonly int[] FormationFillOrder =
 	{
@@ -616,6 +629,13 @@ public partial class PlayerController : CharacterBody3D
 				}
 			}
 		}
+		else if (shopKind == MerchantShopKind.PetShop)
+		{
+			foreach (PetShopOffer offer in PetShopOffers)
+			{
+				entries.Add(new ShopTradeEntry(offer.MonsterNameKey, LocaleText.T(offer.MonsterNameKey), LocaleText.F("shop.detail.pet", offer.Level), offer.Price));
+			}
+		}
 		else
 		{
 			foreach (AttributeGemDefinition gem in BuildCatalog.GetAttributeGemDefinitions())
@@ -676,9 +696,58 @@ public partial class PlayerController : CharacterBody3D
 		}
 
 		Gold -= safePrice;
+		if (shopKind == MerchantShopKind.PetShop)
+		{
+			if (!TryReceivePurchasedPet(itemId, safePrice))
+			{
+				Gold += safePrice;
+				return false;
+			}
+
+			_inventoryPanel.RefreshAll();
+			_merchantShopPanel.RefreshAll();
+			return true;
+		}
+
 		AddInventoryItem(itemId);
 		PostSystemMessage(LocaleText.F("system.shop.bought", GetInventoryItemDisplayName(itemId), safePrice, Gold), new Color(1.0f, 0.86f, 0.46f));
 		_merchantShopPanel.RefreshAll();
+		return true;
+	}
+
+	private bool TryReceivePurchasedPet(string monsterNameKey, int price)
+	{
+		PetShopOffer offer = GetPetShopOffer(monsterNameKey);
+		if (string.IsNullOrWhiteSpace(offer.MonsterNameKey))
+		{
+			return false;
+		}
+
+		if (GetParent() is not World world)
+		{
+			return false;
+		}
+
+		SimpleActor actor = world.SpawnPurchasedPet(offer.MonsterNameKey, offer.Level);
+		if (!_capturedCollection.Contains(actor))
+		{
+			_capturedCollection.Add(actor);
+		}
+
+		actor.Capture(this);
+		PostSystemMessage(LocaleText.F("system.shop.bought_pet", actor.LocalizedDisplayName, price, Gold), new Color(0.64f, 1.0f, 0.82f));
+
+		if (_activeParty.Count < ActivePartyLimit)
+		{
+			DeployCompanion(actor, false);
+		}
+		else
+		{
+			actor.StoreInCollection();
+		}
+
+		_partyPanel.RefreshParty();
+		_formationPanel.RefreshAll();
 		return true;
 	}
 
@@ -1202,6 +1271,11 @@ public partial class PlayerController : CharacterBody3D
 
 	private static bool CanTradeInShop(MerchantShopKind shopKind, string itemId)
 	{
+		if (shopKind == MerchantShopKind.PetShop)
+		{
+			return IsPetShopItem(itemId);
+		}
+
 		if (shopKind == MerchantShopKind.Blacksmith)
 		{
 			return BuildCatalog.GetItemKind(itemId) == InventoryItemKind.Equipment;
@@ -1218,6 +1292,17 @@ public partial class PlayerController : CharacterBody3D
 
 	private static int GetShopBuyPrice(string itemId)
 	{
+		if (IsPetShopItem(itemId))
+		{
+			foreach (PetShopOffer offer in PetShopOffers)
+			{
+				if (offer.MonsterNameKey == itemId)
+				{
+					return offer.Price;
+				}
+			}
+		}
+
 		if (MonsterLootCatalog.IsMonsterLoot(itemId))
 		{
 			return itemId switch
@@ -1278,6 +1363,32 @@ public partial class PlayerController : CharacterBody3D
 			"loot.dragon_scale",
 			"loot.cracked_core",
 		};
+	}
+
+	private static bool IsPetShopItem(string itemId)
+	{
+		foreach (PetShopOffer offer in PetShopOffers)
+		{
+			if (offer.MonsterNameKey == itemId)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private static PetShopOffer GetPetShopOffer(string itemId)
+	{
+		foreach (PetShopOffer offer in PetShopOffers)
+		{
+			if (offer.MonsterNameKey == itemId)
+			{
+				return offer;
+			}
+		}
+
+		return default;
 	}
 
 	private static string GetNpcQuestItemId(SimpleActor actor)
@@ -1812,7 +1923,12 @@ public partial class PlayerController : CharacterBody3D
 		if (merchant != null)
 		{
 			_interactionPromptLabel.Visible = true;
-			string promptKey = merchantShopKind == MerchantShopKind.Blacksmith ? "prompt.shop.blacksmith" : "prompt.shop.item";
+			string promptKey = merchantShopKind switch
+			{
+				MerchantShopKind.Blacksmith => "prompt.shop.blacksmith",
+				MerchantShopKind.PetShop => "prompt.shop.pet",
+				_ => "prompt.shop.item",
+			};
 			_interactionPromptLabel.Text = LocaleText.F(promptKey, "E", merchant.LocalizedDisplayName);
 			return;
 		}
@@ -2326,6 +2442,12 @@ public partial class PlayerController : CharacterBody3D
 		if (actor.DisplayName == "name.npc.item_merchant")
 		{
 			shopKind = MerchantShopKind.ItemShop;
+			return true;
+		}
+
+		if (actor.DisplayName == "name.npc.pet_trainer")
+		{
+			shopKind = MerchantShopKind.PetShop;
 			return true;
 		}
 
