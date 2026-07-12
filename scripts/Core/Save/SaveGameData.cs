@@ -21,6 +21,9 @@ public sealed class PlayerSaveData
 	public List<string> AcceptedNpcQuestNames { get; set; } = new();
 	public List<string> CompletedNpcQuestNames { get; set; } = new();
 	public double MercenaryNextRefreshUnix { get; set; }
+	public double MerchantNextRefreshUnix { get; set; }
+	public List<string> BlacksmithStockItemIds { get; set; } = new();
+	public List<string> PetShopStockNameKeys { get; set; } = new();
 	public List<MercenaryOfferSaveData> MercenaryOffers { get; set; } = new();
 	public List<ActorSaveData> Companions { get; set; } = new();
 	public List<int> ActivePartyIndexes { get; set; } = new();

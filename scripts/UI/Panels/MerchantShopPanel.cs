@@ -12,10 +12,17 @@ public partial class MerchantShopPanel : PanelContainer
 	private Label _titleLabel = null!;
 	private Label _goldLabel = null!;
 	private Label _noticeLabel = null!;
+	private HBoxContainer _tradeModeTabs = null!;
+	private HBoxContainer _refreshRow = null!;
+	private Label _refreshLabel = null!;
+	private Button _refreshButton = null!;
+	private Button _buyTabButton = null!;
+	private Button _sellTabButton = null!;
 	private PanelContainer _tooltipPanel = null!;
 	private Label _tooltipTitleLabel = null!;
 	private Label _tooltipBodyLabel = null!;
 	private ScrollContainer _tooltipBodyScroll = null!;
+	private bool _showSellList;
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -24,6 +31,11 @@ public partial class MerchantShopPanel : PanelContainer
 		if (_tooltipPanel != null && _tooltipPanel.Visible)
 		{
 			PositionTooltip();
+		}
+
+		if (Visible && _player != null && _player.IsMerchantShopRefreshable(_shopKind))
+		{
+			_refreshLabel.Text = _player.GetMerchantRefreshCountdownText();
 		}
 	}
 
@@ -48,6 +60,7 @@ public partial class MerchantShopPanel : PanelContainer
 	public void Open(PlayerController.MerchantShopKind shopKind)
 	{
 		_shopKind = shopKind;
+		_showSellList = false;
 		SetPanelVisible(true);
 	}
 
@@ -76,14 +89,49 @@ public partial class MerchantShopPanel : PanelContainer
 		_goldLabel.Text = LocaleText.F("inventory.gold", _player?.Gold ?? 0);
 		_noticeLabel.Visible = _shopKind == PlayerController.MerchantShopKind.PetShop;
 		_noticeLabel.Text = _noticeLabel.Visible ? LocaleText.T("shop.pet.notice") : string.Empty;
+		bool canSell = _shopKind != PlayerController.MerchantShopKind.PetShop;
+		if (!canSell)
+		{
+			_showSellList = false;
+		}
+		_tradeModeTabs.Visible = canSell;
+		_buyTabButton.Text = LocaleText.T("shop.buy");
+		_sellTabButton.Text = LocaleText.T("shop.sell");
+		_buyTabButton.ButtonPressed = !_showSellList;
+		_sellTabButton.ButtonPressed = _showSellList;
+		bool canRefresh = _player != null && _player.IsMerchantShopRefreshable(_shopKind);
+		_refreshRow.Visible = canRefresh;
+		if (canRefresh)
+		{
+			_refreshLabel.Text = _player!.GetMerchantRefreshCountdownText();
+			_refreshButton.Text = LocaleText.F("mercenary.button.refresh", _player.MerchantManualRefreshCost);
+			_refreshButton.Disabled = _player.Gold < _player.MerchantManualRefreshCost;
+		}
 		_buySection.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-		_sellSection.Visible = false;
+		_buySection.Visible = !_showSellList;
+		_sellSection.Visible = _showSellList;
 		ClearChildren(_buyList);
 		ClearChildren(_sellList);
 		HideTradeTooltip();
 
 		if (_player == null)
 		{
+			return;
+		}
+
+		if (_showSellList)
+		{
+			foreach (PlayerController.ShopTradeEntry entry in _player.GetShopSellEntries(_shopKind))
+			{
+				AddTradeRow(_sellList, entry, false);
+			}
+
+			if (_sellList.GetChildCount() == 0)
+			{
+				var empty = MakeLabel(15, new Color(0.70f, 0.76f, 0.82f));
+				empty.Text = LocaleText.T("shop.sell.empty");
+				_sellList.AddChild(empty);
+			}
 			return;
 		}
 
@@ -99,11 +147,11 @@ public partial class MerchantShopPanel : PanelContainer
 		Name = "MerchantShopPanel";
 		MouseFilter = MouseFilterEnum.Stop;
 		SetAnchorsPreset(LayoutPreset.Center);
-		OffsetLeft = -560.0f;
-		OffsetRight = 560.0f;
-		OffsetTop = -340.0f;
-		OffsetBottom = 340.0f;
-		CustomMinimumSize = new Vector2(1120.0f, 680.0f);
+		OffsetLeft = -392.0f;
+		OffsetRight = 392.0f;
+		OffsetTop = -255.0f;
+		OffsetBottom = 255.0f;
+		CustomMinimumSize = new Vector2(784.0f, 510.0f);
 
 		var style = new StyleBoxFlat
 		{
@@ -143,6 +191,47 @@ public partial class MerchantShopPanel : PanelContainer
 		_noticeLabel.CustomMinimumSize = new Vector2(0.0f, 34.0f);
 		root.AddChild(_noticeLabel);
 
+		_tradeModeTabs = new HBoxContainer();
+		_tradeModeTabs.AddThemeConstantOverride("separation", 8);
+		root.AddChild(_tradeModeTabs);
+
+		_buyTabButton = CreateModeTab("shop.buy");
+		_buyTabButton.Pressed += () =>
+		{
+			_showSellList = false;
+			RefreshAll();
+		};
+		_tradeModeTabs.AddChild(_buyTabButton);
+
+		_sellTabButton = CreateModeTab("shop.sell");
+		_sellTabButton.Pressed += () =>
+		{
+			_showSellList = true;
+			RefreshAll();
+		};
+		_tradeModeTabs.AddChild(_sellTabButton);
+
+		_refreshRow = new HBoxContainer();
+		_refreshRow.AddThemeConstantOverride("separation", 10);
+		root.AddChild(_refreshRow);
+
+		_refreshLabel = MakeLabel(15, new Color(0.82f, 0.92f, 1.0f));
+		_refreshLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+		_refreshRow.AddChild(_refreshLabel);
+
+		_refreshButton = new Button
+		{
+			CustomMinimumSize = new Vector2(148.0f, 38.0f),
+		};
+		_refreshButton.Pressed += () =>
+		{
+			if (_player != null && _player.TryRefreshMerchantShopManually(_shopKind))
+			{
+				RefreshAll();
+			}
+		};
+		_refreshRow.AddChild(_refreshButton);
+
 		var columns = new HBoxContainer();
 		columns.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		columns.SizeFlagsVertical = SizeFlags.ExpandFill;
@@ -161,6 +250,18 @@ public partial class MerchantShopPanel : PanelContainer
 		};
 		closeButton.Pressed += () => CloseRequested?.Invoke();
 		root.AddChild(closeButton);
+	}
+
+	private static Button CreateModeTab(string textKey)
+	{
+		var button = new Button
+		{
+			Text = LocaleText.T(textKey),
+			ToggleMode = true,
+			CustomMinimumSize = new Vector2(148.0f, 40.0f),
+		};
+		button.AddThemeFontSizeOverride("font_size", 16);
+		return button;
 	}
 
 	private VBoxContainer CreateTradeColumn(HBoxContainer parent, string titleKey, out VBoxContainer section)
@@ -344,10 +445,17 @@ public partial class MerchantShopPanel : PanelContainer
 			available = CustomMinimumSize;
 		}
 
-		Vector2 desired = new(
-			(available.X - panelSize.X) * 0.5f,
-			(available.Y - panelSize.Y) * 0.5f
-		);
+		Vector2 mouse = GetViewport().GetMousePosition() - GlobalPosition;
+		Vector2 desired = mouse + new Vector2(18.0f, 18.0f);
+		if (desired.X + panelSize.X + 18.0f > available.X)
+		{
+			desired.X = mouse.X - panelSize.X - 18.0f;
+		}
+		if (desired.Y + panelSize.Y + 18.0f > available.Y)
+		{
+			desired.Y = mouse.Y - panelSize.Y - 18.0f;
+		}
+
 		desired.X = Mathf.Clamp(desired.X, 18.0f, Mathf.Max(18.0f, available.X - panelSize.X - 18.0f));
 		desired.Y = Mathf.Clamp(desired.Y, 18.0f, Mathf.Max(18.0f, available.Y - panelSize.Y - 18.0f));
 
