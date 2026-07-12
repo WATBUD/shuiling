@@ -27,6 +27,9 @@ public partial class PlayerController : CharacterBody3D
 	private const int MercenaryRefreshCost = 50;
 	private const int MercenaryOfferCount = 5;
 	private const double MercenaryRefreshSeconds = 6.0 * 60.0 * 60.0;
+	private const int MerchantRefreshCost = 50;
+	private const int BlacksmithStockCount = 6;
+	private const int PetShopStockCount = 4;
 	private const int PetReviveGoldCost = 40;
 
 	private static readonly PetShopOffer[] PetShopOffers =
@@ -84,8 +87,11 @@ public partial class PlayerController : CharacterBody3D
 	private readonly HashSet<SimpleActor> _acceptedNpcQuests = new();
 	private readonly HashSet<SimpleActor> _completedNpcQuests = new();
 	private readonly List<ContractCompanionOffer> _contractCompanionOffers = new();
+	private readonly List<string> _blacksmithStockItemIds = new();
+	private readonly List<string> _petShopStockNameKeys = new();
 	private readonly RandomNumberGenerator _mercenaryRng = new();
 	private double _mercenaryNextRefreshUnix;
+	private double _merchantNextRefreshUnix;
 	private static readonly ContractCompanionOffer[] ContractCompanionOfferTemplates =
 	{
 		new("mercenary.offer.vanguard", "name.mercenary.vanguard", "role.tank", "Tank", "mercenary.summary.vanguard", 3, 260, 185, 18, 24),
@@ -147,6 +153,7 @@ public partial class PlayerController : CharacterBody3D
 	public IReadOnlyList<SimpleActor> ActiveParty => _activeParty;
 	public IReadOnlyList<ContractCompanionOffer> ContractCompanionOffers => _contractCompanionOffers;
 	public int MercenaryManualRefreshCost => MercenaryRefreshCost;
+	public int MerchantManualRefreshCost => MerchantRefreshCost;
 	public int PetReviveCostPerCompanion => PetReviveGoldCost;
 	public SimpleActor? FocusedTarget => IsValidFocusedTarget(_focusedTarget) ? _focusedTarget : null;
 	public IReadOnlyDictionary<string, int> InventoryItems => _inventoryItems;
@@ -165,6 +172,7 @@ public partial class PlayerController : CharacterBody3D
 		_lastSafePosition = GlobalPosition + Vector3.Up * 0.2f;
 		_mercenaryRng.Seed = Time.GetTicksUsec() ^ (ulong)GetInstanceId();
 		EnsureMercenaryOffers();
+		EnsureMerchantStock();
 		ConfigureThirdPersonCamera();
 		CreatePlayerVisual();
 		CreateTargetInfoPanel();
@@ -200,6 +208,7 @@ public partial class PlayerController : CharacterBody3D
 		UpdateMovementAnimation((float)delta);
 		UpdateFocusedTargetMarker((float)delta);
 		UpdateMercenaryOfferRefresh();
+		UpdateMerchantStockRefresh();
 		UpdateInteractionPrompt();
 		StabilizePlayerExternalModel();
 	}
@@ -602,6 +611,98 @@ public partial class PlayerController : CharacterBody3D
 		_mercenaryNextRefreshUnix = Time.GetUnixTimeFromSystem() + MercenaryRefreshSeconds;
 	}
 
+	public bool IsMerchantShopRefreshable(MerchantShopKind shopKind)
+	{
+		return shopKind is MerchantShopKind.Blacksmith or MerchantShopKind.PetShop;
+	}
+
+	public string GetMerchantRefreshCountdownText()
+	{
+		double remaining = Mathf.Max((float)(_merchantNextRefreshUnix - Time.GetUnixTimeFromSystem()), 0.0f);
+		int totalSeconds = Mathf.CeilToInt((float)remaining);
+		int hours = totalSeconds / 3600;
+		int minutes = (totalSeconds % 3600) / 60;
+		int seconds = totalSeconds % 60;
+		return LocaleText.F("mercenary.refresh.countdown", hours, minutes, seconds);
+	}
+
+	public bool TryRefreshMerchantShopManually(MerchantShopKind shopKind)
+	{
+		if (!IsMerchantShopRefreshable(shopKind))
+		{
+			return false;
+		}
+
+		if (Gold < MerchantRefreshCost)
+		{
+			PostSystemMessage(LocaleText.F("system.shop.refresh_not_enough_gold", MerchantRefreshCost, Gold), new Color(1.0f, 0.62f, 0.48f));
+			return false;
+		}
+
+		Gold -= MerchantRefreshCost;
+		GenerateMerchantStock();
+		PostSystemMessage(LocaleText.F("system.shop.refreshed", MerchantRefreshCost, Gold), new Color(0.82f, 0.94f, 1.0f));
+		_inventoryPanel.RefreshAll();
+		_merchantShopPanel.RefreshAll();
+		return true;
+	}
+
+	private void EnsureMerchantStock()
+	{
+		if (_blacksmithStockItemIds.Count == 0 || _petShopStockNameKeys.Count == 0 || _merchantNextRefreshUnix <= 0.0 || Time.GetUnixTimeFromSystem() >= _merchantNextRefreshUnix)
+		{
+			GenerateMerchantStock();
+		}
+	}
+
+	private void UpdateMerchantStockRefresh()
+	{
+		if (_merchantNextRefreshUnix > 0.0 && Time.GetUnixTimeFromSystem() >= _merchantNextRefreshUnix)
+		{
+			GenerateMerchantStock();
+			PostSystemMessage(LocaleText.T("system.shop.auto_refreshed"), new Color(0.82f, 0.94f, 1.0f));
+			_merchantShopPanel?.RefreshAll();
+		}
+	}
+
+	private void GenerateMerchantStock()
+	{
+		_blacksmithStockItemIds.Clear();
+		var equipmentIds = new List<string>();
+		foreach (EquipmentSlot slot in new[] { EquipmentSlot.Helmet, EquipmentSlot.Weapon, EquipmentSlot.Armor, EquipmentSlot.Accessory })
+		{
+			foreach (EquipmentDefinition equipment in BuildCatalog.GetEquipmentDefinitions(slot))
+			{
+				if (!BuildCatalog.IsFreeItem(equipment.Id))
+				{
+					equipmentIds.Add(equipment.Id);
+				}
+			}
+		}
+		AddRandomItems(equipmentIds, _blacksmithStockItemIds, BlacksmithStockCount);
+
+		_petShopStockNameKeys.Clear();
+		var petKeys = new List<string>();
+		foreach (PetShopOffer offer in PetShopOffers)
+		{
+			petKeys.Add(offer.MonsterNameKey);
+		}
+		AddRandomItems(petKeys, _petShopStockNameKeys, PetShopStockCount);
+
+		_merchantNextRefreshUnix = Time.GetUnixTimeFromSystem() + MercenaryRefreshSeconds;
+	}
+
+	private void AddRandomItems(List<string> source, List<string> target, int count)
+	{
+		var available = new List<string>(source);
+		for (int index = 0; index < count && available.Count > 0; index++)
+		{
+			int randomIndex = _mercenaryRng.RandiRange(0, available.Count - 1);
+			target.Add(available[randomIndex]);
+			available.RemoveAt(randomIndex);
+		}
+	}
+
 	private ContractCompanionOffer CreateRandomMercenaryOffer(ContractCompanionOffer template, int index)
 	{
 		int level = _mercenaryRng.RandiRange(2, 8);
@@ -627,18 +728,24 @@ public partial class PlayerController : CharacterBody3D
 		var entries = new List<ShopTradeEntry>();
 		if (shopKind == MerchantShopKind.Blacksmith)
 		{
-			foreach (EquipmentSlot slot in new[] { EquipmentSlot.Helmet, EquipmentSlot.Weapon, EquipmentSlot.Armor, EquipmentSlot.Accessory })
+			EnsureMerchantStock();
+			foreach (string itemId in _blacksmithStockItemIds)
 			{
-				foreach (EquipmentDefinition equipment in BuildCatalog.GetEquipmentDefinitions(slot))
-				{
-					entries.Add(new ShopTradeEntry(equipment.Id, LocaleText.T(equipment.NameKey), LocaleText.T(equipment.SummaryKey), GetShopBuyPrice(equipment.Id)));
-				}
+				EquipmentDefinition equipment = BuildCatalog.GetEquipment(itemId);
+				entries.Add(new ShopTradeEntry(equipment.Id, LocaleText.T(equipment.NameKey), LocaleText.T(equipment.SummaryKey), GetShopBuyPrice(equipment.Id)));
 			}
 		}
 		else if (shopKind == MerchantShopKind.PetShop)
 		{
-			foreach (PetShopOffer offer in PetShopOffers)
+			EnsureMerchantStock();
+			foreach (string monsterNameKey in _petShopStockNameKeys)
 			{
+				PetShopOffer offer = GetPetShopOffer(monsterNameKey);
+				if (string.IsNullOrWhiteSpace(offer.MonsterNameKey))
+				{
+					continue;
+				}
+
 				entries.Add(new ShopTradeEntry(offer.MonsterNameKey, LocaleText.T(offer.MonsterNameKey), GetPetShopDetail(offer), offer.Price));
 			}
 		}
@@ -805,6 +912,9 @@ public partial class PlayerController : CharacterBody3D
 			Gold = Gold,
 			InventoryItems = new Dictionary<string, int>(_inventoryItems),
 			MercenaryNextRefreshUnix = _mercenaryNextRefreshUnix,
+			MerchantNextRefreshUnix = _merchantNextRefreshUnix,
+			BlacksmithStockItemIds = new List<string>(_blacksmithStockItemIds),
+			PetShopStockNameKeys = new List<string>(_petShopStockNameKeys),
 		};
 
 		foreach (ContractCompanionOffer offer in _contractCompanionOffers)
@@ -867,6 +977,7 @@ public partial class PlayerController : CharacterBody3D
 		Defense = Mathf.Max(data.Defense, 0);
 		Gold = Mathf.Max(data.Gold, 0);
 		RestoreMercenaryOffers(data);
+		RestoreMerchantStock(data);
 
 		_inventoryItems.Clear();
 		foreach (KeyValuePair<string, int> item in data.InventoryItems)
@@ -906,6 +1017,30 @@ public partial class PlayerController : CharacterBody3D
 		_inventoryPanel.RefreshAll();
 		_formationPanel.RefreshAll();
 		_mercenaryShopPanel.RefreshAll();
+	}
+
+	private void RestoreMerchantStock(PlayerSaveData data)
+	{
+		_blacksmithStockItemIds.Clear();
+		foreach (string itemId in data.BlacksmithStockItemIds)
+		{
+			if (!string.IsNullOrWhiteSpace(itemId) && BuildCatalog.GetItemKind(itemId) == InventoryItemKind.Equipment && !_blacksmithStockItemIds.Contains(itemId))
+			{
+				_blacksmithStockItemIds.Add(itemId);
+			}
+		}
+
+		_petShopStockNameKeys.Clear();
+		foreach (string nameKey in data.PetShopStockNameKeys)
+		{
+			if (!string.IsNullOrWhiteSpace(nameKey) && IsPetShopItem(nameKey) && !_petShopStockNameKeys.Contains(nameKey))
+			{
+				_petShopStockNameKeys.Add(nameKey);
+			}
+		}
+
+		_merchantNextRefreshUnix = data.MerchantNextRefreshUnix;
+		EnsureMerchantStock();
 	}
 
 	private void RestoreMercenaryOffers(PlayerSaveData data)
