@@ -63,6 +63,10 @@ public partial class SimpleActor : CharacterBody3D
 	private SimpleActor? _retaliationTarget;
 	private float _retaliationTargetRemaining;
 	private Label3D? _nameplate;
+	private MeshInstance3D? _nameplateMarker;
+	private MeshInstance3D? _nameplateHalo;
+	private StandardMaterial3D? _nameplateMarkerMaterial;
+	private StandardMaterial3D? _nameplateHaloMaterial;
 	private SquadActivity _squadActivity = SquadActivity.Follow;
 	private Vector3 _squadActivityLocalOffset = Vector3.Zero;
 	private float _squadActivityRemaining;
@@ -741,6 +745,25 @@ public partial class SimpleActor : CharacterBody3D
 			Width = 320.0f,
 		};
 		AddChild(_nameplate);
+
+		_nameplateMarkerMaterial = MakeMarkerMaterial(new Color(1.0f, 0.28f, 0.20f, 0.92f), 0.6f);
+		_nameplateHaloMaterial = MakeMarkerMaterial(new Color(1.0f, 0.28f, 0.20f, 0.34f), 0.35f);
+		_nameplateMarker = new MeshInstance3D
+		{
+			Name = "NameplateMarker",
+			Mesh = new BoxMesh { Size = new Vector3(0.22f, 0.22f, 0.22f) },
+			RotationDegrees = new Vector3(35.0f, 45.0f, 0.0f),
+			MaterialOverride = _nameplateMarkerMaterial,
+		};
+		_nameplateHalo = new MeshInstance3D
+		{
+			Name = "NameplateHalo",
+			Mesh = new TorusMesh { InnerRadius = 0.018f, OuterRadius = 0.34f },
+			RotationDegrees = new Vector3(90.0f, 0.0f, 0.0f),
+			MaterialOverride = _nameplateHaloMaterial,
+		};
+		AddChild(_nameplateHalo);
+		AddChild(_nameplateMarker);
 		RefreshNameplate();
 	}
 
@@ -757,10 +780,21 @@ public partial class SimpleActor : CharacterBody3D
 			? _isInActiveParty ? LocaleText.T("actor.nameplate.active") : LocaleText.T("actor.nameplate.stored")
 			: string.Empty;
 		_nameplate.Text = $"{LocaleText.T("actor.level_prefix")}{Level} {LocalizedDisplayName}{capturedText}";
-		_nameplate.Modulate = ActorKind == "monster"
-			? new Color(1.0f, 0.34f, 0.26f)
-			: new Color(0.64f, 0.86f, 1.0f);
+		Color markerColor = GetNameplateStatusColor();
+		_nameplate.Modulate = markerColor;
 		_nameplate.OutlineModulate = new Color(0.02f, 0.025f, 0.03f, 0.96f);
+		if (_nameplateMarkerMaterial != null)
+		{
+			_nameplateMarkerMaterial.AlbedoColor = markerColor;
+			_nameplateMarkerMaterial.Emission = markerColor;
+		}
+
+		if (_nameplateHaloMaterial != null)
+		{
+			_nameplateHaloMaterial.AlbedoColor = new Color(markerColor.R, markerColor.G, markerColor.B, _isCaptured ? 0.45f : 0.30f);
+			_nameplateHaloMaterial.Emission = markerColor;
+		}
+
 		UpdateNameplatePosition();
 	}
 
@@ -775,6 +809,76 @@ public partial class SimpleActor : CharacterBody3D
 		float fallbackTop = ActorKind == "monster" ? 2.2f : 2.05f;
 		float labelY = Mathf.Max(visualTop + 0.38f, fallbackTop);
 		_nameplate.Position = new Vector3(0.0f, labelY, 0.0f);
+		if (_nameplateMarker != null)
+		{
+			_nameplateMarker.Position = new Vector3(0.0f, labelY + 0.34f, 0.0f);
+			_nameplateMarker.Scale = _isCaptured ? new Vector3(1.18f, 1.18f, 1.18f) : Vector3.One;
+		}
+
+		if (_nameplateHalo != null)
+		{
+			_nameplateHalo.Position = new Vector3(0.0f, labelY + 0.28f, 0.0f);
+			_nameplateHalo.Scale = _isCaptured ? new Vector3(1.18f, 1.18f, 1.18f) : Vector3.One;
+		}
+	}
+
+	private Color GetNameplateStatusColor()
+	{
+		if (_isDefeated)
+		{
+			return new Color(0.62f, 0.66f, 0.70f, 0.88f);
+		}
+
+		if (_isCaptured)
+		{
+			return _isInActiveParty
+				? new Color(0.28f, 1.0f, 0.74f, 0.96f)
+				: new Color(0.42f, 0.86f, 1.0f, 0.94f);
+		}
+
+		if (ActorKind != "monster")
+		{
+			return new Color(0.64f, 0.86f, 1.0f, 0.94f);
+		}
+
+		return GetMonsterNameColor(DisplayName);
+	}
+
+	private static Color GetMonsterNameColor(string displayName)
+	{
+		return displayName switch
+		{
+			"name.monster.slime" => new Color(0.20f, 0.96f, 0.82f, 0.94f),
+			"name.monster.water_spirit" => new Color(0.32f, 0.76f, 1.0f, 0.94f),
+			"name.monster.rat" => new Color(0.62f, 0.48f, 0.36f, 0.94f),
+			"name.monster.fox" => new Color(1.0f, 0.48f, 0.20f, 0.94f),
+			"name.monster.deer" => new Color(0.78f, 0.58f, 0.34f, 0.94f),
+			"name.monster.bunny" => new Color(0.96f, 0.86f, 0.78f, 0.94f),
+			"name.monster.beaver" or "name.monster.boar" => new Color(0.58f, 0.34f, 0.18f, 0.94f),
+			"name.monster.crab" => new Color(1.0f, 0.34f, 0.26f, 0.94f),
+			"name.monster.fish" => new Color(0.28f, 0.82f, 1.0f, 0.94f),
+			"name.monster.caterpillar" => new Color(0.44f, 0.92f, 0.28f, 0.94f),
+			"name.monster.bee" => new Color(1.0f, 0.82f, 0.22f, 0.96f),
+			"name.monster.lion" => new Color(0.95f, 0.66f, 0.26f, 0.96f),
+			"name.monster.tiger" => new Color(1.0f, 0.42f, 0.12f, 0.96f),
+			"name.monster.bear" => new Color(0.84f, 0.92f, 1.0f, 0.94f),
+			"name.monster.elephant" => new Color(0.62f, 0.68f, 0.74f, 0.94f),
+			_ => new Color(1.0f, 0.34f, 0.26f, 0.94f),
+		};
+	}
+
+	private static StandardMaterial3D MakeMarkerMaterial(Color color, float emissionEnergy)
+	{
+		return new StandardMaterial3D
+		{
+			AlbedoColor = color,
+			EmissionEnabled = true,
+			Emission = color,
+			EmissionEnergyMultiplier = emissionEnergy,
+			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			NoDepthTest = true,
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+		};
 	}
 
 	private float GetVisualTopY(Node node)
@@ -782,7 +886,7 @@ public partial class SimpleActor : CharacterBody3D
 		float topY = 0.0f;
 		foreach (Node child in node.GetChildren())
 		{
-			if (child == _nameplate || child is CollisionShape3D)
+			if (child == _nameplate || child == _nameplateMarker || child == _nameplateHalo || child is CollisionShape3D)
 			{
 				continue;
 			}
@@ -1390,7 +1494,7 @@ public partial class SimpleActor : CharacterBody3D
 		Vector3 origin = GlobalPosition;
 		int goldAmount = Mathf.Max(GoldReward + _rng.RandiRange(1, Mathf.Max(Level + 2, 3)), 1);
 		SpawnWorldDrop(origin + RandomDropOffset(0.45f), string.Empty, 1, goldAmount);
-		string primaryLootId = MonsterLootCatalog.PickPrimaryDropForMonster(LocalizedDisplayName, IsRangedCombatant, Level);
+		string primaryLootId = MonsterLootCatalog.PickPrimaryDropForMonster(DisplayName, IsRangedCombatant, Level);
 		int primaryAmount = Level >= 6 && _rng.Randf() < 0.42f ? 2 : 1;
 		SpawnWorldDrop(origin + RandomDropOffset(0.78f), primaryLootId, primaryAmount, 0);
 
@@ -1888,8 +1992,13 @@ public partial class SimpleActor : CharacterBody3D
 
 	private Vector3 PickWanderTarget()
 	{
+		if (WanderRadius <= 0.05f)
+		{
+			return HomePosition;
+		}
+
 		float angle = (float)_rng.RandfRange(0.0f, Mathf.Tau);
-		float distance = (float)_rng.RandfRange(2.0f, WanderRadius);
+		float distance = (float)_rng.RandfRange(Mathf.Min(2.0f, WanderRadius), WanderRadius);
 		return HomePosition + new Vector3(Mathf.Cos(angle) * distance, 0.0f, Mathf.Sin(angle) * distance);
 	}
 }
