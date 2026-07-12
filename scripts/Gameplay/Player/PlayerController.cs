@@ -21,6 +21,10 @@ public partial class PlayerController : CharacterBody3D
 	private const int NpcRecruitAffinityRequirement = 80;
 	private const float MercenaryBrokerInteractRange = 4.6f;
 	private const float MerchantInteractRange = 4.6f;
+	private const int MercenaryRefreshCost = 50;
+	private const int MercenaryOfferCount = 5;
+	private const double MercenaryRefreshSeconds = 6.0 * 60.0 * 60.0;
+	private const int PetReviveGoldCost = 40;
 
 	private static readonly int[] FormationFillOrder =
 	{
@@ -66,7 +70,10 @@ public partial class PlayerController : CharacterBody3D
 	private readonly Dictionary<SimpleActor, int> _formationSlotsByActor = new();
 	private readonly HashSet<SimpleActor> _acceptedNpcQuests = new();
 	private readonly HashSet<SimpleActor> _completedNpcQuests = new();
-	private static readonly ContractCompanionOffer[] ContractCompanionOfferCatalog =
+	private readonly List<ContractCompanionOffer> _contractCompanionOffers = new();
+	private readonly RandomNumberGenerator _mercenaryRng = new();
+	private double _mercenaryNextRefreshUnix;
+	private static readonly ContractCompanionOffer[] ContractCompanionOfferTemplates =
 	{
 		new("mercenary.offer.vanguard", "name.mercenary.vanguard", "role.tank", "Tank", "mercenary.summary.vanguard", 3, 260, 185, 18, 24),
 		new("mercenary.offer.ranger", "name.mercenary.ranger", "role.ranged", "Ranged", "mercenary.summary.ranger", 4, 320, 145, 28, 15),
@@ -124,7 +131,9 @@ public partial class PlayerController : CharacterBody3D
 
 	public IReadOnlyList<SimpleActor> CapturedCollection => _capturedCollection;
 	public IReadOnlyList<SimpleActor> ActiveParty => _activeParty;
-	public IReadOnlyList<ContractCompanionOffer> ContractCompanionOffers => ContractCompanionOfferCatalog;
+	public IReadOnlyList<ContractCompanionOffer> ContractCompanionOffers => _contractCompanionOffers;
+	public int MercenaryManualRefreshCost => MercenaryRefreshCost;
+	public int PetReviveCostPerCompanion => PetReviveGoldCost;
 	public SimpleActor? FocusedTarget => IsValidFocusedTarget(_focusedTarget) ? _focusedTarget : null;
 	public IReadOnlyDictionary<string, int> InventoryItems => _inventoryItems;
 	public int FormationGridSide => FormationGridSideLength;
@@ -140,6 +149,8 @@ public partial class PlayerController : CharacterBody3D
 		_cameraPivot = GetNode<Node3D>("CameraPivot");
 		_camera = GetNode<Camera3D>("CameraPivot/Camera3D");
 		_lastSafePosition = GlobalPosition + Vector3.Up * 0.2f;
+		_mercenaryRng.Seed = Time.GetTicksUsec() ^ (ulong)GetInstanceId();
+		EnsureMercenaryOffers();
 		ConfigureThirdPersonCamera();
 		CreatePlayerVisual();
 		CreateTargetInfoPanel();
@@ -173,6 +184,7 @@ public partial class PlayerController : CharacterBody3D
 		UpdateDamageFlash((float)delta);
 		UpdateMovementAnimation((float)delta);
 		UpdateFocusedTargetMarker((float)delta);
+		UpdateMercenaryOfferRefresh();
 		UpdateInteractionPrompt();
 		StabilizePlayerExternalModel();
 	}
@@ -482,6 +494,11 @@ public partial class PlayerController : CharacterBody3D
 
 	public bool TryHireContractCompanion(ContractCompanionOffer offer)
 	{
+		if (!_contractCompanionOffers.Contains(offer))
+		{
+			return false;
+		}
+
 		if (Gold < offer.Cost)
 		{
 			PostSystemMessage(LocaleText.F("system.mercenary.not_enough_gold", offer.Cost, Gold), new Color(1.0f, 0.62f, 0.48f));
@@ -496,10 +513,94 @@ public partial class PlayerController : CharacterBody3D
 		SimpleActor actor = world.SpawnContractCompanion(offer);
 		Gold = Mathf.Max(Gold - offer.Cost, 0);
 		PostSystemMessage(LocaleText.F("system.mercenary.hired", LocaleText.T(offer.NameKey), offer.Cost, Gold), new Color(1.0f, 0.86f, 0.46f));
+		_contractCompanionOffers.Remove(offer);
 		RecruitNpc(actor);
 		_inventoryPanel.RefreshAll();
 		_mercenaryShopPanel.RefreshAll();
 		return true;
+	}
+
+	public bool TryRefreshMercenaryOffersManually()
+	{
+		if (Gold < MercenaryRefreshCost)
+		{
+			PostSystemMessage(LocaleText.F("system.mercenary.refresh_not_enough_gold", MercenaryRefreshCost, Gold), new Color(1.0f, 0.62f, 0.48f));
+			return false;
+		}
+
+		Gold -= MercenaryRefreshCost;
+		GenerateMercenaryOffers();
+		PostSystemMessage(LocaleText.F("system.mercenary.refreshed", MercenaryRefreshCost, Gold), new Color(0.82f, 0.94f, 1.0f));
+		_inventoryPanel.RefreshAll();
+		_mercenaryShopPanel.RefreshAll();
+		return true;
+	}
+
+	public string GetMercenaryRefreshCountdownText()
+	{
+		double remaining = Mathf.Max((float)(_mercenaryNextRefreshUnix - Time.GetUnixTimeFromSystem()), 0.0f);
+		int totalSeconds = Mathf.CeilToInt((float)remaining);
+		int hours = totalSeconds / 3600;
+		int minutes = (totalSeconds % 3600) / 60;
+		int seconds = totalSeconds % 60;
+		return LocaleText.F("mercenary.refresh.countdown", hours, minutes, seconds);
+	}
+
+	private void EnsureMercenaryOffers()
+	{
+		if (_contractCompanionOffers.Count == 0 || _mercenaryNextRefreshUnix <= 0.0 || Time.GetUnixTimeFromSystem() >= _mercenaryNextRefreshUnix)
+		{
+			GenerateMercenaryOffers();
+		}
+	}
+
+	private void UpdateMercenaryOfferRefresh()
+	{
+		if (_mercenaryNextRefreshUnix > 0.0 && Time.GetUnixTimeFromSystem() >= _mercenaryNextRefreshUnix)
+		{
+			GenerateMercenaryOffers();
+			PostSystemMessage(LocaleText.T("system.mercenary.auto_refreshed"), new Color(0.82f, 0.94f, 1.0f));
+		}
+	}
+
+	private void GenerateMercenaryOffers()
+	{
+		_contractCompanionOffers.Clear();
+		var available = new List<ContractCompanionOffer>(ContractCompanionOfferTemplates);
+		for (int index = 0; index < MercenaryOfferCount; index++)
+		{
+			if (available.Count == 0)
+			{
+				available.AddRange(ContractCompanionOfferTemplates);
+			}
+
+			int templateIndex = _mercenaryRng.RandiRange(0, available.Count - 1);
+			ContractCompanionOffer template = available[templateIndex];
+			available.RemoveAt(templateIndex);
+			_contractCompanionOffers.Add(CreateRandomMercenaryOffer(template, index));
+		}
+
+		_mercenaryNextRefreshUnix = Time.GetUnixTimeFromSystem() + MercenaryRefreshSeconds;
+	}
+
+	private ContractCompanionOffer CreateRandomMercenaryOffer(ContractCompanionOffer template, int index)
+	{
+		int level = _mercenaryRng.RandiRange(2, 8);
+		float quality = (float)_mercenaryRng.RandfRange(0.88f, 1.22f);
+		int maxHealth = Mathf.RoundToInt((template.MaxHealth + level * 17) * quality);
+		int attack = Mathf.RoundToInt((template.Attack + level * 3) * quality);
+		int defense = Mathf.RoundToInt((template.Defense + level * 2) * quality);
+		int cost = Mathf.RoundToInt((template.Cost + level * 38 + attack * 4 + defense * 3) * quality / 10.0f) * 10;
+		string id = $"{template.Id}.{Time.GetTicksMsec()}.{index}.{_mercenaryRng.Randi()}";
+		return template with
+		{
+			Id = id,
+			Level = level,
+			Cost = Mathf.Clamp(cost, 160, 720),
+			MaxHealth = Mathf.Max(maxHealth, 80),
+			Attack = Mathf.Max(attack, 8),
+			Defense = Mathf.Max(defense, 5),
+		};
 	}
 
 	public List<ShopTradeEntry> GetShopBuyEntries(MerchantShopKind shopKind)
@@ -628,7 +729,25 @@ public partial class PlayerController : CharacterBody3D
 			Defense = Defense,
 			Gold = Gold,
 			InventoryItems = new Dictionary<string, int>(_inventoryItems),
+			MercenaryNextRefreshUnix = _mercenaryNextRefreshUnix,
 		};
+
+		foreach (ContractCompanionOffer offer in _contractCompanionOffers)
+		{
+			data.MercenaryOffers.Add(new MercenaryOfferSaveData
+			{
+				Id = offer.Id,
+				NameKey = offer.NameKey,
+				RoleNameKey = offer.RoleNameKey,
+				CombatRole = offer.CombatRole,
+				SummaryKey = offer.SummaryKey,
+				Level = offer.Level,
+				Cost = offer.Cost,
+				MaxHealth = offer.MaxHealth,
+				Attack = offer.Attack,
+				Defense = offer.Defense,
+			});
+		}
 
 		foreach (SimpleActor actor in _acceptedNpcQuests)
 		{
@@ -672,6 +791,7 @@ public partial class PlayerController : CharacterBody3D
 		Attack = Mathf.Max(data.Attack, 0);
 		Defense = Mathf.Max(data.Defense, 0);
 		Gold = Mathf.Max(data.Gold, 0);
+		RestoreMercenaryOffers(data);
 
 		_inventoryItems.Clear();
 		foreach (KeyValuePair<string, int> item in data.InventoryItems)
@@ -710,6 +830,35 @@ public partial class PlayerController : CharacterBody3D
 		_partyPanel.RefreshParty();
 		_inventoryPanel.RefreshAll();
 		_formationPanel.RefreshAll();
+		_mercenaryShopPanel.RefreshAll();
+	}
+
+	private void RestoreMercenaryOffers(PlayerSaveData data)
+	{
+		_contractCompanionOffers.Clear();
+		foreach (MercenaryOfferSaveData offer in data.MercenaryOffers)
+		{
+			if (offer.Cost <= 0 || string.IsNullOrWhiteSpace(offer.NameKey))
+			{
+				continue;
+			}
+
+			_contractCompanionOffers.Add(new ContractCompanionOffer(
+				offer.Id,
+				offer.NameKey,
+				offer.RoleNameKey,
+				offer.CombatRole,
+				offer.SummaryKey,
+				Mathf.Max(offer.Level, 1),
+				Mathf.Max(offer.Cost, 1),
+				Mathf.Max(offer.MaxHealth, 1),
+				Mathf.Max(offer.Attack, 1),
+				Mathf.Max(offer.Defense, 0)
+			));
+		}
+
+		_mercenaryNextRefreshUnix = data.MercenaryNextRefreshUnix;
+		EnsureMercenaryOffers();
 	}
 
 	private void RestoreNpcQuestSets(PlayerSaveData data)
@@ -754,6 +903,28 @@ public partial class PlayerController : CharacterBody3D
 
 	public int ReviveDefeatedCompanions()
 	{
+		int fallenCount = 0;
+		foreach (SimpleActor actor in _capturedCollection)
+		{
+			if (IsInstanceValid(actor) && actor.IsDefeated)
+			{
+				fallenCount++;
+			}
+		}
+
+		if (fallenCount <= 0)
+		{
+			PostSystemMessage(LocaleText.T("system.revive.no_fallen"), new Color(0.78f, 0.88f, 1.0f));
+			return 0;
+		}
+
+		int totalCost = fallenCount * PetReviveGoldCost;
+		if (Gold < totalCost)
+		{
+			PostSystemMessage(LocaleText.F("system.revive.not_enough_gold", totalCost, Gold), new Color(1.0f, 0.62f, 0.48f));
+			return 0;
+		}
+
 		int revivedCount = 0;
 		foreach (SimpleActor actor in _capturedCollection)
 		{
@@ -770,14 +941,13 @@ public partial class PlayerController : CharacterBody3D
 
 		if (revivedCount > 0)
 		{
+			int paidGold = revivedCount * PetReviveGoldCost;
+			Gold = Mathf.Max(Gold - paidGold, 0);
 			ReassignFollowSlots();
 			_partyPanel.RefreshParty();
 			_formationPanel.RefreshAll();
-			PostSystemMessage(LocaleText.F("system.revive.count", revivedCount), new Color(0.54f, 1.0f, 0.70f));
-		}
-		else
-		{
-			PostSystemMessage(LocaleText.T("system.revive.no_fallen"), new Color(0.78f, 0.88f, 1.0f));
+			_inventoryPanel.RefreshAll();
+			PostSystemMessage(LocaleText.F("system.revive.count_paid", revivedCount, paidGold, Gold), new Color(0.54f, 1.0f, 0.70f));
 		}
 
 		return revivedCount;
@@ -1783,7 +1953,7 @@ public partial class PlayerController : CharacterBody3D
 		_npcQuestDialogIsNotice = true;
 		_npcQuestTitleLabel.Text = LocaleText.T("revival.dialog.title");
 		_npcQuestBodyLabel.Text = revivedCount > 0
-			? LocaleText.F("revival.dialog.count", revivedCount)
+			? LocaleText.F("revival.dialog.count_paid", revivedCount, revivedCount * PetReviveGoldCost)
 			: LocaleText.T("revival.dialog.no_fallen");
 		_npcQuestRewardLabel.Text = string.Empty;
 		_npcQuestRewardLabel.Visible = false;

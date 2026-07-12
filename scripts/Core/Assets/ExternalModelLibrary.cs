@@ -30,6 +30,12 @@ public static class ExternalModelLibrary
 
 	private static readonly string[] MonsterMelee =
 	{
+		"res://assets/models/monsters/street_rat/street_rat_1k.gltf",
+		"res://assets/models/pets/cube_pets/animal-lion.glb",
+		"res://assets/models/pets/cube_pets/animal-tiger.glb",
+		"res://assets/models/pets/cube_pets/animal-polar.glb",
+		"res://assets/models/pets/cube_pets/animal-hog.glb",
+		"res://assets/models/pets/cube_pets/animal-fox.glb",
 		"res://assets/models/monsters/orc.gltf",
 		"res://assets/models/monsters/golem.gltf",
 		"res://assets/models/monsters/beast.gltf",
@@ -45,6 +51,10 @@ public static class ExternalModelLibrary
 
 	private static readonly string[] MonsterRanged =
 	{
+		"res://assets/models/pets/cube_pets/animal-bee.glb",
+		"res://assets/models/pets/cube_pets/animal-parrot.glb",
+		"res://assets/models/pets/cube_pets/animal-crab.glb",
+		"res://assets/models/pets/cube_pets/animal-fish.glb",
 		"res://assets/models/monsters/imp.gltf",
 		"res://assets/models/monsters/spitter.gltf",
 		"res://assets/models/monsters/blue_demon.gltf",
@@ -63,12 +73,23 @@ public static class ExternalModelLibrary
 
 	private static readonly string[] ForestMonsterModels =
 	{
+		"res://assets/models/monsters/street_rat/street_rat_1k.gltf",
+		"res://assets/models/pets/cube_pets/animal-fox.glb",
+		"res://assets/models/pets/cube_pets/animal-deer.glb",
+		"res://assets/models/pets/cube_pets/animal-bunny.glb",
+		"res://assets/models/pets/cube_pets/animal-beaver.glb",
+		"res://assets/models/pets/cube_pets/animal-hog.glb",
 		"res://assets/models/monsters/beast.gltf",
 		"res://assets/models/monsters/orc.gltf",
 	};
 
 	private static readonly string[] MarshMonsterModels =
 	{
+		"res://assets/models/monsters/street_rat/street_rat_1k.gltf",
+		"res://assets/models/pets/cube_pets/animal-crab.glb",
+		"res://assets/models/pets/cube_pets/animal-fish.glb",
+		"res://assets/models/pets/cube_pets/animal-caterpillar.glb",
+		"res://assets/models/pets/cube_pets/animal-bee.glb",
 		"res://assets/models/monsters/slime_enemy_poly_pizza.glb",
 		"res://assets/models/monsters/slime.gltf",
 		"res://assets/models/monsters/spitter.gltf",
@@ -77,6 +98,10 @@ public static class ExternalModelLibrary
 
 	private static readonly string[] BadlandsMonsterModels =
 	{
+		"res://assets/models/pets/cube_pets/animal-lion.glb",
+		"res://assets/models/pets/cube_pets/animal-tiger.glb",
+		"res://assets/models/pets/cube_pets/animal-polar.glb",
+		"res://assets/models/pets/cube_pets/animal-elephant.glb",
 		"res://assets/models/monsters/golem.gltf",
 		"res://assets/models/monsters/demon.gltf",
 		"res://assets/models/monsters/blue_demon.gltf",
@@ -321,7 +346,7 @@ public static class ExternalModelLibrary
 			model.Name = nodeName;
 			model.Position = position;
 			model.RotationDegrees = rotationDegrees;
-			model.Scale = scale;
+			model.Scale = GetModelSpecificScale(path, scale);
 			parent.AddChild(model);
 			ApplyFallbackMaterials(model, path);
 			TryPlayActorAnimation(model, "idle");
@@ -329,6 +354,16 @@ public static class ExternalModelLibrary
 		}
 
 		return false;
+	}
+
+	private static Vector3 GetModelSpecificScale(string path, Vector3 requestedScale)
+	{
+		if (path.Contains("/street_rat/", System.StringComparison.OrdinalIgnoreCase))
+		{
+			return requestedScale * 10.5f;
+		}
+
+		return requestedScale;
 	}
 
 	private static bool IsBlockedActorPath(Node3D parent, string path)

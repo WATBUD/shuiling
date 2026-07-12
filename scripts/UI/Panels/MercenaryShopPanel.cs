@@ -7,6 +7,9 @@ public partial class MercenaryShopPanel : PanelContainer
 	private VBoxContainer _offerList = null!;
 	private Label _goldLabel = null!;
 	private Label _titleLabel = null!;
+	private Label _refreshLabel = null!;
+	private Button _refreshButton = null!;
+	private float _refreshUiRemaining;
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -20,6 +23,21 @@ public partial class MercenaryShopPanel : PanelContainer
 	public override void _ExitTree()
 	{
 		LocaleText.LanguageChanged -= RefreshAll;
+	}
+
+	public override void _Process(double delta)
+	{
+		if (!Visible)
+		{
+			return;
+		}
+
+		_refreshUiRemaining -= (float)delta;
+		if (_refreshUiRemaining <= 0.0f)
+		{
+			_refreshUiRemaining = 1.0f;
+			RefreshAll();
+		}
 	}
 
 	public void Bind(PlayerController player)
@@ -49,6 +67,9 @@ public partial class MercenaryShopPanel : PanelContainer
 
 		_titleLabel.Text = LocaleText.T("mercenary.shop.title");
 		_goldLabel.Text = LocaleText.F("inventory.gold", _player?.Gold ?? 0);
+		_refreshLabel.Text = _player?.GetMercenaryRefreshCountdownText() ?? LocaleText.F("mercenary.refresh.countdown", 0, 0, 0);
+		_refreshButton.Text = LocaleText.F("mercenary.button.refresh", _player?.MercenaryManualRefreshCost ?? 50);
+		_refreshButton.Disabled = _player == null || _player.Gold < _player.MercenaryManualRefreshCost;
 		ClearChildren(_offerList);
 
 		if (_player == null)
@@ -110,6 +131,27 @@ public partial class MercenaryShopPanel : PanelContainer
 		hint.Text = LocaleText.T("mercenary.shop.hint");
 		hint.AutowrapMode = TextServer.AutowrapMode.WordSmart;
 		root.AddChild(hint);
+
+		var refreshRow = new HBoxContainer();
+		refreshRow.AddThemeConstantOverride("separation", 10);
+		root.AddChild(refreshRow);
+
+		_refreshLabel = MakeLabel(15, new Color(0.82f, 0.92f, 1.0f));
+		_refreshLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+		refreshRow.AddChild(_refreshLabel);
+
+		_refreshButton = new Button
+		{
+			CustomMinimumSize = new Vector2(150.0f, 38.0f),
+		};
+		_refreshButton.Pressed += () =>
+		{
+			if (_player != null && _player.TryRefreshMercenaryOffersManually())
+			{
+				RefreshAll();
+			}
+		};
+		refreshRow.AddChild(_refreshButton);
 
 		var scroll = new ScrollContainer
 		{
