@@ -21,9 +21,13 @@ public partial class FormationPanel : PanelContainer
 	private Label _countLabel = null!;
 	private Label _selectedLabel = null!;
 	private PopupMenu _slotContextMenu = null!;
+	private PanelContainer _orbTooltipPanel = null!;
+	private Label _orbTooltipTitleLabel = null!;
+	private Label _orbTooltipBodyLabel = null!;
 	private readonly List<FormationSlotButton> _slotButtons = new();
 	private int _selectedSlot = -1;
 	private int _contextSlot = -1;
+	private SimpleActor? _hoveredOrbActor;
 	private float _discSize = MaxDiscSize;
 	private float _slotCellSize = 58.0f;
 	private float _playerSlotCellSize = 72.0f;
@@ -43,6 +47,14 @@ public partial class FormationPanel : PanelContainer
 	public override void _ExitTree()
 	{
 		LocaleText.LanguageChanged -= OnLanguageChanged;
+	}
+
+	public override void _Process(double delta)
+	{
+		if (_orbTooltipPanel != null && _orbTooltipPanel.Visible)
+		{
+			UpdateOrbTooltipPosition();
+		}
 	}
 
 	public void Bind(PlayerController player)
@@ -163,6 +175,36 @@ public partial class FormationPanel : PanelContainer
 		_slotContextMenu.Popup();
 	}
 
+	internal void ShowOrbTooltip(SimpleActor actor)
+	{
+		if (!IsInstanceValid(actor))
+		{
+			return;
+		}
+
+		_hoveredOrbActor = actor;
+		_orbTooltipTitleLabel.Text = actor.LocalizedDisplayName;
+		_orbTooltipBodyLabel.Text = BuildOrbTooltipBody(actor);
+		ApplyOrbTooltipSize();
+		_orbTooltipPanel.Visible = true;
+		_orbTooltipPanel.ResetSize();
+		UpdateOrbTooltipPosition();
+	}
+
+	internal void HideOrbTooltip(SimpleActor actor)
+	{
+		if (_hoveredOrbActor != actor)
+		{
+			return;
+		}
+
+		_hoveredOrbActor = null;
+		if (_orbTooltipPanel != null)
+		{
+			_orbTooltipPanel.Visible = false;
+		}
+	}
+
 	private void BuildPanel()
 	{
 		Name = "FormationPanel";
@@ -237,6 +279,8 @@ public partial class FormationPanel : PanelContainer
 			slot.Size = new Vector2(size, size);
 			slot.Position = GetDiscSlotPosition(slotIndex, size);
 			slot.Pressed += () => SelectSlot(slotIndex);
+			slot.MouseEntered += slot.ShowOrbTooltip;
+			slot.MouseExited += slot.HideOrbTooltip;
 			_formationGrid.AddChild(slot);
 			_slotButtons.Add(slot);
 		}
@@ -252,6 +296,8 @@ public partial class FormationPanel : PanelContainer
 		};
 		_slotContextMenu.IdPressed += OnSlotContextMenuPressed;
 		AddChild(_slotContextMenu);
+
+		CreateOrbTooltip();
 
 		var rosterSection = MakeSection(LocaleText.T("formation.roster"), new Vector2(380.0f, 0.0f));
 		content.AddChild(rosterSection);
@@ -403,6 +449,89 @@ public partial class FormationPanel : PanelContainer
 		}
 	}
 
+	private void CreateOrbTooltip()
+	{
+		_orbTooltipPanel = new PanelContainer
+		{
+			Name = "FormationOrbTooltip",
+			Visible = false,
+			MouseFilter = MouseFilterEnum.Ignore,
+			ZIndex = 80,
+		};
+		_orbTooltipPanel.AddThemeStyleboxOverride("panel", MakeStyle(new Color(0.045f, 0.052f, 0.064f, 0.97f), new Color(0.78f, 0.66f, 0.36f, 0.94f), 2));
+		AddChild(_orbTooltipPanel);
+
+		var margin = new MarginContainer();
+		margin.AddThemeConstantOverride("margin_left", 12);
+		margin.AddThemeConstantOverride("margin_right", 12);
+		margin.AddThemeConstantOverride("margin_top", 9);
+		margin.AddThemeConstantOverride("margin_bottom", 9);
+		_orbTooltipPanel.AddChild(margin);
+
+		var root = new VBoxContainer();
+		root.AddThemeConstantOverride("separation", 5);
+		margin.AddChild(root);
+
+		_orbTooltipTitleLabel = MakeLabel(16, new Color(1.0f, 0.92f, 0.58f));
+		_orbTooltipTitleLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		root.AddChild(_orbTooltipTitleLabel);
+
+		_orbTooltipBodyLabel = MakeLabel(13, new Color(0.86f, 0.91f, 0.96f));
+		_orbTooltipBodyLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		root.AddChild(_orbTooltipBodyLabel);
+	}
+
+	private static string BuildOrbTooltipBody(SimpleActor actor)
+	{
+		return string.Join("\n", new[]
+		{
+			$"{LocaleText.T("actor.level_prefix")}{actor.Level} / {actor.CombatRoleName}",
+			LocaleText.F("stat.health_value", actor.CurrentHealth, actor.EffectiveMaxHealth),
+			$"{LocaleText.T("stat.attack")} {actor.EffectiveAttack}",
+			$"{LocaleText.T("stat.defense")} {actor.EffectiveDefense}",
+		});
+	}
+
+	private void UpdateOrbTooltipPosition()
+	{
+		ApplyOrbTooltipSize();
+		Vector2 localMouse = GetGlobalMousePosition() - GlobalPosition;
+		Vector2 tooltipSize = _orbTooltipPanel.Size;
+		if (tooltipSize.LengthSquared() <= 1.0f)
+		{
+			tooltipSize = _orbTooltipPanel.GetCombinedMinimumSize();
+		}
+
+		Vector2 position = localMouse + new Vector2(18.0f, 18.0f);
+		Vector2 panelSize = Size;
+		if (position.X + tooltipSize.X > panelSize.X - 10.0f)
+		{
+			position.X = localMouse.X - tooltipSize.X - 18.0f;
+		}
+
+		if (position.Y + tooltipSize.Y > panelSize.Y - 10.0f)
+		{
+			position.Y = localMouse.Y - tooltipSize.Y - 18.0f;
+		}
+
+		position.X = Mathf.Clamp(position.X, 10.0f, Mathf.Max(10.0f, panelSize.X - tooltipSize.X - 10.0f));
+		position.Y = Mathf.Clamp(position.Y, 10.0f, Mathf.Max(10.0f, panelSize.Y - tooltipSize.Y - 10.0f));
+		_orbTooltipPanel.Position = position;
+	}
+
+	private void ApplyOrbTooltipSize()
+	{
+		float maxWidth = Mathf.Min(320.0f, Mathf.Max(180.0f, Size.X * 0.34f));
+		float titleWidth = _orbTooltipTitleLabel.GetCombinedMinimumSize().X;
+		float bodyWidth = _orbTooltipBodyLabel.GetCombinedMinimumSize().X;
+		float contentWidth = Mathf.Clamp(Mathf.Max(titleWidth, bodyWidth), 120.0f, maxWidth);
+
+		_orbTooltipTitleLabel.CustomMinimumSize = new Vector2(contentWidth, 0.0f);
+		_orbTooltipBodyLabel.CustomMinimumSize = new Vector2(contentWidth, 0.0f);
+		_orbTooltipPanel.CustomMinimumSize = Vector2.Zero;
+		_orbTooltipPanel.Size = _orbTooltipPanel.GetCombinedMinimumSize();
+	}
+
 	private void OnClosePressed()
 	{
 		if (CloseRequested != null)
@@ -455,7 +584,8 @@ public partial class FormationPanel : PanelContainer
 		Vector2 viewport = GetViewportRect().Size;
 		_lastViewportSize = viewport;
 		_panelWidth = Mathf.Clamp(viewport.X * 0.78f, Mathf.Min(760.0f, viewport.X - 80.0f), 1040.0f);
-		_panelHeight = Mathf.Clamp(viewport.Y * 0.68f, Mathf.Min(420.0f, viewport.Y - 96.0f), viewport.Y - 96.0f);
+		float verticalSafeMargin = Mathf.Max(48.0f, viewport.Y * 0.10f);
+		_panelHeight = Mathf.Clamp(viewport.Y * 0.80f, Mathf.Min(460.0f, viewport.Y - verticalSafeMargin * 2.0f), viewport.Y - verticalSafeMargin * 2.0f);
 		float availableHeight = _panelHeight - 168.0f;
 		float availableWidth = _panelWidth * 0.50f;
 		_discSize = Mathf.Clamp(Mathf.Min(availableHeight, availableWidth), MinDiscSize, MaxDiscSize);
@@ -575,6 +705,8 @@ public partial class FormationDiscControl : Control
 
 public partial class FormationSlotButton : Button
 {
+	private static readonly Dictionary<string, Texture2D> OrbIconCache = new();
+
 	public FormationPanel? OwnerPanel { get; set; }
 	public int SlotIndex { get; set; }
 	public bool IsPlayerSlot { get; set; }
@@ -584,11 +716,30 @@ public partial class FormationSlotButton : Button
 	{
 		Actor = actor;
 		Text = GetSlotText();
+		Icon = GetSlotIcon();
+		ExpandIcon = true;
+		IconAlignment = HorizontalAlignment.Center;
 		AddThemeFontSizeOverride("font_size", IsPlayerSlot ? 11 : 10);
-		AddThemeColorOverride("font_color", IsPlayerSlot ? new Color(0.35f, 1.0f, 0.72f) : actor != null ? new Color(1.0f, 0.94f, 0.62f) : new Color(0.62f, 0.70f, 0.76f));
+		AddThemeColorOverride("font_color", IsPlayerSlot ? new Color(0.35f, 1.0f, 0.72f) : new Color(0.62f, 0.70f, 0.76f));
 		AddThemeStyleboxOverride("normal", MakeSlotStyle(selected));
 		AddThemeStyleboxOverride("hover", MakeSlotStyle(true));
 		AddThemeStyleboxOverride("pressed", MakeSlotStyle(true));
+	}
+
+	public void ShowOrbTooltip()
+	{
+		if (Actor != null && OwnerPanel != null && !IsPlayerSlot)
+		{
+			OwnerPanel.ShowOrbTooltip(Actor);
+		}
+	}
+
+	public void HideOrbTooltip()
+	{
+		if (Actor != null && OwnerPanel != null)
+		{
+			OwnerPanel.HideOrbTooltip(Actor);
+		}
 	}
 
 	public override Variant _GetDragData(Vector2 atPosition)
@@ -628,7 +779,151 @@ public partial class FormationSlotButton : Button
 			return LocaleText.T("formation.player_cell");
 		}
 
-		return Actor != null ? Actor.LocalizedDisplayName : LocaleText.T("formation.empty_cell");
+		return Actor != null ? string.Empty : LocaleText.T("formation.empty_cell");
+	}
+
+	private Texture2D? GetSlotIcon()
+	{
+		if (Actor == null)
+		{
+			return null;
+		}
+
+		string key = $"{Actor.ActorKind}:{Actor.DisplayName}:{Actor.CombatRole}";
+		if (OrbIconCache.TryGetValue(key, out Texture2D? cached))
+		{
+			return cached;
+		}
+
+		Texture2D icon = CreateOrbIcon(Actor);
+		OrbIconCache[key] = icon;
+		return icon;
+	}
+
+	private static Texture2D CreateOrbIcon(SimpleActor actor)
+	{
+		const int size = 64;
+		const float center = (size - 1) * 0.5f;
+		const float radius = 28.0f;
+		Image image = Image.CreateEmpty(size, size, false, Image.Format.Rgba8);
+		image.Fill(new Color(0.0f, 0.0f, 0.0f, 0.0f));
+
+		Color baseColor = GetActorOrbColor(actor);
+		Color rimColor = actor.ActorKind == "monster"
+			? new Color(1.0f, 0.52f, 0.35f, 1.0f)
+			: new Color(0.45f, 0.90f, 1.0f, 1.0f);
+		Color markColor = actor.CombatRole switch
+		{
+			"Tank" => new Color(0.92f, 0.95f, 1.0f, 1.0f),
+			"Ranged" => new Color(1.0f, 0.92f, 0.48f, 1.0f),
+			"Support" => new Color(0.58f, 1.0f, 0.72f, 1.0f),
+			_ => new Color(1.0f, 0.86f, 0.72f, 1.0f),
+		};
+
+		for (int y = 0; y < size; y++)
+		{
+			for (int x = 0; x < size; x++)
+			{
+				float dx = x - center;
+				float dy = y - center;
+				float distance = Mathf.Sqrt(dx * dx + dy * dy);
+				if (distance > radius)
+				{
+					continue;
+				}
+
+				float t = Mathf.Clamp(distance / radius, 0.0f, 1.0f);
+				Color color = baseColor.Lerp(new Color(0.025f, 0.030f, 0.040f, 1.0f), t * 0.55f);
+				if (distance > radius - 4.0f)
+				{
+					color = color.Lerp(rimColor, 0.72f);
+				}
+
+				float shine = Mathf.Clamp(1.0f - new Vector2(dx + 9.0f, dy + 10.0f).Length() / 22.0f, 0.0f, 1.0f);
+				color = color.Lerp(new Color(1.0f, 1.0f, 1.0f, 1.0f), shine * 0.34f);
+				image.SetPixel(x, y, color);
+			}
+		}
+
+		DrawOrbMark(image, actor.ActorKind, actor.CombatRole, markColor);
+		return ImageTexture.CreateFromImage(image);
+	}
+
+	private static Color GetActorOrbColor(SimpleActor actor)
+	{
+		uint hash = 2166136261u;
+		foreach (char character in actor.DisplayName)
+		{
+			hash ^= character;
+			hash *= 16777619u;
+		}
+
+		float hue = actor.ActorKind == "monster"
+			? 0.02f + (hash % 18u) / 100.0f
+			: 0.50f + (hash % 16u) / 100.0f;
+		float saturation = actor.ActorKind == "monster" ? 0.76f : 0.58f;
+		float value = actor.ActorKind == "monster" ? 0.92f : 0.98f;
+		return Color.FromHsv(hue % 1.0f, saturation, value, 1.0f);
+	}
+
+	private static void DrawOrbMark(Image image, string actorKind, string combatRole, Color color)
+	{
+		if (actorKind == "monster")
+		{
+			DrawFilledCircle(image, new Vector2(24.0f, 25.0f), 4.2f, color);
+			DrawFilledCircle(image, new Vector2(40.0f, 25.0f), 4.2f, color);
+			DrawFilledCircle(image, new Vector2(32.0f, 40.0f), 7.0f, color.Darkened(0.18f));
+			return;
+		}
+
+		if (combatRole == "Support")
+		{
+			DrawRectMark(image, new Rect2I(29, 19, 6, 26), color);
+			DrawRectMark(image, new Rect2I(22, 29, 20, 6), color);
+			return;
+		}
+
+		if (combatRole == "Ranged")
+		{
+			DrawRectMark(image, new Rect2I(30, 17, 4, 30), color);
+			DrawRectMark(image, new Rect2I(22, 23, 20, 4), color);
+			return;
+		}
+
+		DrawFilledCircle(image, new Vector2(32.0f, 24.0f), 7.5f, color);
+		DrawRectMark(image, new Rect2I(25, 32, 14, 14), color.Darkened(0.12f));
+	}
+
+	private static void DrawFilledCircle(Image image, Vector2 center, float radius, Color color)
+	{
+		int minX = Mathf.Max(Mathf.FloorToInt(center.X - radius), 0);
+		int maxX = Mathf.Min(Mathf.CeilToInt(center.X + radius), image.GetWidth() - 1);
+		int minY = Mathf.Max(Mathf.FloorToInt(center.Y - radius), 0);
+		int maxY = Mathf.Min(Mathf.CeilToInt(center.Y + radius), image.GetHeight() - 1);
+		for (int y = minY; y <= maxY; y++)
+		{
+			for (int x = minX; x <= maxX; x++)
+			{
+				if (new Vector2(x - center.X, y - center.Y).Length() <= radius)
+				{
+					image.SetPixel(x, y, color);
+				}
+			}
+		}
+	}
+
+	private static void DrawRectMark(Image image, Rect2I rect, Color color)
+	{
+		for (int y = rect.Position.Y; y < rect.Position.Y + rect.Size.Y; y++)
+		{
+			for (int x = rect.Position.X; x < rect.Position.X + rect.Size.X; x++)
+			{
+				if (x >= 0 && x < image.GetWidth() && y >= 0 && y < image.GetHeight())
+				{
+					image.SetPixel(x, y, color);
+				}
+			}
+		}
 	}
 
 	private StyleBoxFlat MakeSlotStyle(bool highlighted)
