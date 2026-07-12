@@ -20,8 +20,24 @@ public sealed class PlayerSaveData
 	public Dictionary<string, int> InventoryItems { get; set; } = new();
 	public List<string> AcceptedNpcQuestNames { get; set; } = new();
 	public List<string> CompletedNpcQuestNames { get; set; } = new();
+	public double MercenaryNextRefreshUnix { get; set; }
+	public List<MercenaryOfferSaveData> MercenaryOffers { get; set; } = new();
 	public List<ActorSaveData> Companions { get; set; } = new();
 	public List<int> ActivePartyIndexes { get; set; } = new();
+}
+
+public sealed class MercenaryOfferSaveData
+{
+	public string Id { get; set; } = string.Empty;
+	public string NameKey { get; set; } = "name.mercenary.vanguard";
+	public string RoleNameKey { get; set; } = "role.dps";
+	public string CombatRole { get; set; } = "DPS";
+	public string SummaryKey { get; set; } = "mercenary.summary.duelist";
+	public int Level { get; set; } = 1;
+	public int Cost { get; set; } = 100;
+	public int MaxHealth { get; set; } = 100;
+	public int Attack { get; set; } = 10;
+	public int Defense { get; set; } = 6;
 }
 
 public sealed class ActorSaveData

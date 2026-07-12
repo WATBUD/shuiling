@@ -7,13 +7,8 @@ public partial class World : Node3D
 	{
 		"name.npc.guard",
 		"name.npc.hunter",
-		"name.npc.merchant",
 		"name.npc.gatherer",
 		"name.npc.apprentice",
-		"name.npc.blacksmith",
-		"name.npc.pet_trainer",
-		"name.npc.item_merchant",
-		"name.npc.mercenary_broker",
 	};
 
 	private static readonly string[] MonsterNames =
@@ -637,15 +632,16 @@ public partial class World : Node3D
 	private void CreateMainCity()
 	{
 		Vector3 center = _mainCityCenter;
-		CreateMesh(_mapRoot, "MainCityPlazaEdge", CylinderMeshFor(23.0f, 23.0f, 0.10f), center + new Vector3(0.0f, 0.095f, 0.0f), _matRoadEdge);
-		CreateMesh(_mapRoot, "MainCityPlaza", CylinderMeshFor(20.6f, 20.6f, 0.12f), center + new Vector3(0.0f, 0.115f, 0.0f), _matCobblestone);
-		CreateCityRoad("CitySpineNorth", center + new Vector3(0.0f, 0.0f, -20.0f), new Vector2(12.4f, 22.5f));
-		CreateCityRoad("CitySpineSouth", center + new Vector3(0.0f, 0.0f, 27.0f), new Vector2(12.4f, 40.0f));
-		CreateCityRoad("CityGuildStreetWest", center + new Vector3(-24.5f, 0.0f, -4.0f), new Vector2(37.0f, 10.8f));
-		CreateCityRoad("CityGuildStreetEast", center + new Vector3(24.5f, 0.0f, -4.0f), new Vector2(37.0f, 10.8f));
-		CreateCityRoad("CityMarketStreet", center + new Vector3(0.0f, 0.0f, 18.0f), new Vector2(57.0f, 10.4f));
-		CreateCityRoad("CityWestLane", center + new Vector3(-31.5f, 0.0f, 8.0f), new Vector2(9.4f, 39.0f));
-		CreateCityRoad("CityEastLane", center + new Vector3(31.5f, 0.0f, 8.0f), new Vector2(9.4f, 39.0f));
+		const float shopRadius = 31.0f;
+		CreateMesh(_mapRoot, "MainCityOuterRingEdge", CylinderMeshFor(35.4f, 35.4f, 0.09f), center + new Vector3(0.0f, 0.075f, 0.0f), _matRoadEdge);
+		CreateMesh(_mapRoot, "MainCityOuterRingRoad", CylinderMeshFor(33.0f, 33.0f, 0.10f), center + new Vector3(0.0f, 0.095f, 0.0f), _matCobblestone);
+		CreateMesh(_mapRoot, "MainCityInnerGardenEdge", CylinderMeshFor(22.8f, 22.8f, 0.11f), center + new Vector3(0.0f, 0.115f, 0.0f), _matRoadEdge);
+		CreateMesh(_mapRoot, "MainCityInnerGarden", CylinderMeshFor(20.7f, 20.7f, 0.12f), center + new Vector3(0.0f, 0.135f, 0.0f), _matMeadow);
+		CreateMesh(_mapRoot, "MainCityInnerWalk", CylinderMeshFor(13.4f, 13.4f, 0.13f), center + new Vector3(0.0f, 0.155f, 0.0f), _matPath);
+		CreateCityRoad("CityNorthSpoke", center + new Vector3(0.0f, 0.0f, -27.0f), new Vector2(12.4f, 18.0f));
+		CreateCityRoad("CitySouthSpoke", center + new Vector3(0.0f, 0.0f, 29.0f), new Vector2(12.4f, 22.0f));
+		CreateCityRoad("CityWestSpoke", center + new Vector3(-29.0f, 0.0f, 0.0f), new Vector2(22.0f, 11.2f));
+		CreateCityRoad("CityEastSpoke", center + new Vector3(29.0f, 0.0f, 0.0f), new Vector2(22.0f, 11.2f));
 		CreateMesh(_mapRoot, "CityPortalPlazaEdge", CylinderMeshFor(9.4f, 9.4f, 0.09f), center + new Vector3(0.0f, 0.08f, -28.0f), _matRoadEdge);
 		CreateMesh(_mapRoot, "CityPortalPlaza", CylinderMeshFor(7.8f, 7.8f, 0.10f), center + new Vector3(0.0f, 0.105f, -28.0f), _matCobblestone);
 		CreateBanner(center + new Vector3(-5.2f, 0.0f, -27.6f), 8.0f, _matCrystal);
@@ -653,35 +649,65 @@ public partial class World : Node3D
 		CreateTorch(center + new Vector3(-7.1f, 0.0f, -24.4f));
 		CreateTorch(center + new Vector3(7.1f, 0.0f, -24.4f));
 
-		CreateItemShop(center + new Vector3(13.5f, 0.0f, -8.4f), 122.0f);
-		CreateBlacksmithShop(center + new Vector3(-25.0f, 0.0f, -8.2f), -90.0f);
-		CreateMercenaryGuild(center + new Vector3(25.0f, 0.0f, 4.8f), 90.0f);
+		Vector3 itemShopOffset = RingOffset(54.0f, shopRadius);
+		Vector3 blacksmithOffset = RingOffset(306.0f, shopRadius);
+		Vector3 mercenaryOffset = RingOffset(126.0f, shopRadius);
+		Vector3 petShopOffset = RingOffset(234.0f, shopRadius);
+		Vector3 revivalOffset = RingOffset(0.0f, shopRadius);
+		CreateItemShop(center + itemShopOffset, YawFacingCenter(itemShopOffset));
+		CreateBlacksmithShop(center + blacksmithOffset, YawFacingCenter(blacksmithOffset));
+		CreateMercenaryGuild(center + mercenaryOffset, YawFacingCenter(mercenaryOffset));
+		CreatePetShop(center + petShopOffset, YawFacingCenter(petShopOffset));
+		CreatePetRevivalShop(center + revivalOffset, YawFacingCenter(revivalOffset));
 
-		CreatePetShop(center + new Vector3(0.0f, 0.0f, 12.6f), 0.0f);
-		CreateRevivalNpc(center + new Vector3(0.0f, 0.0f, 7.0f));
+		for (int index = 0; index < 8; index++)
+		{
+			Vector3 offset = RingOffset(index * 45.0f + 22.5f, 23.5f);
+			CreateTorch(center + offset);
+		}
 
-		CreateBanner(center + new Vector3(-5.5f, 0.0f, 7.2f), 18.0f, _matCrystal);
-		CreateBanner(center + new Vector3(5.5f, 0.0f, 7.2f), -18.0f, _matCrystal);
-		CreateTorch(center + new Vector3(-6.8f, 0.0f, 9.2f));
-		CreateTorch(center + new Vector3(6.8f, 0.0f, 9.2f));
-		CreateCityFountain(center + new Vector3(0.0f, 0.0f, -2.4f));
+		for (int index = 0; index < 8; index++)
+		{
+			Vector3 offset = RingOffset(index * 45.0f, 29.0f);
+			CreateExternalProp($"CityRingLantern{index}", "res://assets/models/environment/lantern.glb", center + offset, Vector3.Zero, new Vector3(1.18f, 1.18f, 1.18f), new Vector3(0.6f, 2.2f, 0.6f), new Vector3(0.0f, 1.1f, 0.0f));
+		}
+
+		CreateCityFountain(center);
 		CreateCityMarket(center);
 		CreateCityGardens(center);
 
-		CreateStreetLanternPair(center + new Vector3(0.0f, 0.0f, -11.5f), 4.1f);
-		CreateStreetLanternPair(center + new Vector3(0.0f, 0.0f, 3.8f), 7.0f);
-		CreateStreetLanternPair(center + new Vector3(0.0f, 0.0f, 18.0f), 6.4f);
-		CreateExternalProp("CityTreeLeft", "res://assets/models/environment/tree_01.glb", center + new Vector3(-11.8f, 0.0f, 4.6f), Vector3.Zero, new Vector3(1.45f, 1.45f, 1.45f), new Vector3(1.3f, 3.2f, 1.3f), new Vector3(0.0f, 1.6f, 0.0f));
-		CreateExternalProp("CityTreeRight", "res://assets/models/environment/oak_tree.glb", center + new Vector3(11.8f, 0.0f, 4.6f), Vector3.Zero, new Vector3(1.38f, 1.38f, 1.38f), new Vector3(1.3f, 3.0f, 1.3f), new Vector3(0.0f, 1.5f, 0.0f));
-
 		_obstaclePositions.Add(center);
-		_obstaclePositions.Add(center + new Vector3(0.0f, 0.0f, -2.4f));
 	}
 
 	private void CreateCityRoad(string name, Vector3 center, Vector2 size)
 	{
 		CreateMesh(_mapRoot, $"{name}Edge", BoxMeshFor(new Vector3(size.X + 2.0f, 0.075f, size.Y + 2.0f)), center + new Vector3(0.0f, 0.072f, 0.0f), _matRoadEdge);
 		CreateMesh(_mapRoot, name, BoxMeshFor(new Vector3(size.X, 0.08f, size.Y)), center + new Vector3(0.0f, 0.09f, 0.0f), _matCobblestone);
+	}
+
+	private static Vector3 RingOffset(float degrees, float radius)
+	{
+		float radians = Mathf.DegToRad(degrees);
+		return new Vector3(Mathf.Sin(radians) * radius, 0.0f, Mathf.Cos(radians) * radius);
+	}
+
+	private static float YawFacingCenter(Vector3 offsetFromCenter)
+	{
+		Vector2 direction = new(-offsetFromCenter.X, -offsetFromCenter.Z);
+		if (direction.LengthSquared() <= 0.001f)
+		{
+			return 0.0f;
+		}
+
+		direction = direction.Normalized();
+		return Mathf.RadToDeg(Mathf.Atan2(-direction.X, -direction.Y));
+	}
+
+	private static Vector3 RingFrontOffset(float degrees, float shopRadius, float frontDistance)
+	{
+		Vector3 offset = RingOffset(degrees, shopRadius);
+		Vector3 inward = -offset.Normalized();
+		return offset + inward * frontDistance;
 	}
 
 	private void CreateStreetLanternPair(Vector3 center, float halfWidth)
@@ -1033,8 +1059,30 @@ public partial class World : Node3D
 		AddMesh(shop, "PetStableRight", BoxMeshFor(new Vector3(1.05f, 0.72f, 1.1f)), new Vector3(2.65f, 0.46f, -3.35f), Vector3.Zero, Vector3.One, _matWood);
 		AddMesh(shop, "CareCrystalLeft", new SphereMesh { Radius = 0.22f, Height = 0.32f }, new Vector3(-2.65f, 1.0f, -3.35f), Vector3.Zero, Vector3.One, _matCrystal);
 		AddMesh(shop, "CareCrystalRight", new SphereMesh { Radius = 0.22f, Height = 0.32f }, new Vector3(2.65f, 1.0f, -3.35f), Vector3.Zero, Vector3.One, _matCrystal);
+		AddExternalModelTo(shop, "res://assets/models/pets/cube_pets/animal-dog.glb", "DisplayDog", new Vector3(-2.65f, 0.92f, -3.35f), new Vector3(0.0f, 180.0f, 0.0f), new Vector3(0.62f, 0.62f, 0.62f));
+		AddExternalModelTo(shop, "res://assets/models/pets/cube_pets/animal-cat.glb", "DisplayCat", new Vector3(2.65f, 0.92f, -3.35f), new Vector3(0.0f, 180.0f, 0.0f), new Vector3(0.62f, 0.62f, 0.62f));
+		AddExternalModelTo(shop, "res://assets/models/pets/cube_pets/animal-bunny.glb", "DisplayBunny", new Vector3(0.0f, 0.50f, -3.62f), new Vector3(0.0f, 180.0f, 0.0f), new Vector3(0.48f, 0.48f, 0.48f));
 		AddMesh(shop, "ClinicCrossVertical", BoxMeshFor(new Vector3(0.18f, 0.72f, 0.06f)), new Vector3(0.0f, 1.68f, -3.06f), Vector3.Zero, Vector3.One, _matCrystal);
 		AddMesh(shop, "ClinicCrossHorizontal", BoxMeshFor(new Vector3(0.58f, 0.18f, 0.065f)), new Vector3(0.0f, 1.68f, -3.08f), Vector3.Zero, Vector3.One, _matCrystal);
+	}
+
+	private void CreatePetRevivalShop(Vector3 position, float yawDegrees)
+	{
+		StaticBody3D shop = CreateCityShopShell(
+			"CityPetRevivalShop",
+			position,
+			yawDegrees,
+			new Vector3(7.4f, 3.0f, 5.8f),
+			_matWall,
+			_matCrystal,
+			"shop.pet_revival",
+			new Color(0.72f, 1.0f, 0.92f)
+		);
+
+		AddMesh(shop, "RevivalAltar", CylinderMeshFor(0.72f, 0.92f, 0.44f), new Vector3(0.0f, 0.42f, -3.35f), Vector3.Zero, Vector3.One, _matWall);
+		AddMesh(shop, "RevivalCrystal", new SphereMesh { Radius = 0.28f, Height = 0.42f }, new Vector3(0.0f, 0.92f, -3.35f), Vector3.Zero, Vector3.One, _matCrystal);
+		AddMesh(shop, "RevivalGlow", CylinderMeshFor(1.0f, 1.0f, 0.035f), new Vector3(0.0f, 0.14f, -3.35f), Vector3.Zero, Vector3.One, _matCrystal);
+		CreateRevivalNpc(position + LocalOffset(yawDegrees, new Vector3(0.0f, 0.0f, -4.8f)), yawDegrees);
 	}
 
 	private void CreateMercenaryGuild(Vector3 position, float yawDegrees)
@@ -1078,7 +1126,9 @@ public partial class World : Node3D
 		AddExternalModelTo(shop, "res://assets/models/environment/wall-door.glb", "DoorModule", new Vector3(0.0f, 0.0f, -size.Z * 0.53f), Vector3.Zero, new Vector3(1.65f, 1.65f, 1.65f));
 		AddExternalModelTo(shop, "res://assets/models/environment/wall-window-shutters.glb", "LeftWindowModule", new Vector3(-size.X * 0.32f, 0.0f, -size.Z * 0.535f), Vector3.Zero, new Vector3(1.25f, 1.25f, 1.25f));
 		AddExternalModelTo(shop, "res://assets/models/environment/wall-window-shutters.glb", "RightWindowModule", new Vector3(size.X * 0.32f, 0.0f, -size.Z * 0.535f), Vector3.Zero, new Vector3(1.25f, 1.25f, 1.25f));
-		AddExternalModelTo(shop, "res://assets/models/environment/roof-gable.glb", "RoofGable", new Vector3(0.0f, size.Y + 0.82f, 0.0f), Vector3.Zero, new Vector3(size.X * 0.34f, 1.15f, size.Z * 0.34f));
+		float roofSpan = Mathf.Max(size.X, size.Z) * 0.36f;
+		AddMesh(shop, "RoofSeat", BoxMeshFor(new Vector3(size.X + 0.42f, 0.14f, size.Z + 0.42f)), new Vector3(0.0f, size.Y + 0.07f, 0.0f), Vector3.Zero, Vector3.One, roofMaterial);
+		AddExternalModelTo(shop, "res://assets/models/environment/roof-high-gable.glb", "RoofGable", new Vector3(0.0f, size.Y + 0.78f, 0.0f), Vector3.Zero, new Vector3(roofSpan, 1.08f, roofSpan));
 		AddMesh(shop, "Awning", BoxMeshFor(new Vector3(size.X * 0.92f, 0.18f, 1.25f)), new Vector3(0.0f, 2.18f, -size.Z * 0.64f), new Vector3(-8.0f, 0.0f, 0.0f), Vector3.One, roofMaterial);
 		AddMesh(shop, "SignBoard", BoxMeshFor(new Vector3(2.8f, 0.72f, 0.12f)), new Vector3(0.0f, 2.66f, -size.Z * 0.65f), Vector3.Zero, Vector3.One, _matWood);
 
@@ -1137,12 +1187,13 @@ public partial class World : Node3D
 		}
 	}
 
-	private void CreateRevivalNpc(Vector3 position)
+	private void CreateRevivalNpc(Vector3 position, float yawDegrees)
 	{
 		var npc = new StaticBody3D
 		{
 			Name = "PetRevivalNpc",
 			Position = position,
+			RotationDegrees = new Vector3(0.0f, yawDegrees, 0.0f),
 		};
 		npc.AddToGroup("revival_npc");
 		_propsRoot.AddChild(npc);
@@ -1564,22 +1615,20 @@ public partial class World : Node3D
 
 	private void SpawnCityNpcs()
 	{
+		const float shopRadius = 31.0f;
+		const float frontDistance = 5.0f;
 		CityNpcStation[] stations =
 		{
-			new("name.npc.blacksmith", new Vector3(-20.2f, 0.0f, -8.2f), -90.0f, 0.8f, "Tank"),
-			new("name.npc.item_merchant", new Vector3(9.4f, 0.0f, -5.8f), 122.0f, 0.8f, "Support"),
-			new("name.npc.pet_trainer", new Vector3(-4.6f, 0.0f, 7.0f), -10.0f, 0.7f, "Support"),
-			new("name.npc.mercenary_broker", new Vector3(20.2f, 0.0f, 4.8f), 90.0f, 0.7f, "DPS"),
-			new("name.npc.merchant", new Vector3(16.0f, 0.0f, 14.8f), -90.0f, 1.1f, "Support"),
-			new("name.npc.gatherer", new Vector3(-16.0f, 0.0f, 14.8f), 90.0f, 1.1f, "Gatherer"),
+			new("name.npc.blacksmith", RingFrontOffset(306.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(306.0f, shopRadius)), 0.8f, "Tank"),
+			new("name.npc.item_merchant", RingFrontOffset(54.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(54.0f, shopRadius)), 0.8f, "Support"),
+			new("name.npc.pet_trainer", RingFrontOffset(234.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(234.0f, shopRadius)), 0.7f, "Support"),
+			new("name.npc.mercenary_broker", RingFrontOffset(126.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(126.0f, shopRadius)), 0.7f, "DPS"),
+			new("name.npc.gatherer", RingFrontOffset(180.0f, 24.0f, 1.8f), YawFacingCenter(RingOffset(180.0f, 24.0f)), 1.1f, "Gatherer"),
 			new("name.npc.guard", new Vector3(-5.2f, 0.0f, -27.6f), 180.0f, 0.9f, "Tank"),
 			new("name.npc.guard", new Vector3(5.2f, 0.0f, -27.6f), 180.0f, 0.9f, "Tank"),
-			new("name.npc.hunter", new Vector3(-10.4f, 0.0f, -14.0f), -28.0f, 1.2f, "Ranged"),
-			new("name.npc.apprentice", new Vector3(4.8f, 0.0f, 7.0f), 10.0f, 0.9f, "DPS"),
-			new("name.npc.merchant", new Vector3(22.8f, 0.0f, 14.9f), -90.0f, 1.0f, "Support"),
-			new("name.npc.gatherer", new Vector3(-22.8f, 0.0f, 14.9f), 90.0f, 1.0f, "Gatherer"),
-			new("name.npc.merchant", new Vector3(-8.5f, 0.0f, 31.2f), 180.0f, 1.0f, "Support"),
-			new("name.npc.merchant", new Vector3(8.5f, 0.0f, 31.2f), 180.0f, 1.0f, "Support"),
+			new("name.npc.hunter", RingFrontOffset(270.0f, 24.0f, 1.8f), YawFacingCenter(RingOffset(270.0f, 24.0f)), 1.2f, "Ranged"),
+			new("name.npc.apprentice", RingFrontOffset(90.0f, 24.0f, 1.8f), YawFacingCenter(RingOffset(90.0f, 24.0f)), 0.9f, "DPS"),
+			new("name.npc.gatherer", RingFrontOffset(0.0f, 24.0f, 1.8f), YawFacingCenter(RingOffset(0.0f, 24.0f)), 1.0f, "Gatherer"),
 			new("name.npc.guard", new Vector3(-3.5f, 0.0f, -29.0f), 180.0f, 0.8f, "Tank"),
 			new("name.npc.guard", new Vector3(3.5f, 0.0f, -29.0f), 180.0f, 0.8f, "Tank"),
 		};
@@ -1587,13 +1636,11 @@ public partial class World : Node3D
 		int npcCount = Mathf.Max(CityNpcCount, 0);
 		for (int index = 0; index < npcCount; index++)
 		{
-			CityNpcStation station = stations[index % stations.Length];
+			CityNpcStation station = index < stations.Length
+				? stations[index]
+				: CreateAmbientCityNpcStation(index);
 			SimpleActor actor = CreateActor(false, "city", station.NameKey, station.Role);
 			Vector3 offset = station.Offset;
-			if (index >= stations.Length)
-			{
-				offset += new Vector3((float)_rng.RandfRange(-1.4f, 1.4f), 0.0f, (float)_rng.RandfRange(-1.4f, 1.4f));
-			}
 
 			Vector3 spawnPosition = _mainCityCenter + offset;
 			actor.RotationDegrees = new Vector3(0.0f, station.YawDegrees, 0.0f);
@@ -1605,13 +1652,35 @@ public partial class World : Node3D
 		}
 	}
 
+	private CityNpcStation CreateAmbientCityNpcStation(int index)
+	{
+		string[] names =
+		{
+			"name.npc.guard",
+			"name.npc.hunter",
+			"name.npc.gatherer",
+			"name.npc.apprentice",
+		};
+		string[] roles =
+		{
+			"Tank",
+			"Ranged",
+			"Gatherer",
+			"DPS",
+		};
+		float angle = index * 1.37f;
+		float radius = 16.0f + index % 4 * 3.2f;
+		var offset = new Vector3(Mathf.Sin(angle) * radius, 0.0f, 7.0f + Mathf.Cos(angle) * radius);
+		return new CityNpcStation(names[index % names.Length], offset, Mathf.RadToDeg(angle) + 180.0f, 1.2f, roles[index % roles.Length]);
+	}
+
 	public SimpleActor SpawnContractCompanion(PlayerController.ContractCompanionOffer offer)
 	{
 		SimpleActor actor = CreateActor(false, "city", offer.NameKey, offer.CombatRole, offer.Level);
 		actor.ConfigureStats(offer.NameKey, offer.Level, offer.MaxHealth, offer.Attack, offer.Defense, offer.Level * 6, 0);
 		actor.ConfigureGrowth("ability.npc.guard", Mathf.Max(offer.Level / 2, 1));
 		actor.ConfigureCombatProfile(offer.CombatRole, "personality.brave", offer.CombatRole == "Support" ? "passive.protector" : "passive.combo_rhythm", 92);
-		Vector3 spawnPosition = _mainCityCenter + new Vector3(26.4f, 0.0f, 2.4f);
+		Vector3 spawnPosition = _mainCityCenter + RingFrontOffset(126.0f, 31.0f, 2.6f);
 		actor.Position = spawnPosition;
 		actor.HomePosition = spawnPosition;
 		actor.WanderRadius = 0.6f;
