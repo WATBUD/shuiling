@@ -3,10 +3,19 @@ using System.Collections.Generic;
 
 public partial class FormationPanel : PanelContainer
 {
-	private const int SlotCellSize = 82;
+	private const float MaxDiscSize = 430.0f;
+	private const float MinDiscSize = 300.0f;
+	private static readonly int[] RingSlotOrder =
+	{
+		7, 11, 13, 17,
+		6, 8, 16, 18,
+		2, 10, 14, 22,
+		1, 3, 5, 9, 15, 19, 21, 23,
+		0, 4, 20, 24,
+	};
 
 	private PlayerController? _player;
-	private GridContainer _formationGrid = null!;
+	private Control _formationGrid = null!;
 	private VBoxContainer _rosterList = null!;
 	private Label _titleLabel = null!;
 	private Label _countLabel = null!;
@@ -14,6 +23,12 @@ public partial class FormationPanel : PanelContainer
 	private Button _clearButton = null!;
 	private readonly List<FormationSlotButton> _slotButtons = new();
 	private int _selectedSlot = -1;
+	private float _discSize = MaxDiscSize;
+	private float _slotCellSize = 58.0f;
+	private float _playerSlotCellSize = 72.0f;
+	private float _panelWidth = 1040.0f;
+	private float _panelHeight = 620.0f;
+	private Vector2 _lastViewportSize = Vector2.Zero;
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -43,6 +58,7 @@ public partial class FormationPanel : PanelContainer
 		Visible = visible;
 		if (visible)
 		{
+			RebuildForViewportIfNeeded();
 			RefreshAll();
 		}
 	}
@@ -134,12 +150,13 @@ public partial class FormationPanel : PanelContainer
 	{
 		Name = "FormationPanel";
 		MouseFilter = MouseFilterEnum.Stop;
+		UpdateResponsiveDiscMetrics();
 		SetAnchorsPreset(LayoutPreset.Center);
-		OffsetLeft = -520.0f;
-		OffsetRight = 520.0f;
-		OffsetTop = -340.0f;
-		OffsetBottom = 340.0f;
-		CustomMinimumSize = new Vector2(1040.0f, 680.0f);
+		OffsetLeft = _panelWidth * -0.5f;
+		OffsetRight = _panelWidth * 0.5f;
+		OffsetTop = _panelHeight * -0.5f;
+		OffsetBottom = _panelHeight * 0.5f;
+		CustomMinimumSize = Vector2.Zero;
 		AddThemeStyleboxOverride("panel", MakeStyle(new Color(0.035f, 0.041f, 0.050f, 0.96f), new Color(0.44f, 0.56f, 0.68f, 0.92f), 2));
 
 		var margin = new MarginContainer();
@@ -174,17 +191,16 @@ public partial class FormationPanel : PanelContainer
 		content.AddThemeConstantOverride("separation", 16);
 		root.AddChild(content);
 
-		var gridSection = MakeSection(LocaleText.T("formation.grid"), new Vector2(560.0f, 0.0f));
+		var gridSection = MakeSection(LocaleText.T("formation.grid"), new Vector2(_discSize + 28.0f, 0.0f));
 		content.AddChild(gridSection);
 
-		_formationGrid = new GridContainer
+		_formationGrid = new FormationDiscControl
 		{
-			Columns = 5,
+			DiscSize = _discSize,
+			CustomMinimumSize = new Vector2(_discSize, _discSize),
 			SizeFlagsHorizontal = SizeFlags.ShrinkCenter,
 			SizeFlagsVertical = SizeFlags.ShrinkCenter,
 		};
-		_formationGrid.AddThemeConstantOverride("h_separation", 8);
-		_formationGrid.AddThemeConstantOverride("v_separation", 8);
 		gridSection.AddChild(_formationGrid);
 
 		_slotButtons.Clear();
@@ -196,10 +212,11 @@ public partial class FormationPanel : PanelContainer
 				OwnerPanel = this,
 				SlotIndex = slotIndex,
 				IsPlayerSlot = slotIndex == 12,
-				CustomMinimumSize = new Vector2(SlotCellSize, SlotCellSize),
-				SizeFlagsHorizontal = SizeFlags.ShrinkCenter,
-				SizeFlagsVertical = SizeFlags.ShrinkCenter,
 			};
+			float size = slot.IsPlayerSlot ? _playerSlotCellSize : _slotCellSize;
+			slot.CustomMinimumSize = new Vector2(size, size);
+			slot.Size = new Vector2(size, size);
+			slot.Position = GetDiscSlotPosition(slotIndex, size);
 			slot.Pressed += () => SelectSlot(slotIndex);
 			_formationGrid.AddChild(slot);
 			_slotButtons.Add(slot);
@@ -391,6 +408,22 @@ public partial class FormationPanel : PanelContainer
 	private void OnLanguageChanged()
 	{
 		bool wasVisible = Visible;
+		RebuildPanel(wasVisible);
+	}
+
+	private void RebuildForViewportIfNeeded()
+	{
+		Vector2 viewportSize = GetViewportRect().Size;
+		if (_lastViewportSize == viewportSize)
+		{
+			return;
+		}
+
+		RebuildPanel(true);
+	}
+
+	private void RebuildPanel(bool visible)
+	{
 		foreach (Node child in GetChildren())
 		{
 			RemoveChild(child);
@@ -398,7 +431,7 @@ public partial class FormationPanel : PanelContainer
 		}
 
 		BuildPanel();
-		Visible = wasVisible;
+		Visible = visible;
 		RefreshAll();
 	}
 
@@ -406,6 +439,47 @@ public partial class FormationPanel : PanelContainer
 	{
 		payload = data.AsGodotObject() as FormationDragPayload;
 		return payload?.Actor != null && IsInstanceValid(payload.Actor);
+	}
+
+	private void UpdateResponsiveDiscMetrics()
+	{
+		Vector2 viewport = GetViewportRect().Size;
+		_lastViewportSize = viewport;
+		_panelWidth = Mathf.Clamp(viewport.X * 0.78f, 860.0f, 1040.0f);
+		_panelHeight = Mathf.Clamp(viewport.Y * 0.64f, 460.0f, 620.0f);
+		float availableHeight = _panelHeight - 176.0f;
+		float availableWidth = _panelWidth * 0.50f;
+		_discSize = Mathf.Clamp(Mathf.Min(availableHeight, availableWidth), MinDiscSize, MaxDiscSize);
+		_slotCellSize = Mathf.Clamp(_discSize * 0.135f, 40.0f, 58.0f);
+		_playerSlotCellSize = Mathf.Clamp(_discSize * 0.165f, 50.0f, 72.0f);
+	}
+
+	private Vector2 GetDiscSlotPosition(int slotIndex, float slotSize)
+	{
+		Vector2 center = new(_discSize * 0.5f, _discSize * 0.5f);
+		if (slotIndex == 12)
+		{
+			return center - new Vector2(slotSize, slotSize) * 0.5f;
+		}
+
+		int orderIndex = System.Array.IndexOf(RingSlotOrder, slotIndex);
+		if (orderIndex < 0)
+		{
+			orderIndex = Mathf.Max(slotIndex - (slotIndex > 12 ? 1 : 0), 0);
+		}
+
+		int ring = Mathf.Clamp(orderIndex / 8, 0, 2);
+		int ringSlot = orderIndex % 8;
+		float outerRadius = _discSize * 0.43f;
+		float radius = ring switch
+		{
+			0 => outerRadius * 0.42f,
+			1 => outerRadius * 0.73f,
+			_ => outerRadius,
+		};
+		float angle = -Mathf.Pi * 0.5f + ringSlot * (Mathf.Pi * 2.0f / 8.0f);
+		Vector2 offset = new(Mathf.Cos(angle) * radius, Mathf.Sin(angle) * radius);
+		return center + offset - new Vector2(slotSize, slotSize) * 0.5f;
 	}
 
 	private VBoxContainer MakeSection(string title, Vector2 minSize)
@@ -463,6 +537,30 @@ public partial class FormationPanel : PanelContainer
 	}
 }
 
+public partial class FormationDiscControl : Control
+{
+	public float DiscSize { get; set; } = 430.0f;
+
+	public override void _Ready()
+	{
+		MouseFilter = MouseFilterEnum.Pass;
+		QueueRedraw();
+	}
+
+	public override void _Draw()
+	{
+		Vector2 center = Size * 0.5f;
+		float outerRadius = DiscSize * 0.43f;
+		float centerRadius = DiscSize * 0.098f;
+		DrawCircle(center, DiscSize * 0.477f, new Color(0.045f, 0.055f, 0.066f, 0.88f));
+		DrawArc(center, outerRadius * 0.42f, 0.0f, Mathf.Tau, 96, new Color(0.34f, 0.62f, 0.78f, 0.38f), 3.0f);
+		DrawArc(center, outerRadius * 0.73f, 0.0f, Mathf.Tau, 96, new Color(0.72f, 0.58f, 0.30f, 0.34f), 3.0f);
+		DrawArc(center, outerRadius, 0.0f, Mathf.Tau, 128, new Color(0.78f, 0.84f, 0.92f, 0.26f), 3.0f);
+		DrawCircle(center, centerRadius, new Color(0.08f, 0.17f, 0.14f, 0.74f));
+		DrawArc(center, centerRadius, 0.0f, Mathf.Tau, 64, new Color(0.42f, 1.0f, 0.74f, 0.50f), 2.0f);
+	}
+}
+
 public partial class FormationSlotButton : Button
 {
 	public FormationPanel? OwnerPanel { get; set; }
@@ -474,7 +572,7 @@ public partial class FormationSlotButton : Button
 	{
 		Actor = actor;
 		Text = GetSlotText();
-		AddThemeFontSizeOverride("font_size", 12);
+		AddThemeFontSizeOverride("font_size", IsPlayerSlot ? 11 : 10);
 		AddThemeColorOverride("font_color", IsPlayerSlot ? new Color(0.35f, 1.0f, 0.72f) : actor != null ? new Color(1.0f, 0.94f, 0.62f) : new Color(0.62f, 0.70f, 0.76f));
 		AddThemeStyleboxOverride("normal", MakeSlotStyle(selected));
 		AddThemeStyleboxOverride("hover", MakeSlotStyle(true));
@@ -535,7 +633,7 @@ public partial class FormationSlotButton : Button
 			BorderColor = border,
 		};
 		style.SetBorderWidthAll(highlighted ? 2 : 1);
-		style.SetCornerRadiusAll(5);
+		style.SetCornerRadiusAll(99);
 		return style;
 	}
 }

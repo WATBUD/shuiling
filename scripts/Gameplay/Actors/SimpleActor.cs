@@ -2,6 +2,8 @@ using Godot;
 
 public partial class SimpleActor : CharacterBody3D
 {
+	private const float MinimumCompanionFormationDistance = 3.6f;
+
 	private enum SquadActivity
 	{
 		Follow,
@@ -1074,10 +1076,22 @@ public partial class SimpleActor : CharacterBody3D
 			: Vector3.Zero;
 		if (offset.LengthSquared() <= 0.001f)
 		{
-			offset = new Vector3(0.0f, 0.0f, 2.35f);
+			offset = new Vector3(0.0f, 0.0f, MinimumCompanionFormationDistance);
 		}
 
-		return offset * CurrentBuildStats.FollowDistanceMultiplier;
+		return KeepFormationOffsetOutsidePlayer(offset * CurrentBuildStats.FollowDistanceMultiplier);
+	}
+
+	private static Vector3 KeepFormationOffsetOutsidePlayer(Vector3 offset)
+	{
+		float distance = new Vector2(offset.X, offset.Z).Length();
+		if (distance >= MinimumCompanionFormationDistance || distance <= 0.001f)
+		{
+			return offset;
+		}
+
+		float scale = MinimumCompanionFormationDistance / distance;
+		return new Vector3(offset.X * scale, offset.Y, offset.Z * scale);
 	}
 
 	private Vector3 PlayerLocalToWorld(Vector3 localOffset)
