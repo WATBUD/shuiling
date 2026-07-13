@@ -7,18 +7,33 @@ public partial class MainMenu : Control
 
 	public override void _Ready()
 	{
-		BuildMenu();
+		try
+		{
+			BuildMenu();
+		}
+		catch (System.Exception exception)
+		{
+			GD.PushError($"Main menu failed to initialize: {exception}");
+			BuildFallbackMenu(exception.Message);
+		}
 	}
 
 	private void BuildMenu()
 	{
+		ClearChildren();
 		SetAnchorsPreset(LayoutPreset.FullRect);
 
 		var background = new ColorRect
 		{
 			Color = new Color(0.025f, 0.035f, 0.045f),
+			AnchorLeft = 0.0f,
 			AnchorRight = 1.0f,
+			AnchorTop = 0.0f,
 			AnchorBottom = 1.0f,
+			OffsetLeft = 0.0f,
+			OffsetRight = 0.0f,
+			OffsetTop = 0.0f,
+			OffsetBottom = 0.0f,
 		};
 		AddChild(background);
 
@@ -71,6 +86,63 @@ public partial class MainMenu : Control
 		RefreshSaveInfo();
 	}
 
+	private void BuildFallbackMenu(string errorMessage)
+	{
+		ClearChildren();
+		SetAnchorsPreset(LayoutPreset.FullRect);
+
+		var background = new ColorRect
+		{
+			Color = new Color(0.035f, 0.020f, 0.025f),
+			AnchorRight = 1.0f,
+			AnchorBottom = 1.0f,
+		};
+		AddChild(background);
+
+		var root = new VBoxContainer
+		{
+			AnchorLeft = 0.5f,
+			AnchorRight = 0.5f,
+			AnchorTop = 0.5f,
+			AnchorBottom = 0.5f,
+			OffsetLeft = -260.0f,
+			OffsetRight = 260.0f,
+			OffsetTop = -150.0f,
+			OffsetBottom = 150.0f,
+		};
+		root.AddThemeConstantOverride("separation", 14);
+		AddChild(root);
+
+		var title = new Label
+		{
+			Text = "Shuiling",
+			HorizontalAlignment = HorizontalAlignment.Center,
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		title.AddThemeFontSizeOverride("font_size", 36);
+		title.AddThemeColorOverride("font_color", new Color(1.0f, 0.94f, 0.76f));
+		root.AddChild(title);
+
+		var message = new Label
+		{
+			Text = $"Startup UI fallback\n{errorMessage}",
+			HorizontalAlignment = HorizontalAlignment.Center,
+			AutowrapMode = TextServer.AutowrapMode.WordSmart,
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		message.AddThemeFontSizeOverride("font_size", 15);
+		message.AddThemeColorOverride("font_color", new Color(1.0f, 0.72f, 0.68f));
+		root.AddChild(message);
+
+		Button newGameButton = MakeMenuButton("New Game");
+		newGameButton.Pressed += StartNewGame;
+		root.AddChild(newGameButton);
+
+		Button quitButton = MakeMenuButton("Quit");
+		quitButton.Pressed += () => GetTree().Quit();
+		root.AddChild(quitButton);
+	}
+
 	private static Button MakeMenuButton(string text)
 	{
 		var button = new Button
@@ -81,6 +153,15 @@ public partial class MainMenu : Control
 		};
 		button.AddThemeFontSizeOverride("font_size", 20);
 		return button;
+	}
+
+	private void ClearChildren()
+	{
+		foreach (Node child in GetChildren())
+		{
+			RemoveChild(child);
+			child.QueueFree();
+		}
 	}
 
 	private void RefreshSaveInfo()
