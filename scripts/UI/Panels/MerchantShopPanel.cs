@@ -3,6 +3,14 @@ using System.Collections.Generic;
 
 public partial class MerchantShopPanel : PanelContainer
 {
+	private enum ItemCategory
+	{
+		Materials,
+		Gems,
+		Consumables,
+		Special,
+	}
+
 	private PlayerController? _player;
 	private PlayerController.MerchantShopKind _shopKind;
 	private VBoxContainer _buySection = null!;
@@ -12,6 +20,8 @@ public partial class MerchantShopPanel : PanelContainer
 	private Label _titleLabel = null!;
 	private Label _goldLabel = null!;
 	private Label _noticeLabel = null!;
+	private Label _categoryTitleLabel = null!;
+	private HBoxContainer _categoryTabs = null!;
 	private HBoxContainer _tradeModeTabs = null!;
 	private HBoxContainer _refreshRow = null!;
 	private Label _refreshLabel = null!;
@@ -19,7 +29,23 @@ public partial class MerchantShopPanel : PanelContainer
 	private Button _buyTabButton = null!;
 	private Button _sellTabButton = null!;
 	private FloatingTooltip _tooltip = null!;
+	private readonly Dictionary<ItemCategory, Button> _categoryButtons = new();
+	private ItemCategory _selectedCategory = ItemCategory.Materials;
 	private bool _showSellList;
+
+	public override void _UnhandledInput(InputEvent @event)
+	{
+		if (!Visible || _shopKind != PlayerController.MerchantShopKind.ItemShop)
+		{
+			return;
+		}
+
+		if (@event is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Tab })
+		{
+			CycleItemCategory();
+			GetViewport().SetInputAsHandled();
+		}
+	}
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -58,6 +84,7 @@ public partial class MerchantShopPanel : PanelContainer
 	{
 		_shopKind = shopKind;
 		_showSellList = false;
+		_selectedCategory = ItemCategory.Materials;
 		SetPanelVisible(true);
 	}
 
@@ -86,6 +113,9 @@ public partial class MerchantShopPanel : PanelContainer
 		_goldLabel.Text = LocaleText.F("inventory.gold", _player?.Gold ?? 0);
 		_noticeLabel.Visible = _shopKind == PlayerController.MerchantShopKind.PetShop;
 		_noticeLabel.Text = _noticeLabel.Visible ? LocaleText.T("shop.pet.notice") : string.Empty;
+		_categoryTabs.Visible = _shopKind == PlayerController.MerchantShopKind.ItemShop;
+		_categoryTitleLabel.Visible = _shopKind == PlayerController.MerchantShopKind.ItemShop;
+		RefreshCategoryTabs();
 		bool canSell = _shopKind != PlayerController.MerchantShopKind.PetShop;
 		if (!canSell)
 		{
@@ -120,13 +150,20 @@ public partial class MerchantShopPanel : PanelContainer
 		{
 			foreach (PlayerController.ShopTradeEntry entry in _player.GetShopSellEntries(_shopKind))
 			{
+				if (!ShouldShowEntry(entry))
+				{
+					continue;
+				}
+
 				AddTradeRow(_sellList, entry, false);
 			}
 
 			if (_sellList.GetChildCount() == 0)
 			{
 				var empty = MakeLabel(15, new Color(0.70f, 0.76f, 0.82f));
-				empty.Text = LocaleText.T("shop.sell.empty");
+				empty.Text = _shopKind == PlayerController.MerchantShopKind.ItemShop
+					? LocaleText.T("shop.category.empty")
+					: LocaleText.T("shop.sell.empty");
 				_sellList.AddChild(empty);
 			}
 			return;
@@ -134,7 +171,19 @@ public partial class MerchantShopPanel : PanelContainer
 
 		foreach (PlayerController.ShopTradeEntry entry in _player.GetShopBuyEntries(_shopKind))
 		{
+			if (!ShouldShowEntry(entry))
+			{
+				continue;
+			}
+
 			AddTradeRow(_buyList, entry, true);
+		}
+
+		if (_buyList.GetChildCount() == 0)
+		{
+			var empty = MakeLabel(15, new Color(0.70f, 0.76f, 0.82f));
+			empty.Text = LocaleText.T("shop.category.empty");
+			_buyList.AddChild(empty);
 		}
 
 	}
@@ -187,6 +236,18 @@ public partial class MerchantShopPanel : PanelContainer
 		_noticeLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
 		_noticeLabel.CustomMinimumSize = new Vector2(0.0f, 34.0f);
 		root.AddChild(_noticeLabel);
+
+		_categoryTabs = new HBoxContainer();
+		_categoryTabs.AddThemeConstantOverride("separation", 8);
+		root.AddChild(_categoryTabs);
+
+		AddCategoryTab(ItemCategory.Materials);
+		AddCategoryTab(ItemCategory.Gems);
+		AddCategoryTab(ItemCategory.Consumables);
+		AddCategoryTab(ItemCategory.Special);
+
+		_categoryTitleLabel = MakeLabel(17, new Color(0.82f, 0.92f, 1.0f));
+		root.AddChild(_categoryTitleLabel);
 
 		_tradeModeTabs = new HBoxContainer();
 		_tradeModeTabs.AddThemeConstantOverride("separation", 8);
@@ -247,6 +308,18 @@ public partial class MerchantShopPanel : PanelContainer
 		};
 		closeButton.Pressed += () => CloseRequested?.Invoke();
 		root.AddChild(closeButton);
+	}
+
+	private void AddCategoryTab(ItemCategory category)
+	{
+		Button button = CreateModeTab(GetCategoryKey(category));
+		button.Pressed += () =>
+		{
+			_selectedCategory = category;
+			RefreshAll();
+		};
+		_categoryTabs.AddChild(button);
+		_categoryButtons[category] = button;
 	}
 
 	private static Button CreateModeTab(string textKey)
@@ -332,6 +405,13 @@ public partial class MerchantShopPanel : PanelContainer
 		name.SizeFlagsVertical = SizeFlags.ExpandFill;
 		info.AddChild(name);
 
+		if (!isPetBuyRow && _player != null)
+		{
+			var countLabel = MakeLabel(13, new Color(0.70f, 0.80f, 0.88f));
+			countLabel.Text = LocaleText.F("shop.owned_count", _player.GetInventoryCount(entry.ItemId));
+			info.AddChild(countLabel);
+		}
+
 		var action = new Button
 		{
 			Text = isBuy ? LocaleText.F("shop.button.buy", entry.Price) : LocaleText.F("shop.button.sell", entry.Price),
@@ -354,6 +434,60 @@ public partial class MerchantShopPanel : PanelContainer
 			}
 		};
 		line.AddChild(action);
+	}
+
+	private void RefreshCategoryTabs()
+	{
+		foreach (KeyValuePair<ItemCategory, Button> pair in _categoryButtons)
+		{
+			pair.Value.Text = LocaleText.T(GetCategoryKey(pair.Key));
+			pair.Value.ButtonPressed = pair.Key == _selectedCategory;
+		}
+
+		_categoryTitleLabel.Text = LocaleText.T(GetCategoryKey(_selectedCategory));
+	}
+
+	private bool ShouldShowEntry(PlayerController.ShopTradeEntry entry)
+	{
+		return _shopKind != PlayerController.MerchantShopKind.ItemShop || GetEntryCategory(entry.ItemId) == _selectedCategory;
+	}
+
+	private static ItemCategory GetEntryCategory(string itemId)
+	{
+		if (MonsterLootCatalog.IsMonsterLoot(itemId))
+		{
+			return ItemCategory.Materials;
+		}
+
+		InventoryItemKind kind = BuildCatalog.GetItemKind(itemId);
+		return kind switch
+		{
+			InventoryItemKind.AttributeGem or InventoryItemKind.SkillGem => ItemCategory.Gems,
+			_ => ItemCategory.Special,
+		};
+	}
+
+	private void CycleItemCategory()
+	{
+		_selectedCategory = _selectedCategory switch
+		{
+			ItemCategory.Materials => ItemCategory.Gems,
+			ItemCategory.Gems => ItemCategory.Consumables,
+			ItemCategory.Consumables => ItemCategory.Special,
+			_ => ItemCategory.Materials,
+		};
+		RefreshAll();
+	}
+
+	private static string GetCategoryKey(ItemCategory category)
+	{
+		return category switch
+		{
+			ItemCategory.Materials => "shop.category.materials",
+			ItemCategory.Gems => "shop.category.gems",
+			ItemCategory.Consumables => "shop.category.consumables",
+			_ => "shop.category.special",
+		};
 	}
 
 	private void BuildTooltipPanel()
