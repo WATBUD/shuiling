@@ -38,6 +38,7 @@ public partial class InventoryPanel : PanelContainer
 	private Label _companionInfoBodyLabel = null!;
 	private Label _selectedSlotLabel = null!;
 	private Label _buildSummaryLabel = null!;
+	private Label _abilityInfoLabel = null!;
 	private Label _bagCountLabel = null!;
 	private Label _itemDetailTitleLabel = null!;
 	private Label _itemDetailBodyLabel = null!;
@@ -182,41 +183,25 @@ public partial class InventoryPanel : PanelContainer
 		content.AddThemeConstantOverride("separation", 14);
 		root.AddChild(content);
 
-		var companionSection = MakeSection(LocaleText.T("inventory.companions"), new Vector2(200.0f, 0.0f));
+		// Far left: companion selector list.
+		var companionSection = MakeSection(LocaleText.T("inventory.companions"), new Vector2(178.0f, 0.0f));
 		content.AddChild(companionSection);
 		_companionList = MakeScrollableList(companionSection);
 
-		var companionInfoPanel = MakeInfoPanel(new Vector2(0.0f, 142.0f));
-		companionSection.AddChild(companionInfoPanel);
-		var companionInfoMargin = new MarginContainer();
-		companionInfoMargin.AddThemeConstantOverride("margin_left", 10);
-		companionInfoMargin.AddThemeConstantOverride("margin_right", 10);
-		companionInfoMargin.AddThemeConstantOverride("margin_top", 8);
-		companionInfoMargin.AddThemeConstantOverride("margin_bottom", 8);
-		companionInfoPanel.AddChild(companionInfoMargin);
-		var companionInfoRows = new VBoxContainer();
-		companionInfoRows.AddThemeConstantOverride("separation", 5);
-		companionInfoMargin.AddChild(companionInfoRows);
-		_companionInfoTitleLabel = MakeLabel(15, new Color(1.0f, 0.92f, 0.58f));
-		companionInfoRows.AddChild(_companionInfoTitleLabel);
-		_companionInfoBodyLabel = MakeLabel(12, new Color(0.80f, 0.87f, 0.93f));
-		_companionInfoBodyLabel.CustomMinimumSize = new Vector2(0.0f, 80.0f);
-		companionInfoRows.AddChild(_companionInfoBodyLabel);
+		// Middle (merged panel): equipment slots on top, character / ability info below.
+		var buildSection = MakeSection(LocaleText.T("inventory.equipment_slots"), new Vector2(330.0f, 0.0f));
+		content.AddChild(buildSection);
 
-		var equipmentSection = MakeSection(LocaleText.T("inventory.equipment_slots"), new Vector2(300.0f, 0.0f));
-		content.AddChild(equipmentSection);
+		_selectedActorLabel = MakeLabel(18, new Color(1.0f, 0.96f, 0.76f));
+		buildSection.AddChild(_selectedActorLabel);
 
-		_selectedActorLabel = MakeLabel(22, new Color(1.0f, 0.96f, 0.76f));
-		equipmentSection.AddChild(_selectedActorLabel);
-
-		_buildSummaryLabel = MakeLabel(14, new Color(0.74f, 0.83f, 0.90f));
-		equipmentSection.AddChild(_buildSummaryLabel);
+		_buildSummaryLabel = MakeLabel(13, new Color(0.74f, 0.83f, 0.90f));
+		buildSection.AddChild(_buildSummaryLabel);
 
 		var slotGrid = new GridContainer { Columns = 2 };
 		slotGrid.AddThemeConstantOverride("h_separation", 8);
 		slotGrid.AddThemeConstantOverride("v_separation", 8);
-		slotGrid.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-		equipmentSection.AddChild(slotGrid);
+		buildSection.AddChild(slotGrid);
 
 		_helmetButton = AddSlotButton(slotGrid, EquipTarget.Helmet);
 		_weaponButton = AddSlotButton(slotGrid, EquipTarget.Weapon);
@@ -228,7 +213,38 @@ public partial class InventoryPanel : PanelContainer
 		_skill3Button = AddSlotButton(slotGrid, EquipTarget.SkillGem3);
 
 		_selectedSlotLabel = MakeLabel(14, new Color(0.98f, 0.98f, 0.98f));
-		equipmentSection.AddChild(_selectedSlotLabel);
+		buildSection.AddChild(_selectedSlotLabel);
+
+		var infoHeader = MakeLabel(15, new Color(0.86f, 0.92f, 0.98f));
+		infoHeader.Text = LocaleText.T("inventory.companion_info");
+		buildSection.AddChild(infoHeader);
+
+		var infoPanel = MakeInfoPanel(new Vector2(0.0f, 130.0f));
+		infoPanel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		buildSection.AddChild(infoPanel);
+		var infoMargin = new MarginContainer();
+		infoMargin.AddThemeConstantOverride("margin_left", 10);
+		infoMargin.AddThemeConstantOverride("margin_right", 10);
+		infoMargin.AddThemeConstantOverride("margin_top", 8);
+		infoMargin.AddThemeConstantOverride("margin_bottom", 8);
+		infoPanel.AddChild(infoMargin);
+		var infoRows = new VBoxContainer();
+		infoRows.AddThemeConstantOverride("separation", 5);
+		infoMargin.AddChild(infoRows);
+		_companionInfoTitleLabel = MakeLabel(14, new Color(1.0f, 0.92f, 0.58f));
+		infoRows.AddChild(_companionInfoTitleLabel);
+
+		// Two-column stat readout so a detailed panel stays short enough to fit.
+		var infoColumns = new HBoxContainer();
+		infoColumns.AddThemeConstantOverride("separation", 14);
+		infoColumns.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		infoRows.AddChild(infoColumns);
+		_companionInfoBodyLabel = MakeLabel(12, new Color(0.80f, 0.87f, 0.93f));
+		_companionInfoBodyLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		infoColumns.AddChild(_companionInfoBodyLabel);
+		_abilityInfoLabel = MakeLabel(12, new Color(0.74f, 0.88f, 0.80f));
+		_abilityInfoLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		infoColumns.AddChild(_abilityInfoLabel);
 
 		var itemSection = MakeSection(LocaleText.T("inventory.items"), new Vector2(320.0f, 0.0f));
 		itemSection.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
@@ -379,13 +395,68 @@ public partial class InventoryPanel : PanelContainer
 	private Button AddSlotButton(GridContainer parent, EquipTarget target)
 	{
 		var button = MakeButton(string.Empty);
-		button.CustomMinimumSize = new Vector2(0.0f, 54.0f);
+		button.CustomMinimumSize = new Vector2(0.0f, 42.0f);
 		button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 		button.Pressed += () => SelectTarget(target);
 		button.MouseEntered += () => ShowTooltipForTarget(target);
 		button.MouseExited += HideItemTooltip;
+		button.GuiInput += inputEvent =>
+		{
+			if (inputEvent is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left, DoubleClick: true })
+			{
+				UnequipSlot(target);
+				button.AcceptEvent();
+			}
+		};
 		parent.AddChild(button);
 		return button;
+	}
+
+	// Double-clicking an equipped slot takes the item off. Equipping never removed it
+	// from the bag, so unequipping just empties the slot; the item stays available.
+	private void UnequipSlot(EquipTarget target)
+	{
+		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
+		{
+			return;
+		}
+
+		switch (target)
+		{
+			case EquipTarget.Helmet:
+			case EquipTarget.Weapon:
+			case EquipTarget.Armor:
+			case EquipTarget.Accessory:
+				EquipmentSlot slot = ToEquipmentSlot(target);
+				_selectedActor.EquipBuildEquipment(slot, GetEmptyEquipmentId(slot));
+				break;
+			case EquipTarget.AttributeGem:
+				_selectedActor.EquipAttributeGem("gem.attribute.none");
+				break;
+			case EquipTarget.SkillGem1:
+				_selectedActor.EquipSkillGem(0, "gem.skill.none");
+				break;
+			case EquipTarget.SkillGem2:
+				_selectedActor.EquipSkillGem(1, "gem.skill.none");
+				break;
+			case EquipTarget.SkillGem3:
+				_selectedActor.EquipSkillGem(2, "gem.skill.none");
+				break;
+		}
+
+		HideItemTooltip();
+		RefreshAll();
+	}
+
+	private static EquipmentSlot ToEquipmentSlot(EquipTarget target)
+	{
+		return target switch
+		{
+			EquipTarget.Helmet => EquipmentSlot.Helmet,
+			EquipTarget.Weapon => EquipmentSlot.Weapon,
+			EquipTarget.Armor => EquipmentSlot.Armor,
+			_ => EquipmentSlot.Accessory,
+		};
 	}
 
 	private void SelectDefaultActor()
@@ -507,7 +578,7 @@ public partial class InventoryPanel : PanelContainer
 	private void SetSlotButton(Button button, EquipTarget target, string itemId, string itemNameKey)
 	{
 		button.Text = $"{GetTargetName(target)}\n{LocaleText.T(itemNameKey)}";
-		ItemIconLibrary.Apply(button, itemId, 38);
+		ItemIconLibrary.Apply(button, itemId, 26);
 		button.AddThemeColorOverride("font_color", target == _selectedTarget ? new Color(1.0f, 0.92f, 0.50f) : new Color(0.92f, 0.96f, 1.0f));
 	}
 
@@ -521,7 +592,7 @@ public partial class InventoryPanel : PanelContainer
 		}
 
 		button.Text = $"{GetTargetName(target)}\n{gemName}";
-		ItemIconLibrary.Apply(button, gemId, 38);
+		ItemIconLibrary.Apply(button, gemId, 26);
 		button.AddThemeColorOverride("font_color", target == _selectedTarget ? new Color(1.0f, 0.92f, 0.50f) : new Color(0.92f, 0.96f, 1.0f));
 	}
 
@@ -992,30 +1063,37 @@ public partial class InventoryPanel : PanelContainer
 			_selectedActorLabel.Text = LocaleText.T("inventory.no_companions");
 			_companionInfoTitleLabel.Text = LocaleText.T("inventory.companion_info");
 			_companionInfoBodyLabel.Text = LocaleText.T("inventory.no_companions");
+			_abilityInfoLabel.Text = string.Empty;
 			_selectedSlotLabel.Text = string.Empty;
 			_buildSummaryLabel.Text = string.Empty;
 			return;
 		}
 
+		BuildStats stats = _selectedActor.CurrentBuildStats;
 		_selectedActorLabel.Text = _selectedActor.LocalizedDisplayName;
-		_companionInfoTitleLabel.Text = _selectedActor.LocalizedDisplayName;
+		_companionInfoTitleLabel.Text = LocaleText.F("inventory.info_header", _selectedActor.Level, stats.BuildPower);
 		_companionInfoBodyLabel.Text = LocaleText.F(
-			"inventory.companion_summary",
-			_selectedActor.Level,
+			"inventory.stats_column",
 			_selectedActor.CurrentHealth,
 			_selectedActor.EffectiveMaxHealth,
-			_selectedActor.Affinity,
-			_selectedActor.AttackModeName,
-			_selectedActor.EffectiveAttack,
-			_selectedActor.EffectiveDefense
-		);
-		_buildSummaryLabel.Text = LocaleText.F(
-			"inventory.build_summary",
-			_selectedActor.CurrentBuildStats.BuildPower,
 			_selectedActor.EffectiveAttack,
 			_selectedActor.EffectiveDefense,
-			_selectedActor.BuildElementName
+			_selectedActor.EffectiveAttackRange.ToString("0.0"),
+			_selectedActor.EffectiveDetectionRadius.ToString("0.0"),
+			Mathf.RoundToInt(stats.CritChance * 100.0f),
+			Mathf.RoundToInt(stats.MoveSpeedMultiplier * 100.0f)
 		);
+		_abilityInfoLabel.Text = LocaleText.F(
+			"inventory.meta_column",
+			_selectedActor.AttackModeName,
+			_selectedActor.Affinity,
+			_selectedActor.BuildElementName,
+			_selectedActor.CombatRoleName,
+			_selectedActor.LocalizedPersonality,
+			_selectedActor.LocalizedPassiveAbility,
+			_selectedActor.LocalizedSpecialAbility
+		);
+		_buildSummaryLabel.Text = _selectedActor.BuildRareComboName;
 		_selectedSlotLabel.Text = LocaleText.F("inventory.selected_slot", GetTargetName(_selectedTarget));
 	}
 
