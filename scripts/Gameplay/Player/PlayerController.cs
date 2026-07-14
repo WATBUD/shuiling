@@ -503,6 +503,7 @@ public partial class PlayerController : CharacterBody3D
 		actor.DeployToParty(this, _activeParty.Count - 1);
 		EnsureFormationSlotForActor(actor);
 		actor.OnFormationLayoutChanged();
+		RecalculateFormationBonuses();
 		_partyPanel.RefreshParty();
 		_formationPanel.RefreshAll();
 		return true;
@@ -830,6 +831,7 @@ public partial class PlayerController : CharacterBody3D
 		}
 
 		SimpleActor actor = world.SpawnPurchasedPet(offer.MonsterNameKey, offer.Level, offer.MaxHealth, offer.Attack, offer.Defense);
+		actor.ClearBuildLoadout();
 		if (!_capturedCollection.Contains(actor))
 		{
 			_capturedCollection.Add(actor);
@@ -878,6 +880,7 @@ public partial class PlayerController : CharacterBody3D
 		bool removed = _activeParty.Remove(actor);
 		ClearFormationAssignment(actor);
 		actor.StoreInCollection();
+		RecalculateFormationBonuses();
 		if (removed)
 		{
 			ReassignFollowSlots();

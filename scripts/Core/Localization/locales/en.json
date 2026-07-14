@@ -305,6 +305,7 @@
 	"equip.accessory.turtle_amulet":  "Turtle Amulet",
 	"equip.accessory.focus_lens":  "Focus Lens",
 	"gem.attribute.none":  "No Attribute",
+	"equipment.none": "Unequipped",
 	"gem.attribute.fire":  "Fire Gem",
 	"gem.attribute.water":  "Water Gem",
 	"gem.attribute.lightning":  "Lightning Gem",
@@ -485,5 +486,11 @@
 	"passive.tough_body":  "Tough Body",
 	"passive.combo_rhythm":  "Combo Rhythm",
 	"passive.protector":  "Protector\u0027s Reflex",
-	"passive.fast_growth":  "Fast Growth"
+	"passive.fast_growth":  "Fast Growth",
+	"formation.bonus.active": "Formation: {0}",
+	"formation.bonus.resonance": "Element resonance (+ATK)",
+	"formation.bonus.guard": "Tank guard (damage reduction)",
+	"formation.bonus.support": "Support link (faster actions)",
+	"formation.bonus.frontline": "Tank frontline (+DEF aura)",
+	"formation.bonus.backline": "Ranged backline (+range aura)"
 }

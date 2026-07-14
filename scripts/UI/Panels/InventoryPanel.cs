@@ -613,12 +613,72 @@ public partial class InventoryPanel : PanelContainer
 		button.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
 		button.AddThemeFontSizeOverride("font_size", 11);
 		ItemIconLibrary.Apply(button, itemId, 44);
-		button.TooltipText = GetInventoryItemName(itemId);
 		button.AddThemeColorOverride("font_color", itemId == _selectedItemId ? new Color(1.0f, 0.92f, 0.50f) : new Color(0.92f, 0.96f, 1.0f));
 		button.MouseEntered += () => ShowItemTooltip(itemId, LocaleText.T("inventory.items"));
 		button.MouseExited += HideItemTooltip;
 		button.Pressed += () => SelectInventoryItem(itemId);
+		button.GuiInput += inputEvent =>
+		{
+			if (inputEvent is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left, DoubleClick: true })
+			{
+				_selectedItemId = itemId;
+				ToggleItemEquipment(itemId);
+				button.AcceptEvent();
+			}
+		};
 		_itemGrid.AddChild(button);
+	}
+
+	private void ToggleItemEquipment(string itemId)
+	{
+		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
+		{
+			return;
+		}
+
+		CompanionBuildLoadout loadout = _selectedActor.BuildLoadout;
+		InventoryItemKind kind = BuildCatalog.GetItemKind(itemId);
+		if (kind == InventoryItemKind.Equipment)
+		{
+			EquipmentDefinition equipment = BuildCatalog.GetEquipment(itemId);
+			if (loadout.GetEquipmentId(equipment.Slot) == itemId)
+			{
+				_selectedActor.EquipBuildEquipment(equipment.Slot, GetEmptyEquipmentId(equipment.Slot));
+				RefreshAll();
+				return;
+			}
+		}
+		else if (kind == InventoryItemKind.AttributeGem && loadout.AttributeGemId == itemId)
+		{
+			_selectedActor.EquipAttributeGem("gem.attribute.none");
+			RefreshAll();
+			return;
+		}
+		else if (kind == InventoryItemKind.SkillGem)
+		{
+			for (int index = 0; index < loadout.SkillGemIds.Length; index++)
+			{
+				if (loadout.SkillGemIds[index] == itemId)
+				{
+					_selectedActor.EquipSkillGem(index, "gem.skill.none");
+					RefreshAll();
+					return;
+				}
+			}
+		}
+
+		EquipItem(itemId);
+	}
+
+	private static string GetEmptyEquipmentId(EquipmentSlot slot)
+	{
+		return slot switch
+		{
+			EquipmentSlot.Helmet => "equip.helmet.none",
+			EquipmentSlot.Weapon => "equip.weapon.none",
+			EquipmentSlot.Armor => "equip.armor.none",
+			_ => "equip.accessory.none",
+		};
 	}
 
 	private static string GetInventoryItemName(string itemId)
@@ -931,7 +991,7 @@ public partial class InventoryPanel : PanelContainer
 		}
 	}
 
-	private string BuildItemTooltipBody(string itemId, string slotName)
+	public static string BuildItemTooltipBody(string itemId, string slotName)
 	{
 		var lines = new List<string>
 		{

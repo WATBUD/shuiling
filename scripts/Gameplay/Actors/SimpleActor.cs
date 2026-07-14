@@ -92,6 +92,12 @@ public partial class SimpleActor : CharacterBody3D
 	private float _burnRemaining;
 	private float _statusTickRemaining;
 	private SimpleActor? _statusSource;
+	private float _formationAttackMultiplier = 1.0f;
+	private float _formationDefenseMultiplier = 1.0f;
+	private float _formationCooldownMultiplier = 1.0f;
+	private float _formationIncomingDamageMultiplier = 1.0f;
+	private float _formationRangeBonus;
+	private string _formationBonusSummary = string.Empty;
 
 	public bool CanBeCaptured => ActorKind == "monster" && !_isCaptured && !_isDefeated;
 	public bool IsNpcRecruitCandidate => ActorKind == "npc" && !_isCaptured && !_isDefeated;
@@ -158,6 +164,7 @@ public partial class SimpleActor : CharacterBody3D
 	public string BuildAttributeGemName => LocaleText.T(BuildCatalog.GetAttributeGem(BuildLoadout.AttributeGemId).NameKey);
 	public string AttackModeName => LocaleText.T(BuildCatalog.GetAttackMode(AttackModeId).NameKey);
 	public string BuildRareComboName => BuildCatalog.LocalizedRareCombo(CurrentBuildStats);
+	public string FormationBonusSummary => _formationBonusSummary;
 
 	private string[] GetTraitKeys()
 	{
@@ -425,6 +432,21 @@ public partial class SimpleActor : CharacterBody3D
 		_squadThinkRemaining = 0.0f;
 	}
 
+	public void SetFormationBonuses(float attackMultiplier, float defenseMultiplier, float cooldownMultiplier, float incomingDamageMultiplier, float rangeBonus, string summary)
+	{
+		_formationAttackMultiplier = attackMultiplier;
+		_formationDefenseMultiplier = defenseMultiplier;
+		_formationCooldownMultiplier = cooldownMultiplier;
+		_formationIncomingDamageMultiplier = incomingDamageMultiplier;
+		_formationRangeBonus = rangeBonus;
+		_formationBonusSummary = summary;
+		_buildStatsDirty = true;
+		if (_buildConfigured)
+		{
+			RecalculateBuildStats();
+		}
+	}
+
 	public void CycleBuildEquipment(EquipmentSlot slot)
 	{
 		BuildLoadout.CycleEquipment(slot);
@@ -439,6 +461,21 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		BuildLoadout.SetEquipmentId(slot, equipmentId);
+		MarkBuildChanged();
+	}
+
+	public void ClearBuildLoadout()
+	{
+		_buildLoadout = new CompanionBuildLoadout
+		{
+			HelmetId = "equip.helmet.none",
+			WeaponId = "equip.weapon.none",
+			ArmorId = "equip.armor.none",
+			AccessoryId = "equip.accessory.none",
+			AttributeGemId = "gem.attribute.none",
+			SkillGemIds = new[] { "gem.skill.none", "gem.skill.none", "gem.skill.none" },
+		};
+		_buildConfigured = true;
 		MarkBuildChanged();
 	}
 
@@ -650,6 +687,11 @@ public partial class SimpleActor : CharacterBody3D
 	{
 		EnsureBuildLoadout();
 		_buildStats = BuildCatalog.CalculateStats(this, _buildLoadout);
+		_buildStats.Attack = Mathf.Max(Mathf.RoundToInt(_buildStats.Attack * _formationAttackMultiplier), 1);
+		_buildStats.Defense = Mathf.Max(Mathf.RoundToInt(_buildStats.Defense * _formationDefenseMultiplier), 0);
+		_buildStats.AttackCooldownMultiplier *= _formationCooldownMultiplier;
+		_buildStats.IncomingDamageMultiplier *= _formationIncomingDamageMultiplier;
+		_buildStats.AttackRangeBonus += _formationRangeBonus;
 		_buildStatsDirty = false;
 		CurrentHealth = Mathf.Clamp(CurrentHealth, 0, _buildStats.MaxHealth);
 	}
@@ -659,6 +701,7 @@ public partial class SimpleActor : CharacterBody3D
 		_buildStatsDirty = true;
 		RecalculateBuildStats();
 		RefreshNameplate();
+		_followTarget?.RecalculateFormationBonuses();
 	}
 
 	private void MarkBaseStatsChanged()
@@ -726,7 +769,7 @@ public partial class SimpleActor : CharacterBody3D
 		float elementMultiplier = attacker == null
 			? 1.0f
 			: ElementChart.GetMultiplier(attacker.CurrentBuildStats.DamageElementId, CurrentBuildStats.DamageElementId);
-		int elementalDamage = Mathf.Max(Mathf.RoundToInt(rawDamage * elementMultiplier), 1);
+		int elementalDamage = Mathf.Max(Mathf.RoundToInt(rawDamage * elementMultiplier * CurrentBuildStats.IncomingDamageMultiplier), 1);
 		int mitigatedDamage = Mathf.Max(elementalDamage - Mathf.RoundToInt(EffectiveDefense * 0.35f), 1);
 		RememberAttacker(attacker);
 		CurrentHealth = Mathf.Max(CurrentHealth - mitigatedDamage, 0);

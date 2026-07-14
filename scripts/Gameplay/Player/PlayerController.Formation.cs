@@ -17,6 +17,8 @@ public partial class PlayerController
 		1, 3, 5, 9, 15, 19, 21, 23,
 		0, 4, 20, 24,
 	};
+	private static readonly int[] FormationFrontRow = { 6, 7, 8 };
+	private static readonly int[] FormationBackRow = { 16, 17, 18 };
 
 	private readonly Dictionary<int, SimpleActor> _formationActorsBySlot = new();
 	private readonly Dictionary<SimpleActor, int> _formationSlotsByActor = new();
@@ -117,6 +119,7 @@ public partial class PlayerController
 
 		SetFormationAssignment(actor, slotIndex);
 		actor.OnFormationLayoutChanged();
+		RecalculateFormationBonuses();
 		RefreshFormationViews();
 		return true;
 	}
@@ -136,6 +139,7 @@ public partial class PlayerController
 
 		ClearFormationAssignment(actor);
 		actor.OnFormationLayoutChanged();
+		RecalculateFormationBonuses();
 		RefreshFormationViews();
 		return true;
 	}
@@ -193,6 +197,80 @@ public partial class PlayerController
 
 		_formationActorsBySlot[slotIndex] = actor;
 		_formationSlotsByActor[actor] = slotIndex;
+	}
+
+	public void RecalculateFormationBonuses()
+	{
+		bool tankFrontAura = AreSlotsFilledByRole(FormationFrontRow, "Tank");
+		bool rangedBackAura = AreSlotsFilledByRole(FormationBackRow, "Ranged");
+		foreach (KeyValuePair<int, SimpleActor> entry in _formationActorsBySlot)
+		{
+			SimpleActor actor = entry.Value;
+			if (!IsInstanceValid(actor) || !actor.IsCaptured || !actor.IsInActiveParty)
+			{
+				continue;
+			}
+
+			int adjacentTanks = 0;
+			int adjacentSupports = 0;
+			int sameElementNeighbors = 0;
+			string elementId = BuildCatalog.GetAttributeGem(actor.BuildLoadout.AttributeGemId).ElementId;
+			foreach (int neighborSlot in GetAdjacentSlots(entry.Key))
+			{
+				SimpleActor? neighbor = GetFormationActor(neighborSlot);
+				if (neighbor == null)
+				{
+					continue;
+				}
+
+				adjacentTanks += neighbor.CombatRole == "Tank" ? 1 : 0;
+				adjacentSupports += neighbor.CombatRole == "Support" ? 1 : 0;
+				string neighborElement = BuildCatalog.GetAttributeGem(neighbor.BuildLoadout.AttributeGemId).ElementId;
+				sameElementNeighbors += elementId != "physical" && neighborElement == elementId ? 1 : 0;
+			}
+
+			float attackMultiplier = 1.0f + Mathf.Min(sameElementNeighbors, 3) * 0.08f;
+			float defenseMultiplier = tankFrontAura ? 1.12f : 1.0f;
+			float cooldownMultiplier = Mathf.Max(1.0f - adjacentSupports * 0.08f, 0.80f);
+			float incomingMultiplier = Mathf.Max(1.0f - adjacentTanks * 0.10f, 0.80f);
+			float rangeBonus = rangedBackAura ? 1.25f : 0.0f;
+			var bonuses = new List<string>();
+			if (sameElementNeighbors > 0) bonuses.Add(LocaleText.T("formation.bonus.resonance"));
+			if (adjacentTanks > 0) bonuses.Add(LocaleText.T("formation.bonus.guard"));
+			if (adjacentSupports > 0) bonuses.Add(LocaleText.T("formation.bonus.support"));
+			if (tankFrontAura) bonuses.Add(LocaleText.T("formation.bonus.frontline"));
+			if (rangedBackAura) bonuses.Add(LocaleText.T("formation.bonus.backline"));
+			actor.SetFormationBonuses(attackMultiplier, defenseMultiplier, cooldownMultiplier, incomingMultiplier, rangeBonus, string.Join(" / ", bonuses));
+		}
+	}
+
+	private bool AreSlotsFilledByRole(int[] slots, string role)
+	{
+		foreach (int slot in slots)
+		{
+			if (GetFormationActor(slot)?.CombatRole != role)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private static IEnumerable<int> GetAdjacentSlots(int slotIndex)
+	{
+		int row = slotIndex / FormationGridSideLength;
+		int column = slotIndex % FormationGridSideLength;
+		for (int rowOffset = -1; rowOffset <= 1; rowOffset++)
+		{
+			for (int columnOffset = -1; columnOffset <= 1; columnOffset++)
+			{
+				if ((rowOffset == 0 && columnOffset == 0) || row + rowOffset < 0 || row + rowOffset >= FormationGridSideLength || column + columnOffset < 0 || column + columnOffset >= FormationGridSideLength)
+				{
+					continue;
+				}
+				yield return (row + rowOffset) * FormationGridSideLength + column + columnOffset;
+			}
+		}
 	}
 
 	private void ClearFormationAssignment(SimpleActor actor)
