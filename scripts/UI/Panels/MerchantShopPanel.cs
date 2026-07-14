@@ -416,7 +416,7 @@ public partial class MerchantShopPanel : PanelContainer
 		style.SetCornerRadiusAll(6);
 		row.AddThemeStyleboxOverride("panel", style);
 		row.MouseFilter = MouseFilterEnum.Stop;
-		row.MouseEntered += () => ShowTradeTooltip(entry);
+		row.MouseEntered += () => ShowTradeTooltip(entry, isBuy);
 		row.MouseExited += HideTradeTooltip;
 		parent.AddChild(row);
 
@@ -469,13 +469,14 @@ public partial class MerchantShopPanel : PanelContainer
 			Disabled = _player == null || (isBuy && _player.Gold < entry.Price),
 		};
 		action.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+		action.MouseEntered += () => ShowTradeTooltip(entry, isBuy);
+		action.MouseExited += HideTradeTooltip;
 		action.Pressed += () =>
 		{
 			if (_player == null)
 			{
 				return;
 			}
-
 			bool changed = isBuy
 				? _player.TryBuyShopItem(_shopKind, entry.ItemId, entry.Price)
 				: _player.TrySellShopItem(_shopKind, entry.ItemId, entry.Price);
@@ -553,14 +554,16 @@ public partial class MerchantShopPanel : PanelContainer
 		AddChild(_tooltip);
 	}
 
-	private void ShowTradeTooltip(PlayerController.ShopTradeEntry entry)
+	private void ShowTradeTooltip(PlayerController.ShopTradeEntry entry, bool isBuy)
 	{
-		if (string.IsNullOrWhiteSpace(entry.Detail))
+		string body = _shopKind == PlayerController.MerchantShopKind.PetShop
+			? entry.Detail
+			: InventoryPanel.BuildItemTooltipBody(entry.ItemId, LocaleText.T(isBuy ? "shop.buy" : "shop.sell"));
+		if (_player != null)
 		{
-			return;
+			body += $"\n{LocaleText.F("shop.owned_count", _player.GetInventoryCount(entry.ItemId))}  /  {LocaleText.F(isBuy ? "shop.button.buy" : "shop.button.sell", entry.Price)}";
 		}
-
-		_tooltip.ShowTooltip(entry.DisplayName, entry.Detail, this);
+		_tooltip.ShowTooltip(entry.DisplayName, body, this);
 	}
 
 	private void HideTradeTooltip()

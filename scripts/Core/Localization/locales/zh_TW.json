@@ -305,6 +305,7 @@
 	"equip.accessory.turtle_amulet":  "龜甲護符",
 	"equip.accessory.focus_lens":  "聚焦鏡",
 	"gem.attribute.none":  "無屬性",
+	"equipment.none": "未裝備",
 	"gem.attribute.fire":  "火焰寶石",
 	"gem.attribute.water":  "水寶石",
 	"gem.attribute.lightning":  "雷電寶石",
@@ -485,5 +486,11 @@
 	"passive.tough_body":  "堅韌體魄",
 	"passive.combo_rhythm":  "連擊節奏",
 	"passive.protector":  "護主反應",
-	"passive.fast_growth":  "成長加速"
+	"passive.fast_growth":  "成長加速",
+	"formation.bonus.active": "站位綜效：{0}",
+	"formation.bonus.resonance": "元素共鳴（攻擊提升）",
+	"formation.bonus.guard": "坦克護衛（受到傷害降低）",
+	"formation.bonus.support": "支援連結（行動加速）",
+	"formation.bonus.frontline": "坦克前線（全隊防禦光環）",
+	"formation.bonus.backline": "遠程後排（全隊射程光環）"
 }

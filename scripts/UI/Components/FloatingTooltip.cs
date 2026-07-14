@@ -19,6 +19,11 @@ public partial class FloatingTooltip : PanelContainer
 		Visible = false;
 		MouseFilter = MouseFilterEnum.Ignore;
 		ZIndex = 80;
+		SetAnchorsPreset(LayoutPreset.TopLeft);
+		SizeFlagsHorizontal = SizeFlags.ShrinkBegin;
+		SizeFlagsVertical = SizeFlags.ShrinkBegin;
+		GrowHorizontal = GrowDirection.Begin;
+		GrowVertical = GrowDirection.Begin;
 
 		var style = new StyleBoxFlat
 		{
@@ -47,13 +52,15 @@ public partial class FloatingTooltip : PanelContainer
 		{
 			HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
 			VerticalScrollMode = ScrollContainer.ScrollMode.Auto,
-			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
+			SizeFlagsVertical = SizeFlags.ShrinkBegin,
 		};
 		root.AddChild(_bodyScroll);
 
 		_bodyLabel = MakeLabel(13, new Color(0.86f, 0.91f, 0.96f));
 		_bodyLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		_bodyScroll.AddChild(_bodyLabel);
+		SetMousePassthroughRecursive(this);
 	}
 
 	public void ShowTooltip(string title, string body, Control owner)
@@ -68,7 +75,6 @@ public partial class FloatingTooltip : PanelContainer
 		_bodyLabel.Text = body;
 		ApplyContentSize(owner);
 		Visible = true;
-		ResetSize();
 	}
 
 	public void HideTooltip()
@@ -108,8 +114,25 @@ public partial class FloatingTooltip : PanelContainer
 		Position = position;
 	}
 
+	private static void SetMousePassthroughRecursive(Node node)
+	{
+		if (node is Control control)
+		{
+			control.MouseFilter = MouseFilterEnum.Ignore;
+		}
+
+		foreach (Node child in node.GetChildren())
+		{
+			SetMousePassthroughRecursive(child);
+		}
+	}
+
 	private void ApplyContentSize(Control owner)
 	{
+		_titleLabel.CustomMinimumSize = Vector2.Zero;
+		_bodyLabel.CustomMinimumSize = Vector2.Zero;
+		_bodyScroll.CustomMinimumSize = Vector2.Zero;
+
 		float maxContentWidth = Mathf.Min(MaxWidth, Mathf.Max(MinWidth, owner.Size.X * MaxWidthRatio));
 		float titleWidth = _titleLabel.GetCombinedMinimumSize().X;
 		float bodyWidth = _bodyLabel.GetCombinedMinimumSize().X;
@@ -118,12 +141,16 @@ public partial class FloatingTooltip : PanelContainer
 		_titleLabel.CustomMinimumSize = new Vector2(contentWidth, 0.0f);
 		_bodyLabel.CustomMinimumSize = new Vector2(contentWidth, 0.0f);
 		float maxPanelHeight = Mathf.Max(160.0f, owner.Size.Y * MaxHeightRatio);
-		float maxBodyHeight = Mathf.Max(64.0f, maxPanelHeight - 74.0f);
-		float bodyHeight = Mathf.Clamp(_bodyLabel.GetCombinedMinimumSize().Y + 8.0f, MinBodyHeight, maxBodyHeight);
+		float titleHeight = _titleLabel.GetCombinedMinimumSize().Y;
+		float maxBodyHeight = Mathf.Max(48.0f, maxPanelHeight - titleHeight - 23.0f);
+		float naturalBodyHeight = _bodyLabel.GetCombinedMinimumSize().Y;
+		float bodyHeight = Mathf.Clamp(naturalBodyHeight, MinBodyHeight, maxBodyHeight);
 		_bodyScroll.CustomMinimumSize = new Vector2(contentWidth, bodyHeight);
 		_bodyScroll.Size = new Vector2(contentWidth, bodyHeight);
-		CustomMinimumSize = Vector2.Zero;
-		Size = new Vector2(GetCombinedMinimumSize().X, Mathf.Min(GetCombinedMinimumSize().Y, maxPanelHeight));
+
+		Vector2 panelSize = new(contentWidth + 24.0f, Mathf.Min(titleHeight + bodyHeight + 23.0f, maxPanelHeight));
+		CustomMinimumSize = panelSize;
+		Size = panelSize;
 	}
 
 	private static Label MakeLabel(int fontSize, Color color)

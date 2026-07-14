@@ -110,6 +110,7 @@ public sealed class BuildStats
 	public float LifeStealPercent { get; set; }
 	public float KnockbackForce { get; set; }
 	public float ControlChance { get; set; }
+	public float IncomingDamageMultiplier { get; set; } = 1.0f;
 	public int EquipmentSocketCount { get; set; }
 	public int BuildPower { get; set; }
 	public bool HasHealSkill { get; set; }
@@ -319,6 +320,10 @@ public static class BuildCatalog
 
 	private static readonly List<EquipmentDefinition> Equipment = new()
 	{
+		new EquipmentDefinition { Id = "equip.helmet.none", NameKey = "equipment.none", SummaryKey = "gem.summary.none", Slot = EquipmentSlot.Helmet },
+		new EquipmentDefinition { Id = "equip.weapon.none", NameKey = "equipment.none", SummaryKey = "gem.summary.none", Slot = EquipmentSlot.Weapon },
+		new EquipmentDefinition { Id = "equip.armor.none", NameKey = "equipment.none", SummaryKey = "gem.summary.none", Slot = EquipmentSlot.Armor },
+		new EquipmentDefinition { Id = "equip.accessory.none", NameKey = "equipment.none", SummaryKey = "gem.summary.none", Slot = EquipmentSlot.Accessory },
 		new EquipmentDefinition { Id = "equip.helmet.traveler", NameKey = "equip.helmet.traveler", SummaryKey = "equip.summary.traveler_helmet", Slot = EquipmentSlot.Helmet, MaxHealthBonus = 10, DefenseBonus = 3, SocketCount = 1 },
 		new EquipmentDefinition { Id = "equip.helmet.guardian", NameKey = "equip.helmet.guardian", SummaryKey = "equip.summary.guardian_helmet", Slot = EquipmentSlot.Helmet, MaxHealthBonus = 26, DefenseBonus = 8, SocketCount = 1 },
 		new EquipmentDefinition { Id = "equip.helmet.mystic", NameKey = "equip.helmet.mystic", SummaryKey = "equip.summary.mystic_hood", Slot = EquipmentSlot.Helmet, MaxHealthBonus = 12, DefenseBonus = 4, AttackCooldownReduction = 0.07f, AttackRangeBonus = 0.6f, SocketCount = 2 },
@@ -537,7 +542,7 @@ public static class BuildCatalog
 			}
 		}
 
-		return Equipment[0];
+		return Equipment.Find(equipment => equipment.Id == "equip.helmet.traveler")!;
 	}
 
 	public static AttributeGemDefinition GetAttributeGem(string id)
@@ -637,7 +642,8 @@ public static class BuildCatalog
 
 	public static bool IsFreeItem(string id)
 	{
-		return id is "gem.attribute.none" or "gem.skill.none";
+		return id is "gem.attribute.none" or "gem.skill.none"
+			|| id.EndsWith(".none", System.StringComparison.Ordinal);
 	}
 
 	public static string GetItemNameKey(string id)

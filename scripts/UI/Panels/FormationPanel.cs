@@ -359,6 +359,10 @@ public partial class FormationPanel : PanelContainer
 
 		_selectedLabel.Visible = true;
 		_selectedLabel.Text = LocaleText.F("formation.selected_actor", actor.LocalizedDisplayName, actor.CombatRoleName, actor.EffectiveAttack, actor.EffectiveDefense);
+		if (!string.IsNullOrEmpty(actor.FormationBonusSummary))
+		{
+			_selectedLabel.Text += $"\n{LocaleText.F("formation.bonus.active", actor.FormationBonusSummary)}";
+		}
 	}
 
 	private void RefreshRoster()
