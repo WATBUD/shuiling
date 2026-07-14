@@ -501,7 +501,22 @@ public partial class SimpleActor : CharacterBody3D
 	{
 		int safeSlot = Mathf.Clamp(slotIndex, 0, BuildLoadout.SkillGemIds.Length - 1);
 		BuildLoadout.SkillGemIds[safeSlot] = BuildCatalog.GetSkillGem(gemId).Id;
+		BuildLoadout.SkillGemLevels[safeSlot] = 1;
 		MarkBuildChanged();
+	}
+
+	public int GetSkillGemLevel(int slotIndex)
+	{
+		return BuildLoadout.GetSkillGemLevel(slotIndex);
+	}
+
+	public int RaiseSkillGemLevel(int slotIndex)
+	{
+		int safeSlot = Mathf.Clamp(slotIndex, 0, BuildLoadout.SkillGemLevels.Length - 1);
+		int nextLevel = Mathf.Min(BuildLoadout.GetSkillGemLevel(safeSlot) + 1, BuildCatalog.MaxSkillGemLevel);
+		BuildLoadout.SkillGemLevels[safeSlot] = nextLevel;
+		MarkBuildChanged();
+		return nextLevel;
 	}
 
 	public void CycleAttackMode()
@@ -626,6 +641,7 @@ public partial class SimpleActor : CharacterBody3D
 				AccessoryId = loadout.AccessoryId,
 				AttributeGemId = loadout.AttributeGemId,
 				SkillGemIds = new[] { loadout.SkillGemIds[0], loadout.SkillGemIds[1], loadout.SkillGemIds[2] },
+				SkillGemLevels = new[] { loadout.GetSkillGemLevel(0), loadout.GetSkillGemLevel(1), loadout.GetSkillGemLevel(2) },
 			},
 		};
 	}
@@ -662,6 +678,9 @@ public partial class SimpleActor : CharacterBody3D
 			SkillGemIds = data.BuildLoadout.SkillGemIds.Length >= 3
 				? new[] { data.BuildLoadout.SkillGemIds[0], data.BuildLoadout.SkillGemIds[1], data.BuildLoadout.SkillGemIds[2] }
 				: new[] { "gem.skill.none", "gem.skill.none", "gem.skill.none" },
+			SkillGemLevels = data.BuildLoadout.SkillGemLevels.Length >= 3
+				? new[] { Mathf.Max(data.BuildLoadout.SkillGemLevels[0], 1), Mathf.Max(data.BuildLoadout.SkillGemLevels[1], 1), Mathf.Max(data.BuildLoadout.SkillGemLevels[2], 1) }
+				: new[] { 1, 1, 1 },
 		};
 		_buildConfigured = true;
 		_buildStatsDirty = true;
@@ -1133,17 +1152,15 @@ public partial class SimpleActor : CharacterBody3D
 
 	private SquadActivity ChooseLivingSquadActivity(BuildStats stats, float roll)
 	{
-		return stats.AiBehaviorId switch
-		{
-			BuildCatalog.AiFollowClosely => roll < 0.78f ? SquadActivity.Follow : SquadActivity.Rest,
-			BuildCatalog.AiProtectPlayer or BuildCatalog.AiDefensive => roll < 0.58f ? SquadActivity.Guard : roll < 0.78f ? SquadActivity.Follow : SquadActivity.Rest,
-			BuildCatalog.AiHealAllies => roll < 0.55f ? SquadActivity.Follow : roll < 0.82f ? SquadActivity.Guard : SquadActivity.Rest,
-			BuildCatalog.AiGatherResources or BuildCatalog.AiLootNearby => roll < 0.62f ? SquadActivity.Gather : roll < 0.82f ? SquadActivity.Roam : SquadActivity.Follow,
-			BuildCatalog.AiRoamFreely => roll < 0.54f ? SquadActivity.Roam : roll < 0.82f ? SquadActivity.Scout : SquadActivity.Follow,
-			BuildCatalog.AiAggressive => roll < 0.48f ? SquadActivity.Scout : roll < 0.80f ? SquadActivity.Guard : SquadActivity.Roam,
-			BuildCatalog.AiKeepDistance => roll < 0.46f ? SquadActivity.Scout : roll < 0.76f ? SquadActivity.Roam : SquadActivity.Follow,
-			_ => roll < 0.36f ? SquadActivity.Follow : roll < 0.62f ? SquadActivity.Guard : roll < 0.82f ? SquadActivity.Roam : SquadActivity.Rest,
-		};
+		// Idle behavior no longer varies by combat mode: companions loosely follow the
+		// player and occasionally guard, roam, or rest.
+		return roll < 0.36f
+			? SquadActivity.Follow
+			: roll < 0.62f
+				? SquadActivity.Guard
+				: roll < 0.82f
+					? SquadActivity.Roam
+					: SquadActivity.Rest;
 	}
 
 	private Vector3 MakeActivityLocalOffset(SquadActivity activity)
@@ -1271,7 +1288,9 @@ public partial class SimpleActor : CharacterBody3D
 	private bool TryUseSupportBuild(ref Vector3 velocity, float step)
 	{
 		BuildStats stats = CurrentBuildStats;
-		if (!stats.HasHealSkill || stats.AiBehaviorId != BuildCatalog.AiHealAllies || _followTarget == null || !IsInstanceValid(_followTarget) || _attackCooldownRemaining > 0.0f)
+		// A companion with a heal skill auto-heals allies while in auto mode; manual mode
+		// suppresses all automatic behavior so it only acts on the player's command.
+		if (!stats.HasHealSkill || stats.AiBehaviorId == BuildCatalog.AiManualOnly || _followTarget == null || !IsInstanceValid(_followTarget) || _attackCooldownRemaining > 0.0f)
 		{
 			return false;
 		}
@@ -1327,17 +1346,6 @@ public partial class SimpleActor : CharacterBody3D
 			return false;
 		}
 
-		BuildStats stats = CurrentBuildStats;
-		if (stats.AiBehaviorId == BuildCatalog.AiKeepDistance && distance < Mathf.Min(EffectiveAttackRange * 0.62f, 4.2f) && distance > 0.05f)
-		{
-			Vector3 retreatDirection = -toTarget.Normalized();
-			float retreatSpeed = Mathf.Max(EffectiveMoveSpeed * 2.0f, 4.0f);
-			velocity.X = Mathf.MoveToward(velocity.X, retreatDirection.X * retreatSpeed, retreatSpeed * 8.0f * step);
-			velocity.Z = Mathf.MoveToward(velocity.Z, retreatDirection.Z * retreatSpeed, retreatSpeed * 8.0f * step);
-			FaceDirection(toTarget, step);
-			return true;
-		}
-
 		if (distance <= EffectiveAttackRange)
 		{
 			velocity = SlowToStop(velocity, step);
@@ -1347,8 +1355,7 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		Vector3 direction = toTarget.Normalized();
-		float combatSpeedMultiplier = stats.AiBehaviorId == BuildCatalog.AiAggressive ? 2.35f : 2.05f;
-		float combatSpeed = Mathf.Max(EffectiveMoveSpeed * combatSpeedMultiplier, 4.2f);
+		float combatSpeed = Mathf.Max(EffectiveMoveSpeed * 2.05f, 4.2f);
 		velocity.X = Mathf.MoveToward(velocity.X, direction.X * combatSpeed, combatSpeed * 8.0f * step);
 		velocity.Z = Mathf.MoveToward(velocity.Z, direction.Z * combatSpeed, combatSpeed * 8.0f * step);
 		FaceDirection(direction, step);
@@ -1373,6 +1380,14 @@ public partial class SimpleActor : CharacterBody3D
 			}
 		}
 
+		// Manual mode never auto-acquires: it fights only the player's designated target
+		// (handled above) and ignores retaliation / nearest-enemy search entirely.
+		if (CurrentBuildStats.AiBehaviorId == BuildCatalog.AiManualOnly)
+		{
+			_combatTarget = null;
+			return null;
+		}
+
 		if (_combatTarget != null && IsValidCommandTarget(_combatTarget) && _combatTarget.IsHostileToPlayer && GlobalPosition.DistanceTo(_combatTarget.GlobalPosition) <= EffectiveDetectionRadius * 1.35f)
 		{
 			return _combatTarget;
@@ -1385,22 +1400,10 @@ public partial class SimpleActor : CharacterBody3D
 
 		_combatTargetSearchRemaining = 0.18f + (_followSlot % 4) * 0.035f;
 
-		BuildStats stats = CurrentBuildStats;
-		Vector3 anchor = GlobalPosition;
-		bool playerAnchored = stats.AiBehaviorId is BuildCatalog.AiProtectPlayer or BuildCatalog.AiDefensive or BuildCatalog.AiHealAllies or BuildCatalog.AiFollowClosely;
-		if (playerAnchored && _followTarget != null && IsInstanceValid(_followTarget))
-		{
-			anchor = _followTarget.GlobalPosition;
-		}
-
+		// Auto mode: pick the nearest hostile within detection range.
 		float searchRadius = EffectiveDetectionRadius;
-		if (stats.AiBehaviorId is BuildCatalog.AiGatherResources or BuildCatalog.AiLootNearby or BuildCatalog.AiRoamFreely)
-		{
-			searchRadius *= 0.58f;
-		}
-
 		SimpleActor? selected = null;
-		float bestScore = float.MaxValue;
+		float bestDistance = float.MaxValue;
 		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
 		{
 			if (node is not SimpleActor actor || !actor.IsHostileToPlayer)
@@ -1409,25 +1412,13 @@ public partial class SimpleActor : CharacterBody3D
 			}
 
 			float distanceFromSelf = GlobalPosition.DistanceTo(actor.GlobalPosition);
-			float distanceFromAnchor = anchor.DistanceTo(actor.GlobalPosition);
-			if (distanceFromSelf > searchRadius && distanceFromAnchor > searchRadius)
+			if (distanceFromSelf > searchRadius || distanceFromSelf >= bestDistance)
 			{
 				continue;
 			}
 
-			float score = stats.AiBehaviorId switch
-			{
-				BuildCatalog.AiAttackBossFirst => -actor.Level * 1000.0f + distanceFromSelf,
-				BuildCatalog.AiAttackLowestHp => actor.HealthRatio * 1000.0f + distanceFromSelf * 0.04f,
-				BuildCatalog.AiProtectPlayer or BuildCatalog.AiDefensive or BuildCatalog.AiHealAllies or BuildCatalog.AiFollowClosely => distanceFromAnchor,
-				_ => distanceFromSelf,
-			};
-
-			if (score < bestScore)
-			{
-				selected = actor;
-				bestScore = score;
-			}
+			selected = actor;
+			bestDistance = distanceFromSelf;
 		}
 
 		_combatTarget = selected;
@@ -1446,6 +1437,23 @@ public partial class SimpleActor : CharacterBody3D
 			return;
 		}
 
+		// Only captured companions use the gem-driven projectile system. Wild monsters
+		// (e.g. retaliating against a companion) keep the direct instant-hit path, whose
+		// targeting differs from the companion "hostile monster" search.
+		if (_isCaptured)
+		{
+			LaunchAttack(target);
+		}
+		else
+		{
+			LegacyAttackActor(target);
+		}
+
+		_attackCooldownRemaining = EffectiveAttackCooldown;
+	}
+
+	private void LegacyAttackActor(SimpleActor target)
+	{
 		BuildStats stats = CurrentBuildStats;
 		int roleBonus = CombatRole == "DPS" ? 4 : CombatRole == "Tank" ? 1 : CombatRole == "Ranged" ? 2 : 0;
 		int affinityBonus = Affinity >= 80 ? 2 : Affinity >= 55 ? 1 : 0;
@@ -1461,12 +1469,128 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			target.ApplyElementStatus(stats.DamageElementId, this);
 		}
+
+		if (stats.LifeStealPercent > 0.0f && dealtDamage > 0)
+		{
+			ReceiveHealing(Mathf.RoundToInt(dealtDamage * stats.LifeStealPercent));
+		}
+	}
+
+	// Base attack of the pet, shaped by whatever behavior gems the build carries.
+	// Damage is no longer applied instantly; each spawned projectile carries it and
+	// resolves on impact through ResolveProjectileHit.
+	private void LaunchAttack(SimpleActor target)
+	{
+		BuildStats stats = CurrentBuildStats;
+		int roleBonus = CombatRole == "DPS" ? 4 : CombatRole == "Tank" ? 1 : CombatRole == "Ranged" ? 2 : 0;
+		int affinityBonus = Affinity >= 80 ? 2 : Affinity >= 55 ? 1 : 0;
+		int baseDamage = Mathf.Max(stats.Attack + roleBonus + affinityBonus, 1);
+
+		SetExternalAnimationState(GetExternalAttackAnimationState(false), 0.48f);
+		AnimateAttackPose();
+
+		bool isMelee = !UsesProjectileAttack(false);
+		if (isMelee)
+		{
+			SpawnSwingEffect(target.GlobalPosition);
+		}
+
+		Vector3 toTarget = target.GlobalPosition - GlobalPosition;
+		toTarget.Y = 0.0f;
+		Vector3 forward = toTarget.LengthSquared() > 0.001f ? toTarget.Normalized() : -GlobalTransform.Basis.Z;
+
+		int projectileCount = 1 + Mathf.Max(stats.Behavior.ExtraProjectiles, 0);
+		float spreadStep = Mathf.DegToRad(14.0f);
+		for (int index = 0; index < projectileCount; index++)
+		{
+			float angle = (index - (projectileCount - 1) / 2.0f) * spreadStep;
+			Vector3 direction = forward.Rotated(Vector3.Up, angle);
+			SimpleActor? homing = Mathf.Abs(angle) < 0.001f ? target : null;
+			SpawnCombatProjectile(direction, homing, baseDamage, stats, isMelee);
+		}
+	}
+
+	private void SpawnCombatProjectile(Vector3 direction, SimpleActor? homingTarget, int baseDamage, BuildStats stats, bool isMelee)
+	{
+		Node? parent = GetTree().CurrentScene ?? GetParent();
+		if (parent == null)
+		{
+			return;
+		}
+
+		var projectile = new CombatProjectile
+		{
+			Attacker = this,
+			Damage = baseDamage,
+			EffectColor = GetAttackColor(),
+			IsMelee = isMelee,
+			IsArrow = UsesArrowProjectile(false),
+			Speed = isMelee ? 26.0f : 17.0f,
+			MaxRange = Mathf.Max(EffectiveAttackRange * 1.6f, isMelee ? 3.0f : 9.0f),
+			HitRadius = isMelee ? 1.35f : 1.0f,
+			InitialTarget = homingTarget,
+			LaunchDirection = direction,
+			SpawnOrigin = GlobalPosition + Vector3.Up * (isMelee ? 1.04f : 1.22f) + direction * 0.5f,
+			Behavior = stats.Behavior.Clone(),
+		};
+		parent.AddChild(projectile);
+	}
+
+	// Called by a CombatProjectile when it strikes a target. Centralizes the crit roll,
+	// elemental damage, on-hit control status, and life steal so all combat math stays here.
+	public int ResolveProjectileHit(SimpleActor target, int baseDamage)
+	{
+		if (target == null || !IsInstanceValid(target) || !target.IsActiveWorldTarget)
+		{
+			return 0;
+		}
+
+		BuildStats stats = CurrentBuildStats;
+		int damage = Mathf.Max(baseDamage, 1);
+		if (_rng.Randf() < stats.CritChance)
+		{
+			damage = Mathf.RoundToInt(damage * 1.55f);
+		}
+
+		int dealtDamage = target.ReceiveDamage(damage, this);
+		if (dealtDamage > 0 && _rng.Randf() < stats.ControlChance)
+		{
+			target.ApplyElementStatus(stats.DamageElementId, this);
+		}
+
 		if (stats.LifeStealPercent > 0.0f && dealtDamage > 0)
 		{
 			ReceiveHealing(Mathf.RoundToInt(dealtDamage * stats.LifeStealPercent));
 		}
 
-		_attackCooldownRemaining = EffectiveAttackCooldown;
+		return dealtDamage;
+	}
+
+	// Hostile actors within radius of a point, skipping any already struck by the
+	// projectile. Used for chain retargeting, split fan-out, and explosion splash.
+	public List<SimpleActor> FindProjectileTargets(Vector3 center, float radius, ICollection<SimpleActor> exclude)
+	{
+		var results = new List<SimpleActor>();
+		float radiusSquared = radius * radius;
+		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
+		{
+			if (node is not SimpleActor actor || !actor.IsHostileToPlayer)
+			{
+				continue;
+			}
+
+			if (exclude != null && exclude.Contains(actor))
+			{
+				continue;
+			}
+
+			if (center.DistanceSquaredTo(actor.GlobalPosition) <= radiusSquared)
+			{
+				results.Add(actor);
+			}
+		}
+
+		return results;
 	}
 
 	private void ApplyElementStatus(string elementId, SimpleActor source)

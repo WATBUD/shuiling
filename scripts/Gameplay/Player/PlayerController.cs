@@ -1268,6 +1268,48 @@ public partial class PlayerController : CharacterBody3D
 		return actor.TryEvolve();
 	}
 
+	public SkillGemUpgradeCost? GetCompanionSkillGemUpgradeCost(SimpleActor actor, int slot)
+	{
+		if (!IsInstanceValid(actor) || slot < 0 || slot >= actor.BuildLoadout.SkillGemIds.Length)
+		{
+			return null;
+		}
+
+		return BuildCatalog.GetSkillGemUpgradeCost(actor.BuildLoadout.SkillGemIds[slot], actor.GetSkillGemLevel(slot));
+	}
+
+	public bool CanAffordSkillGemUpgrade(SkillGemUpgradeCost cost)
+	{
+		return Gold >= cost.Gold && GetInventoryCount(cost.MaterialId) >= cost.MaterialCount;
+	}
+
+	// Spend gold + loot materials to raise one companion skill gem by a level.
+	public bool TryUpgradeCompanionSkillGem(SimpleActor actor, int slot)
+	{
+		SkillGemUpgradeCost? maybeCost = GetCompanionSkillGemUpgradeCost(actor, slot);
+		if (maybeCost is not SkillGemUpgradeCost cost)
+		{
+			PostSystemMessage(LocaleText.T("system.gem.max_level"), new Color(1.0f, 0.82f, 0.42f));
+			return false;
+		}
+
+		if (!CanAffordSkillGemUpgrade(cost))
+		{
+			PostSystemMessage(
+				LocaleText.F("system.gem.upgrade_not_enough", cost.Gold, cost.MaterialCount, GetInventoryItemDisplayName(cost.MaterialId)),
+				new Color(1.0f, 0.62f, 0.48f));
+			return false;
+		}
+
+		Gold -= cost.Gold;
+		TryConsumeInventoryItem(cost.MaterialId, cost.MaterialCount);
+		int newLevel = actor.RaiseSkillGemLevel(slot);
+		string gemName = LocaleText.T(BuildCatalog.GetSkillGem(actor.BuildLoadout.SkillGemIds[slot]).NameKey);
+		PostSystemMessage(LocaleText.F("system.gem.upgraded", gemName, newLevel), new Color(0.62f, 1.0f, 0.68f));
+		_inventoryPanel?.RefreshAll();
+		return true;
+	}
+
 	private void RemoveInventoryItemSilently(string itemId, int amount)
 	{
 		int requestedAmount = Mathf.Max(amount, 1);

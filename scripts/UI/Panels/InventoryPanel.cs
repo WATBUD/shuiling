@@ -43,6 +43,7 @@ public partial class InventoryPanel : PanelContainer
 	private Label _itemDetailBodyLabel = null!;
 	private Button _equipSelectedButton = null!;
 	private Button _useSelectedButton = null!;
+	private Button _upgradeSkillGemButton = null!;
 	private Button _helmetButton = null!;
 	private Button _weaponButton = null!;
 	private Button _armorButton = null!;
@@ -293,6 +294,11 @@ public partial class InventoryPanel : PanelContainer
 		_useSelectedButton.CustomMinimumSize = new Vector2(120.0f, 34.0f);
 		_useSelectedButton.Pressed += OnUseSelectedPressed;
 		actionRow.AddChild(_useSelectedButton);
+		_upgradeSkillGemButton = MakeButton(LocaleText.T("inventory.action.upgrade"));
+		_upgradeSkillGemButton.CustomMinimumSize = new Vector2(190.0f, 34.0f);
+		_upgradeSkillGemButton.Pressed += OnUpgradeSkillGemPressed;
+		_upgradeSkillGemButton.Visible = false;
+		actionRow.AddChild(_upgradeSkillGemButton);
 		BuildTooltip();
 		RefreshText();
 	}
@@ -493,15 +499,29 @@ public partial class InventoryPanel : PanelContainer
 		SetSlotButton(_armorButton, EquipTarget.Armor, loadout.ArmorId, BuildCatalog.GetEquipment(loadout.ArmorId).NameKey);
 		SetSlotButton(_accessoryButton, EquipTarget.Accessory, loadout.AccessoryId, BuildCatalog.GetEquipment(loadout.AccessoryId).NameKey);
 		SetSlotButton(_attributeButton, EquipTarget.AttributeGem, loadout.AttributeGemId, BuildCatalog.GetAttributeGem(loadout.AttributeGemId).NameKey);
-		SetSlotButton(_skill1Button, EquipTarget.SkillGem1, loadout.SkillGemIds[0], BuildCatalog.GetSkillGem(loadout.SkillGemIds[0]).NameKey);
-		SetSlotButton(_skill2Button, EquipTarget.SkillGem2, loadout.SkillGemIds[1], BuildCatalog.GetSkillGem(loadout.SkillGemIds[1]).NameKey);
-		SetSlotButton(_skill3Button, EquipTarget.SkillGem3, loadout.SkillGemIds[2], BuildCatalog.GetSkillGem(loadout.SkillGemIds[2]).NameKey);
+		SetSkillSlotButton(_skill1Button, EquipTarget.SkillGem1, 0, loadout);
+		SetSkillSlotButton(_skill2Button, EquipTarget.SkillGem2, 1, loadout);
+		SetSkillSlotButton(_skill3Button, EquipTarget.SkillGem3, 2, loadout);
 	}
 
 	private void SetSlotButton(Button button, EquipTarget target, string itemId, string itemNameKey)
 	{
 		button.Text = $"{GetTargetName(target)}\n{LocaleText.T(itemNameKey)}";
 		ItemIconLibrary.Apply(button, itemId, 38);
+		button.AddThemeColorOverride("font_color", target == _selectedTarget ? new Color(1.0f, 0.92f, 0.50f) : new Color(0.92f, 0.96f, 1.0f));
+	}
+
+	private void SetSkillSlotButton(Button button, EquipTarget target, int slot, CompanionBuildLoadout loadout)
+	{
+		string gemId = loadout.SkillGemIds[slot];
+		string gemName = LocaleText.T(BuildCatalog.GetSkillGem(gemId).NameKey);
+		if (BuildCatalog.IsUpgradeableSkillGem(gemId))
+		{
+			gemName = LocaleText.F("inventory.gem_level", gemName, loadout.GetSkillGemLevel(slot));
+		}
+
+		button.Text = $"{GetTargetName(target)}\n{gemName}";
+		ItemIconLibrary.Apply(button, gemId, 38);
 		button.AddThemeColorOverride("font_color", target == _selectedTarget ? new Color(1.0f, 0.92f, 0.50f) : new Color(0.92f, 0.96f, 1.0f));
 	}
 
@@ -705,8 +725,67 @@ public partial class InventoryPanel : PanelContainer
 		}
 	}
 
+	private int SelectedSkillSlotIndex()
+	{
+		return _selectedTarget switch
+		{
+			EquipTarget.SkillGem1 => 0,
+			EquipTarget.SkillGem2 => 1,
+			EquipTarget.SkillGem3 => 2,
+			_ => -1,
+		};
+	}
+
+	private void RefreshUpgradeButton()
+	{
+		int slot = SelectedSkillSlotIndex();
+		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor) || slot < 0)
+		{
+			_upgradeSkillGemButton.Visible = false;
+			return;
+		}
+
+		string gemId = _selectedActor.BuildLoadout.SkillGemIds[slot];
+		if (!BuildCatalog.IsUpgradeableSkillGem(gemId))
+		{
+			_upgradeSkillGemButton.Visible = false;
+			return;
+		}
+
+		_upgradeSkillGemButton.Visible = true;
+		if (_player.GetCompanionSkillGemUpgradeCost(_selectedActor, slot) is not SkillGemUpgradeCost cost)
+		{
+			_upgradeSkillGemButton.Text = LocaleText.F("inventory.action.gem_maxed", _selectedActor.GetSkillGemLevel(slot));
+			_upgradeSkillGemButton.Disabled = true;
+			return;
+		}
+
+		_upgradeSkillGemButton.Text = LocaleText.F(
+			"inventory.action.upgrade_gem",
+			cost.NextLevel,
+			cost.Gold,
+			cost.MaterialCount,
+			LocaleText.T(MonsterLootCatalog.GetNameKey(cost.MaterialId)));
+		_upgradeSkillGemButton.Disabled = !_player.CanAffordSkillGemUpgrade(cost);
+	}
+
+	private void OnUpgradeSkillGemPressed()
+	{
+		int slot = SelectedSkillSlotIndex();
+		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor) || slot < 0)
+		{
+			return;
+		}
+
+		if (_player.TryUpgradeCompanionSkillGem(_selectedActor, slot))
+		{
+			RefreshAll();
+		}
+	}
+
 	private void RefreshSelectedItemDetails()
 	{
+		RefreshUpgradeButton();
 		if (_player == null || string.IsNullOrEmpty(_selectedItemId) || !_player.HasInventoryItem(_selectedItemId))
 		{
 			_selectedItemId = string.Empty;

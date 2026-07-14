@@ -79,6 +79,7 @@ public sealed class CompanionBuildSaveData
 		"gem.skill.none",
 		"gem.skill.none",
 	};
+	public int[] SkillGemLevels { get; set; } = { 1, 1, 1 };
 }
 
 public sealed class SaveVector3
