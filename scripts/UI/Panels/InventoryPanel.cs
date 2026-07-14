@@ -33,7 +33,6 @@ public partial class InventoryPanel : PanelContainer
 	private GridContainer _itemGrid = null!;
 	private Label _titleLabel = null!;
 	private Label _goldLabel = null!;
-	private Label _selectedActorLabel = null!;
 	private Label _companionInfoTitleLabel = null!;
 	private Label _companionInfoBodyLabel = null!;
 	private Label _selectedSlotLabel = null!;
@@ -191,9 +190,6 @@ public partial class InventoryPanel : PanelContainer
 		// Middle (merged panel): equipment slots on top, character / ability info below.
 		var buildSection = MakeSection(LocaleText.T("inventory.equipment_slots"), new Vector2(330.0f, 0.0f));
 		content.AddChild(buildSection);
-
-		_selectedActorLabel = MakeLabel(18, new Color(1.0f, 0.96f, 0.76f));
-		buildSection.AddChild(_selectedActorLabel);
 
 		_buildSummaryLabel = MakeLabel(13, new Color(0.74f, 0.83f, 0.90f));
 		buildSection.AddChild(_buildSummaryLabel);
@@ -1060,7 +1056,6 @@ public partial class InventoryPanel : PanelContainer
 	{
 		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
 		{
-			_selectedActorLabel.Text = LocaleText.T("inventory.no_companions");
 			_companionInfoTitleLabel.Text = LocaleText.T("inventory.companion_info");
 			_companionInfoBodyLabel.Text = LocaleText.T("inventory.no_companions");
 			_abilityInfoLabel.Text = string.Empty;
@@ -1070,7 +1065,6 @@ public partial class InventoryPanel : PanelContainer
 		}
 
 		BuildStats stats = _selectedActor.CurrentBuildStats;
-		_selectedActorLabel.Text = _selectedActor.LocalizedDisplayName;
 		_companionInfoTitleLabel.Text = LocaleText.F("inventory.info_header", _selectedActor.Level, stats.BuildPower);
 		_companionInfoBodyLabel.Text = LocaleText.F(
 			"inventory.stats_column",
