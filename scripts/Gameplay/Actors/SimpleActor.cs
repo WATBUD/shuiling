@@ -86,6 +86,12 @@ public partial class SimpleActor : CharacterBody3D
 	private BuildStats _buildStats = new();
 	private bool _buildConfigured;
 	private bool _buildStatsDirty = true;
+	private float _slowRemaining;
+	private float _stunRemaining;
+	private float _poisonRemaining;
+	private float _burnRemaining;
+	private float _statusTickRemaining;
+	private SimpleActor? _statusSource;
 
 	public bool CanBeCaptured => ActorKind == "monster" && !_isCaptured && !_isDefeated;
 	public bool IsNpcRecruitCandidate => ActorKind == "npc" && !_isCaptured && !_isDefeated;
@@ -118,7 +124,7 @@ public partial class SimpleActor : CharacterBody3D
 	public int EffectiveMaxHealth => CurrentBuildStats.MaxHealth;
 	public int EffectiveAttack => CurrentBuildStats.Attack;
 	public int EffectiveDefense => CurrentBuildStats.Defense;
-	public float EffectiveMoveSpeed => Mathf.Max(MoveSpeed * CurrentBuildStats.MoveSpeedMultiplier, 0.3f);
+	public float EffectiveMoveSpeed => Mathf.Max(MoveSpeed * CurrentBuildStats.MoveSpeedMultiplier * (_slowRemaining > 0.0f ? 0.55f : 1.0f), 0.3f);
 	public float EffectiveAttackRange => Mathf.Max(AttackRange + CurrentBuildStats.AttackRangeBonus, 0.75f);
 	public float EffectiveDetectionRadius => Mathf.Max(DetectionRadius + CurrentBuildStats.DetectionRadiusBonus, 3.0f);
 	public float EffectiveAttackCooldown => Mathf.Max(AttackCooldown * CurrentBuildStats.AttackCooldownMultiplier, 0.22f);
@@ -171,6 +177,14 @@ public partial class SimpleActor : CharacterBody3D
 	public Color AttackFxColor => GetAttackColor();
 	public int ExperienceToNextLevel => 35 + Level * 18 + EvolutionStage * 20;
 	public bool CanEvolve => EvolutionStage < 3 && Level >= (EvolutionStage + 1) * 5;
+	public string EvolutionMaterialId => EvolutionStage switch
+	{
+		0 => "loot.cracked_core",
+		1 => "loot.beast_hide",
+		2 => "loot.dragon_scale",
+		_ => string.Empty,
+	};
+	public int EvolutionMaterialCount => EvolutionStage switch { 0 => 3, 1 => 5, 2 => 2, _ => 0 };
 	public float HealthRatio => EffectiveMaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)EffectiveMaxHealth, 0.0f, 1.0f);
 
 	public override void _Ready()
@@ -188,6 +202,7 @@ public partial class SimpleActor : CharacterBody3D
 		_targetPosition = PickWanderTarget();
 		EnsureBuildLoadout();
 		RecalculateBuildStats();
+		ApplyEvolutionAppearance();
 		AddToGroup(ActorKind == "monster" ? "monsters" : "npcs");
 		CreateNameplate();
 		LocaleText.LanguageChanged += RefreshNameplate;
@@ -213,6 +228,7 @@ public partial class SimpleActor : CharacterBody3D
 	public override void _PhysicsProcess(double delta)
 	{
 		float step = (float)delta;
+		UpdateStatusEffects(step);
 		_attackCooldownRemaining = Mathf.Max(_attackCooldownRemaining - step, 0.0f);
 		_retaliationTargetRemaining = Mathf.Max(_retaliationTargetRemaining - step, 0.0f);
 		_combatTargetSearchRemaining = Mathf.Max(_combatTargetSearchRemaining - step, 0.0f);
@@ -221,6 +237,13 @@ public partial class SimpleActor : CharacterBody3D
 		if (_isDefeated)
 		{
 			Velocity = SlowToStop(velocity, step);
+			MoveAndSlideWithEffects(step);
+			return;
+		}
+
+		if (_stunRemaining > 0.0f)
+		{
+			Velocity = SlowToStop(Velocity, step);
 			MoveAndSlideWithEffects(step);
 			return;
 		}
@@ -289,7 +312,7 @@ public partial class SimpleActor : CharacterBody3D
 		else
 		{
 			Vector3 direction = toDestination.Normalized();
-			float activeSpeed = MoveSpeed * (chasing ? 1.35f : 1.0f);
+			float activeSpeed = EffectiveMoveSpeed * (chasing ? 1.35f : 1.0f);
 			velocity.X = Mathf.MoveToward(velocity.X, direction.X * activeSpeed, activeSpeed * 6.0f * step);
 			velocity.Z = Mathf.MoveToward(velocity.Z, direction.Z * activeSpeed, activeSpeed * 6.0f * step);
 			FaceDirection(direction, step);
@@ -673,6 +696,7 @@ public partial class SimpleActor : CharacterBody3D
 		Defense += 6 + EvolutionStage * 2;
 		AbilityRank++;
 		MarkBaseStatsChanged();
+		ApplyEvolutionAppearance();
 		CurrentHealth = EffectiveMaxHealth;
 		RefreshNameplate();
 		return true;
@@ -699,7 +723,11 @@ public partial class SimpleActor : CharacterBody3D
 			return 0;
 		}
 
-		int mitigatedDamage = Mathf.Max(rawDamage - Mathf.RoundToInt(EffectiveDefense * 0.35f), 1);
+		float elementMultiplier = attacker == null
+			? 1.0f
+			: ElementChart.GetMultiplier(attacker.CurrentBuildStats.DamageElementId, CurrentBuildStats.DamageElementId);
+		int elementalDamage = Mathf.Max(Mathf.RoundToInt(rawDamage * elementMultiplier), 1);
+		int mitigatedDamage = Mathf.Max(elementalDamage - Mathf.RoundToInt(EffectiveDefense * 0.35f), 1);
 		RememberAttacker(attacker);
 		CurrentHealth = Mathf.Max(CurrentHealth - mitigatedDamage, 0);
 		SpawnCombatEffect(mitigatedDamage, attacker?.GetAttackColor() ?? new Color(1.0f, 0.5f, 0.22f, 0.92f));
@@ -1386,12 +1414,66 @@ public partial class SimpleActor : CharacterBody3D
 
 		PlayAttackAction(target.GlobalPosition, false);
 		int dealtDamage = target.ReceiveDamage(damage, this);
+		if (dealtDamage > 0 && _rng.Randf() < stats.ControlChance)
+		{
+			target.ApplyElementStatus(stats.DamageElementId, this);
+		}
 		if (stats.LifeStealPercent > 0.0f && dealtDamage > 0)
 		{
 			ReceiveHealing(Mathf.RoundToInt(dealtDamage * stats.LifeStealPercent));
 		}
 
 		_attackCooldownRemaining = EffectiveAttackCooldown;
+	}
+
+	private void ApplyElementStatus(string elementId, SimpleActor source)
+	{
+		_statusSource = source;
+		switch (elementId)
+		{
+			case "ice":
+				_slowRemaining = Mathf.Max(_slowRemaining, 3.0f);
+				break;
+			case "lightning":
+				_stunRemaining = Mathf.Max(_stunRemaining, 0.9f);
+				break;
+			case "poison":
+				_poisonRemaining = Mathf.Max(_poisonRemaining, 5.0f);
+				break;
+			case "fire":
+				_burnRemaining = Mathf.Max(_burnRemaining, 4.0f);
+				break;
+		}
+	}
+
+	private void UpdateStatusEffects(float step)
+	{
+		_slowRemaining = Mathf.Max(_slowRemaining - step, 0.0f);
+		_stunRemaining = Mathf.Max(_stunRemaining - step, 0.0f);
+		_poisonRemaining = Mathf.Max(_poisonRemaining - step, 0.0f);
+		_burnRemaining = Mathf.Max(_burnRemaining - step, 0.0f);
+		if (_poisonRemaining <= 0.0f && _burnRemaining <= 0.0f)
+		{
+			_statusTickRemaining = 0.0f;
+			return;
+		}
+
+		_statusTickRemaining -= step;
+		if (_statusTickRemaining > 0.0f || _isDefeated)
+		{
+			return;
+		}
+
+		_statusTickRemaining = 1.0f;
+		int damage = (_poisonRemaining > 0.0f ? Mathf.Max(2, Mathf.RoundToInt(EffectiveMaxHealth * 0.025f)) : 0)
+			+ (_burnRemaining > 0.0f ? Mathf.Max(3, Mathf.RoundToInt(EffectiveMaxHealth * 0.035f)) : 0);
+		ReceiveDamage(damage, _statusSource);
+	}
+
+	private void ApplyEvolutionAppearance()
+	{
+		float scale = 1.0f + EvolutionStage * 0.08f;
+		Scale = Vector3.One * scale;
 	}
 
 	private bool TryAttackPlayer(Node3D player, Vector3 velocity, float step)
@@ -1636,7 +1718,7 @@ public partial class SimpleActor : CharacterBody3D
 	private void ApplyLivingPose()
 	{
 		RotationDegrees = new Vector3(0.0f, RotationDegrees.Y, 0.0f);
-		Scale = Vector3.One;
+		ApplyEvolutionAppearance();
 		ResetAttackVisualScale();
 		SetExternalAnimationState("idle");
 	}

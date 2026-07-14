@@ -1247,6 +1247,24 @@ public partial class PlayerController : CharacterBody3D
 		return true;
 	}
 
+	public bool CanEvolveActor(SimpleActor actor)
+	{
+		return IsInstanceValid(actor)
+			&& actor.CanEvolve
+			&& !string.IsNullOrEmpty(actor.EvolutionMaterialId)
+			&& GetInventoryCount(actor.EvolutionMaterialId) >= actor.EvolutionMaterialCount;
+	}
+
+	public bool TryEvolveActor(SimpleActor actor)
+	{
+		if (!CanEvolveActor(actor) || !TryConsumeInventoryItem(actor.EvolutionMaterialId, actor.EvolutionMaterialCount))
+		{
+			return false;
+		}
+
+		return actor.TryEvolve();
+	}
+
 	private void RemoveInventoryItemSilently(string itemId, int amount)
 	{
 		int requestedAmount = Mathf.Max(amount, 1);

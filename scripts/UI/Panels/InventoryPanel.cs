@@ -488,19 +488,20 @@ public partial class InventoryPanel : PanelContainer
 
 		SetSlotsDisabled(false);
 		CompanionBuildLoadout loadout = _selectedActor.BuildLoadout;
-		SetSlotButton(_helmetButton, EquipTarget.Helmet, BuildCatalog.GetEquipment(loadout.HelmetId).NameKey);
-		SetSlotButton(_weaponButton, EquipTarget.Weapon, BuildCatalog.GetEquipment(loadout.WeaponId).NameKey);
-		SetSlotButton(_armorButton, EquipTarget.Armor, BuildCatalog.GetEquipment(loadout.ArmorId).NameKey);
-		SetSlotButton(_accessoryButton, EquipTarget.Accessory, BuildCatalog.GetEquipment(loadout.AccessoryId).NameKey);
-		SetSlotButton(_attributeButton, EquipTarget.AttributeGem, BuildCatalog.GetAttributeGem(loadout.AttributeGemId).NameKey);
-		SetSlotButton(_skill1Button, EquipTarget.SkillGem1, BuildCatalog.GetSkillGem(loadout.SkillGemIds[0]).NameKey);
-		SetSlotButton(_skill2Button, EquipTarget.SkillGem2, BuildCatalog.GetSkillGem(loadout.SkillGemIds[1]).NameKey);
-		SetSlotButton(_skill3Button, EquipTarget.SkillGem3, BuildCatalog.GetSkillGem(loadout.SkillGemIds[2]).NameKey);
+		SetSlotButton(_helmetButton, EquipTarget.Helmet, loadout.HelmetId, BuildCatalog.GetEquipment(loadout.HelmetId).NameKey);
+		SetSlotButton(_weaponButton, EquipTarget.Weapon, loadout.WeaponId, BuildCatalog.GetEquipment(loadout.WeaponId).NameKey);
+		SetSlotButton(_armorButton, EquipTarget.Armor, loadout.ArmorId, BuildCatalog.GetEquipment(loadout.ArmorId).NameKey);
+		SetSlotButton(_accessoryButton, EquipTarget.Accessory, loadout.AccessoryId, BuildCatalog.GetEquipment(loadout.AccessoryId).NameKey);
+		SetSlotButton(_attributeButton, EquipTarget.AttributeGem, loadout.AttributeGemId, BuildCatalog.GetAttributeGem(loadout.AttributeGemId).NameKey);
+		SetSlotButton(_skill1Button, EquipTarget.SkillGem1, loadout.SkillGemIds[0], BuildCatalog.GetSkillGem(loadout.SkillGemIds[0]).NameKey);
+		SetSlotButton(_skill2Button, EquipTarget.SkillGem2, loadout.SkillGemIds[1], BuildCatalog.GetSkillGem(loadout.SkillGemIds[1]).NameKey);
+		SetSlotButton(_skill3Button, EquipTarget.SkillGem3, loadout.SkillGemIds[2], BuildCatalog.GetSkillGem(loadout.SkillGemIds[2]).NameKey);
 	}
 
-	private void SetSlotButton(Button button, EquipTarget target, string itemNameKey)
+	private void SetSlotButton(Button button, EquipTarget target, string itemId, string itemNameKey)
 	{
 		button.Text = $"{GetTargetName(target)}\n{LocaleText.T(itemNameKey)}";
+		ItemIconLibrary.Apply(button, itemId, 38);
 		button.AddThemeColorOverride("font_color", target == _selectedTarget ? new Color(1.0f, 0.92f, 0.50f) : new Color(0.92f, 0.96f, 1.0f));
 	}
 
@@ -512,6 +513,7 @@ public partial class InventoryPanel : PanelContainer
 			if (disabled)
 			{
 				button.Text = "-";
+				button.Icon = null;
 			}
 		}
 	}
@@ -602,14 +604,16 @@ public partial class InventoryPanel : PanelContainer
 	private void AddItemSlotButton(string itemId)
 	{
 		int count = _player?.GetInventoryCount(itemId) ?? 0;
-		string countText = BuildCatalog.IsFreeItem(itemId) ? string.Empty : $"\nx{count}";
-		var button = MakeButton($"{GetItemIconText(itemId)}\n{GetInventoryItemName(itemId)}{countText}");
+		string countText = BuildCatalog.IsFreeItem(itemId) ? string.Empty : $"x{count}";
+		var button = MakeButton(countText);
 		button.CustomMinimumSize = new Vector2(64.0f, 72.0f);
 		button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 		button.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
 		button.Alignment = HorizontalAlignment.Center;
 		button.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
 		button.AddThemeFontSizeOverride("font_size", 11);
+		ItemIconLibrary.Apply(button, itemId, 44);
+		button.TooltipText = GetInventoryItemName(itemId);
 		button.AddThemeColorOverride("font_color", itemId == _selectedItemId ? new Color(1.0f, 0.92f, 0.50f) : new Color(0.92f, 0.96f, 1.0f));
 		button.MouseEntered += () => ShowItemTooltip(itemId, LocaleText.T("inventory.items"));
 		button.MouseExited += HideItemTooltip;
