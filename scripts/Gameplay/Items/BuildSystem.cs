@@ -87,6 +87,62 @@ public sealed class SkillGemDefinition
 	public float LifeStealPercent { get; set; }
 	public bool EnablesHeal { get; set; }
 	public bool EnablesShield { get; set; }
+
+	// PoE-style attack behavior. A gem either just tweaks stats (BehaviorId == None)
+	// or attaches a projectile behavior that shapes how the base attack plays out.
+	public string BehaviorId { get; set; } = ProjectileBehavior.None;
+
+	// Base magnitude at gem level 1. Meaning depends on BehaviorId:
+	//  Multi   -> extra projectiles fired at cast
+	//  Split   -> child projectiles spawned on first hit
+	//  Chain   -> number of bounces to new targets
+	//  Pierce  -> number of enemies passed through
+	//  Explosion -> unused (radius drives it)
+	public int BehaviorMagnitude { get; set; }
+
+	// Base explosion / area radius at gem level 1 (Explosion behavior only).
+	public float BehaviorRadius { get; set; }
+
+	// Loot material consumed (alongside gold) to raise this gem's level.
+	public string UpgradeMaterialId { get; set; } = string.Empty;
+}
+
+public readonly record struct SkillGemUpgradeCost(int NextLevel, int Gold, string MaterialId, int MaterialCount);
+
+public static class ProjectileBehavior
+{
+	public const string None = "none";
+	public const string Multi = "multi";
+	public const string Split = "split";
+	public const string Chain = "chain";
+	public const string Pierce = "pierce";
+	public const string Explosion = "explosion";
+}
+
+// Aggregated behavior for one companion's current build. Combines every equipped
+// behavior gem (and their levels) into the counts the projectile actually consumes.
+public sealed class ProjectileBehaviorProfile
+{
+	public int ExtraProjectiles { get; set; }   // Multi: fired together at cast
+	public int SplitCount { get; set; }          // Split: children spawned on first hit
+	public int ChainBounces { get; set; }        // Chain: hops to fresh targets
+	public int PierceCount { get; set; }          // Pierce: enemies passed through
+	public float ExplosionRadius { get; set; }   // Explosion: AoE radius on hit
+
+	public bool HasAny =>
+		ExtraProjectiles > 0 || SplitCount > 0 || ChainBounces > 0 || PierceCount > 0 || ExplosionRadius > 0.0f;
+
+	public ProjectileBehaviorProfile Clone()
+	{
+		return new ProjectileBehaviorProfile
+		{
+			ExtraProjectiles = ExtraProjectiles,
+			SplitCount = SplitCount,
+			ChainBounces = ChainBounces,
+			PierceCount = PierceCount,
+			ExplosionRadius = ExplosionRadius,
+		};
+	}
 }
 
 public sealed class AttackModeDefinition
@@ -122,6 +178,7 @@ public sealed class BuildStats
 	public string RareComboKey { get; set; } = string.Empty;
 	public Color AttackColor { get; set; } = new(1.0f, 0.54f, 0.24f, 0.92f);
 	public string[] TraitKeys { get; set; } = System.Array.Empty<string>();
+	public ProjectileBehaviorProfile Behavior { get; set; } = new();
 }
 
 public sealed class CompanionBuildLoadout
@@ -137,6 +194,20 @@ public sealed class CompanionBuildLoadout
 		"gem.skill.none",
 		"gem.skill.none",
 	};
+
+	// Parallel to SkillGemIds. Level scales a behavior gem's magnitude/radius.
+	public int[] SkillGemLevels { get; set; } = { 1, 1, 1 };
+
+	public int GetSkillGemLevel(int index)
+	{
+		EnsureSkillSlots();
+		if (index < 0 || index >= SkillGemLevels.Length)
+		{
+			return 1;
+		}
+
+		return Mathf.Max(SkillGemLevels[index], 1);
+	}
 
 	public string GetEquipmentId(EquipmentSlot slot)
 	{
@@ -201,34 +272,34 @@ public sealed class CompanionBuildLoadout
 
 	private void EnsureSkillSlots()
 	{
-		if (SkillGemIds.Length == 3)
+		if (SkillGemIds.Length != 3)
 		{
-			return;
+			string[] previous = SkillGemIds;
+			SkillGemIds = new[] { "gem.skill.none", "gem.skill.none", "gem.skill.none" };
+			for (int index = 0; index < Mathf.Min(previous.Length, SkillGemIds.Length); index++)
+			{
+				SkillGemIds[index] = previous[index];
+			}
 		}
 
-		string[] previous = SkillGemIds;
-		SkillGemIds = new[] { "gem.skill.none", "gem.skill.none", "gem.skill.none" };
-		for (int index = 0; index < Mathf.Min(previous.Length, SkillGemIds.Length); index++)
+		if (SkillGemLevels.Length != 3)
 		{
-			SkillGemIds[index] = previous[index];
+			int[] previousLevels = SkillGemLevels;
+			SkillGemLevels = new[] { 1, 1, 1 };
+			for (int index = 0; index < Mathf.Min(previousLevels.Length, SkillGemLevels.Length); index++)
+			{
+				SkillGemLevels[index] = Mathf.Max(previousLevels[index], 1);
+			}
 		}
 	}
 }
 
 public static class BuildCatalog
 {
-	public const string AiProtectPlayer = "protect_player";
+	// Only two combat behaviors remain: manual (attack the player's designated target
+	// only) and auto (attack the nearest hostile).
+	public const string AiManualOnly = "manual";
 	public const string AiAttackNearest = "attack_nearest";
-	public const string AiAttackBossFirst = "attack_boss_first";
-	public const string AiAttackLowestHp = "attack_lowest_hp";
-	public const string AiKeepDistance = "keep_distance";
-	public const string AiAggressive = "aggressive";
-	public const string AiDefensive = "defensive";
-	public const string AiHealAllies = "heal_allies";
-	public const string AiGatherResources = "gather_resources";
-	public const string AiLootNearby = "loot_nearby";
-	public const string AiFollowClosely = "follow_closely";
-	public const string AiRoamFreely = "roam_freely";
 
 	private static readonly Dictionary<string, CompanionIdentity> Identities = new()
 	{
@@ -367,21 +438,20 @@ public static class BuildCatalog
 		new SkillGemDefinition { Id = "gem.skill.dash", NameKey = "gem.skill.dash", SummaryKey = "gem.skill.summary.dash", MoveSpeedBonus = 0.18f, AttackCooldownReduction = 0.08f },
 		new SkillGemDefinition { Id = "gem.skill.laser", NameKey = "gem.skill.laser", SummaryKey = "gem.skill.summary.laser", AttackBonus = 6, AttackRangeBonus = 3.2f, DetectionRadiusBonus = 2.0f },
 		new SkillGemDefinition { Id = "gem.skill.summon", NameKey = "gem.skill.summon", SummaryKey = "gem.skill.summary.summon", MaxHealthBonus = 28, DefenseBonus = 4 },
-		new SkillGemDefinition { Id = "gem.skill.chain", NameKey = "gem.skill.chain", SummaryKey = "gem.skill.summary.chain", AttackBonus = 3, DetectionRadiusBonus = 2.0f },
-		new SkillGemDefinition { Id = "gem.skill.explosion", NameKey = "gem.skill.explosion", SummaryKey = "gem.skill.summary.explosion", AttackBonus = 7, AttackCooldownReduction = -0.04f },
-		new SkillGemDefinition { Id = "gem.skill.piercing", NameKey = "gem.skill.piercing", SummaryKey = "gem.skill.summary.piercing", AttackBonus = 2, AttackRangeBonus = 2.0f },
+		new SkillGemDefinition { Id = "gem.skill.chain", NameKey = "gem.skill.chain", SummaryKey = "gem.skill.summary.chain", AttackBonus = 3, DetectionRadiusBonus = 2.0f, BehaviorId = ProjectileBehavior.Chain, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.water_core" },
+		new SkillGemDefinition { Id = "gem.skill.explosion", NameKey = "gem.skill.explosion", SummaryKey = "gem.skill.summary.explosion", AttackBonus = 7, AttackCooldownReduction = -0.04f, BehaviorId = ProjectileBehavior.Explosion, BehaviorRadius = 3.0f, UpgradeMaterialId = "loot.red_horn" },
+		new SkillGemDefinition { Id = "gem.skill.piercing", NameKey = "gem.skill.piercing", SummaryKey = "gem.skill.summary.piercing", AttackBonus = 2, AttackRangeBonus = 2.0f, BehaviorId = ProjectileBehavior.Pierce, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.small_bone" },
 		new SkillGemDefinition { Id = "gem.skill.life_steal", NameKey = "gem.skill.life_steal", SummaryKey = "gem.skill.summary.life_steal", LifeStealPercent = 0.08f, DefenseBonus = 2 },
+		new SkillGemDefinition { Id = "gem.skill.split", NameKey = "gem.skill.split", SummaryKey = "gem.skill.summary.split", AttackBonus = 2, BehaviorId = ProjectileBehavior.Split, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.sharp_claw" },
+		new SkillGemDefinition { Id = "gem.skill.multishot", NameKey = "gem.skill.multishot", SummaryKey = "gem.skill.summary.multishot", AttackBonus = 1, AttackCooldownReduction = -0.03f, BehaviorId = ProjectileBehavior.Multi, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.insect_wing" },
 	};
 
 	private static readonly List<AttackModeDefinition> AttackModes = new()
 	{
-		new AttackModeDefinition { Id = AiAttackNearest, NameKey = "attack_mode.attack_nearest", BehaviorId = AiAttackNearest },
-		new AttackModeDefinition { Id = AiAttackBossFirst, NameKey = "attack_mode.attack_boss_first", BehaviorId = AiAttackBossFirst },
-		new AttackModeDefinition { Id = AiAttackLowestHp, NameKey = "attack_mode.attack_lowest_hp", BehaviorId = AiAttackLowestHp },
-		new AttackModeDefinition { Id = AiKeepDistance, NameKey = "attack_mode.keep_distance", BehaviorId = AiKeepDistance },
-		new AttackModeDefinition { Id = AiAggressive, NameKey = "attack_mode.aggressive", BehaviorId = AiAggressive },
-		new AttackModeDefinition { Id = AiDefensive, NameKey = "attack_mode.defensive", BehaviorId = AiDefensive },
-		new AttackModeDefinition { Id = AiHealAllies, NameKey = "attack_mode.heal_allies", BehaviorId = AiHealAllies },
+		// Only two selectable modes. Auto is first so unknown/legacy saved ids fall back
+		// to it (companions keep fighting) rather than silently going passive.
+		new AttackModeDefinition { Id = AiAttackNearest, NameKey = "attack_mode.auto", BehaviorId = AiAttackNearest },
+		new AttackModeDefinition { Id = AiManualOnly, NameKey = "attack_mode.manual", BehaviorId = AiManualOnly },
 	};
 
 	public static CompanionIdentity GetIdentity(SimpleActor actor)
@@ -500,9 +570,11 @@ public static class BuildCatalog
 		stats.ControlChance += attributeGem.ControlChance;
 		stats.KnockbackForce += attributeGem.KnockbackForce;
 
-		foreach (string skillId in loadout.SkillGemIds)
+		for (int slot = 0; slot < loadout.SkillGemIds.Length; slot++)
 		{
-			ApplySkillGem(stats, GetSkillGem(skillId));
+			SkillGemDefinition gem = GetSkillGem(loadout.SkillGemIds[slot]);
+			ApplySkillGem(stats, gem);
+			AccumulateBehavior(stats.Behavior, gem, loadout.GetSkillGemLevel(slot));
 		}
 
 		stats.AiBehaviorId = GetAttackMode(actor.AttackModeId).BehaviorId;
@@ -739,6 +811,34 @@ public static class BuildCatalog
 		return AttributeGems[0].Id;
 	}
 
+	public const int MaxSkillGemLevel = 5;
+
+	public static bool IsUpgradeableSkillGem(string gemId)
+	{
+		return GetSkillGem(gemId).BehaviorId != ProjectileBehavior.None;
+	}
+
+	// Cost to raise a behavior gem from its current level to the next one, or null if
+	// the gem has no behavior to scale or is already at the maximum level.
+	public static SkillGemUpgradeCost? GetSkillGemUpgradeCost(string gemId, int currentLevel)
+	{
+		SkillGemDefinition gem = GetSkillGem(gemId);
+		if (gem.BehaviorId == ProjectileBehavior.None)
+		{
+			return null;
+		}
+
+		int level = Mathf.Clamp(currentLevel, 1, MaxSkillGemLevel);
+		if (level >= MaxSkillGemLevel)
+		{
+			return null;
+		}
+
+		int nextLevel = level + 1;
+		string materialId = string.IsNullOrEmpty(gem.UpgradeMaterialId) ? "loot.cracked_core" : gem.UpgradeMaterialId;
+		return new SkillGemUpgradeCost(nextLevel, 90 * nextLevel * nextLevel, materialId, level);
+	}
+
 	public static string GetNextSkillGemId(string currentId)
 	{
 		for (int index = 0; index < SkillGems.Count; index++)
@@ -767,21 +867,9 @@ public static class BuildCatalog
 
 	public static string GetDefaultAttackModeId(SimpleActor actor)
 	{
-		string identityId = GetIdentity(actor).Id;
-		return actor.CombatRole switch
-		{
-			"Support" => AiHealAllies,
-			"Tank" => AiDefensive,
-			"Ranged" => AiKeepDistance,
-			_ => identityId switch
-			{
-				"identity.wolf" => AiAggressive,
-				"identity.dragon" => AiAttackBossFirst,
-				"identity.water_spirit" => AiHealAllies,
-				"identity.venom_imp" => AiAttackLowestHp,
-				_ => AiAttackNearest,
-			},
-		};
+		// Companions default to auto-attacking the nearest enemy. Players can switch a
+		// companion to manual (only strike the designated target) from the party panel.
+		return AiAttackNearest;
 	}
 
 	public static string LocalizedList(string[] keys)
@@ -852,6 +940,35 @@ public static class BuildCatalog
 		stats.LifeStealPercent += gem.LifeStealPercent;
 		stats.HasHealSkill |= gem.EnablesHeal;
 		stats.HasShieldSkill |= gem.EnablesShield;
+	}
+
+	private static void AccumulateBehavior(ProjectileBehaviorProfile profile, SkillGemDefinition gem, int level)
+	{
+		if (gem.BehaviorId == ProjectileBehavior.None)
+		{
+			return;
+		}
+
+		int levelBonus = Mathf.Max(level, 1) - 1;
+		int magnitude = Mathf.Max(gem.BehaviorMagnitude + levelBonus, 0);
+		switch (gem.BehaviorId)
+		{
+			case ProjectileBehavior.Multi:
+				profile.ExtraProjectiles += magnitude;
+				break;
+			case ProjectileBehavior.Split:
+				profile.SplitCount += magnitude;
+				break;
+			case ProjectileBehavior.Chain:
+				profile.ChainBounces += magnitude;
+				break;
+			case ProjectileBehavior.Pierce:
+				profile.PierceCount += magnitude;
+				break;
+			case ProjectileBehavior.Explosion:
+				profile.ExplosionRadius += gem.BehaviorRadius + levelBonus * 0.6f;
+				break;
+		}
 	}
 
 	private static void ApplyRareCombos(BuildStats stats, CompanionBuildLoadout loadout)
