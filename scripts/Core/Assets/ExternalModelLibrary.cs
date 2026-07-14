@@ -1,7 +1,11 @@
 using Godot;
+using System.Collections.Generic;
 
 public static class ExternalModelLibrary
 {
+	private static readonly Dictionary<ulong, AnimationPlayer?> AnimationPlayerCache = new();
+	private static readonly Dictionary<ulong, Node3D?> RootMotionNodeCache = new();
+
 	private static readonly string[] PlayerModels =
 	{
 		"res://assets/models/player/player_rogue_hooded.glb",
@@ -228,7 +232,7 @@ public static class ExternalModelLibrary
 
 	public static bool TryPlayActorAnimation(Node root, string state)
 	{
-		if (FindAnimationPlayer(root) is not AnimationPlayer player)
+		if (GetCachedAnimationPlayer(root) is not AnimationPlayer player)
 		{
 			return false;
 		}
@@ -253,7 +257,7 @@ public static class ExternalModelLibrary
 		model.Position = localPosition;
 		model.RotationDegrees = localRotationDegrees;
 
-		if (FindRootMotionNode(model) is Node3D rootMotionNode)
+		if (GetCachedRootMotionNode(model) is Node3D rootMotionNode)
 		{
 			rootMotionNode.Position = Vector3.Zero;
 			rootMotionNode.Rotation = Vector3.Zero;
@@ -568,6 +572,24 @@ public static class ExternalModelLibrary
 		return null;
 	}
 
+	private static AnimationPlayer? GetCachedAnimationPlayer(Node root)
+	{
+		ulong instanceId = root.GetInstanceId();
+		if (AnimationPlayerCache.TryGetValue(instanceId, out AnimationPlayer? cachedPlayer))
+		{
+			if (cachedPlayer == null || GodotObject.IsInstanceValid(cachedPlayer))
+			{
+				return cachedPlayer;
+			}
+
+			AnimationPlayerCache.Remove(instanceId);
+		}
+
+		AnimationPlayer? player = FindAnimationPlayer(root);
+		AnimationPlayerCache[instanceId] = player;
+		return player;
+	}
+
 	private static Node3D? FindRootMotionNode(Node root)
 	{
 		foreach (Node child in root.GetChildren())
@@ -585,6 +607,24 @@ public static class ExternalModelLibrary
 		}
 
 		return null;
+	}
+
+	private static Node3D? GetCachedRootMotionNode(Node3D model)
+	{
+		ulong instanceId = model.GetInstanceId();
+		if (RootMotionNodeCache.TryGetValue(instanceId, out Node3D? cachedNode))
+		{
+			if (cachedNode == null || GodotObject.IsInstanceValid(cachedNode))
+			{
+				return cachedNode;
+			}
+
+			RootMotionNodeCache.Remove(instanceId);
+		}
+
+		Node3D? rootMotionNode = FindRootMotionNode(model);
+		RootMotionNodeCache[instanceId] = rootMotionNode;
+		return rootMotionNode;
 	}
 
 	private static bool IsRootMotionNodeName(string name)

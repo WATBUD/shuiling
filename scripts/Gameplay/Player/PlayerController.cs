@@ -29,6 +29,8 @@ public partial class PlayerController : CharacterBody3D
 	private const int BlacksmithStockCount = 6;
 	private const int PetShopStockCount = 4;
 	private const int PetReviveGoldCost = 40;
+	private const float InteractionPromptRefreshSeconds = 0.12f;
+	private const float WorldDropCollectRefreshSeconds = 0.10f;
 
 	private static readonly PetShopOffer[] PetShopOffers =
 	{
@@ -92,6 +94,8 @@ public partial class PlayerController : CharacterBody3D
 	private Vector3 _lastSafePosition = new(0.0f, 0.2f, 8.0f);
 	private float _gravity;
 	private float _captureCooldownRemaining;
+	private float _interactionPromptRefreshRemaining;
+	private float _worldDropCollectRefreshRemaining;
 	private int _captureNetCharges;
 	private float _captureNetRechargeRemaining;
 	private Node3D _cameraPivot = null!;
@@ -132,6 +136,7 @@ public partial class PlayerController : CharacterBody3D
 	private bool _npcQuestDialogIsNotice;
 	private Node3D? _playerExternalModel;
 	private string _playerExternalAnimationState = string.Empty;
+	private readonly Dictionary<string, Node3D?> _playerVisualNodeCache = new();
 	private float _damageFlashRemaining;
 	private float _footstepEffectRemaining;
 	private float _movementAnimationPhase;
@@ -193,8 +198,7 @@ public partial class PlayerController : CharacterBody3D
 		UpdateFocusedTargetMarker((float)delta);
 		UpdateMercenaryOfferRefresh();
 		UpdateMerchantStockRefresh();
-		UpdateInteractionPrompt();
-		StabilizePlayerExternalModel();
+		UpdateInteractionPrompt((float)delta);
 	}
 
 	public override void _UnhandledInput(InputEvent @event)
@@ -365,7 +369,7 @@ public partial class PlayerController : CharacterBody3D
 
 		Velocity = velocity;
 		MoveAndSlide();
-		CollectNearbyWorldDrops();
+		UpdateNearbyWorldDropCollection(step);
 		UpdateMovementEffects(step, targetSpeed);
 		UpdateSafeGroundPosition();
 		RecoverIfOutOfWorld();
@@ -1269,6 +1273,18 @@ public partial class PlayerController : CharacterBody3D
 		}
 	}
 
+	private void UpdateNearbyWorldDropCollection(float step)
+	{
+		_worldDropCollectRefreshRemaining = Mathf.Max(_worldDropCollectRefreshRemaining - step, 0.0f);
+		if (_worldDropCollectRefreshRemaining > 0.0f)
+		{
+			return;
+		}
+
+		_worldDropCollectRefreshRemaining = WorldDropCollectRefreshSeconds;
+		CollectNearbyWorldDrops();
+	}
+
 	private static string GetInventoryItemDisplayName(string itemId)
 	{
 		return MonsterLootCatalog.IsMonsterLoot(itemId)
@@ -1817,7 +1833,7 @@ public partial class PlayerController : CharacterBody3D
 		_systemLogPanel.AddMessage(message, color);
 	}
 
-	private void UpdateInteractionPrompt()
+	private void UpdateInteractionPrompt(float step)
 	{
 		if (_interactionPromptLabel == null)
 		{
@@ -1829,6 +1845,14 @@ public partial class PlayerController : CharacterBody3D
 			_interactionPromptLabel.Visible = false;
 			return;
 		}
+
+		_interactionPromptRefreshRemaining = Mathf.Max(_interactionPromptRefreshRemaining - step, 0.0f);
+		if (_interactionPromptRefreshRemaining > 0.0f)
+		{
+			return;
+		}
+
+		_interactionPromptRefreshRemaining = InteractionPromptRefreshSeconds;
 
 		Node3D? revivalNpc = GetNearestRevivalNpc();
 		if (revivalNpc != null)
@@ -2746,7 +2770,7 @@ public partial class PlayerController : CharacterBody3D
 
 	private void SetVisualPosition(string nodeName, Vector3 position)
 	{
-		if (GetNodeOrNull<Node3D>(nodeName) is Node3D node)
+		if (GetCachedPlayerVisualNode(nodeName) is Node3D node)
 		{
 			node.Position = position;
 		}
@@ -2754,10 +2778,27 @@ public partial class PlayerController : CharacterBody3D
 
 	private void SetVisualRotation(string nodeName, Vector3 rotationDegrees)
 	{
-		if (GetNodeOrNull<Node3D>(nodeName) is Node3D node)
+		if (GetCachedPlayerVisualNode(nodeName) is Node3D node)
 		{
 			node.RotationDegrees = rotationDegrees;
 		}
+	}
+
+	private Node3D? GetCachedPlayerVisualNode(string nodeName)
+	{
+		if (_playerVisualNodeCache.TryGetValue(nodeName, out Node3D? cachedNode))
+		{
+			if (cachedNode == null || IsInstanceValid(cachedNode))
+			{
+				return cachedNode;
+			}
+
+			_playerVisualNodeCache.Remove(nodeName);
+		}
+
+		Node3D? node = GetNodeOrNull<Node3D>(nodeName);
+		_playerVisualNodeCache[nodeName] = node;
+		return node;
 	}
 
 	private static Label MakeHudLabel(string text, int fontSize, Color color)
@@ -2892,7 +2933,7 @@ public partial class PlayerController : CharacterBody3D
 	{
 		float targetAngle = Mathf.Atan2(-direction.X, -direction.Z);
 		Vector3 rotation = Rotation;
-		rotation.Y = Mathf.LerpAngle(rotation.Y, targetAngle, Mathf.Min(step * 12.0f, 1.0f));
+		rotation.Y = Mathf.LerpAngle(rotation.Y, targetAngle, Mathf.Min(step * 22.0f, 1.0f));
 		Rotation = rotation;
 	}
 

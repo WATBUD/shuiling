@@ -1,8 +1,11 @@
 using Godot;
+using System.Collections.Generic;
 
 public partial class SimpleActor : CharacterBody3D
 {
 	private const float MinimumCompanionFormationDistance = 3.6f;
+	private const float ExternalRootMotionStabilizeSeconds = 0.12f;
+	private const int RearCompanionDustStartSlot = 4;
 
 	private enum SquadActivity
 	{
@@ -63,6 +66,12 @@ public partial class SimpleActor : CharacterBody3D
 	private Vector3 _attackPoseBaseScale = Vector3.One;
 	private SimpleActor? _combatTarget;
 	private SimpleActor? _retaliationTarget;
+	private Node3D? _cachedPlayerNode;
+	private readonly Dictionary<string, Node3D?> _childNodeCache = new();
+	private Node3D? _externalModelNode;
+	private bool _externalModelLookupAttempted;
+	private float _combatTargetSearchRemaining;
+	private float _externalRootMotionStabilizeRemaining;
 	private float _retaliationTargetRemaining;
 	private Label3D? _nameplate;
 	private MeshInstance3D? _nameplateMarker;
@@ -191,6 +200,13 @@ public partial class SimpleActor : CharacterBody3D
 
 	public override void _Process(double delta)
 	{
+		_externalRootMotionStabilizeRemaining = Mathf.Max(_externalRootMotionStabilizeRemaining - (float)delta, 0.0f);
+		if (_externalRootMotionStabilizeRemaining > 0.0f)
+		{
+			return;
+		}
+
+		_externalRootMotionStabilizeRemaining = ExternalRootMotionStabilizeSeconds + (_followSlot % 4) * 0.015f;
 		StabilizeExternalModelRootMotion();
 	}
 
@@ -199,6 +215,7 @@ public partial class SimpleActor : CharacterBody3D
 		float step = (float)delta;
 		_attackCooldownRemaining = Mathf.Max(_attackCooldownRemaining - step, 0.0f);
 		_retaliationTargetRemaining = Mathf.Max(_retaliationTargetRemaining - step, 0.0f);
+		_combatTargetSearchRemaining = Mathf.Max(_combatTargetSearchRemaining - step, 0.0f);
 		Vector3 velocity = Velocity;
 
 		if (_isDefeated)
@@ -219,7 +236,7 @@ public partial class SimpleActor : CharacterBody3D
 			return;
 		}
 
-		Node3D? player = GetTree().GetFirstNodeInGroup("player") as Node3D;
+		Node3D? player = GetCachedPlayerNode();
 		bool chasing = false;
 		Vector3 destination = _targetPosition;
 
@@ -280,6 +297,17 @@ public partial class SimpleActor : CharacterBody3D
 
 		Velocity = velocity;
 		MoveAndSlideWithEffects(step);
+	}
+
+	private Node3D? GetCachedPlayerNode()
+	{
+		if (_cachedPlayerNode != null && IsInstanceValid(_cachedPlayerNode))
+		{
+			return _cachedPlayerNode;
+		}
+
+		_cachedPlayerNode = GetTree().GetFirstNodeInGroup("player") as Node3D;
+		return _cachedPlayerNode;
 	}
 
 	public void Capture(PlayerController followTarget)
@@ -1279,6 +1307,13 @@ public partial class SimpleActor : CharacterBody3D
 			return _combatTarget;
 		}
 
+		if (_combatTargetSearchRemaining > 0.0f)
+		{
+			return null;
+		}
+
+		_combatTargetSearchRemaining = 0.18f + (_followSlot % 4) * 0.035f;
+
 		BuildStats stats = CurrentBuildStats;
 		Vector3 anchor = GlobalPosition;
 		bool playerAnchored = stats.AiBehaviorId is BuildCatalog.AiProtectPlayer or BuildCatalog.AiDefensive or BuildCatalog.AiHealAllies or BuildCatalog.AiFollowClosely;
@@ -1784,6 +1819,12 @@ public partial class SimpleActor : CharacterBody3D
 		Vector3 planarVelocity = Velocity;
 		planarVelocity.Y = 0.0f;
 		float speed = planarVelocity.Length();
+		if (_isCaptured && _followSlot >= RearCompanionDustStartSlot)
+		{
+			_footstepEffectRemaining = Mathf.Max(_footstepEffectRemaining, speed > EffectiveMoveSpeed * 1.65f ? 0.22f : 0.36f);
+			return;
+		}
+
 		if (!IsOnFloor() || speed < 0.85f || _footstepEffectRemaining > 0.0f)
 		{
 			return;
@@ -1928,6 +1969,11 @@ public partial class SimpleActor : CharacterBody3D
 
 	private void SetExternalAnimationState(string state, float lockDuration = 0.0f)
 	{
+		if (_externalAnimationState == state && lockDuration <= 0.0f)
+		{
+			return;
+		}
+
 		bool played = ExternalModelLibrary.TryPlayActorAnimation(this, state);
 		if (played)
 		{
@@ -1943,7 +1989,7 @@ public partial class SimpleActor : CharacterBody3D
 
 	private void SetChildPosition(string nodeName, Vector3 position)
 	{
-		if (GetNodeOrNull<Node3D>(nodeName) is Node3D node)
+		if (GetCachedChildNode(nodeName) is Node3D node)
 		{
 			node.Position = position;
 		}
@@ -1951,21 +1997,61 @@ public partial class SimpleActor : CharacterBody3D
 
 	private void SetChildRotation(string nodeName, Vector3 rotationDegrees)
 	{
-		if (GetNodeOrNull<Node3D>(nodeName) is Node3D node)
+		if (GetCachedChildNode(nodeName) is Node3D node)
 		{
 			node.RotationDegrees = rotationDegrees;
 		}
 	}
 
+	private Node3D? GetCachedChildNode(string nodeName)
+	{
+		if (_childNodeCache.TryGetValue(nodeName, out Node3D? cachedNode))
+		{
+			if (cachedNode == null || IsInstanceValid(cachedNode))
+			{
+				return cachedNode;
+			}
+
+			_childNodeCache.Remove(nodeName);
+		}
+
+		Node3D? node = GetNodeOrNull<Node3D>(nodeName);
+		_childNodeCache[nodeName] = node;
+		return node;
+	}
+
 	private void StabilizeExternalModelRootMotion()
 	{
-		Node3D? model = GetNodeOrNull<Node3D>("ExternalModel");
+		Node3D? model = GetCachedExternalModelNode();
 		if (model == null)
 		{
 			return;
 		}
 
 		ExternalModelLibrary.StabilizeRootMotion(model, Vector3.Zero, new Vector3(0.0f, 180.0f, 0.0f));
+	}
+
+	private Node3D? GetCachedExternalModelNode()
+	{
+		if (_externalModelNode != null)
+		{
+			if (IsInstanceValid(_externalModelNode))
+			{
+				return _externalModelNode;
+			}
+
+			_externalModelNode = null;
+			_externalModelLookupAttempted = false;
+		}
+
+		if (_externalModelLookupAttempted)
+		{
+			return null;
+		}
+
+		_externalModelLookupAttempted = true;
+		_externalModelNode = GetNodeOrNull<Node3D>("ExternalModel");
+		return _externalModelNode;
 	}
 
 	private void FaceDirection(Vector3 direction, float step)
