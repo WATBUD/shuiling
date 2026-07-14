@@ -396,6 +396,14 @@ public partial class PartyPanel : PanelContainer
 		_skillGem1Button.Text = BuildButtonText("build.slot.skill1", LocaleText.T(BuildCatalog.GetSkillGem(loadout.SkillGemIds[0]).NameKey));
 		_skillGem2Button.Text = BuildButtonText("build.slot.skill2", LocaleText.T(BuildCatalog.GetSkillGem(loadout.SkillGemIds[1]).NameKey));
 		_skillGem3Button.Text = BuildButtonText("build.slot.skill3", LocaleText.T(BuildCatalog.GetSkillGem(loadout.SkillGemIds[2]).NameKey));
+		ItemIconLibrary.Apply(_helmetButton, loadout.HelmetId, 32);
+		ItemIconLibrary.Apply(_weaponButton, loadout.WeaponId, 32);
+		ItemIconLibrary.Apply(_armorButton, loadout.ArmorId, 32);
+		ItemIconLibrary.Apply(_accessoryButton, loadout.AccessoryId, 32);
+		ItemIconLibrary.Apply(_attributeGemButton, loadout.AttributeGemId, 32);
+		ItemIconLibrary.Apply(_skillGem1Button, loadout.SkillGemIds[0], 32);
+		ItemIconLibrary.Apply(_skillGem2Button, loadout.SkillGemIds[1], 32);
+		ItemIconLibrary.Apply(_skillGem3Button, loadout.SkillGemIds[2], 32);
 	}
 
 	private static string BuildButtonText(string slotKey, string value)
@@ -417,6 +425,10 @@ public partial class PartyPanel : PanelContainer
 
 		if (disabled)
 		{
+			foreach (Button button in new[] { _helmetButton, _weaponButton, _armorButton, _accessoryButton, _attributeGemButton, _skillGem1Button, _skillGem2Button, _skillGem3Button })
+			{
+				button.Icon = null;
+			}
 			_helmetButton.Text = "-";
 			_weaponButton.Text = "-";
 			_armorButton.Text = "-";
@@ -470,8 +482,14 @@ public partial class PartyPanel : PanelContainer
 
 		_memberContextMenu.AddSeparator();
 		_memberContextMenu.AddItem(LocaleText.T("button.train"), 3);
-		_memberContextMenu.AddItem(LocaleText.T("button.evolve"), 4);
-		_memberContextMenu.SetItemDisabled(_memberContextMenu.GetItemIndex(4), !actor.CanEvolve);
+		string materialName = string.IsNullOrEmpty(actor.EvolutionMaterialId)
+			? string.Empty
+			: LocaleText.T(MonsterLootCatalog.GetNameKey(actor.EvolutionMaterialId));
+		string evolveText = actor.EvolutionMaterialCount > 0
+			? $"{LocaleText.T("button.evolve")} ({materialName} {actor.EvolutionMaterialCount})"
+			: LocaleText.T("button.evolve");
+		_memberContextMenu.AddItem(evolveText, 4);
+		_memberContextMenu.SetItemDisabled(_memberContextMenu.GetItemIndex(4), !_player.CanEvolveActor(actor));
 		_memberContextMenu.AddItem(LocaleText.T("button.enhance_ability"), 5);
 		_memberContextMenu.Position = new Vector2I(Mathf.RoundToInt(screenPosition.X), Mathf.RoundToInt(screenPosition.Y));
 		_memberContextMenu.Popup();
@@ -496,7 +514,7 @@ public partial class PartyPanel : PanelContainer
 				_contextActor.GrantTraining(25);
 				break;
 			case 4:
-				_contextActor.TryEvolve();
+				_player.TryEvolveActor(_contextActor);
 				break;
 			case 5:
 				_contextActor.EnhanceAbility();

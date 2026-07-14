@@ -20,7 +20,6 @@ public partial class MerchantShopPanel : PanelContainer
 	private Label _titleLabel = null!;
 	private Label _goldLabel = null!;
 	private Label _noticeLabel = null!;
-	private Label _categoryTitleLabel = null!;
 	private HBoxContainer _categoryTabs = null!;
 	private HBoxContainer _tradeModeTabs = null!;
 	private HBoxContainer _refreshRow = null!;
@@ -114,7 +113,6 @@ public partial class MerchantShopPanel : PanelContainer
 		_noticeLabel.Visible = _shopKind == PlayerController.MerchantShopKind.PetShop;
 		_noticeLabel.Text = _noticeLabel.Visible ? LocaleText.T("shop.pet.notice") : string.Empty;
 		_categoryTabs.Visible = _shopKind == PlayerController.MerchantShopKind.ItemShop;
-		_categoryTitleLabel.Visible = _shopKind == PlayerController.MerchantShopKind.ItemShop;
 		RefreshCategoryTabs();
 		bool canSell = _shopKind != PlayerController.MerchantShopKind.PetShop;
 		if (!canSell)
@@ -246,9 +244,6 @@ public partial class MerchantShopPanel : PanelContainer
 		AddCategoryTab(ItemCategory.Consumables);
 		AddCategoryTab(ItemCategory.Special);
 
-		_categoryTitleLabel = MakeLabel(17, new Color(0.82f, 0.92f, 1.0f));
-		root.AddChild(_categoryTitleLabel);
-
 		_tradeModeTabs = new HBoxContainer();
 		_tradeModeTabs.AddThemeConstantOverride("separation", 8);
 		root.AddChild(_tradeModeTabs);
@@ -312,7 +307,7 @@ public partial class MerchantShopPanel : PanelContainer
 
 	private void AddCategoryTab(ItemCategory category)
 	{
-		Button button = CreateModeTab(GetCategoryKey(category));
+		Button button = CreateCategoryTab(GetCategoryKey(category));
 		button.Pressed += () =>
 		{
 			_selectedCategory = category;
@@ -322,15 +317,57 @@ public partial class MerchantShopPanel : PanelContainer
 		_categoryButtons[category] = button;
 	}
 
+	private static Button CreateCategoryTab(string textKey)
+	{
+		var button = new Button
+		{
+			Text = LocaleText.T(textKey),
+			ToggleMode = true,
+			CustomMinimumSize = new Vector2(102.0f, 30.0f),
+			TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis,
+		};
+		ApplyTagButtonStyle(button);
+		return button;
+	}
+
+	private static void ApplyTagButtonStyle(Button button)
+	{
+		button.AddThemeFontSizeOverride("font_size", 13);
+		button.AddThemeStyleboxOverride("normal", MakeTagStyle(new Color(0.075f, 0.086f, 0.105f, 0.92f), new Color(0.24f, 0.30f, 0.38f, 0.78f)));
+		button.AddThemeStyleboxOverride("hover", MakeTagStyle(new Color(0.11f, 0.13f, 0.16f, 0.96f), new Color(0.42f, 0.55f, 0.66f, 0.90f)));
+		button.AddThemeStyleboxOverride("pressed", MakeTagStyle(new Color(0.18f, 0.27f, 0.33f, 0.98f), new Color(0.70f, 0.90f, 1.0f, 0.98f)));
+		button.AddThemeStyleboxOverride("hover_pressed", MakeTagStyle(new Color(0.20f, 0.31f, 0.38f, 1.0f), new Color(0.78f, 0.94f, 1.0f, 1.0f)));
+		button.AddThemeColorOverride("font_color", new Color(0.78f, 0.86f, 0.92f));
+		button.AddThemeColorOverride("font_pressed_color", new Color(1.0f, 0.96f, 0.78f));
+		button.AddThemeColorOverride("font_hover_color", new Color(0.92f, 0.98f, 1.0f));
+	}
+
+	private static StyleBoxFlat MakeTagStyle(Color background, Color border)
+	{
+		var style = new StyleBoxFlat
+		{
+			BgColor = background,
+			BorderColor = border,
+		};
+		style.SetBorderWidthAll(1);
+		style.SetCornerRadiusAll(6);
+		style.ContentMarginLeft = 10.0f;
+		style.ContentMarginRight = 10.0f;
+		style.ContentMarginTop = 4.0f;
+		style.ContentMarginBottom = 4.0f;
+		return style;
+	}
+
 	private static Button CreateModeTab(string textKey)
 	{
 		var button = new Button
 		{
 			Text = LocaleText.T(textKey),
 			ToggleMode = true,
-			CustomMinimumSize = new Vector2(148.0f, 40.0f),
+			CustomMinimumSize = new Vector2(102.0f, 30.0f),
+			TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis,
 		};
-		button.AddThemeFontSizeOverride("font_size", 16);
+		ApplyTagButtonStyle(button);
 		return button;
 	}
 
@@ -391,25 +428,38 @@ public partial class MerchantShopPanel : PanelContainer
 		row.AddChild(margin);
 
 		var line = new HBoxContainer();
+		line.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		line.AddThemeConstantOverride("separation", isPetBuyRow ? 16 : 10);
 		margin.AddChild(line);
 
-		var info = new VBoxContainer();
-		info.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-		info.AddThemeConstantOverride("separation", 4);
-		line.AddChild(info);
+		Texture2D? itemIcon = ItemIconLibrary.Get(entry.ItemId);
+		if (itemIcon != null)
+		{
+			line.AddChild(ItemIconLibrary.CreateRect(entry.ItemId, 46.0f));
+		}
 
 		var name = MakeLabel(isPetBuyRow ? 18 : 16, new Color(0.96f, 0.98f, 1.0f));
 		name.Text = entry.DisplayName;
+		name.AutowrapMode = TextServer.AutowrapMode.Off;
+		name.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+		name.ClipText = true;
 		name.VerticalAlignment = VerticalAlignment.Center;
+		name.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		name.SizeFlagsVertical = SizeFlags.ExpandFill;
-		info.AddChild(name);
+		line.AddChild(name);
 
 		if (!isPetBuyRow && _player != null)
 		{
-			var countLabel = MakeLabel(13, new Color(0.70f, 0.80f, 0.88f));
+			var countLabel = MakeLabel(14, new Color(0.70f, 0.80f, 0.88f));
 			countLabel.Text = LocaleText.F("shop.owned_count", _player.GetInventoryCount(entry.ItemId));
-			info.AddChild(countLabel);
+			countLabel.AutowrapMode = TextServer.AutowrapMode.Off;
+			countLabel.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+			countLabel.ClipText = true;
+			countLabel.HorizontalAlignment = HorizontalAlignment.Right;
+			countLabel.VerticalAlignment = VerticalAlignment.Center;
+			countLabel.CustomMinimumSize = new Vector2(64.0f, 0.0f);
+			countLabel.SizeFlagsVertical = SizeFlags.ExpandFill;
+			line.AddChild(countLabel);
 		}
 
 		var action = new Button
@@ -418,6 +468,7 @@ public partial class MerchantShopPanel : PanelContainer
 			CustomMinimumSize = new Vector2(isPetBuyRow ? 132.0f : 118.0f, 48.0f),
 			Disabled = _player == null || (isBuy && _player.Gold < entry.Price),
 		};
+		action.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
 		action.Pressed += () =>
 		{
 			if (_player == null)
@@ -443,8 +494,6 @@ public partial class MerchantShopPanel : PanelContainer
 			pair.Value.Text = LocaleText.T(GetCategoryKey(pair.Key));
 			pair.Value.ButtonPressed = pair.Key == _selectedCategory;
 		}
-
-		_categoryTitleLabel.Text = LocaleText.T(GetCategoryKey(_selectedCategory));
 	}
 
 	private bool ShouldShowEntry(PlayerController.ShopTradeEntry entry)

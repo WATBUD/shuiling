@@ -341,7 +341,7 @@ public static class BuildCatalog
 	private static readonly List<AttributeGemDefinition> AttributeGems = new()
 	{
 		new AttributeGemDefinition { Id = "gem.attribute.none", NameKey = "gem.attribute.none", SummaryKey = "gem.summary.none", ElementId = "physical", ElementNameKey = "element.physical", AttackColor = new Color(1.0f, 0.54f, 0.24f, 0.92f) },
-		new AttributeGemDefinition { Id = "gem.attribute.fire", NameKey = "gem.attribute.fire", SummaryKey = "gem.summary.fire", ElementId = "fire", ElementNameKey = "element.fire", AttackBonus = 5, AttackColor = new Color(1.0f, 0.28f, 0.08f, 0.94f) },
+		new AttributeGemDefinition { Id = "gem.attribute.fire", NameKey = "gem.attribute.fire", SummaryKey = "gem.summary.fire", ElementId = "fire", ElementNameKey = "element.fire", AttackBonus = 5, ControlChance = 0.18f, AttackColor = new Color(1.0f, 0.28f, 0.08f, 0.94f) },
 		new AttributeGemDefinition { Id = "gem.attribute.water", NameKey = "gem.attribute.water", SummaryKey = "gem.summary.water", ElementId = "water", ElementNameKey = "element.water", AttackBonus = 2, AttackRangeBonus = 0.8f, AttackColor = new Color(0.20f, 0.70f, 1.0f, 0.94f) },
 		new AttributeGemDefinition { Id = "gem.attribute.lightning", NameKey = "gem.attribute.lightning", SummaryKey = "gem.summary.lightning", ElementId = "lightning", ElementNameKey = "element.lightning", AttackBonus = 3, CritChanceBonus = 0.06f, ControlChance = 0.16f, AttackColor = new Color(0.95f, 0.88f, 0.20f, 0.95f) },
 		new AttributeGemDefinition { Id = "gem.attribute.ice", NameKey = "gem.attribute.ice", SummaryKey = "gem.summary.ice", ElementId = "ice", ElementNameKey = "element.ice", DefenseBonus = 3, ControlChance = 0.18f, AttackColor = new Color(0.58f, 0.88f, 1.0f, 0.95f) },
@@ -444,6 +444,17 @@ public static class BuildCatalog
 			loadout.WeaponId = "equip.weapon.claws";
 			loadout.AttributeGemId = "gem.attribute.poison";
 			loadout.SkillGemIds = new[] { "gem.skill.life_steal", "gem.skill.dash", "gem.skill.none" };
+		}
+
+		if (actor.ActorKind == "monster")
+		{
+			loadout.AttributeGemId = actor.MapId switch
+			{
+				"wild_marsh" => "gem.attribute.water",
+				"wild_badlands" => "gem.attribute.fire",
+				"wild_forest" => "gem.attribute.wind",
+				_ => loadout.AttributeGemId,
+			};
 		}
 
 		return loadout;
