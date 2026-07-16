@@ -106,6 +106,7 @@ public partial class PlayerController : CharacterBody3D
 	};
 	private float _cameraYaw;
 	private float _cameraPitch = 0.08f;
+	private bool _isRightMouseLookActive;
 	private CameraViewMode _cameraMode = CameraViewMode.ThirdPerson;
 	private Vector3 _lastSafePosition = new(0.0f, 0.2f, 8.0f);
 	private float _gravity;
@@ -193,6 +194,10 @@ public partial class PlayerController : CharacterBody3D
 		CreateSettingsPanel();
 		CreatePauseMenuPanel();
 		InitializeStarterInventory();
+		if (!GameLaunchOptions.LoadSaveOnWorldReady)
+		{
+			CallDeferred(nameof(GrantStarterBunny));
+		}
 		InitializeCaptureNetAmmo();
 		CreateCaptureAmmoHud();
 		CreateDamageFlashHud();
@@ -319,6 +324,15 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
+		if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Right } rightMouseButton)
+		{
+			_isRightMouseLookActive = rightMouseButton.Pressed;
+			Input.MouseMode = rightMouseButton.Pressed
+				? Input.MouseModeEnum.Captured
+				: _cameraMode == CameraViewMode.GodView ? Input.MouseModeEnum.Visible : Input.MouseModeEnum.Captured;
+			return;
+		}
+
 		if (@event is InputEventMouseMotion godViewMouseMotion
 			&& _cameraMode == CameraViewMode.GodView
 			&& (godViewMouseMotion.ButtonMask & MouseButtonMask.Middle) != 0)
@@ -327,13 +341,14 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
-		if (@event is InputEventMouseMotion mouseMotion && Input.MouseMode == Input.MouseModeEnum.Captured)
+		if (@event is InputEventMouseMotion mouseMotion && Input.MouseMode == Input.MouseModeEnum.Captured && _isRightMouseLookActive)
 		{
 			_cameraYaw = Mathf.Wrap(
 				_cameraYaw - mouseMotion.Relative.X * HorizontalLookSensitivity,
 				-Mathf.Pi,
 				Mathf.Pi
 			);
+			Rotation = new Vector3(Rotation.X, _cameraYaw, Rotation.Z);
 			if (_cameraMode == CameraViewMode.ThirdPerson)
 			{
 				_cameraPitch = Mathf.Clamp(
@@ -1756,6 +1771,17 @@ public partial class PlayerController : CharacterBody3D
 		{
 			AddInventoryItem(itemId);
 		}
+	}
+
+	private void GrantStarterBunny()
+	{
+		if (_capturedCollection.Count > 0 || GetParent() is not World world)
+		{
+			return;
+		}
+
+		SimpleActor bunny = world.SpawnPurchasedPet("name.monster.bunny", 2, 130, 21, 12);
+		CaptureActor(bunny);
 	}
 
 	private void UpdateCaptureNetRecharge(float step)
