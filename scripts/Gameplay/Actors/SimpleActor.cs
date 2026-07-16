@@ -313,6 +313,7 @@ public partial class SimpleActor : CharacterBody3D
 	public string LocalizedPersonality => LocaleText.T(Personality);
 	public string LocalizedPassiveAbility => LocaleText.T(PassiveAbility);
 	public string TraitSummary => BuildCatalog.LocalizedList(GetTraitKeys());
+	public string[] TraitKeys => GetTraitKeys();
 	public string BuildEquipmentSummary => BuildCatalog.LocalizedEquipmentSet(BuildLoadout);
 	public string BuildSkillSummary => BuildCatalog.LocalizedSkillGems(BuildLoadout);
 	public string BuildAttributeGemName => LocaleText.T(BuildCatalog.GetAttributeGem(BuildLoadout.AttributeGemId).NameKey);

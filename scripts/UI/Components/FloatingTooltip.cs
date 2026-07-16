@@ -6,9 +6,9 @@ public partial class FloatingTooltip : PanelContainer
 	private readonly Label _bodyLabel;
 	private readonly ScrollContainer _bodyScroll;
 
-	public float MaxWidthRatio { get; set; } = 0.34f;
-	public float MaxHeightRatio { get; set; } = 0.50f;
-	public float MaxWidth { get; set; } = 320.0f;
+	public float MaxWidthRatio { get; set; } = 0.70f;
+	public float MaxHeightRatio { get; set; } = 0.72f;
+	public float MaxWidth { get; set; } = 720.0f;
 	public float MinWidth { get; set; } = 120.0f;
 	public float MinBodyHeight { get; set; } = 0.0f;
 	public Vector2 MouseOffset { get; set; } = new(18.0f, 18.0f);
@@ -17,6 +17,9 @@ public partial class FloatingTooltip : PanelContainer
 	public FloatingTooltip()
 	{
 		Visible = false;
+		// A tooltip is an overlay, not layout content. Keeping it top-level prevents
+		// its natural size from changing the minimum size of the card/panel that owns it.
+		TopLevel = true;
 		MouseFilter = MouseFilterEnum.Ignore;
 		ZIndex = 80;
 		SetAnchorsPreset(LayoutPreset.TopLeft);
@@ -82,6 +85,16 @@ public partial class FloatingTooltip : PanelContainer
 		Visible = false;
 	}
 
+	public void ScrollDetail(int amount)
+	{
+		if (!Visible)
+		{
+			return;
+		}
+
+		_bodyScroll.ScrollVertical += amount;
+	}
+
 	public void PositionNearMouse(Control owner)
 	{
 		if (!Visible)
@@ -90,7 +103,11 @@ public partial class FloatingTooltip : PanelContainer
 		}
 
 		ApplyContentSize(owner);
-		Vector2 localMouse = owner.GetGlobalMousePosition() - owner.GlobalPosition;
+		// Top-level controls use viewport/canvas coordinates directly. Non-top-level
+		// controls use coordinates relative to their owner.
+		Vector2 coordinateOrigin = TopLevel ? Vector2.Zero : owner.GlobalPosition;
+		Vector2 localMouse = owner.GetGlobalMousePosition() - coordinateOrigin;
+		Vector2 viewportSize = owner.GetViewportRect().Size;
 		Vector2 tooltipSize = Size;
 		if (tooltipSize.LengthSquared() <= 1.0f)
 		{
@@ -98,19 +115,20 @@ public partial class FloatingTooltip : PanelContainer
 		}
 
 		Vector2 position = localMouse + MouseOffset;
-		Vector2 bounds = owner.Size;
-		if (position.X + tooltipSize.X > bounds.X - EdgePadding)
+		Vector2 viewportMin = new Vector2(EdgePadding, EdgePadding) - coordinateOrigin;
+		Vector2 viewportMax = viewportSize - coordinateOrigin - new Vector2(EdgePadding, EdgePadding);
+		if (position.X + tooltipSize.X > viewportMax.X)
 		{
 			position.X = localMouse.X - tooltipSize.X - MouseOffset.X;
 		}
 
-		if (position.Y + tooltipSize.Y > bounds.Y - EdgePadding)
+		if (position.Y + tooltipSize.Y > viewportMax.Y)
 		{
 			position.Y = localMouse.Y - tooltipSize.Y - MouseOffset.Y;
 		}
 
-		position.X = Mathf.Clamp(position.X, EdgePadding, Mathf.Max(EdgePadding, bounds.X - tooltipSize.X - EdgePadding));
-		position.Y = Mathf.Clamp(position.Y, EdgePadding, Mathf.Max(EdgePadding, bounds.Y - tooltipSize.Y - EdgePadding));
+		position.X = Mathf.Clamp(position.X, viewportMin.X, Mathf.Max(viewportMin.X, viewportMax.X - tooltipSize.X));
+		position.Y = Mathf.Clamp(position.Y, viewportMin.Y, Mathf.Max(viewportMin.Y, viewportMax.Y - tooltipSize.Y));
 		Position = position;
 	}
 
@@ -133,14 +151,17 @@ public partial class FloatingTooltip : PanelContainer
 		_bodyLabel.CustomMinimumSize = Vector2.Zero;
 		_bodyScroll.CustomMinimumSize = Vector2.Zero;
 
-		float maxContentWidth = Mathf.Min(MaxWidth, Mathf.Max(MinWidth, owner.Size.X * MaxWidthRatio));
+		Vector2 viewportSize = owner.GetViewportRect().Size;
+		float availableViewportWidth = Mathf.Max(MinWidth, viewportSize.X - EdgePadding * 2.0f - 24.0f);
+		float maxContentWidth = Mathf.Min(MaxWidth, Mathf.Min(availableViewportWidth, viewportSize.X * MaxWidthRatio));
 		float titleWidth = _titleLabel.GetCombinedMinimumSize().X;
 		float bodyWidth = _bodyLabel.GetCombinedMinimumSize().X;
 		float contentWidth = Mathf.Clamp(Mathf.Max(titleWidth, bodyWidth), MinWidth, maxContentWidth);
 
 		_titleLabel.CustomMinimumSize = new Vector2(contentWidth, 0.0f);
 		_bodyLabel.CustomMinimumSize = new Vector2(contentWidth, 0.0f);
-		float maxPanelHeight = Mathf.Max(160.0f, owner.Size.Y * MaxHeightRatio);
+		float availableViewportHeight = Mathf.Max(160.0f, viewportSize.Y - EdgePadding * 2.0f);
+		float maxPanelHeight = Mathf.Min(availableViewportHeight, Mathf.Max(160.0f, viewportSize.Y * MaxHeightRatio));
 		float titleHeight = _titleLabel.GetCombinedMinimumSize().Y;
 		float maxBodyHeight = Mathf.Max(48.0f, maxPanelHeight - titleHeight - 23.0f);
 		float naturalBodyHeight = _bodyLabel.GetCombinedMinimumSize().Y;
