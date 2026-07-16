@@ -676,8 +676,25 @@ public partial class SimpleActor : CharacterBody3D
 	public void EquipSkillGem(int slotIndex, string gemId)
 	{
 		int safeSlot = Mathf.Clamp(slotIndex, 0, BuildLoadout.SkillGemIds.Length - 1);
-		BuildLoadout.SkillGemIds[safeSlot] = BuildCatalog.GetSkillGem(gemId).Id;
+		string validatedGemId = BuildCatalog.GetSkillGem(gemId).Id;
+		if (BuildCatalog.IsProjectileSupportGem(validatedGemId) && !BuildCatalog.HasRangedActiveSkill(BuildLoadout))
+		{
+			return;
+		}
+
+		BuildLoadout.SkillGemIds[safeSlot] = validatedGemId;
 		BuildLoadout.SkillGemLevels[safeSlot] = 1;
+		if (!BuildCatalog.HasRangedActiveSkill(BuildLoadout))
+		{
+			for (int index = 0; index < BuildLoadout.SkillGemIds.Length; index++)
+			{
+				if (BuildCatalog.IsProjectileSupportGem(BuildLoadout.SkillGemIds[index]))
+				{
+					BuildLoadout.SkillGemIds[index] = "gem.skill.none";
+					BuildLoadout.SkillGemLevels[index] = 1;
+				}
+			}
+		}
 		MarkBuildChanged();
 	}
 
@@ -870,6 +887,7 @@ public partial class SimpleActor : CharacterBody3D
 				? new[] { Mathf.Max(data.BuildLoadout.SkillGemLevels[0], 1), Mathf.Max(data.BuildLoadout.SkillGemLevels[1], 1), Mathf.Max(data.BuildLoadout.SkillGemLevels[2], 1) }
 				: new[] { 1, 1, 1 },
 		};
+		RemoveUnsupportedProjectileGems();
 		_buildConfigured = true;
 		_buildStatsDirty = true;
 		RecalculateBuildStats();
@@ -885,9 +903,27 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		_buildLoadout = BuildCatalog.CreateStarterLoadout(this);
+		RemoveUnsupportedProjectileGems();
 		AttackModeId = BuildCatalog.GetAttackMode(AttackModeId).Id;
 		_buildConfigured = true;
 		_buildStatsDirty = true;
+	}
+
+	private void RemoveUnsupportedProjectileGems()
+	{
+		if (BuildCatalog.HasRangedActiveSkill(_buildLoadout))
+		{
+			return;
+		}
+
+		for (int index = 0; index < _buildLoadout.SkillGemIds.Length; index++)
+		{
+			if (BuildCatalog.IsProjectileSupportGem(_buildLoadout.SkillGemIds[index]))
+			{
+				_buildLoadout.SkillGemIds[index] = "gem.skill.none";
+				_buildLoadout.SkillGemLevels[index] = 1;
+			}
+		}
 	}
 
 	private void RecalculateBuildStats()
@@ -978,6 +1014,11 @@ public partial class SimpleActor : CharacterBody3D
 			: ElementChart.GetMultiplier(attacker.CurrentBuildStats.DamageElementId, CurrentBuildStats.DamageElementId);
 		int elementalDamage = Mathf.Max(Mathf.RoundToInt(rawDamage * elementMultiplier * CurrentBuildStats.IncomingDamageMultiplier), 1);
 		int mitigatedDamage = Mathf.Max(elementalDamage - Mathf.RoundToInt(EffectiveDefense * 0.35f), 1);
+		if (CurrentBuildStats.HasShieldSkill)
+		{
+			mitigatedDamage = Mathf.Max(Mathf.RoundToInt(mitigatedDamage * 0.78f), 1);
+			SpawnCombatEffect(string.Empty, new Color(0.35f, 0.78f, 1.0f, 0.78f), GlobalPosition + new Vector3(0.0f, 1.0f, 0.0f), 0.28f, 0.82f);
+		}
 		RememberAttacker(attacker);
 		CurrentHealth = Mathf.Max(CurrentHealth - mitigatedDamage, 0);
 		SpawnCombatEffect(mitigatedDamage, attacker?.GetAttackColor() ?? new Color(1.0f, 0.5f, 0.22f, 0.92f));
@@ -1930,8 +1971,9 @@ public partial class SimpleActor : CharacterBody3D
 		toTarget.Y = 0.0f;
 		Vector3 forward = toTarget.LengthSquared() > 0.001f ? toTarget.Normalized() : -GlobalTransform.Basis.Z;
 
-		int projectileCount = 1 + Mathf.Max(stats.Behavior.ExtraProjectiles, 0);
-		float spreadStep = Mathf.DegToRad(14.0f);
+		bool usesWhirlwind = isMelee && BuildLoadout.HasSkill("gem.skill.whirlwind");
+		int projectileCount = usesWhirlwind ? 3 : 1 + Mathf.Max(stats.Behavior.ExtraProjectiles, 0);
+		float spreadStep = Mathf.DegToRad(usesWhirlwind ? 32.0f : 14.0f);
 		for (int index = 0; index < projectileCount; index++)
 		{
 			float angle = (index - (projectileCount - 1) / 2.0f) * spreadStep;
@@ -1956,6 +1998,7 @@ public partial class SimpleActor : CharacterBody3D
 			EffectColor = GetAttackColor(),
 			IsMelee = isMelee,
 			IsArrow = UsesArrowProjectile(false),
+			VisualSkillId = stats.ActiveRangedSkillId,
 			Speed = isMelee ? 26.0f : 17.0f,
 			MaxRange = Mathf.Max(EffectiveAttackRange * 1.6f, isMelee ? 3.0f : 9.0f),
 			HitRadius = isMelee ? 1.35f : 1.0f,
@@ -2003,6 +2046,7 @@ public partial class SimpleActor : CharacterBody3D
 	{
 		var results = new List<SimpleActor>();
 		float radiusSquared = radius * radius;
+		center.Y = 0.0f;
 		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
 		{
 			if (node is not SimpleActor actor || !actor.IsHostileToPlayer)
@@ -2015,7 +2059,9 @@ public partial class SimpleActor : CharacterBody3D
 				continue;
 			}
 
-			if (center.DistanceSquaredTo(actor.GlobalPosition) <= radiusSquared)
+			Vector3 actorPosition = actor.GlobalPosition;
+			actorPosition.Y = 0.0f;
+			if (center.DistanceSquaredTo(actorPosition) <= radiusSquared)
 			{
 				results.Add(actor);
 			}
@@ -2475,7 +2521,7 @@ public partial class SimpleActor : CharacterBody3D
 
 	private bool UsesProjectileAttack(bool isHealing)
 	{
-		return isHealing || IsRangedCombatant;
+		return isHealing || IsRangedCombatant || BuildCatalog.HasRangedActiveSkill(BuildLoadout);
 	}
 
 	private bool UsesArrowProjectile(bool isHealing)

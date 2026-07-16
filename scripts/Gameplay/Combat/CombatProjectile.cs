@@ -20,6 +20,7 @@ public partial class CombatProjectile : Node3D
 	public Color EffectColor { get; set; } = new(1.0f, 0.5f, 0.18f, 0.92f);
 	public bool IsMelee { get; set; }
 	public bool IsArrow { get; set; }
+	public string VisualSkillId { get; set; } = string.Empty;
 	public float Speed { get; set; } = 17.0f;
 	public float MaxRange { get; set; } = 10.0f;
 	public float HitRadius { get; set; } = 1.15f;
@@ -64,13 +65,14 @@ public partial class CombatProjectile : Node3D
 		SteerTowardHoming(step);
 
 		float distance = Speed * step;
+		Vector3 previousPosition = GlobalPosition;
 		GlobalPosition += _direction * distance;
 		_traveled += distance;
 		RotationDegrees += IsMelee
 			? new Vector3(0.0f, 900.0f * step, 0.0f)
 			: new Vector3(220.0f * step, 0.0f, 420.0f * step);
 
-		SimpleActor? victim = FindImpact();
+		SimpleActor? victim = FindImpact(previousPosition, GlobalPosition);
 		if (victim != null)
 		{
 			ResolveHit(victim);
@@ -96,7 +98,7 @@ public partial class CombatProjectile : Node3D
 		FaceTravelDirection();
 	}
 
-	private SimpleActor? FindImpact()
+	private SimpleActor? FindImpact(Vector3 from, Vector3 to)
 	{
 		if (Attacker == null)
 		{
@@ -104,13 +106,24 @@ public partial class CombatProjectile : Node3D
 		}
 
 		SimpleActor? closest = null;
-		float bestDistanceSq = HitRadius * HitRadius;
-		foreach (SimpleActor candidate in Attacker.FindProjectileTargets(GlobalPosition, HitRadius, _alreadyHit))
+		float bestPathProgress = float.MaxValue;
+		Vector3 flatFrom = new(from.X, 0.0f, from.Z);
+		Vector3 flatTo = new(to.X, 0.0f, to.Z);
+		Vector3 segment = flatTo - flatFrom;
+		float segmentLengthSquared = segment.LengthSquared();
+		Vector3 midpoint = (flatFrom + flatTo) * 0.5f;
+		float searchRadius = HitRadius + Mathf.Sqrt(segmentLengthSquared) * 0.5f;
+		foreach (SimpleActor candidate in Attacker.FindProjectileTargets(midpoint, searchRadius, _alreadyHit))
 		{
-			float distanceSq = GlobalPosition.DistanceSquaredTo(candidate.GlobalPosition);
-			if (distanceSq <= bestDistanceSq)
+			Vector3 targetPosition = candidate.GlobalPosition;
+			targetPosition.Y = 0.0f;
+			float progress = segmentLengthSquared > 0.0001f
+				? Mathf.Clamp((targetPosition - flatFrom).Dot(segment) / segmentLengthSquared, 0.0f, 1.0f)
+				: 0.0f;
+			Vector3 nearestPoint = flatFrom + segment * progress;
+			if (nearestPoint.DistanceSquaredTo(targetPosition) <= HitRadius * HitRadius && progress < bestPathProgress)
 			{
-				bestDistanceSq = distanceSq;
+				bestPathProgress = progress;
 				closest = candidate;
 			}
 		}
@@ -211,6 +224,7 @@ public partial class CombatProjectile : Node3D
 				EffectColor = EffectColor,
 				IsMelee = false,
 				IsArrow = IsArrow,
+				VisualSkillId = VisualSkillId,
 				Speed = Speed * 0.95f,
 				MaxRange = ChainSearchRadius,
 				HitRadius = HitRadius,
@@ -336,6 +350,27 @@ public partial class CombatProjectile : Node3D
 				new Vector3(90.0f, 0.0f, 0.0f),
 				EffectColor
 			);
+			return;
+		}
+
+		if (VisualSkillId == "gem.skill.laser")
+		{
+			AddFxMesh("LaserCore", new CapsuleMesh { Radius = 0.10f, Height = 1.45f }, Vector3.Zero, new Vector3(90.0f, 0.0f, 0.0f), new Color(0.55f, 0.92f, 1.0f, 0.96f));
+			AddFxMesh("LaserGlow", new CapsuleMesh { Radius = 0.20f, Height = 1.15f }, Vector3.Zero, new Vector3(90.0f, 0.0f, 0.0f), new Color(EffectColor.R, EffectColor.G, EffectColor.B, 0.38f));
+			return;
+		}
+
+		if (VisualSkillId == "gem.skill.meteor")
+		{
+			AddFxMesh("MeteorCore", new SphereMesh { Radius = 0.36f, Height = 0.72f }, Vector3.Zero, Vector3.Zero, new Color(0.30f, 0.20f, 0.16f, 1.0f));
+			AddFxMesh("MeteorFlame", new SphereMesh { Radius = 0.48f, Height = 0.96f }, new Vector3(0.0f, 0.0f, 0.24f), Vector3.Zero, new Color(1.0f, 0.28f, 0.05f, 0.62f));
+			return;
+		}
+
+		if (VisualSkillId == "gem.skill.fireball")
+		{
+			AddFxMesh("FireballCore", new SphereMesh { Radius = 0.30f, Height = 0.60f }, Vector3.Zero, Vector3.Zero, new Color(1.0f, 0.78f, 0.18f, 1.0f));
+			AddFxMesh("FireballFlame", new SphereMesh { Radius = 0.42f, Height = 0.84f }, new Vector3(0.0f, 0.0f, 0.18f), Vector3.Zero, new Color(1.0f, 0.18f, 0.03f, 0.58f));
 			return;
 		}
 
