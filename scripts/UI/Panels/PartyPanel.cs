@@ -8,7 +8,6 @@ public partial class PartyPanel : PanelContainer
 	private Label _titleLabel = null!;
 	private Label _nameLabel = null!;
 	private Label _roleLabel = null!;
-	private Label _healthLabel = null!;
 	private Label _levelLabel = null!;
 	private Label _attackLabel = null!;
 	private Label _defenseLabel = null!;
@@ -21,11 +20,11 @@ public partial class PartyPanel : PanelContainer
 	private Label _passiveLabel = null!;
 	private Label _affinityLabel = null!;
 	private Label _stateLabel = null!;
-	private Label _buildPowerLabel = null!;
 	private Label _elementLabel = null!;
 	private Label _equipmentLabel = null!;
 	private Label _skillGemsLabel = null!;
 	private Label _attackModeLabel = null!;
+	private CompanionInfoCard _companionInfoCard = null!;
 	private Button _helmetButton = null!;
 	private Button _weaponButton = null!;
 	private Button _armorButton = null!;
@@ -35,7 +34,6 @@ public partial class PartyPanel : PanelContainer
 	private Button _skillGem2Button = null!;
 	private Button _skillGem3Button = null!;
 	private Button _attackModeButton = null!;
-	private ProgressBar _healthBar = null!;
 	private PopupMenu _memberContextMenu = null!;
 	private SimpleActor? _contextActor;
 	private GodotObject? _selected;
@@ -205,53 +203,12 @@ public partial class PartyPanel : PanelContainer
 		_roleLabel = MakeLabel(14, new Color(0.72f, 0.82f, 0.92f));
 		detailRows.AddChild(_roleLabel);
 
-		_healthBar = new ProgressBar
+		_companionInfoCard = new CompanionInfoCard
 		{
-			MinValue = 0.0,
-			MaxValue = 100.0,
-			ShowPercentage = false,
-			CustomMinimumSize = new Vector2(0.0f, 16.0f),
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 		};
-		detailRows.AddChild(_healthBar);
+		detailRows.AddChild(_companionInfoCard);
 
-		_healthLabel = MakeLabel(14, new Color(0.94f, 0.94f, 0.94f));
-		detailRows.AddChild(_healthLabel);
-
-		_levelLabel = AddStatRow(detailRows, "stat.level");
-		_attackLabel = AddStatRow(detailRows, "stat.attack");
-		_defenseLabel = AddStatRow(detailRows, "stat.defense");
-		_speedLabel = AddStatRow(detailRows, "stat.speed");
-		_combatRoleLabel = AddStatRow(detailRows, "stat.role");
-		_personalityLabel = AddStatRow(detailRows, "stat.personality");
-		_passiveLabel = AddStatRow(detailRows, "build.traits");
-		_affinityLabel = AddStatRow(detailRows, "stat.affinity");
-		_growthLabel = AddStatRow(detailRows, "stat.growth");
-		_experienceLabel = AddStatRow(detailRows, "stat.experience");
-		_abilityLabel = AddStatRow(detailRows, "stat.ability");
-		_stateLabel = AddStatRow(detailRows, "stat.state");
-		_buildPowerLabel = AddStatRow(detailRows, "build.power");
-		_elementLabel = AddStatRow(detailRows, "build.element");
-		_equipmentLabel = AddStatRow(detailRows, "build.equipment");
-		_skillGemsLabel = AddStatRow(detailRows, "build.skill_gems");
-		_attackModeLabel = AddStatRow(detailRows, "build.attack_mode");
-
-		var buildButtonGrid = new GridContainer
-		{
-			Columns = 3,
-		};
-		buildButtonGrid.AddThemeConstantOverride("h_separation", 8);
-		buildButtonGrid.AddThemeConstantOverride("v_separation", 8);
-		detailRows.AddChild(buildButtonGrid);
-
-		_helmetButton = AddBuildButton(buildButtonGrid, OnHelmetPressed);
-		_weaponButton = AddBuildButton(buildButtonGrid, OnWeaponPressed);
-		_armorButton = AddBuildButton(buildButtonGrid, OnArmorPressed);
-		_accessoryButton = AddBuildButton(buildButtonGrid, OnAccessoryPressed);
-		_attributeGemButton = AddBuildButton(buildButtonGrid, OnAttributeGemPressed);
-		_attackModeButton = AddBuildButton(buildButtonGrid, OnAttackModePressed);
-		_skillGem1Button = AddBuildButton(buildButtonGrid, () => OnSkillGemPressed(0));
-		_skillGem2Button = AddBuildButton(buildButtonGrid, () => OnSkillGemPressed(1));
-		_skillGem3Button = AddBuildButton(buildButtonGrid, () => OnSkillGemPressed(2));
 
 		_memberContextMenu = new PopupMenu
 		{
@@ -338,55 +295,15 @@ public partial class PartyPanel : PanelContainer
 		if (_selected is SimpleActor actor && IsInstanceValid(actor))
 		{
 			_nameLabel.Text = actor.LocalizedDisplayName;
-			_roleLabel.Text = $"{actor.TypeName} / {actor.CombatSummary}";
-			_healthBar.Value = actor.HealthRatio * 100.0f;
-			_healthLabel.Text = LocaleText.F("stat.health_value", actor.CurrentHealth, actor.EffectiveMaxHealth);
-			_levelLabel.Text = actor.Level.ToString();
-			_attackLabel.Text = LocaleText.F("build.effective_stat", actor.EffectiveAttack, actor.Attack);
-			_defenseLabel.Text = LocaleText.F("build.effective_stat", actor.EffectiveDefense, actor.Defense);
-			_speedLabel.Text = actor.EffectiveMoveSpeed.ToString("0.0");
-			_combatRoleLabel.Text = actor.CombatRoleName;
-			_personalityLabel.Text = actor.LocalizedPersonality;
-			_passiveLabel.Text = actor.TraitSummary;
-			_affinityLabel.Text = $"{actor.Affinity} / 100";
-			_growthLabel.Text = actor.GrowthName;
-			_experienceLabel.Text = $"{actor.Experience} / {actor.ExperienceToNextLevel}";
-			_abilityLabel.Text = $"{actor.LocalizedSpecialAbility} {LocaleText.T("actor.level_prefix")}{actor.AbilityRank}";
-			_stateLabel.Text = _player.IsMountedCompanion(actor)
-				? $"{actor.StateName} / 寵物騎乘中"
-				: actor.StateName;
-			_buildPowerLabel.Text = actor.CurrentBuildStats.BuildPower.ToString();
-			_elementLabel.Text = $"{actor.BuildElementName} / {actor.BuildRareComboName}";
-			_equipmentLabel.Text = LocaleText.F("build.equipment_summary", actor.BuildEquipmentSummary, actor.CurrentBuildStats.EquipmentSocketCount);
-			_skillGemsLabel.Text = actor.BuildSkillSummary;
-			_attackModeLabel.Text = actor.AttackModeName;
-			UpdateBuildButtons(actor);
+			_roleLabel.Text = LocaleText.F("inventory.info_header", actor.Level);
+			_companionInfoCard.SetActor(actor);
 			return;
 		}
 
 		_selected = _player;
 		_nameLabel.Text = _player.LocalizedPlayerName;
 		_roleLabel.Text = LocaleText.T("party.player_role");
-		_healthBar.Value = _player.HealthRatio * 100.0f;
-		_healthLabel.Text = LocaleText.F("stat.health_value", _player.CurrentHealth, _player.MaxHealth);
-		_levelLabel.Text = _player.Level.ToString();
-		_attackLabel.Text = _player.Attack.ToString();
-		_defenseLabel.Text = _player.Defense.ToString();
-		_speedLabel.Text = _player.WalkSpeed.ToString("0.0");
-		_combatRoleLabel.Text = LocaleText.T("party.leader");
-		_personalityLabel.Text = "-";
-		_passiveLabel.Text = "-";
-		_affinityLabel.Text = "-";
-		_growthLabel.Text = "-";
-		_experienceLabel.Text = "-";
-		_abilityLabel.Text = "-";
-		_stateLabel.Text = LocaleText.T("party.playable");
-		_buildPowerLabel.Text = "-";
-		_elementLabel.Text = "-";
-		_equipmentLabel.Text = "-";
-		_skillGemsLabel.Text = "-";
-		_attackModeLabel.Text = "-";
-		SetBuildButtonsDisabled(true);
+		_companionInfoCard.SetActor(null);
 	}
 
 	private void UpdateBuildButtons(SimpleActor actor)

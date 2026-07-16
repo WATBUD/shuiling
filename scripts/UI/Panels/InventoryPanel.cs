@@ -33,11 +33,9 @@ public partial class InventoryPanel : PanelContainer
 	private GridContainer _itemGrid = null!;
 	private Label _titleLabel = null!;
 	private Label _goldLabel = null!;
-	private Label _companionInfoTitleLabel = null!;
-	private Label _companionInfoBodyLabel = null!;
 	private Label _selectedSlotLabel = null!;
 	private Label _buildSummaryLabel = null!;
-	private Label _abilityInfoLabel = null!;
+	private CompanionInfoCard _companionInfoCard = null!;
 	private Label _bagCountLabel = null!;
 	private Label _itemDetailTitleLabel = null!;
 	private Label _itemDetailBodyLabel = null!;
@@ -188,8 +186,18 @@ public partial class InventoryPanel : PanelContainer
 		_companionList = MakeScrollableList(companionSection);
 
 		// Middle (merged panel): equipment slots on top, character / ability info below.
+		var buildScroll = new ScrollContainer
+		{
+			CustomMinimumSize = new Vector2(330.0f, 0.0f),
+			HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+			VerticalScrollMode = ScrollContainer.ScrollMode.Auto,
+			SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+		};
+		content.AddChild(buildScroll);
 		var buildSection = MakeSection(LocaleText.T("inventory.equipment_slots"), new Vector2(330.0f, 0.0f));
-		content.AddChild(buildSection);
+		buildSection.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		buildSection.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
+		buildScroll.AddChild(buildSection);
 
 		_buildSummaryLabel = MakeLabel(13, new Color(0.74f, 0.83f, 0.90f));
 		buildSection.AddChild(_buildSummaryLabel);
@@ -215,34 +223,12 @@ public partial class InventoryPanel : PanelContainer
 		infoHeader.Text = LocaleText.T("inventory.companion_info");
 		buildSection.AddChild(infoHeader);
 
-		var infoPanel = MakeInfoPanel(new Vector2(0.0f, 130.0f));
-		infoPanel.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-		buildSection.AddChild(infoPanel);
-		var infoMargin = new MarginContainer();
-		infoMargin.AddThemeConstantOverride("margin_left", 10);
-		infoMargin.AddThemeConstantOverride("margin_right", 10);
-		infoMargin.AddThemeConstantOverride("margin_top", 8);
-		infoMargin.AddThemeConstantOverride("margin_bottom", 8);
-		infoPanel.AddChild(infoMargin);
-		var infoRows = new VBoxContainer();
-		infoRows.AddThemeConstantOverride("separation", 5);
-		infoMargin.AddChild(infoRows);
-		_companionInfoTitleLabel = MakeLabel(14, new Color(1.0f, 0.92f, 0.58f));
-		infoRows.AddChild(_companionInfoTitleLabel);
-
-		// Two-column stat readout so a detailed panel stays short enough to fit.
-		var infoColumns = new HBoxContainer();
-		infoColumns.AddThemeConstantOverride("separation", 14);
-		infoColumns.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-		infoRows.AddChild(infoColumns);
-		_companionInfoBodyLabel = MakeLabel(12, new Color(0.80f, 0.87f, 0.93f));
-		_companionInfoBodyLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-		_companionInfoBodyLabel.VerticalAlignment = VerticalAlignment.Top;
-		infoColumns.AddChild(_companionInfoBodyLabel);
-		_abilityInfoLabel = MakeLabel(12, new Color(0.74f, 0.88f, 0.80f));
-		_abilityInfoLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-		_abilityInfoLabel.VerticalAlignment = VerticalAlignment.Top;
-		infoColumns.AddChild(_abilityInfoLabel);
+		_companionInfoCard = new CompanionInfoCard
+		{
+			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+			SizeFlagsVertical = Control.SizeFlags.ShrinkBegin,
+		};
+		buildSection.AddChild(_companionInfoCard);
 
 		var itemSection = MakeSection(LocaleText.T("inventory.items"), new Vector2(320.0f, 0.0f));
 		itemSection.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
@@ -1030,37 +1016,13 @@ public partial class InventoryPanel : PanelContainer
 	{
 		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
 		{
-			_companionInfoTitleLabel.Text = LocaleText.T("inventory.companion_info");
-			_companionInfoBodyLabel.Text = LocaleText.T("inventory.no_companions");
-			_abilityInfoLabel.Text = string.Empty;
+			_companionInfoCard.SetActor(null);
 			_selectedSlotLabel.Text = string.Empty;
 			_buildSummaryLabel.Text = string.Empty;
 			return;
 		}
 
-		BuildStats stats = _selectedActor.CurrentBuildStats;
-		_companionInfoTitleLabel.Text = LocaleText.F("inventory.info_header", _selectedActor.Level, stats.BuildPower);
-		_companionInfoBodyLabel.Text = LocaleText.F(
-			"inventory.stats_column",
-			_selectedActor.CurrentHealth,
-			_selectedActor.EffectiveMaxHealth,
-			_selectedActor.EffectiveAttack,
-			_selectedActor.EffectiveDefense,
-			_selectedActor.EffectiveAttackRange.ToString("0.0"),
-			_selectedActor.EffectiveDetectionRadius.ToString("0.0"),
-			Mathf.RoundToInt(stats.CritChance * 100.0f),
-			_selectedActor.EffectiveMoveSpeed.ToString("0.0")
-		);
-		_abilityInfoLabel.Text = LocaleText.F(
-			"inventory.meta_column",
-			_selectedActor.AttackModeName,
-			_selectedActor.Affinity,
-			_selectedActor.BuildElementName,
-			_selectedActor.CombatRoleName,
-			_selectedActor.LocalizedPersonality,
-			_selectedActor.LocalizedPassiveAbility,
-			_selectedActor.LocalizedSpecialAbility
-		);
+		_companionInfoCard.SetActor(_selectedActor);
 		_buildSummaryLabel.Text = _selectedActor.BuildRareComboName;
 		_selectedSlotLabel.Text = LocaleText.F("inventory.selected_slot", GetTargetName(_selectedTarget));
 	}

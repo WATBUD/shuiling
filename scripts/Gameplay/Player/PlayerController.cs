@@ -105,6 +105,8 @@ public partial class PlayerController : CharacterBody3D
 		new("mercenary.offer.scout", "name.mercenary.scout", "role.gatherer", "Gatherer", "mercenary.summary.scout", 2, 180, 118, 17, 12),
 	};
 	private float _cameraYaw;
+	private float _thirdPersonCameraYaw;
+	private float _godViewCameraYaw;
 	private float _cameraPitch = 0.08f;
 	private bool _isRightMouseLookActive;
 	private CameraViewMode _cameraMode = CameraViewMode.ThirdPerson;
@@ -341,14 +343,17 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
-		if (@event is InputEventMouseMotion mouseMotion && Input.MouseMode == Input.MouseModeEnum.Captured && _isRightMouseLookActive)
+		if (@event is InputEventMouseMotion mouseMotion && Input.MouseMode == Input.MouseModeEnum.Captured && (_cameraMode == CameraViewMode.ThirdPerson || _isRightMouseLookActive))
 		{
 			_cameraYaw = Mathf.Wrap(
 				_cameraYaw - mouseMotion.Relative.X * HorizontalLookSensitivity,
 				-Mathf.Pi,
 				Mathf.Pi
 			);
-			Rotation = new Vector3(Rotation.X, _cameraYaw, Rotation.Z);
+			if (_cameraMode == CameraViewMode.ThirdPerson)
+			{
+				Rotation = new Vector3(Rotation.X, _cameraYaw, Rotation.Z);
+			}
 			if (_cameraMode == CameraViewMode.ThirdPerson)
 			{
 				_cameraPitch = Mathf.Clamp(
@@ -1031,7 +1036,17 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
+		if (_cameraMode == CameraViewMode.ThirdPerson)
+		{
+			_thirdPersonCameraYaw = _cameraYaw;
+		}
+		else
+		{
+			_godViewCameraYaw = _cameraYaw;
+		}
+
 		_cameraMode = mode;
+		_cameraYaw = mode == CameraViewMode.ThirdPerson ? _thirdPersonCameraYaw : _godViewCameraYaw;
 		ApplyCameraModeSettings();
 		UpdateMouseModeForPanels();
 		UpdateCamera();

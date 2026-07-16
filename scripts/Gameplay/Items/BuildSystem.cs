@@ -168,7 +168,6 @@ public sealed class BuildStats
 	public float ControlChance { get; set; }
 	public float IncomingDamageMultiplier { get; set; } = 1.0f;
 	public int EquipmentSocketCount { get; set; }
-	public int BuildPower { get; set; }
 	public bool HasHealSkill { get; set; }
 	public bool HasShieldSkill { get; set; }
 	public string IdentityId { get; set; } = string.Empty;
@@ -592,7 +591,6 @@ public static class BuildCatalog
 		stats.MaxHealth = Mathf.Max(stats.MaxHealth, 1);
 		stats.Attack = Mathf.Max(stats.Attack, 1);
 		stats.Defense = Mathf.Max(stats.Defense, 0);
-		stats.BuildPower = Mathf.RoundToInt(stats.MaxHealth * 0.22f + stats.Attack * 3.0f + stats.Defense * 2.1f + stats.CritChance * 120.0f + stats.AttackRangeBonus * 9.0f);
 		return stats;
 	}
 
