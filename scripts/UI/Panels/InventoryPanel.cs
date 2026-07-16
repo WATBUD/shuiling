@@ -1,5 +1,50 @@
 using Godot;
+using System;
 using System.Collections.Generic;
+
+public partial class InventoryItemDragButton : Button
+{
+	public string DragItemId { get; set; } = string.Empty;
+
+	public override Variant _GetDragData(Vector2 atPosition)
+	{
+		if (string.IsNullOrEmpty(DragItemId))
+		{
+			return default;
+		}
+
+		var preview = new Button
+		{
+			Text = Text,
+			Icon = Icon,
+			CustomMinimumSize = new Vector2(64.0f, 72.0f),
+			MouseFilter = MouseFilterEnum.Ignore,
+			Modulate = new Color(1.0f, 1.0f, 1.0f, 0.88f),
+		};
+		SetDragPreview(preview);
+		return DragItemId;
+	}
+}
+
+public partial class InventoryEquipDropButton : Button
+{
+	public Func<string, bool>? CanAcceptItem { get; set; }
+	public Action<string>? ItemDropped { get; set; }
+
+	public override bool _CanDropData(Vector2 atPosition, Variant data)
+	{
+		return data.VariantType == Variant.Type.String
+			&& CanAcceptItem?.Invoke(data.AsString()) == true;
+	}
+
+	public override void _DropData(Vector2 atPosition, Variant data)
+	{
+		if (data.VariantType == Variant.Type.String)
+		{
+			ItemDropped?.Invoke(data.AsString());
+		}
+	}
+}
 
 public partial class InventoryPanel : PanelContainer
 {
@@ -378,7 +423,13 @@ public partial class InventoryPanel : PanelContainer
 
 	private Button AddSlotButton(GridContainer parent, EquipTarget target)
 	{
-		var button = MakeButton(string.Empty);
+		var button = new InventoryEquipDropButton
+		{
+			Text = string.Empty,
+			CanAcceptItem = itemId => IsCompatibleItemForTarget(itemId, target),
+			ItemDropped = itemId => EquipItemToTarget(itemId, target),
+		};
+		ApplyButtonStyle(button);
 		button.CustomMinimumSize = new Vector2(0.0f, 42.0f);
 		button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 		button.Pressed += () => SelectTarget(target);
@@ -652,7 +703,14 @@ public partial class InventoryPanel : PanelContainer
 	{
 		int count = _player?.GetInventoryCount(itemId) ?? 0;
 		string countText = BuildCatalog.IsFreeItem(itemId) ? string.Empty : $"x{count}";
-		var button = MakeButton(countText);
+		var button = new InventoryItemDragButton
+		{
+			Text = countText,
+			DragItemId = BuildCatalog.GetItemKind(itemId) is InventoryItemKind.AttributeGem or InventoryItemKind.SkillGem
+				? itemId
+				: string.Empty,
+		};
+		ApplyButtonStyle(button);
 		button.CustomMinimumSize = new Vector2(64.0f, 72.0f);
 		button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 		button.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
@@ -703,6 +761,15 @@ public partial class InventoryPanel : PanelContainer
 		}
 		else if (kind == InventoryItemKind.SkillGem)
 		{
+			int emptySlot = FindFirstEmptySkillGemSlot(loadout);
+			if (emptySlot >= 0)
+			{
+				_selectedTarget = SkillTargetFromIndex(emptySlot);
+				_selectedActor.EquipSkillGem(emptySlot, itemId);
+				RefreshAll();
+				return;
+			}
+
 			for (int index = 0; index < loadout.SkillGemIds.Length; index++)
 			{
 				if (loadout.SkillGemIds[index] == itemId)
@@ -715,6 +782,29 @@ public partial class InventoryPanel : PanelContainer
 		}
 
 		EquipItem(itemId);
+	}
+
+	private static int FindFirstEmptySkillGemSlot(CompanionBuildLoadout loadout)
+	{
+		for (int index = 0; index < loadout.SkillGemIds.Length; index++)
+		{
+			if (loadout.SkillGemIds[index] == "gem.skill.none")
+			{
+				return index;
+			}
+		}
+
+		return -1;
+	}
+
+	private static EquipTarget SkillTargetFromIndex(int index)
+	{
+		return index switch
+		{
+			0 => EquipTarget.SkillGem1,
+			1 => EquipTarget.SkillGem2,
+			_ => EquipTarget.SkillGem3,
+		};
 	}
 
 	private static string GetEmptyEquipmentId(EquipmentSlot slot)
@@ -841,6 +931,14 @@ public partial class InventoryPanel : PanelContainer
 	private bool IsCompatibleItemForTarget(string itemId, EquipTarget target)
 	{
 		if (MonsterLootCatalog.IsMonsterLoot(itemId))
+		{
+			return false;
+		}
+
+		InventoryItemKind kind = BuildCatalog.GetItemKind(itemId);
+		if (kind == InventoryItemKind.SkillGem
+			&& BuildCatalog.IsProjectileSupportGem(itemId)
+			&& (_selectedActor == null || !IsInstanceValid(_selectedActor) || !BuildCatalog.HasRangedActiveSkill(_selectedActor.BuildLoadout)))
 		{
 			return false;
 		}
@@ -995,6 +1093,18 @@ public partial class InventoryPanel : PanelContainer
 
 		HideItemTooltip();
 		RefreshAll();
+	}
+
+	private void EquipItemToTarget(string itemId, EquipTarget target)
+	{
+		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor)
+			|| !_player.HasInventoryItem(itemId) || !IsCompatibleItemForTarget(itemId, target))
+		{
+			return;
+		}
+
+		_selectedTarget = target;
+		EquipItem(itemId);
 	}
 
 	private void OnEquipSelectedPressed()
@@ -1173,7 +1283,12 @@ public partial class InventoryPanel : PanelContainer
 
 	private static void AppendSkillGemTooltip(List<string> lines, SkillGemDefinition item)
 	{
+		lines.Add(LocaleText.F("tooltip.gem_category", LocaleText.T(BuildCatalog.GetSkillGemCategoryKey(item.Id))));
 		AddSummaryLine(lines, item.SummaryKey);
+		if (BuildCatalog.IsProjectileSupportGem(item.Id))
+		{
+			lines.Add(LocaleText.T("tooltip.requires_ranged_skill"));
+		}
 		AddStatLine(lines, "stat.health", item.MaxHealthBonus);
 		AddStatLine(lines, "stat.attack", item.AttackBonus);
 		AddStatLine(lines, "stat.defense", item.DefenseBonus);
@@ -1340,7 +1455,12 @@ public partial class InventoryPanel : PanelContainer
 	private static Button MakeButton(string text)
 	{
 		var button = new Button { Text = text };
-		button.AddThemeFontSizeOverride("font_size", 13);
+		ApplyButtonStyle(button);
 		return button;
+	}
+
+	private static void ApplyButtonStyle(Button button)
+	{
+		button.AddThemeFontSizeOverride("font_size", 13);
 	}
 }

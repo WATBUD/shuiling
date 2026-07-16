@@ -87,6 +87,7 @@ public sealed class SkillGemDefinition
 	public float LifeStealPercent { get; set; }
 	public bool EnablesHeal { get; set; }
 	public bool EnablesShield { get; set; }
+	public bool IsRangedActiveSkill { get; set; }
 
 	// PoE-style attack behavior. A gem either just tweaks stats (BehaviorId == None)
 	// or attaches a projectile behavior that shapes how the base attack plays out.
@@ -170,6 +171,7 @@ public sealed class BuildStats
 	public int EquipmentSocketCount { get; set; }
 	public bool HasHealSkill { get; set; }
 	public bool HasShieldSkill { get; set; }
+	public string ActiveRangedSkillId { get; set; } = string.Empty;
 	public string IdentityId { get; set; } = string.Empty;
 	public string DamageElementId { get; set; } = "physical";
 	public string DamageElementNameKey { get; set; } = "element.physical";
@@ -437,13 +439,13 @@ public static class BuildCatalog
 	private static readonly List<SkillGemDefinition> SkillGems = new()
 	{
 		new SkillGemDefinition { Id = "gem.skill.none", NameKey = "gem.skill.none", SummaryKey = "gem.skill.summary.none" },
-		new SkillGemDefinition { Id = "gem.skill.fireball", NameKey = "gem.skill.fireball", SummaryKey = "gem.skill.summary.fireball", AttackBonus = 5, AttackRangeBonus = 2.0f },
+		new SkillGemDefinition { Id = "gem.skill.fireball", NameKey = "gem.skill.fireball", SummaryKey = "gem.skill.summary.fireball", AttackBonus = 5, AttackRangeBonus = 2.0f, IsRangedActiveSkill = true },
 		new SkillGemDefinition { Id = "gem.skill.heal", NameKey = "gem.skill.heal", SummaryKey = "gem.skill.summary.heal", DefenseBonus = 3, EnablesHeal = true },
 		new SkillGemDefinition { Id = "gem.skill.shield", NameKey = "gem.skill.shield", SummaryKey = "gem.skill.summary.shield", MaxHealthBonus = 20, DefenseBonus = 10, EnablesShield = true },
 		new SkillGemDefinition { Id = "gem.skill.whirlwind", NameKey = "gem.skill.whirlwind", SummaryKey = "gem.skill.summary.whirlwind", AttackBonus = 4, DefenseBonus = 2, AttackCooldownReduction = 0.04f },
-		new SkillGemDefinition { Id = "gem.skill.meteor", NameKey = "gem.skill.meteor", SummaryKey = "gem.skill.summary.meteor", AttackBonus = 12, AttackRangeBonus = 1.2f, AttackCooldownReduction = -0.08f },
+		new SkillGemDefinition { Id = "gem.skill.meteor", NameKey = "gem.skill.meteor", SummaryKey = "gem.skill.summary.meteor", AttackBonus = 12, AttackRangeBonus = 1.2f, AttackCooldownReduction = -0.08f, IsRangedActiveSkill = true },
 		new SkillGemDefinition { Id = "gem.skill.dash", NameKey = "gem.skill.dash", SummaryKey = "gem.skill.summary.dash", MoveSpeedBonus = 0.18f, AttackCooldownReduction = 0.08f },
-		new SkillGemDefinition { Id = "gem.skill.laser", NameKey = "gem.skill.laser", SummaryKey = "gem.skill.summary.laser", AttackBonus = 6, AttackRangeBonus = 3.2f, DetectionRadiusBonus = 2.0f },
+		new SkillGemDefinition { Id = "gem.skill.laser", NameKey = "gem.skill.laser", SummaryKey = "gem.skill.summary.laser", AttackBonus = 6, AttackRangeBonus = 3.2f, DetectionRadiusBonus = 2.0f, IsRangedActiveSkill = true },
 		new SkillGemDefinition { Id = "gem.skill.summon", NameKey = "gem.skill.summon", SummaryKey = "gem.skill.summary.summon", MaxHealthBonus = 28, DefenseBonus = 4 },
 		new SkillGemDefinition { Id = "gem.skill.chain", NameKey = "gem.skill.chain", SummaryKey = "gem.skill.summary.chain", AttackBonus = 3, DetectionRadiusBonus = 2.0f, BehaviorId = ProjectileBehavior.Chain, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.water_core" },
 		new SkillGemDefinition { Id = "gem.skill.explosion", NameKey = "gem.skill.explosion", SummaryKey = "gem.skill.summary.explosion", AttackBonus = 7, AttackCooldownReduction = -0.04f, BehaviorId = ProjectileBehavior.Explosion, BehaviorRadius = 3.0f, UpgradeMaterialId = "loot.red_horn" },
@@ -578,9 +580,18 @@ public static class BuildCatalog
 		stats.ControlChance += attributeGem.ControlChance;
 		stats.KnockbackForce += attributeGem.KnockbackForce;
 
+		bool hasRangedActiveSkill = HasRangedActiveSkill(loadout);
 		for (int slot = 0; slot < loadout.SkillGemIds.Length; slot++)
 		{
 			SkillGemDefinition gem = GetSkillGem(loadout.SkillGemIds[slot]);
+			if (IsProjectileSupportGem(gem.Id) && !hasRangedActiveSkill)
+			{
+				continue;
+			}
+			if (gem.IsRangedActiveSkill && string.IsNullOrEmpty(stats.ActiveRangedSkillId))
+			{
+				stats.ActiveRangedSkillId = gem.Id;
+			}
 			ApplySkillGem(stats, gem);
 			AccumulateBehavior(stats.Behavior, gem, loadout.GetSkillGemLevel(slot));
 		}
@@ -829,6 +840,39 @@ public static class BuildCatalog
 	public static bool IsUpgradeableSkillGem(string gemId)
 	{
 		return GetSkillGem(gemId).BehaviorId != ProjectileBehavior.None;
+	}
+
+	public static bool IsRangedActiveSkillGem(string gemId) => GetSkillGem(gemId).IsRangedActiveSkill;
+
+	public static bool IsProjectileSupportGem(string gemId) => GetSkillGem(gemId).BehaviorId != ProjectileBehavior.None;
+
+	public static string GetSkillGemCategoryKey(string gemId)
+	{
+		SkillGemDefinition gem = GetSkillGem(gemId);
+		if (IsProjectileSupportGem(gemId))
+		{
+			return "tooltip.gem_category.support";
+		}
+
+		if (gem.IsRangedActiveSkill || gem.EnablesHeal || gem.EnablesShield || gemId == "gem.skill.whirlwind")
+		{
+			return "tooltip.gem_category.active";
+		}
+
+		return "tooltip.gem_category.effect";
+	}
+
+	public static bool HasRangedActiveSkill(CompanionBuildLoadout loadout)
+	{
+		foreach (string gemId in loadout.SkillGemIds)
+		{
+			if (IsRangedActiveSkillGem(gemId))
+			{
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	// Cost to raise a behavior gem from its current level to the next one, or null if
