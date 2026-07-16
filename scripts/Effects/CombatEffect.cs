@@ -3,7 +3,9 @@ using System.Collections.Generic;
 
 public partial class CombatEffect : Node3D
 {
-	private const float DamageTextRenderScale = 1.0f;
+	public const float MinimumDamageTextScale = 0.5f;
+	public const float MaximumDamageTextScale = 2.0f;
+	public static float DamageTextScale { get; private set; } = 1.0f;
 	[Export] public string Text { get; set; } = string.Empty;
 	[Export] public Color EffectColor { get; set; } = new(1.0f, 0.55f, 0.18f, 0.9f);
 	[Export] public float Lifetime { get; set; } = 0.52f;
@@ -16,6 +18,11 @@ public partial class CombatEffect : Node3D
 	private Label3D? _label;
 	private Label3D? _labelShadow;
 	private Label3D? _labelHighlight;
+
+	public static void SetDamageTextScale(float scale)
+	{
+		DamageTextScale = Mathf.Clamp(scale, MinimumDamageTextScale, MaximumDamageTextScale);
+	}
 
 	public override void _Ready()
 	{
@@ -42,6 +49,7 @@ public partial class CombatEffect : Node3D
 
 		if (_label != null)
 		{
+			float configuredTextScale = int.TryParse(Text, out _) ? DamageTextScale : 1.0f;
 			float popScale = t < 0.14f
 				? Mathf.Lerp(0.55f, 1.12f, t / 0.14f)
 				: t < 0.30f
@@ -51,10 +59,10 @@ public partial class CombatEffect : Node3D
 			Vector3 textPosition = new(_textDrift * t, 0.78f + rise, 0.0f);
 			Color mainColor = GetDamageTextColor();
 			_label.Position = textPosition;
-			_label.Scale = Vector3.One * (popScale * DamageTextRenderScale);
+			_label.Scale = Vector3.One * (popScale * configuredTextScale);
 			_label.Modulate = new Color(mainColor.R, mainColor.G, mainColor.B, alpha);
-			UpdateLayeredLabel(_labelShadow, textPosition + new Vector3(0.035f, -0.035f, 0.01f), popScale * DamageTextRenderScale, new Color(0.035f, 0.02f, 0.03f, alpha * 0.92f));
-			UpdateLayeredLabel(_labelHighlight, textPosition + new Vector3(-0.018f, 0.025f, -0.01f), popScale * 0.985f * DamageTextRenderScale, new Color(1.0f, 1.0f, 0.88f, alpha * 0.34f));
+			UpdateLayeredLabel(_labelShadow, textPosition + new Vector3(0.035f, -0.035f, 0.01f), popScale * configuredTextScale, new Color(0.035f, 0.02f, 0.03f, alpha * 0.92f));
+			UpdateLayeredLabel(_labelHighlight, textPosition + new Vector3(-0.018f, 0.025f, -0.01f), popScale * 0.985f * configuredTextScale, new Color(1.0f, 1.0f, 0.88f, alpha * 0.34f));
 		}
 
 		if (_age >= Lifetime)

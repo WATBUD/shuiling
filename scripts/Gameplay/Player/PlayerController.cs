@@ -67,7 +67,7 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float ThirdPersonDistance { get; set; } = 6.2f;
 	[Export] public float ThirdPersonCameraHeight { get; set; } = 3.35f;
 	[Export] public float ThirdPersonLookHeight { get; set; } = 2.2f;
-	[Export] public float GodViewDistance { get; set; } = 11.5f;
+	[Export] public float GodViewDistance { get; set; } = 28.0f;
 	[Export] public float GodViewCameraHeight { get; set; } = 15.5f;
 	[Export] public float GodViewMinZoom { get; set; } = 7.0f;
 	[Export] public float GodViewMaxZoom { get; set; } = 28.0f;
@@ -125,7 +125,7 @@ public partial class PlayerController : CharacterBody3D
 	private float _godViewCameraYaw;
 	private float _cameraPitch = 0.08f;
 	private bool _isRightMouseLookActive;
-	private CameraViewMode _cameraMode = CameraViewMode.ThirdPerson;
+	private CameraViewMode _cameraMode = CameraViewMode.GodView;
 	private Vector3 _lastSafePosition = new(0.0f, 0.2f, 8.0f);
 	private float _gravity;
 	private float _captureCooldownRemaining;
@@ -189,6 +189,7 @@ public partial class PlayerController : CharacterBody3D
 	public string LocalizedPlayerName => LocaleText.T(PlayerName);
 	public Vector3 MinimapForward => GetCameraPlanarForward();
 	public CameraViewMode CameraMode => _cameraMode;
+	public float DamageTextScale => CombatEffect.DamageTextScale;
 	public float HealthRatio => MaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)MaxHealth, 0.0f, 1.0f);
 	public int ExperienceToNextLevel => 60 + Level * 30;
 
@@ -227,7 +228,9 @@ public partial class PlayerController : CharacterBody3D
 
 		AddToGroup("player");
 		EnsureInputActions();
-		Input.MouseMode = Input.MouseModeEnum.Captured;
+		Input.MouseMode = _cameraMode == CameraViewMode.GodView
+			? Input.MouseModeEnum.Visible
+			: Input.MouseModeEnum.Captured;
 	}
 
 	public override void _Process(double delta)
@@ -1089,6 +1092,7 @@ public partial class PlayerController : CharacterBody3D
 			Defense = Defense,
 			Gold = Gold,
 			CameraMode = CameraModeToSaveId(_cameraMode),
+			DamageTextScale = DamageTextScale,
 			InventoryItems = new Dictionary<string, int>(_inventoryItems),
 			MercenaryNextRefreshUnix = _mercenaryNextRefreshUnix,
 			MerchantNextRefreshUnix = _merchantNextRefreshUnix,
@@ -1156,6 +1160,7 @@ public partial class PlayerController : CharacterBody3D
 		Attack = Mathf.Max(data.Attack, 0);
 		Defense = Mathf.Max(data.Defense, 0);
 		Gold = Mathf.Max(data.Gold, 0);
+		SetDamageTextScale(data.DamageTextScale);
 		SetCameraMode(CameraModeFromSaveId(data.CameraMode));
 		RestoreMercenaryOffers(data);
 		RestoreMerchantStock(data);
@@ -1198,6 +1203,11 @@ public partial class PlayerController : CharacterBody3D
 		_inventoryPanel.RefreshAll();
 		_formationPanel.RefreshAll();
 		_mercenaryShopPanel.RefreshAll();
+	}
+
+	public void SetDamageTextScale(float scale)
+	{
+		CombatEffect.SetDamageTextScale(scale);
 	}
 
 	private void RestoreMerchantStock(PlayerSaveData data)
@@ -3270,7 +3280,7 @@ public partial class PlayerController : CharacterBody3D
 
 	private static CameraViewMode CameraModeFromSaveId(string modeId)
 	{
-		return modeId == GodViewCameraModeId ? CameraViewMode.GodView : CameraViewMode.ThirdPerson;
+		return modeId == ThirdPersonCameraModeId ? CameraViewMode.ThirdPerson : CameraViewMode.GodView;
 	}
 
 	private void UpdateSafeGroundPosition()

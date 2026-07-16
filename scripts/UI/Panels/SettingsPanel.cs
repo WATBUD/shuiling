@@ -26,6 +26,8 @@ public partial class SettingsPanel : PanelContainer
 	private OptionButton _windowModeOption = null!;
 	private Button _thirdPersonCameraButton = null!;
 	private Button _godViewCameraButton = null!;
+	private HSlider _damageTextScaleSlider = null!;
+	private Label _damageTextScaleValueLabel = null!;
 	private VBoxContainer _settingsRows = null!;
 	private readonly Dictionary<SettingsCategory, Button> _categoryButtons = new();
 	private SettingsCategory _selectedCategory = SettingsCategory.Language;
@@ -155,6 +157,8 @@ public partial class SettingsPanel : PanelContainer
 		_windowModeOption = null!;
 		_thirdPersonCameraButton = null!;
 		_godViewCameraButton = null!;
+		_damageTextScaleSlider = null!;
+		_damageTextScaleValueLabel = null!;
 
 		switch (_selectedCategory)
 		{
@@ -225,6 +229,24 @@ public partial class SettingsPanel : PanelContainer
 		cameraModeButtons.AddChild(_godViewCameraButton);
 
 		AddSettingRow(section, "ui.camera_mode", cameraModeButtons);
+
+		var damageTextControl = new HBoxContainer();
+		damageTextControl.AddThemeConstantOverride("separation", 12);
+		_damageTextScaleSlider = new HSlider
+		{
+			MinValue = CombatEffect.MinimumDamageTextScale,
+			MaxValue = CombatEffect.MaximumDamageTextScale,
+			Step = 0.05,
+			CustomMinimumSize = new Vector2(230.0f, 36.0f),
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		_damageTextScaleSlider.ValueChanged += OnDamageTextScaleChanged;
+		damageTextControl.AddChild(_damageTextScaleSlider);
+		_damageTextScaleValueLabel = MakeLabel(string.Empty, 15, new Color(1.0f, 0.92f, 0.66f));
+		_damageTextScaleValueLabel.CustomMinimumSize = new Vector2(64.0f, 36.0f);
+		_damageTextScaleValueLabel.HorizontalAlignment = HorizontalAlignment.Right;
+		damageTextControl.AddChild(_damageTextScaleValueLabel);
+		AddSettingRow(section, "ui.damage_text_size", damageTextControl);
 	}
 
 	private void BuildShortcutSection(VBoxContainer rows)
@@ -293,6 +315,40 @@ public partial class SettingsPanel : PanelContainer
 		if (_thirdPersonCameraButton != null && _godViewCameraButton != null)
 		{
 			SyncCameraMode();
+		}
+
+		if (_damageTextScaleSlider != null)
+		{
+			SyncDamageTextScale();
+		}
+	}
+
+	private void SyncDamageTextScale()
+	{
+		float scale = _player?.DamageTextScale ?? CombatEffect.DamageTextScale;
+		_damageTextScaleSlider.SetValueNoSignal(scale);
+		UpdateDamageTextScaleLabel(scale);
+	}
+
+	private void OnDamageTextScaleChanged(double value)
+	{
+		float scale = (float)value;
+		if (_player != null)
+		{
+			_player.SetDamageTextScale(scale);
+		}
+		else
+		{
+			CombatEffect.SetDamageTextScale(scale);
+		}
+		UpdateDamageTextScaleLabel(scale);
+	}
+
+	private void UpdateDamageTextScaleLabel(float scale)
+	{
+		if (_damageTextScaleValueLabel != null)
+		{
+			_damageTextScaleValueLabel.Text = LocaleText.F("ui.damage_text_size_value", Mathf.RoundToInt(scale * 100.0f));
 		}
 	}
 
