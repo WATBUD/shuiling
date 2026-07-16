@@ -40,6 +40,8 @@ public static class ItemIconLibrary
 		["gem.skill.explosion"] = "gem_01.png",
 		["gem.skill.piercing"] = "gem_04.png",
 		["gem.skill.life_steal"] = "gem_07.png",
+		["gem.skill.split"] = "gem_04.png",
+		["gem.skill.multishot"] = "gem_06.png",
 		["loot.slime_mucus"] = "material_magic.png",
 		["loot.beast_hide"] = "material_wood.png",
 		["loot.sharp_claw"] = "material_bones.png",

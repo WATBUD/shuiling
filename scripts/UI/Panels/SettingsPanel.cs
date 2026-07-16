@@ -24,7 +24,8 @@ public partial class SettingsPanel : PanelContainer
 	private OptionButton _languageOption = null!;
 	private OptionButton _resolutionOption = null!;
 	private OptionButton _windowModeOption = null!;
-	private Label _cameraModeValueLabel = null!;
+	private Button _thirdPersonCameraButton = null!;
+	private Button _godViewCameraButton = null!;
 	private VBoxContainer _settingsRows = null!;
 	private readonly Dictionary<SettingsCategory, Button> _categoryButtons = new();
 	private SettingsCategory _selectedCategory = SettingsCategory.Language;
@@ -46,7 +47,7 @@ public partial class SettingsPanel : PanelContainer
 	public void Bind(PlayerController player)
 	{
 		_player = player;
-		if (_cameraModeValueLabel != null)
+		if (_thirdPersonCameraButton != null)
 		{
 			SyncFromPlayer();
 		}
@@ -152,7 +153,8 @@ public partial class SettingsPanel : PanelContainer
 		_languageOption = null!;
 		_resolutionOption = null!;
 		_windowModeOption = null!;
-		_cameraModeValueLabel = null!;
+		_thirdPersonCameraButton = null!;
+		_godViewCameraButton = null!;
 
 		switch (_selectedCategory)
 		{
@@ -211,10 +213,18 @@ public partial class SettingsPanel : PanelContainer
 	private void BuildControlSection(VBoxContainer rows)
 	{
 		var section = MakeSection(rows, "ui.controls");
-		_cameraModeValueLabel = MakeLabel(LocaleText.T("ui.horizontal_orbit_camera"), 15, new Color(0.96f, 0.98f, 1.0f));
-		_cameraModeValueLabel.AutowrapMode = TextServer.AutowrapMode.Off;
-		_cameraModeValueLabel.ClipText = false;
-		AddSettingRow(section, "ui.camera_mode", _cameraModeValueLabel);
+		var cameraModeButtons = new HBoxContainer();
+		cameraModeButtons.AddThemeConstantOverride("separation", 8);
+
+		_thirdPersonCameraButton = MakeCameraModeButton(LocaleText.T("ui.camera_third_person"));
+		_thirdPersonCameraButton.Pressed += OnThirdPersonCameraPressed;
+		cameraModeButtons.AddChild(_thirdPersonCameraButton);
+
+		_godViewCameraButton = MakeCameraModeButton(LocaleText.T("ui.camera_god_view"));
+		_godViewCameraButton.Pressed += OnGodViewCameraPressed;
+		cameraModeButtons.AddChild(_godViewCameraButton);
+
+		AddSettingRow(section, "ui.camera_mode", cameraModeButtons);
 	}
 
 	private void BuildShortcutSection(VBoxContainer rows)
@@ -280,10 +290,17 @@ public partial class SettingsPanel : PanelContainer
 			SyncWindowMode();
 		}
 
-		if (_cameraModeValueLabel != null)
+		if (_thirdPersonCameraButton != null && _godViewCameraButton != null)
 		{
-			_cameraModeValueLabel.Text = LocaleText.T("ui.horizontal_orbit_camera");
+			SyncCameraMode();
 		}
+	}
+
+	private void SyncCameraMode()
+	{
+		bool isGodView = _player?.CameraMode == PlayerController.CameraViewMode.GodView;
+		_thirdPersonCameraButton.ButtonPressed = !isGodView;
+		_godViewCameraButton.ButtonPressed = isGodView;
 	}
 
 	private void SyncLanguage()
@@ -337,6 +354,18 @@ public partial class SettingsPanel : PanelContainer
 		{
 			LocaleText.SetLanguage(LocaleText.LanguageCodes[(int)index]);
 		}
+	}
+
+	private void OnThirdPersonCameraPressed()
+	{
+		_player?.SetCameraMode(PlayerController.CameraViewMode.ThirdPerson);
+		SyncCameraMode();
+	}
+
+	private void OnGodViewCameraPressed()
+	{
+		_player?.SetCameraMode(PlayerController.CameraViewMode.GodView);
+		SyncCameraMode();
 	}
 
 	private void OnLanguageChanged()
@@ -460,6 +489,15 @@ public partial class SettingsPanel : PanelContainer
 	{
 		var button = new Button { Text = text };
 		button.AddThemeFontSizeOverride("font_size", 14);
+		return button;
+	}
+
+	private static Button MakeCameraModeButton(string text)
+	{
+		var button = MakeButton(text);
+		button.ToggleMode = true;
+		button.CustomMinimumSize = new Vector2(150.0f, 36.0f);
+		button.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		return button;
 	}
 }

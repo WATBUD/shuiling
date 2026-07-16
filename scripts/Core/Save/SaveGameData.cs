@@ -17,6 +17,7 @@ public sealed class PlayerSaveData
 	public int Attack { get; set; } = 16;
 	public int Defense { get; set; } = 10;
 	public int Gold { get; set; }
+	public string CameraMode { get; set; } = "third_person";
 	public Dictionary<string, int> InventoryItems { get; set; } = new();
 	public List<string> AcceptedNpcQuestNames { get; set; } = new();
 	public List<string> CompletedNpcQuestNames { get; set; } = new();
@@ -52,6 +53,7 @@ public sealed class ActorSaveData
 	public int CurrentHealth { get; set; } = 100;
 	public int Attack { get; set; } = 10;
 	public int Defense { get; set; } = 6;
+	public float MoveSpeed { get; set; } = 7.0f;
 	public int ExperienceReward { get; set; } = 6;
 	public int GoldReward { get; set; } = 2;
 	public int Experience { get; set; }
@@ -62,6 +64,7 @@ public sealed class ActorSaveData
 	public string Personality { get; set; } = "personality.calm";
 	public string PassiveAbility { get; set; } = "ability.none";
 	public int Affinity { get; set; } = 50;
+	public string MoodStateId { get; set; } = string.Empty;
 	public string AttackModeId { get; set; } = "attack_nearest";
 	public CompanionBuildSaveData BuildLoadout { get; set; } = new();
 }

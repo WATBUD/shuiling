@@ -139,10 +139,11 @@ public partial class TargetInfoPanel : PanelContainer
 
 	private void UpdateFromActor(SimpleActor actor)
 	{
+		int displayedHealth = actor.IsDefeated ? 0 : actor.CurrentHealth;
 		_nameLabel.Text = actor.LocalizedDisplayName;
 		_typeLabel.Text = $"{actor.TypeName}  /  {actor.CombatSummary}";
 		_healthBar.Value = actor.HealthRatio * 100.0f;
-		_healthLabel.Text = LocaleText.F("stat.health_value", actor.CurrentHealth, actor.EffectiveMaxHealth);
+		_healthLabel.Text = LocaleText.F("stat.health_value", displayedHealth, actor.EffectiveMaxHealth);
 		_levelLabel.Text = actor.Level.ToString();
 		_attackLabel.Text = LocaleText.F("build.effective_stat", actor.EffectiveAttack, actor.Attack);
 		_defenseLabel.Text = LocaleText.F("build.effective_stat", actor.EffectiveDefense, actor.Defense);

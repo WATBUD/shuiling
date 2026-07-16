@@ -237,9 +237,11 @@ public partial class InventoryPanel : PanelContainer
 		infoRows.AddChild(infoColumns);
 		_companionInfoBodyLabel = MakeLabel(12, new Color(0.80f, 0.87f, 0.93f));
 		_companionInfoBodyLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		_companionInfoBodyLabel.VerticalAlignment = VerticalAlignment.Top;
 		infoColumns.AddChild(_companionInfoBodyLabel);
 		_abilityInfoLabel = MakeLabel(12, new Color(0.74f, 0.88f, 0.80f));
 		_abilityInfoLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		_abilityInfoLabel.VerticalAlignment = VerticalAlignment.Top;
 		infoColumns.AddChild(_abilityInfoLabel);
 
 		var itemSection = MakeSection(LocaleText.T("inventory.items"), new Vector2(320.0f, 0.0f));
@@ -656,36 +658,8 @@ public partial class InventoryPanel : PanelContainer
 			}
 		}
 
-		AddCompatibleFreeItems(ids);
 		SortItemIds(ids);
 		return ids;
-	}
-
-	private void AddCompatibleFreeItems(List<string> ids)
-	{
-		switch (_selectedTarget)
-		{
-			case EquipTarget.AttributeGem:
-				foreach (AttributeGemDefinition item in BuildCatalog.GetAttributeGemDefinitions())
-				{
-					if (BuildCatalog.IsFreeItem(item.Id) && ShouldShowItemInCategory(item.Id, _selectedCategory) && !ids.Contains(item.Id))
-					{
-						ids.Add(item.Id);
-					}
-				}
-				break;
-			case EquipTarget.SkillGem1:
-			case EquipTarget.SkillGem2:
-			case EquipTarget.SkillGem3:
-				foreach (SkillGemDefinition item in BuildCatalog.GetSkillGemDefinitions())
-				{
-					if (BuildCatalog.IsFreeItem(item.Id) && ShouldShowItemInCategory(item.Id, _selectedCategory) && !ids.Contains(item.Id))
-					{
-						ids.Add(item.Id);
-					}
-				}
-				break;
-		}
 	}
 
 	private void AddItemSlotButton(string itemId)
@@ -1075,7 +1049,7 @@ public partial class InventoryPanel : PanelContainer
 			_selectedActor.EffectiveAttackRange.ToString("0.0"),
 			_selectedActor.EffectiveDetectionRadius.ToString("0.0"),
 			Mathf.RoundToInt(stats.CritChance * 100.0f),
-			Mathf.RoundToInt(stats.MoveSpeedMultiplier * 100.0f)
+			_selectedActor.EffectiveMoveSpeed.ToString("0.0")
 		);
 		_abilityInfoLabel.Text = LocaleText.F(
 			"inventory.meta_column",

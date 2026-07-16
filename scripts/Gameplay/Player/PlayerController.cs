@@ -5,6 +5,12 @@ public partial class PlayerController : CharacterBody3D
 {
 	// Keep feature-specific player code in focused partials when possible.
 	// Current split: PlayerController.Formation.cs owns formation board state and slot offsets.
+	public enum CameraViewMode
+	{
+		ThirdPerson,
+		GodView,
+	}
+
 	public sealed record ContractCompanionOffer(string Id, string NameKey, string RoleNameKey, string CombatRole, string SummaryKey, int Level, int Cost, int MaxHealth, int Attack, int Defense);
 	public enum MerchantShopKind
 	{
@@ -31,6 +37,8 @@ public partial class PlayerController : CharacterBody3D
 	private const int PetReviveGoldCost = 40;
 	private const float InteractionPromptRefreshSeconds = 0.12f;
 	private const float WorldDropCollectRefreshSeconds = 0.10f;
+	private const string ThirdPersonCameraModeId = "third_person";
+	private const string GodViewCameraModeId = "god_view";
 
 	private static readonly PetShopOffer[] PetShopOffers =
 	{
@@ -48,6 +56,12 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float ThirdPersonDistance { get; set; } = 6.2f;
 	[Export] public float ThirdPersonCameraHeight { get; set; } = 3.35f;
 	[Export] public float ThirdPersonLookHeight { get; set; } = 2.2f;
+	[Export] public float GodViewDistance { get; set; } = 11.5f;
+	[Export] public float GodViewCameraHeight { get; set; } = 15.5f;
+	[Export] public float GodViewMinZoom { get; set; } = 7.0f;
+	[Export] public float GodViewMaxZoom { get; set; } = 28.0f;
+	[Export] public float GodViewWheelZoomStep { get; set; } = 1.5f;
+	[Export] public float GodViewMouseZoomSensitivity { get; set; } = 0.025f;
 	[Export] public float HorizontalLookSensitivity { get; set; } = 0.0026f;
 	[Export] public float VerticalLookSensitivity { get; set; } = 0.0022f;
 	[Export] public float CameraWorldHalfExtent { get; set; } = 68.5f;
@@ -72,6 +86,7 @@ public partial class PlayerController : CharacterBody3D
 
 	private readonly List<SimpleActor> _capturedCollection = new();
 	private readonly List<SimpleActor> _activeParty = new();
+	private SimpleActor? _mountedCompanion;
 	private readonly Dictionary<string, int> _inventoryItems = new();
 	private readonly HashSet<SimpleActor> _acceptedNpcQuests = new();
 	private readonly HashSet<SimpleActor> _completedNpcQuests = new();
@@ -91,6 +106,7 @@ public partial class PlayerController : CharacterBody3D
 	};
 	private float _cameraYaw;
 	private float _cameraPitch = 0.08f;
+	private CameraViewMode _cameraMode = CameraViewMode.ThirdPerson;
 	private Vector3 _lastSafePosition = new(0.0f, 0.2f, 8.0f);
 	private float _gravity;
 	private float _captureCooldownRemaining;
@@ -137,12 +153,14 @@ public partial class PlayerController : CharacterBody3D
 	private Node3D? _playerExternalModel;
 	private string _playerExternalAnimationState = string.Empty;
 	private readonly Dictionary<string, Node3D?> _playerVisualNodeCache = new();
+	private Node3D? _playerVisualRoot;
 	private float _damageFlashRemaining;
 	private float _footstepEffectRemaining;
 	private float _movementAnimationPhase;
 
 	public IReadOnlyList<SimpleActor> CapturedCollection => _capturedCollection;
 	public IReadOnlyList<SimpleActor> ActiveParty => _activeParty;
+	public SimpleActor? MountedCompanion => IsMountedCompanionValid() ? _mountedCompanion : null;
 	public IReadOnlyList<ContractCompanionOffer> ContractCompanionOffers => _contractCompanionOffers;
 	public int MercenaryManualRefreshCost => MercenaryRefreshCost;
 	public int MerchantManualRefreshCost => MerchantRefreshCost;
@@ -151,6 +169,7 @@ public partial class PlayerController : CharacterBody3D
 	public IReadOnlyDictionary<string, int> InventoryItems => _inventoryItems;
 	public string LocalizedPlayerName => LocaleText.T(PlayerName);
 	public Vector3 MinimapForward => GetCameraPlanarForward();
+	public CameraViewMode CameraMode => _cameraMode;
 	public float HealthRatio => MaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)MaxHealth, 0.0f, 1.0f);
 
 	public override void _Ready()
@@ -189,8 +208,21 @@ public partial class PlayerController : CharacterBody3D
 
 	public override void _Process(double delta)
 	{
+		if (_mountedCompanion != null && !IsMountedCompanionValid())
+		{
+			if (IsInstanceValid(_mountedCompanion))
+			{
+				_mountedCompanion.SetMountedByPlayer(false);
+			}
+			_mountedCompanion = null;
+			UpdateMountedVisualOffset();
+		}
+		else if (_mountedCompanion != null)
+		{
+			UpdateMountedVisualOffset();
+		}
 		UpdateCaptureNetRecharge((float)delta);
-		UpdateThirdPersonCamera();
+		UpdateCamera();
 		UpdateTargetInfoPanel();
 		UpdateCaptureAmmoHud();
 		UpdateDamageFlash((float)delta);
@@ -287,6 +319,14 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
+		if (@event is InputEventMouseMotion godViewMouseMotion
+			&& _cameraMode == CameraViewMode.GodView
+			&& (godViewMouseMotion.ButtonMask & MouseButtonMask.Middle) != 0)
+		{
+			AdjustGodViewZoom(godViewMouseMotion.Relative.Y * GodViewMouseZoomSensitivity);
+			return;
+		}
+
 		if (@event is InputEventMouseMotion mouseMotion && Input.MouseMode == Input.MouseModeEnum.Captured)
 		{
 			_cameraYaw = Mathf.Wrap(
@@ -294,20 +334,45 @@ public partial class PlayerController : CharacterBody3D
 				-Mathf.Pi,
 				Mathf.Pi
 			);
-			_cameraPitch = Mathf.Clamp(
-				_cameraPitch + mouseMotion.Relative.Y * VerticalLookSensitivity,
-				-0.42f,
-				0.76f
-			);
+			if (_cameraMode == CameraViewMode.ThirdPerson)
+			{
+				_cameraPitch = Mathf.Clamp(
+					_cameraPitch + mouseMotion.Relative.Y * VerticalLookSensitivity,
+					-0.42f,
+					0.76f
+				);
+			}
 			return;
 		}
 
 		if (@event is InputEventMouseButton { Pressed: true })
 		{
-			Input.MouseMode = Input.MouseModeEnum.Captured;
+			if (_cameraMode == CameraViewMode.GodView && @event is InputEventMouseButton zoomButton)
+			{
+				if (zoomButton.ButtonIndex == MouseButton.WheelUp)
+				{
+					AdjustGodViewZoom(-GodViewWheelZoomStep);
+					return;
+				}
+
+				if (zoomButton.ButtonIndex == MouseButton.WheelDown)
+				{
+					AdjustGodViewZoom(GodViewWheelZoomStep);
+					return;
+				}
+			}
+
 			if (@event is InputEventMouseButton { ButtonIndex: MouseButton.Left })
 			{
-				TrySelectActorTarget();
+				if (_cameraMode == CameraViewMode.GodView && @event is InputEventMouseButton selectButton)
+				{
+					TrySelectActorTarget(selectButton.Position);
+				}
+				else
+				{
+					Input.MouseMode = Input.MouseModeEnum.Captured;
+					TrySelectActorTarget();
+				}
 				return;
 			}
 		}
@@ -359,6 +424,14 @@ public partial class PlayerController : CharacterBody3D
 		Vector3 right = new(-forward.Z, 0.0f, forward.X);
 		Vector3 direction = (right * inputDirection.X + forward * -inputDirection.Y).Normalized();
 		float targetSpeed = Input.IsActionPressed("sprint") ? SprintSpeed : WalkSpeed;
+		if (MountedCompanion is SimpleActor mount)
+		{
+			targetSpeed = mount.EffectiveMoveSpeed;
+			if (Input.IsActionPressed("sprint"))
+			{
+				targetSpeed *= SprintSpeed / Mathf.Max(WalkSpeed, 0.01f);
+			}
+		}
 
 		velocity.X = Mathf.MoveToward(velocity.X, direction.X * targetSpeed, Acceleration * step);
 		velocity.Z = Mathf.MoveToward(velocity.Z, direction.Z * targetSpeed, Acceleration * step);
@@ -475,6 +548,45 @@ public partial class PlayerController : CharacterBody3D
 	public bool IsInActiveParty(SimpleActor actor)
 	{
 		return _activeParty.Contains(actor);
+	}
+
+	public bool IsMountedCompanion(SimpleActor actor)
+	{
+		return MountedCompanion == actor;
+	}
+
+	public bool ToggleMountCompanion(SimpleActor actor)
+	{
+		if (!_activeParty.Contains(actor) || actor.IsDefeated)
+		{
+			return false;
+		}
+
+		if (IsMountedCompanion(actor))
+		{
+			actor.SetMountedByPlayer(false);
+			_mountedCompanion = null;
+		}
+		else
+		{
+			if (MountedCompanion != null)
+			{
+				MountedCompanion.SetMountedByPlayer(false);
+			}
+			_mountedCompanion = actor;
+			actor.SetMountedByPlayer(true);
+		}
+		UpdateMountedVisualOffset();
+		_partyPanel.RefreshParty();
+		return true;
+	}
+
+	private bool IsMountedCompanionValid()
+	{
+		return _mountedCompanion != null
+			&& IsInstanceValid(_mountedCompanion)
+			&& _activeParty.Contains(_mountedCompanion)
+			&& !_mountedCompanion.IsDefeated;
 	}
 
 	public bool DeployCompanion(SimpleActor actor, bool replaceLastIfFull)
@@ -878,6 +990,12 @@ public partial class PlayerController : CharacterBody3D
 		}
 
 		bool removed = _activeParty.Remove(actor);
+		if (_mountedCompanion == actor)
+		{
+			actor.SetMountedByPlayer(false);
+			_mountedCompanion = null;
+			UpdateMountedVisualOffset();
+		}
 		ClearFormationAssignment(actor);
 		actor.StoreInCollection();
 		RecalculateFormationBonuses();
@@ -891,6 +1009,19 @@ public partial class PlayerController : CharacterBody3D
 		return true;
 	}
 
+	public void SetCameraMode(CameraViewMode mode)
+	{
+		if (_cameraMode == mode)
+		{
+			return;
+		}
+
+		_cameraMode = mode;
+		ApplyCameraModeSettings();
+		UpdateMouseModeForPanels();
+		UpdateCamera();
+	}
+
 	public PlayerSaveData ExportSaveData()
 	{
 		var data = new PlayerSaveData
@@ -901,6 +1032,7 @@ public partial class PlayerController : CharacterBody3D
 			Attack = Attack,
 			Defense = Defense,
 			Gold = Gold,
+			CameraMode = CameraModeToSaveId(_cameraMode),
 			InventoryItems = new Dictionary<string, int>(_inventoryItems),
 			MercenaryNextRefreshUnix = _mercenaryNextRefreshUnix,
 			MerchantNextRefreshUnix = _merchantNextRefreshUnix,
@@ -967,6 +1099,7 @@ public partial class PlayerController : CharacterBody3D
 		Attack = Mathf.Max(data.Attack, 0);
 		Defense = Mathf.Max(data.Defense, 0);
 		Gold = Mathf.Max(data.Gold, 0);
+		SetCameraMode(CameraModeFromSaveId(data.CameraMode));
 		RestoreMercenaryOffers(data);
 		RestoreMerchantStock(data);
 
@@ -2508,12 +2641,36 @@ public partial class PlayerController : CharacterBody3D
 		ClearSelectedActor();
 	}
 
+	private void TrySelectActorTarget(Vector2 screenPosition)
+	{
+		if (TryRaycastActor(screenPosition, out SimpleActor actor))
+		{
+			SetSelectedActor(actor);
+			return;
+		}
+
+		ClearSelectedActor();
+	}
+
 	private bool TryRaycastActor(out SimpleActor actor)
+	{
+		Vector3 origin = _camera.GlobalPosition;
+		Vector3 end = origin + GetCameraAimDirection() * TargetInfoRange;
+		return TryRaycastActor(origin, end, out actor);
+	}
+
+	private bool TryRaycastActor(Vector2 screenPosition, out SimpleActor actor)
+	{
+		Vector3 origin = _camera.ProjectRayOrigin(screenPosition);
+		Vector3 direction = _camera.ProjectRayNormal(screenPosition);
+		Vector3 end = origin + direction * Mathf.Max(TargetInfoRange * 4.0f, 120.0f);
+		return TryRaycastActor(origin, end, out actor);
+	}
+
+	private bool TryRaycastActor(Vector3 origin, Vector3 end, out SimpleActor actor)
 	{
 		actor = null!;
 		PhysicsDirectSpaceState3D spaceState = GetWorld3D().DirectSpaceState;
-		Vector3 origin = _camera.GlobalPosition;
-		Vector3 end = origin + GetCameraAimDirection() * TargetInfoRange;
 		var query = PhysicsRayQueryParameters3D.Create(origin, end);
 		query.CollideWithAreas = false;
 		query.CollideWithBodies = true;
@@ -2564,7 +2721,7 @@ public partial class PlayerController : CharacterBody3D
 
 	private bool IsAttackCommandTarget(SimpleActor actor)
 	{
-		return IsInstanceValid(actor) && actor.IsActiveWorldTarget;
+		return IsInstanceValid(actor) && actor.IsHostileToPlayer;
 	}
 
 	private void EnsureSelectedTargetMarker()
@@ -2765,6 +2922,19 @@ public partial class PlayerController : CharacterBody3D
 		float speed = planarVelocity.Length();
 		float moveRatio = Mathf.Clamp(speed / Mathf.Max(SprintSpeed, 0.01f), 0.0f, 1.0f);
 		bool isMoving = speed > 0.25f && IsOnFloor();
+		if (MountedCompanion != null)
+		{
+			if (_playerExternalModel != null)
+			{
+				SetPlayerExternalAnimationState("idle");
+				StabilizePlayerExternalModel();
+				return;
+			}
+
+			ApplyMountedPose();
+			return;
+		}
+
 		if (_playerExternalModel != null)
 		{
 			string state = !isMoving ? "idle" : moveRatio > 0.72f ? "run" : "walk";
@@ -2811,6 +2981,18 @@ public partial class PlayerController : CharacterBody3D
 		SetVisualRotation("PlayerScarfTail", new Vector3(-12.0f - moveRatio * 12.0f, 0.0f, -12.0f + swing * 5.0f * intensity));
 	}
 
+	private void ApplyMountedPose()
+	{
+		SetVisualRotation("PlayerLeftLeg", new Vector3(74.0f, 0.0f, -20.0f));
+		SetVisualRotation("PlayerRightLeg", new Vector3(74.0f, 0.0f, 20.0f));
+		SetVisualPosition("PlayerLeftLeg", new Vector3(-0.27f, 0.43f, -0.20f));
+		SetVisualPosition("PlayerRightLeg", new Vector3(0.27f, 0.43f, -0.20f));
+		SetVisualPosition("PlayerLeftBoot", new Vector3(-0.36f, 0.24f, -0.48f));
+		SetVisualPosition("PlayerRightBoot", new Vector3(0.36f, 0.24f, -0.48f));
+		SetVisualRotation("PlayerLeftBoot", new Vector3(8.0f, 0.0f, 0.0f));
+		SetVisualRotation("PlayerRightBoot", new Vector3(8.0f, 0.0f, 0.0f));
+	}
+
 	private void SetPlayerExternalAnimationState(string state)
 	{
 		if (_playerExternalModel == null || _playerExternalAnimationState == state)
@@ -2827,7 +3009,9 @@ public partial class PlayerController : CharacterBody3D
 	{
 		if (_playerExternalModel != null)
 		{
-			ExternalModelLibrary.StabilizeRootMotion(_playerExternalModel, Vector3.Zero, new Vector3(0.0f, 180.0f, 0.0f));
+			SimpleActor? mount = MountedCompanion;
+			Vector3 ridingOffset = mount != null ? Vector3.Up * mount.MountSeatHeight : Vector3.Zero;
+			ExternalModelLibrary.StabilizeRootMotion(_playerExternalModel, ridingOffset, new Vector3(0.0f, 180.0f, 0.0f));
 		}
 	}
 
@@ -2859,7 +3043,7 @@ public partial class PlayerController : CharacterBody3D
 			_playerVisualNodeCache.Remove(nodeName);
 		}
 
-		Node3D? node = GetNodeOrNull<Node3D>(nodeName);
+		Node3D? node = _playerVisualRoot?.FindChild(nodeName, true, false) as Node3D;
 		_playerVisualNodeCache[nodeName] = node;
 		return node;
 	}
@@ -2893,11 +3077,32 @@ public partial class PlayerController : CharacterBody3D
 		_cameraYaw = 0.0f;
 		_cameraPitch = 0.08f;
 		_camera.TopLevel = true;
-		_camera.Fov = 58.0f;
 		_camera.Near = 0.05f;
 		_camera.HOffset = 0.0f;
 		_camera.VOffset = 0.0f;
 		_cameraPivot.Position = Vector3.Zero;
+		ApplyCameraModeSettings();
+		UpdateCamera();
+	}
+
+	private void ApplyCameraModeSettings()
+	{
+		if (_camera == null || !IsInstanceValid(_camera))
+		{
+			return;
+		}
+
+		_camera.Fov = _cameraMode == CameraViewMode.GodView ? 48.0f : 58.0f;
+	}
+
+	private void UpdateCamera()
+	{
+		if (_cameraMode == CameraViewMode.GodView)
+		{
+			UpdateGodViewCamera();
+			return;
+		}
+
 		UpdateThirdPersonCamera();
 	}
 
@@ -2913,6 +3118,26 @@ public partial class PlayerController : CharacterBody3D
 		Vector3 lookTarget = GlobalPosition + Vector3.Up * lookHeight;
 
 		_camera.LookAtFromPosition(cameraPosition, lookTarget, Vector3.Up);
+	}
+
+	private void UpdateGodViewCamera()
+	{
+		Vector3 backward = GetCameraPlanarBackward();
+		float distance = Mathf.Max(GodViewDistance, 6.0f);
+		float height = Mathf.Max(GodViewCameraHeight, 8.0f);
+		Vector3 cameraPosition = GlobalPosition + backward * distance + Vector3.Up * height;
+		cameraPosition = ClampCameraInsideMap(cameraPosition);
+		Vector3 lookTarget = GlobalPosition + Vector3.Up * 0.85f;
+
+		_camera.LookAtFromPosition(cameraPosition, lookTarget, Vector3.Up);
+	}
+
+	private void AdjustGodViewZoom(float amount)
+	{
+		float minZoom = Mathf.Max(GodViewMinZoom, 6.0f);
+		float maxZoom = Mathf.Max(GodViewMaxZoom, minZoom);
+		GodViewDistance = Mathf.Clamp(GodViewDistance + amount, minZoom, maxZoom);
+		UpdateGodViewCamera();
 	}
 
 	private Vector3 ClampCameraInsideMap(Vector3 position)
@@ -2953,6 +3178,16 @@ public partial class PlayerController : CharacterBody3D
 	private Vector3 GetCaptureThrowDirection()
 	{
 		return GetCameraPlanarForward();
+	}
+
+	private static string CameraModeToSaveId(CameraViewMode mode)
+	{
+		return mode == CameraViewMode.GodView ? GodViewCameraModeId : ThirdPersonCameraModeId;
+	}
+
+	private static CameraViewMode CameraModeFromSaveId(string modeId)
+	{
+		return modeId == GodViewCameraModeId ? CameraViewMode.GodView : CameraViewMode.ThirdPerson;
 	}
 
 	private void UpdateSafeGroundPosition()
@@ -3005,9 +3240,13 @@ public partial class PlayerController : CharacterBody3D
 		_playerExternalModel = ExternalModelLibrary.TryAddPlayerModel(this);
 		if (_playerExternalModel != null)
 		{
+			_playerVisualRoot = _playerExternalModel;
 			AddPlayerExternalEquipment();
 			return;
 		}
+
+		_playerVisualRoot = new Node3D { Name = "PlayerVisualRoot" };
+		AddChild(_playerVisualRoot);
 
 		var matCoat = MakeMaterial(new Color(0.18f, 0.36f, 0.62f));
 		var matCoatDark = MakeMaterial(new Color(0.08f, 0.19f, 0.32f));
@@ -3139,7 +3378,16 @@ public partial class PlayerController : CharacterBody3D
 			Scale = scale,
 		};
 		meshInstance.SetSurfaceOverrideMaterial(0, material);
-		AddChild(meshInstance);
+		(_playerVisualRoot ?? this).AddChild(meshInstance);
+	}
+
+	private void UpdateMountedVisualOffset()
+	{
+		if (_playerVisualRoot != null && IsInstanceValid(_playerVisualRoot))
+		{
+			SimpleActor? mount = MountedCompanion;
+			_playerVisualRoot.Position = mount != null ? Vector3.Up * mount.MountSeatHeight : Vector3.Zero;
+		}
 	}
 
 	private static StandardMaterial3D MakeMaterial(Color color, float roughness = 0.82f)
@@ -3482,12 +3730,17 @@ public partial class PlayerController : CharacterBody3D
 	{
 		Input.MouseMode = _pauseMenuPanel.Visible || _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _settingsPanel.Visible || (_npcQuestDialog != null && _npcQuestDialog.Visible) || (_mapTravelDialog != null && _mapTravelDialog.Visible)
 			? Input.MouseModeEnum.Visible
-			: Input.MouseModeEnum.Captured;
+			: _cameraMode == CameraViewMode.GodView
+				? Input.MouseModeEnum.Visible
+				: Input.MouseModeEnum.Captured;
 	}
 
 	private void UpdateTargetInfoPanel()
 	{
-		if (TryRaycastActor(out SimpleActor actor))
+		bool foundActor = _cameraMode == CameraViewMode.GodView
+			? TryRaycastActor(GetViewport().GetMousePosition(), out SimpleActor actor)
+			: TryRaycastActor(out actor);
+		if (foundActor)
 		{
 			_targetInfoPanel.ShowActor(actor);
 			return;
