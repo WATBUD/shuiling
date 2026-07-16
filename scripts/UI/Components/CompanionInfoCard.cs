@@ -10,11 +10,12 @@ public partial class CompanionInfoCard : PanelContainer
 	private Label _meta = null!;
 	private Label _mode = null!;
 	private Label _ability = null!;
-	private Label _traits = null!;
-	private Label _equipment = null!;
-	private Label _skillGems = null!;
+	private HFlowContainer _traitFlow = null!;
+	private HFlowContainer _equipmentFlow = null!;
+	private HFlowContainer _skillGemFlow = null!;
 	private FloatingTooltip _tooltip = null!;
 	private SimpleActor? _actor;
+	private string _detailSignature = string.Empty;
 
 	public override void _Ready()
 	{
@@ -61,22 +62,52 @@ public partial class CompanionInfoCard : PanelContainer
 		_meta = MakeLabel(12, new Color(0.74f, 0.88f, 0.80f));
 		metaRows.AddChild(_meta);
 		_ability = AddInteractiveLabel(metaRows);
-		_traits = AddInteractiveLabel(metaRows);
-		_equipment = AddInteractiveLabel(metaRows);
-		_skillGems = AddInteractiveLabel(metaRows);
+		metaRows.AddChild(MakeLabel(12, new Color(0.74f, 0.88f, 0.80f), "build.traits"));
+		_traitFlow = AddFlow(metaRows);
+		metaRows.AddChild(MakeLabel(12, new Color(0.74f, 0.88f, 0.80f), "build.equipment"));
+		_equipmentFlow = AddFlow(metaRows);
+		metaRows.AddChild(MakeLabel(12, new Color(0.74f, 0.88f, 0.80f), "build.skill_gems"));
+		_skillGemFlow = AddFlow(metaRows);
 
-		_tooltip = new FloatingTooltip { MaxWidth = 390.0f, MaxWidthRatio = 0.70f, MaxHeightRatio = 0.72f };
+		_tooltip = new FloatingTooltip
+		{
+			Name = "CompanionDetailTooltip",
+			TopLevel = true,
+			ZIndex = 100,
+			MaxWidth = 720.0f,
+			MaxWidthRatio = 0.70f,
+			MaxHeightRatio = 0.72f,
+		};
 		AddChild(_tooltip);
 		BindTooltip(_ability, BuildAbilityTooltip);
-		BindTooltip(_traits, BuildTraitsTooltip);
-		BindTooltip(_equipment, BuildEquipmentTooltip);
-		BindTooltip(_skillGems, BuildSkillGemTooltip);
 		SetActor(_actor);
 	}
 
 	public override void _Process(double delta)
 	{
-		if (_tooltip != null && _tooltip.Visible) _tooltip.PositionNearMouse(this);
+		if (_tooltip != null && _tooltip.Visible)
+		{
+			_tooltip.PositionNearMouse(this);
+		}
+	}
+
+	public override void _Input(InputEvent inputEvent)
+	{
+		if (_tooltip == null || !_tooltip.Visible || inputEvent is not InputEventMouseButton { Pressed: true } mouseButton)
+		{
+			return;
+		}
+
+		if (mouseButton.ButtonIndex == MouseButton.WheelUp)
+		{
+			_tooltip.ScrollDetail(-48);
+			GetViewport().SetInputAsHandled();
+		}
+		else if (mouseButton.ButtonIndex == MouseButton.WheelDown)
+		{
+			_tooltip.ScrollDetail(48);
+			GetViewport().SetInputAsHandled();
+		}
 	}
 
 	private void OnModeGuiInput(InputEvent inputEvent)
@@ -97,7 +128,11 @@ public partial class CompanionInfoCard : PanelContainer
 			_title.Text = LocaleText.T("inventory.companion_info");
 			_experienceBar.Value = 0.0;
 			_experience.Text = LocaleText.T("inventory.no_companions");
-			_stats.Text = _meta.Text = _ability.Text = _traits.Text = _equipment.Text = _skillGems.Text = string.Empty;
+			_stats.Text = _meta.Text = _ability.Text = string.Empty;
+			ClearFlow(_traitFlow);
+			ClearFlow(_equipmentFlow);
+			ClearFlow(_skillGemFlow);
+			_detailSignature = string.Empty;
 			_mode.Visible = false;
 			_tooltip?.HideTooltip();
 			return;
@@ -109,6 +144,7 @@ public partial class CompanionInfoCard : PanelContainer
 		_experienceBar.Value = Mathf.Clamp(_actor.Experience, 0, _actor.ExperienceToNextLevel);
 		_experience.Text = $"{LocaleText.T("stat.experience")} {_actor.Experience}/{_actor.ExperienceToNextLevel}";
 		_stats.Text = string.Join("\n",
+			$"HP {(_actor.IsDefeated ? 0 : _actor.CurrentHealth)} / {_actor.EffectiveMaxHealth}",
 			$"{LocaleText.T("stat.attack")} {LocaleText.F("build.effective_stat", _actor.EffectiveAttack, _actor.Attack)}",
 			$"{LocaleText.T("stat.defense")} {LocaleText.F("build.effective_stat", _actor.EffectiveDefense, _actor.Defense)}",
 			$"{LocaleText.T("stat.speed")} {_actor.EffectiveMoveSpeed:0.0}",
@@ -123,9 +159,12 @@ public partial class CompanionInfoCard : PanelContainer
 			$"{LocaleText.T("stat.affinity")} {_actor.Affinity} / 100",
 			$"{LocaleText.T("build.element")} {_actor.BuildElementName} / {_actor.BuildRareComboName}");
 		_ability.Text = $"{LocaleText.T("stat.ability")} {_actor.LocalizedSpecialAbility} {LocaleText.T("actor.level_prefix")}{_actor.AbilityRank}";
-		_traits.Text = $"{LocaleText.T("build.traits")} {_actor.TraitSummary}";
-		_equipment.Text = $"{LocaleText.T("build.equipment")} {LocaleText.F("build.equipment_summary", _actor.BuildEquipmentSummary, stats.EquipmentSocketCount)}";
-		_skillGems.Text = $"{LocaleText.T("build.skill_gems")} {_actor.BuildSkillSummary}";
+		string detailSignature = BuildDetailSignature(_actor);
+		if (_detailSignature != detailSignature)
+		{
+			_detailSignature = detailSignature;
+			RebuildDetailTerms();
+		}
 		_mode.Text = $"{LocaleText.T("build.slot.attack_mode")}: {_actor.AttackModeName}";
 		_mode.Visible = true;
 	}
@@ -135,6 +174,111 @@ public partial class CompanionInfoCard : PanelContainer
 		if (_actor == null || !IsInstanceValid(_actor)) return;
 		_actor.CycleAttackMode();
 		SetActor(_actor);
+	}
+
+	private void RebuildDetailTerms()
+	{
+		ClearFlow(_traitFlow);
+		ClearFlow(_equipmentFlow);
+		ClearFlow(_skillGemFlow);
+		if (_actor == null) return;
+
+		foreach (string traitKey in _actor.TraitKeys)
+		{
+			string capturedKey = traitKey;
+			AddTerm(_traitFlow, LocaleText.T(capturedKey), () => BuildSingleTraitTooltip(capturedKey));
+		}
+
+		CompanionBuildLoadout loadout = _actor.BuildLoadout;
+		var equipmentItems = new (string Id, string Slot)[]
+		{
+			(loadout.HelmetId, LocaleText.T("build.slot.helmet")),
+			(loadout.WeaponId, LocaleText.T("build.slot.weapon")),
+			(loadout.ArmorId, LocaleText.T("build.slot.armor")),
+			(loadout.AccessoryId, LocaleText.T("build.slot.accessory")),
+			(loadout.AttributeGemId, LocaleText.T("build.slot.attribute")),
+		};
+		foreach ((string id, string slot) in equipmentItems)
+		{
+			string capturedId = id;
+			string capturedSlot = slot;
+			string name = BuildCatalog.GetItemKind(id) == InventoryItemKind.AttributeGem
+				? LocaleText.T(BuildCatalog.GetAttributeGem(id).NameKey)
+				: LocaleText.T(BuildCatalog.GetEquipment(id).NameKey);
+			AddTerm(_equipmentFlow, name, () => (name, InventoryPanel.BuildItemTooltipBody(capturedId, capturedSlot)));
+		}
+
+		for (int index = 0; index < loadout.SkillGemIds.Length; index++)
+		{
+			string id = loadout.SkillGemIds[index];
+			string slot = LocaleText.T($"build.slot.skill{index + 1}");
+			SkillGemDefinition gem = BuildCatalog.GetSkillGem(id);
+			string name = $"{LocaleText.T(gem.NameKey)} Lv.{loadout.GetSkillGemLevel(index)}";
+			AddTerm(_skillGemFlow, name, () => (name, InventoryPanel.BuildItemTooltipBody(id, slot)));
+		}
+	}
+
+	private static string BuildDetailSignature(SimpleActor actor)
+	{
+		CompanionBuildLoadout loadout = actor.BuildLoadout;
+		return string.Join("|",
+			actor.GetInstanceId(),
+			actor.SpecialAbility,
+			actor.AbilityRank,
+			string.Join(",", actor.TraitKeys),
+			loadout.HelmetId,
+			loadout.WeaponId,
+			loadout.ArmorId,
+			loadout.AccessoryId,
+			loadout.AttributeGemId,
+			string.Join(",", loadout.SkillGemIds),
+			string.Join(",", loadout.SkillGemLevels));
+	}
+
+	private (string, string) BuildSingleTraitTooltip(string traitKey)
+	{
+		if (_actor == null) return (string.Empty, string.Empty);
+		BuildStats stats = _actor.CurrentBuildStats;
+		string value = traitKey switch
+		{
+			"identity.passive.move_speed" => $"{LocaleText.T("stat.speed")} {_actor.MoveSpeed:0.0} -> {_actor.EffectiveMoveSpeed:0.0}",
+			"identity.passive.crit_rate" => $"{LocaleText.T("tooltip.crit_chance")} {stats.CritChance * 100.0f:0.#}%",
+			"identity.passive.water_damage" or "identity.passive.fire_damage" or "identity.passive.poison_mastery" => $"{LocaleText.T("stat.attack")} {_actor.EffectiveAttack} / {_actor.BuildElementName}",
+			"identity.passive.thick_hide" or "identity.passive.team_defense" or "identity.passive.guard_oath" => $"{LocaleText.T("stat.defense")} {_actor.Defense} -> {_actor.EffectiveDefense}",
+			"identity.passive.small_target" => $"{LocaleText.T("stat.speed")} {_actor.EffectiveMoveSpeed:0.0}",
+			"identity.passive.water_aoe" => $"{LocaleText.T("tooltip.attack_range")} {_actor.EffectiveAttackRange:0.0}",
+			_ => LocaleText.T(traitKey),
+		};
+		return (LocaleText.T(traitKey), value);
+	}
+
+	private void AddTerm(HFlowContainer flow, string text, System.Func<(string Title, string Body)> factory)
+	{
+		Label label = MakeLabel(12, new Color(0.88f, 0.95f, 0.72f));
+		label.Text = $"[{text}]";
+		label.AutowrapMode = TextServer.AutowrapMode.Off;
+		label.MouseFilter = MouseFilterEnum.Stop;
+		label.MouseDefaultCursorShape = CursorShape.PointingHand;
+		flow.AddChild(label);
+		BindTooltip(label, factory);
+	}
+
+	private static HFlowContainer AddFlow(VBoxContainer parent)
+	{
+		var flow = new HFlowContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkBegin };
+		flow.AddThemeConstantOverride("h_separation", 5);
+		flow.AddThemeConstantOverride("v_separation", 1);
+		parent.AddChild(flow);
+		return flow;
+	}
+
+	private static void ClearFlow(HFlowContainer flow)
+	{
+		foreach (Node child in flow.GetChildren())
+		{
+			flow.RemoveChild(child);
+			child.QueueFree();
+		}
 	}
 
 	private Label AddInteractiveLabel(VBoxContainer parent, Color? color = null)
@@ -236,6 +380,13 @@ public partial class CompanionInfoCard : PanelContainer
 		var label = new Label { VerticalAlignment = VerticalAlignment.Top, AutowrapMode = TextServer.AutowrapMode.WordSmart, SizeFlagsVertical = SizeFlags.ShrinkBegin };
 		label.AddThemeFontSizeOverride("font_size", fontSize);
 		label.AddThemeColorOverride("font_color", color);
+		return label;
+	}
+
+	private static Label MakeLabel(int fontSize, Color color, string textKey)
+	{
+		Label label = MakeLabel(fontSize, color);
+		label.Text = LocaleText.T(textKey);
 		return label;
 	}
 }
