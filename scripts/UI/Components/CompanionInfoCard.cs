@@ -9,6 +9,7 @@ public partial class CompanionInfoCard : PanelContainer
 	private Label _stats = null!;
 	private Label _meta = null!;
 	private Label _mode = null!;
+	private Label _mood = null!;
 	private Label _ability = null!;
 	private Label _traitsTitle = null!;
 	private Label _equipmentTitle = null!;
@@ -63,6 +64,8 @@ public partial class CompanionInfoCard : PanelContainer
 		columns.AddChild(metaRows);
 		_mode = AddInteractiveLabel(metaRows, new Color(0.88f, 0.95f, 0.72f));
 		_mode.GuiInput += OnModeGuiInput;
+		_mood = MakeLabel(12, new Color(1.0f, 0.78f, 0.82f));
+		metaRows.AddChild(_mood);
 		_meta = MakeLabel(12, new Color(0.74f, 0.88f, 0.80f));
 		metaRows.AddChild(_meta);
 		_ability = AddInteractiveLabel(metaRows);
@@ -136,12 +139,13 @@ public partial class CompanionInfoCard : PanelContainer
 			_title.Text = LocaleText.T("inventory.companion_info");
 			_experienceBar.Value = 0.0;
 			_experience.Text = LocaleText.T("inventory.no_companions");
-			_stats.Text = _meta.Text = _ability.Text = string.Empty;
+			_stats.Text = _meta.Text = _mood.Text = _ability.Text = string.Empty;
 			ClearFlow(_traitFlow);
 			ClearFlow(_equipmentFlow);
 			ClearFlow(_skillGemFlow);
 			_detailSignature = string.Empty;
 			_mode.Visible = false;
+			_mood.Visible = false;
 			_tooltip?.HideTooltip();
 			return;
 		}
@@ -168,9 +172,11 @@ public partial class CompanionInfoCard : PanelContainer
 			$"{LocaleText.T("stat.state")} {_actor.StateName}");
 		_meta.Text = string.Join("\n",
 			$"{_actor.TypeName} / {_actor.CombatRangeName}",
-			$"{LocaleText.T("stat.role")} {_actor.CombatRoleName} / {_actor.LocalizedPersonality}",
+			$"{LocaleText.T("stat.role")} {_actor.CombatRoleName}",
 			$"{LocaleText.T("stat.affinity")} {_actor.Affinity} / 100",
 			$"{LocaleText.T("build.element")} {_actor.BuildElementName} / {_actor.BuildRareComboName}");
+		_mood.Text = $"{LocaleText.T("stat.mood")}：{_actor.MoodName}";
+		_mood.Visible = true;
 		_ability.Text = $"{LocaleText.T("stat.ability")} {_actor.LocalizedSpecialAbility} {LocaleText.T("actor.level_prefix")}{_actor.AbilityRank}";
 		string detailSignature = BuildDetailSignature(_actor);
 		if (_detailSignature != detailSignature)
@@ -215,6 +221,7 @@ public partial class CompanionInfoCard : PanelContainer
 			LocaleText.F("party.title", _player.ActiveParty.Count, _player.ActivePartyLimit, _player.CapturedCollection.Count));
 		_ability.Text = string.Empty;
 		_mode.Visible = false;
+		_mood.Visible = false;
 		SetPetSectionsVisible(true);
 		_ability.Visible = false;
 		_traitsTitle.Text = LocaleText.T("build.traits");

@@ -295,10 +295,12 @@ public sealed class CompanionBuildLoadout
 
 public static class BuildCatalog
 {
-	// Only two combat behaviors remain: manual (attack the player's designated target
-	// only) and auto (attack the nearest hostile).
+	// Three distinct combat behaviors: fully independent auto targeting, player-command
+	// priority with automatic fallback, and manual designated-target-only combat.
 	public const string AiManualOnly = "manual";
-	public const string AiAttackNearest = "attack_nearest";
+	public const string AiAttackNearest = "independent";
+	public const string AiCommandPriority = "command_priority";
+	private const string LegacyAiAttackNearest = "attack_nearest";
 
 	private static readonly Dictionary<string, CompanionIdentity> Identities = new()
 	{
@@ -453,9 +455,10 @@ public static class BuildCatalog
 
 	private static readonly List<AttackModeDefinition> AttackModes = new()
 	{
-		// Only two selectable modes. Auto is first so unknown/legacy saved ids fall back
-		// to it (companions keep fighting) rather than silently going passive.
-		new AttackModeDefinition { Id = AiAttackNearest, NameKey = "attack_mode.auto", BehaviorId = AiAttackNearest },
+		// Command priority is the safe default and fallback: companions obey explicit
+		// orders while continuing to defend the party when no target is designated.
+		new AttackModeDefinition { Id = AiCommandPriority, NameKey = "attack_mode.command_priority", BehaviorId = AiCommandPriority },
+		new AttackModeDefinition { Id = AiAttackNearest, NameKey = "attack_mode.independent", BehaviorId = AiAttackNearest },
 		new AttackModeDefinition { Id = AiManualOnly, NameKey = "attack_mode.manual", BehaviorId = AiManualOnly },
 	};
 
@@ -648,6 +651,13 @@ public static class BuildCatalog
 
 	public static AttackModeDefinition GetAttackMode(string id)
 	{
+		// Before the three-mode split, attack_nearest still honored player-designated
+		// targets first. Preserve that behavior when loading an older save.
+		if (id == LegacyAiAttackNearest)
+		{
+			return AttackModes[0];
+		}
+
 		foreach (AttackModeDefinition mode in AttackModes)
 		{
 			if (mode.Id == id)
@@ -870,9 +880,7 @@ public static class BuildCatalog
 
 	public static string GetDefaultAttackModeId(SimpleActor actor)
 	{
-		// Companions default to auto-attacking the nearest enemy. Players can switch a
-		// companion to manual (only strike the designated target) from the party panel.
-		return AiAttackNearest;
+		return AiCommandPriority;
 	}
 
 	public static string LocalizedList(string[] keys)

@@ -40,7 +40,7 @@ public partial class SimpleActor : CharacterBody3D
 	[Export] public string PassiveAbility { get; set; } = "ability.none";
 	[Export] public int Affinity { get; set; } = 50;
 	[Export] public string MoodStateId { get; set; } = string.Empty;
-	[Export] public string AttackModeId { get; set; } = BuildCatalog.AiAttackNearest;
+	[Export] public string AttackModeId { get; set; } = BuildCatalog.AiCommandPriority;
 	[Export] public float DetectionRadius { get; set; } = 12.0f;
 	[Export] public float AttackRange { get; set; } = 1.8f;
 	[Export] public float AttackCooldown { get; set; } = 1.35f;
@@ -284,15 +284,34 @@ public partial class SimpleActor : CharacterBody3D
 	{
 		get
 		{
-			string baseState = _isDefeated
+			return _isDefeated
 				? LocaleText.T("actor.state.defeated")
 				: _isCaptured
 					? _isInActiveParty ? LocaleText.T("actor.state.active") : LocaleText.T("actor.state.stored")
 					: ActorKind == "monster" ? LocaleText.T("actor.state.hostile") : LocaleText.T("actor.state.neutral");
-			return string.IsNullOrWhiteSpace(MoodStateId)
-				? baseState
-				: $"{baseState} / {LocaleText.T(MoodStateId)}";
 		}
+	}
+	public string MoodName => LocaleText.T(GetMoodStateKey());
+	public string MoodStateKey => GetMoodStateKey();
+
+	private string GetMoodStateKey()
+	{
+		if (!string.IsNullOrWhiteSpace(MoodStateId))
+		{
+			return MoodStateId;
+		}
+
+		return Affinity switch
+		{
+			<= -60 => "actor.mood.wants_to_escape",
+			<= -30 => "actor.mood.depressed",
+			< 0 => "actor.mood.sulking",
+			< 20 => "actor.mood.wary",
+			< 50 => "actor.mood.settling_in",
+			< 75 => "actor.mood.trusting",
+			< 90 => "actor.mood.happy",
+			_ => "actor.mood.devoted",
+		};
 	}
 	public string GrowthName => EvolutionStage <= 0
 		? LocaleText.T("actor.growth.base")
@@ -679,12 +698,16 @@ public partial class SimpleActor : CharacterBody3D
 	public void CycleAttackMode()
 	{
 		AttackModeId = BuildCatalog.GetNextAttackModeId(AttackModeId);
+		_combatTarget = null;
+		_combatTargetSearchRemaining = 0.0f;
 		MarkBuildChanged();
 	}
 
 	public void SetAttackMode(string modeId)
 	{
 		AttackModeId = BuildCatalog.GetAttackMode(modeId).Id;
+		_combatTarget = null;
+		_combatTargetSearchRemaining = 0.0f;
 		MarkBuildChanged();
 	}
 
@@ -1769,7 +1792,9 @@ public partial class SimpleActor : CharacterBody3D
 
 	private SimpleActor? GetCombatTarget()
 	{
-		if (_followTarget != null && IsInstanceValid(_followTarget))
+		string behaviorId = CurrentBuildStats.AiBehaviorId;
+		bool acceptsPlayerCommand = behaviorId is BuildCatalog.AiCommandPriority or BuildCatalog.AiManualOnly;
+		if (acceptsPlayerCommand && _followTarget != null && IsInstanceValid(_followTarget))
 		{
 			SimpleActor? focusedTarget = _followTarget.FocusedTarget;
 			if (focusedTarget != null && IsValidCommandTarget(focusedTarget))
@@ -1786,8 +1811,9 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		// Manual mode never auto-acquires: it fights only the player's designated target
-		// (handled above) and ignores retaliation / nearest-enemy search entirely.
-		if (CurrentBuildStats.AiBehaviorId == BuildCatalog.AiManualOnly)
+		// handled above. Independent mode intentionally skips the command branch, while
+		// command-priority mode reaches the same automatic fallback used below.
+		if (behaviorId == BuildCatalog.AiManualOnly)
 		{
 			_combatTarget = null;
 			return null;
