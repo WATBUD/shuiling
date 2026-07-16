@@ -32,8 +32,7 @@ public partial class CombatEffect : Node3D
 
 		if (_impactRoot != null)
 		{
-			_impactRoot.Scale = Vector3.One * (0.55f + t * 1.85f);
-			_impactRoot.RotationDegrees += new Vector3(0.0f, 220.0f * step, 0.0f);
+			_impactRoot.Scale = Vector3.One * Mathf.Lerp(0.72f, 1.18f, t);
 		}
 
 		foreach (StandardMaterial3D material in _materials)
@@ -71,36 +70,13 @@ public partial class CombatEffect : Node3D
 
 		AddFxMesh(
 			"ImpactCore",
-			new SphereMesh { Radius = Radius * 0.23f, Height = Radius * 0.46f },
-			new Vector3(0.0f, Radius * 0.35f, 0.0f),
+			new SphereMesh { Radius = Radius * 0.15f, Height = Radius * 0.30f },
+			new Vector3(0.0f, Radius * 0.18f, 0.0f),
 			Vector3.Zero,
-			new Vector3(1.0f, 0.55f, 1.0f),
+			new Vector3(1.0f, 0.72f, 1.0f),
 			EffectColor
 		);
-
-		AddFxMesh(
-			"ImpactRing",
-			new CylinderMesh
-			{
-				TopRadius = Radius,
-				BottomRadius = Radius,
-				Height = 0.035f,
-				RadialSegments = 36,
-			},
-			new Vector3(0.0f, 0.05f, 0.0f),
-			Vector3.Zero,
-			Vector3.One,
-			new Color(EffectColor.R, EffectColor.G, EffectColor.B, EffectColor.A * 0.55f)
-		);
-
-		AddFxMesh(
-			"Slash",
-			new BoxMesh { Size = new Vector3(Radius * 1.75f, 0.055f, 0.16f) },
-			new Vector3(0.0f, Radius * 0.48f, 0.0f),
-			new Vector3(18.0f, 34.0f, 18.0f),
-			Vector3.One,
-			new Color(1.0f, 0.92f, 0.58f, 0.82f)
-		);
+		AddImpactParticles();
 
 		if (!string.IsNullOrEmpty(Text))
 		{
@@ -111,6 +87,51 @@ public partial class CombatEffect : Node3D
 			AddChild(_label);
 			AddChild(_labelHighlight);
 		}
+	}
+
+	private void AddImpactParticles()
+	{
+		var particleMaterial = new StandardMaterial3D
+		{
+			AlbedoColor = new Color(EffectColor.R, EffectColor.G, EffectColor.B, 0.92f),
+			EmissionEnabled = true,
+			Emission = EffectColor,
+			EmissionEnergyMultiplier = 2.2f,
+			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+			BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled,
+		};
+		var sparkMesh = new QuadMesh
+		{
+			Size = new Vector2(Mathf.Max(Radius * 0.075f, 0.028f), Mathf.Max(Radius * 0.32f, 0.12f)),
+			Material = particleMaterial,
+		};
+		var processMaterial = new ParticleProcessMaterial
+		{
+			EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere,
+			EmissionSphereRadius = Radius * 0.14f,
+			Direction = Vector3.Up,
+			Spread = 180.0f,
+			InitialVelocityMin = Mathf.Max(Radius * 3.2f, 1.4f),
+			InitialVelocityMax = Mathf.Max(Radius * 5.8f, 2.6f),
+			Gravity = new Vector3(0.0f, -4.2f, 0.0f),
+			ScaleMin = 0.62f,
+			ScaleMax = 1.08f,
+			Color = new Color(EffectColor.R, EffectColor.G, EffectColor.B, 0.92f),
+		};
+		var sparks = new GpuParticles3D
+		{
+			Name = "ImpactSparks",
+			Amount = 11,
+			Lifetime = Mathf.Clamp(Lifetime * 0.62f, 0.16f, 0.34f),
+			OneShot = true,
+			Explosiveness = 1.0f,
+			Randomness = 0.48f,
+			ProcessMaterial = processMaterial,
+			DrawPass1 = sparkMesh,
+			Emitting = true,
+		};
+		(_impactRoot ?? this).AddChild(sparks);
 	}
 
 	private Label3D CreateDamageLabel(int outlineSize, Color outlineColor)
@@ -163,8 +184,11 @@ public partial class CombatEffect : Node3D
 		var material = new StandardMaterial3D
 		{
 			AlbedoColor = color,
+			EmissionEnabled = true,
+			Emission = new Color(color.R, color.G, color.B),
+			EmissionEnergyMultiplier = 1.8f,
 			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-			Roughness = 0.22f,
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
 		};
 		_materials.Add(material);
 

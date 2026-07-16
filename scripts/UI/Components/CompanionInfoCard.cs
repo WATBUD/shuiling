@@ -10,11 +10,15 @@ public partial class CompanionInfoCard : PanelContainer
 	private Label _meta = null!;
 	private Label _mode = null!;
 	private Label _ability = null!;
+	private Label _traitsTitle = null!;
+	private Label _equipmentTitle = null!;
+	private Label _skillGemsTitle = null!;
 	private HFlowContainer _traitFlow = null!;
 	private HFlowContainer _equipmentFlow = null!;
 	private HFlowContainer _skillGemFlow = null!;
 	private FloatingTooltip _tooltip = null!;
 	private SimpleActor? _actor;
+	private PlayerController? _player;
 	private string _detailSignature = string.Empty;
 
 	public override void _Ready()
@@ -62,11 +66,14 @@ public partial class CompanionInfoCard : PanelContainer
 		_meta = MakeLabel(12, new Color(0.74f, 0.88f, 0.80f));
 		metaRows.AddChild(_meta);
 		_ability = AddInteractiveLabel(metaRows);
-		metaRows.AddChild(MakeLabel(12, new Color(0.74f, 0.88f, 0.80f), "build.traits"));
+		_traitsTitle = MakeLabel(12, new Color(0.74f, 0.88f, 0.80f), "build.traits");
+		metaRows.AddChild(_traitsTitle);
 		_traitFlow = AddFlow(metaRows);
-		metaRows.AddChild(MakeLabel(12, new Color(0.74f, 0.88f, 0.80f), "build.equipment"));
+		_equipmentTitle = MakeLabel(12, new Color(0.74f, 0.88f, 0.80f), "build.equipment");
+		metaRows.AddChild(_equipmentTitle);
 		_equipmentFlow = AddFlow(metaRows);
-		metaRows.AddChild(MakeLabel(12, new Color(0.74f, 0.88f, 0.80f), "build.skill_gems"));
+		_skillGemsTitle = MakeLabel(12, new Color(0.74f, 0.88f, 0.80f), "build.skill_gems");
+		metaRows.AddChild(_skillGemsTitle);
 		_skillGemFlow = AddFlow(metaRows);
 
 		_tooltip = new FloatingTooltip
@@ -121,6 +128,7 @@ public partial class CompanionInfoCard : PanelContainer
 
 	public void SetActor(SimpleActor? actor)
 	{
+		_player = null;
 		_actor = actor != null && IsInstanceValid(actor) ? actor : null;
 		if (_title == null) return;
 		if (_actor == null)
@@ -139,6 +147,11 @@ public partial class CompanionInfoCard : PanelContainer
 		}
 
 		BuildStats stats = _actor.CurrentBuildStats;
+		SetPetSectionsVisible(true);
+		_traitsTitle.Text = LocaleText.T("build.traits");
+		_equipmentTitle.Text = LocaleText.T("build.equipment");
+		_skillGemsTitle.Text = LocaleText.T("build.skill_gems");
+		_experienceBar.Visible = true;
 		_title.Text = $"{_actor.LocalizedDisplayName} - {LocaleText.F("inventory.info_header", _actor.Level)}";
 		_experienceBar.MaxValue = Mathf.Max(_actor.ExperienceToNextLevel, 1);
 		_experienceBar.Value = Mathf.Clamp(_actor.Experience, 0, _actor.ExperienceToNextLevel);
@@ -167,6 +180,84 @@ public partial class CompanionInfoCard : PanelContainer
 		}
 		_mode.Text = $"{LocaleText.T("build.slot.attack_mode")}: {_actor.AttackModeName}";
 		_mode.Visible = true;
+	}
+
+	public void SetPlayer(PlayerController? player)
+	{
+		_actor = null;
+		_player = player != null && IsInstanceValid(player) ? player : null;
+		if (_title == null) return;
+		if (_player == null)
+		{
+			SetActor(null);
+			return;
+		}
+
+		_title.Text = $"{_player.LocalizedPlayerName} - {LocaleText.F("inventory.info_header", _player.Level)}";
+		_experience.Text = $"{LocaleText.T("stat.experience")} {_player.Experience}/{_player.ExperienceToNextLevel}";
+		_experienceBar.MaxValue = Mathf.Max(_player.ExperienceToNextLevel, 1);
+		_experienceBar.Value = Mathf.Clamp(_player.Experience, 0, _player.ExperienceToNextLevel);
+		_experienceBar.Visible = true;
+		_stats.Text = string.Join("\n",
+			$"HP {_player.CurrentHealth} / {_player.MaxHealth}",
+			$"{LocaleText.T("stat.attack")} {_player.Attack}",
+			$"{LocaleText.T("stat.defense")} {_player.Defense}",
+			$"{LocaleText.T("stat.speed")} {_player.WalkSpeed:0.0}",
+			$"{LocaleText.T("tooltip.attack_range")} {_player.AttackRange:0.0}",
+			$"{LocaleText.T("tooltip.detection_radius")} {_player.DetectionRadius:0.0}",
+			$"{LocaleText.T("tooltip.crit_chance")} {_player.CritChance * 100.0f:0.#}%",
+			$"{LocaleText.T("stat.state")} {LocaleText.T("party.playable")}");
+		_meta.Text = string.Join("\n",
+			$"Player / {LocaleText.T("combat.range.melee")}",
+			$"{LocaleText.T("stat.role")} {LocaleText.T("role.dps")} / {LocaleText.T("personality.brave")}",
+			$"{LocaleText.T("build.element")} {LocaleText.T("element.physical")}",
+			LocaleText.F("inventory.gold", _player.Gold),
+			LocaleText.F("party.title", _player.ActiveParty.Count, _player.ActivePartyLimit, _player.CapturedCollection.Count));
+		_ability.Text = string.Empty;
+		_mode.Visible = false;
+		SetPetSectionsVisible(true);
+		_ability.Visible = false;
+		_traitsTitle.Text = LocaleText.T("build.traits");
+		_equipmentTitle.Text = LocaleText.T("build.equipment");
+		_skillGemsTitle.Text = LocaleText.T("stat.ability");
+		string playerSignature = $"player|{_player.Level}|{_player.Attack}|{_player.Defense}|{_player.WalkSpeed}|{_player.SprintSpeed}|{_player.CaptureNetCapacity}|{_player.CaptureNetRechargeSeconds}";
+		if (_detailSignature != playerSignature)
+		{
+			_detailSignature = playerSignature;
+			RebuildPlayerTerms();
+		}
+	}
+
+	private void RebuildPlayerTerms()
+	{
+		ClearFlow(_traitFlow);
+		ClearFlow(_equipmentFlow);
+		ClearFlow(_skillGemFlow);
+		if (_player == null) return;
+
+		AddTerm(_traitFlow, LocaleText.T("player.trait.runner"), () =>
+			(LocaleText.T("player.trait.runner"), $"{LocaleText.T("stat.speed")} {_player.WalkSpeed:0.0} -> {_player.SprintSpeed:0.0}"));
+		AddTerm(_traitFlow, LocaleText.T("player.trait.resilience"), () =>
+			(LocaleText.T("player.trait.resilience"), $"HP {_player.MaxHealth}\n{LocaleText.T("stat.defense")} {_player.Defense}"));
+		AddTerm(_equipmentFlow, LocaleText.T("player.equipment.sword"), () =>
+			(LocaleText.T("player.equipment.sword"), $"{LocaleText.T("stat.attack")} {_player.Attack}\n{LocaleText.T("tooltip.attack_range")} {_player.AttackRange:0.0}"));
+		AddTerm(_equipmentFlow, LocaleText.T("player.equipment.shield"), () =>
+			(LocaleText.T("player.equipment.shield"), $"{LocaleText.T("stat.defense")} {_player.Defense}\nHP {_player.MaxHealth}"));
+		AddTerm(_skillGemFlow, LocaleText.T("player.skill.capture"), () =>
+			(LocaleText.T("player.skill.capture"), $"Capacity {_player.CaptureNetCapacity}\nRecharge {_player.CaptureNetRechargeSeconds:0.0}s"));
+		AddTerm(_skillGemFlow, LocaleText.T("player.skill.sprint"), () =>
+			(LocaleText.T("player.skill.sprint"), $"{LocaleText.T("stat.speed")} {_player.WalkSpeed:0.0} -> {_player.SprintSpeed:0.0}\nJump {_player.JumpVelocity:0.0}"));
+	}
+
+	private void SetPetSectionsVisible(bool visible)
+	{
+		_ability.Visible = visible;
+		_traitsTitle.Visible = visible;
+		_traitFlow.Visible = visible;
+		_equipmentTitle.Visible = visible;
+		_equipmentFlow.Visible = visible;
+		_skillGemsTitle.Visible = visible;
+		_skillGemFlow.Visible = visible;
 	}
 
 	private void CycleMode()
@@ -307,7 +398,9 @@ public partial class CompanionInfoCard : PanelContainer
 	{
 		control.MouseEntered += () =>
 		{
-			if (_actor == null || !IsInstanceValid(_actor)) return;
+			bool hasActor = _actor != null && IsInstanceValid(_actor);
+			bool hasPlayer = _player != null && IsInstanceValid(_player);
+			if (!hasActor && !hasPlayer) return;
 			(string title, string body) = factory();
 			_tooltip.ShowTooltip(title, body, this);
 		};

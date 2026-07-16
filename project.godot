@@ -30,8 +30,8 @@ project/assembly_name="新遊戲專案"
 
 [gui]
 
-theme/default_font_generate_mipmaps=true
 theme/default_font_multichannel_signed_distance_field=true
+theme/default_font_generate_mipmaps=true
 
 [physics]
 
@@ -40,5 +40,4 @@ theme/default_font_multichannel_signed_distance_field=true
 [rendering]
 
 rendering_device/driver.windows="d3d12"
-renderer/rendering_method="forward_plus"
 renderer/rendering_method.mobile="gl_compatibility"

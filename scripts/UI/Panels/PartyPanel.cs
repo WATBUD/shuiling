@@ -6,8 +6,6 @@ public partial class PartyPanel : PanelContainer
 	private PlayerController? _player;
 	private VBoxContainer _memberList = null!;
 	private Label _titleLabel = null!;
-	private Label _nameLabel = null!;
-	private Label _roleLabel = null!;
 	private Label _levelLabel = null!;
 	private Label _attackLabel = null!;
 	private Label _defenseLabel = null!;
@@ -197,12 +195,6 @@ public partial class PartyPanel : PanelContainer
 		detailRows.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		detailScroll.AddChild(detailRows);
 
-		_nameLabel = MakeLabel(24, new Color(1.0f, 1.0f, 1.0f));
-		detailRows.AddChild(_nameLabel);
-
-		_roleLabel = MakeLabel(14, new Color(0.72f, 0.82f, 0.92f));
-		detailRows.AddChild(_roleLabel);
-
 		_companionInfoCard = new CompanionInfoCard
 		{
 			SizeFlagsHorizontal = SizeFlags.ExpandFill,
@@ -294,16 +286,12 @@ public partial class PartyPanel : PanelContainer
 
 		if (_selected is SimpleActor actor && IsInstanceValid(actor))
 		{
-			_nameLabel.Text = actor.LocalizedDisplayName;
-			_roleLabel.Text = LocaleText.F("inventory.info_header", actor.Level);
 			_companionInfoCard.SetActor(actor);
 			return;
 		}
 
 		_selected = _player;
-		_nameLabel.Text = _player.LocalizedPlayerName;
-		_roleLabel.Text = LocaleText.T("party.player_role");
-		_companionInfoCard.SetActor(null);
+		_companionInfoCard.SetPlayer(_player);
 	}
 
 	private void UpdateBuildButtons(SimpleActor actor)

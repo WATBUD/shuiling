@@ -1659,7 +1659,7 @@ public partial class World : Node3D
 	{
 		SimpleActor actor = CreateActor(false, "city", offer.NameKey, offer.CombatRole, offer.Level);
 		actor.ConfigureStats(offer.NameKey, offer.Level, offer.MaxHealth, offer.Attack, offer.Defense, offer.Level * 6, 0);
-		actor.ConfigureGrowth("ability.npc.guard", Mathf.Max(offer.Level / 2, 1));
+		actor.ConfigureGrowth(offer.CombatRole == "Support" ? "ability.npc.heal" : "ability.npc.guard", Mathf.Max(offer.Level / 2, 1));
 		actor.ConfigureCombatProfile(offer.CombatRole, "personality.brave", offer.CombatRole == "Support" ? "passive.protector" : "passive.combo_rhythm", 5);
 		Vector3 spawnPosition = _mainCityCenter + RingFrontOffset(126.0f, 31.0f, 2.6f);
 		actor.Position = spawnPosition;

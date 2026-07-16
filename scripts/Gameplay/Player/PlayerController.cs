@@ -87,11 +87,16 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float MapPortalInteractRange { get; set; } = 5.2f;
 	[Export] public string PlayerName { get; set; } = "player.default_name";
 	[Export] public int Level { get; set; } = 1;
+	[Export] public int Experience { get; set; }
 	[Export] public int MaxHealth { get; set; } = 150;
 	[Export] public int CurrentHealth { get; set; } = 150;
 	[Export] public int Attack { get; set; } = 16;
 	[Export] public int Defense { get; set; } = 10;
 	[Export] public int Gold { get; set; } = 5000;
+	[Export] public float AttackRange { get; set; } = 2.2f;
+	[Export] public float DetectionRadius { get; set; } = 18.0f;
+	[Export] public float CritChance { get; set; } = 0.05f;
+	[Export] public float AttackCooldown { get; set; } = 1.0f;
 	[Export] public int ActivePartyLimit { get; set; } = 20;
 	[Export] public float DamageFlashDuration { get; set; } = 0.32f;
 
@@ -111,7 +116,7 @@ public partial class PlayerController : CharacterBody3D
 	{
 		new("mercenary.offer.vanguard", "name.mercenary.vanguard", "role.tank", "Tank", "mercenary.summary.vanguard", 3, 260, 185, 18, 24),
 		new("mercenary.offer.ranger", "name.mercenary.ranger", "role.ranged", "Ranged", "mercenary.summary.ranger", 4, 320, 145, 28, 15),
-		new("mercenary.offer.mender", "name.mercenary.mender", "role.support", "Support", "mercenary.summary.mender", 3, 300, 132, 16, 18),
+		new("mercenary.offer.arcane_healer", "name.mercenary.arcane_healer", "role.support", "Support", "mercenary.summary.arcane_healer", 3, 300, 132, 16, 18),
 		new("mercenary.offer.duelist", "name.mercenary.duelist", "role.dps", "DPS", "mercenary.summary.duelist", 5, 420, 160, 36, 16),
 		new("mercenary.offer.scout", "name.mercenary.scout", "role.gatherer", "Gatherer", "mercenary.summary.scout", 2, 180, 118, 17, 12),
 	};
@@ -185,6 +190,7 @@ public partial class PlayerController : CharacterBody3D
 	public Vector3 MinimapForward => GetCameraPlanarForward();
 	public CameraViewMode CameraMode => _cameraMode;
 	public float HealthRatio => MaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)MaxHealth, 0.0f, 1.0f);
+	public int ExperienceToNextLevel => 60 + Level * 30;
 
 	public override void _Ready()
 	{
@@ -506,7 +512,7 @@ public partial class PlayerController : CharacterBody3D
 		_captureCooldownRemaining = CaptureCooldown;
 		_captureNetCharges = Mathf.Max(_captureNetCharges - 1, 0);
 		Vector3 direction = GetCaptureThrowDirection();
-		Vector3 spawnPosition = GlobalPosition + new Vector3(0.0f, 1.18f, 0.0f) + GetCameraPlanarForward() * 1.05f;
+		Vector3 spawnPosition = GlobalPosition + new Vector3(0.0f, 1.18f, 0.0f) + direction * 1.05f;
 		var net = new CaptureNet
 		{
 			OwnerPlayer = this,
@@ -1076,6 +1082,7 @@ public partial class PlayerController : CharacterBody3D
 		var data = new PlayerSaveData
 		{
 			Level = Level,
+			Experience = Experience,
 			MaxHealth = MaxHealth,
 			CurrentHealth = CurrentHealth,
 			Attack = Attack,
@@ -1143,6 +1150,7 @@ public partial class PlayerController : CharacterBody3D
 	public void ApplySaveData(PlayerSaveData data, IReadOnlyList<SimpleActor> loadedCompanions)
 	{
 		Level = Mathf.Max(data.Level, 1);
+		Experience = Mathf.Max(data.Experience, 0);
 		MaxHealth = Mathf.Max(data.MaxHealth, 1);
 		CurrentHealth = Mathf.Clamp(data.CurrentHealth, 1, MaxHealth);
 		Attack = Mathf.Max(data.Attack, 0);
@@ -1226,12 +1234,14 @@ public partial class PlayerController : CharacterBody3D
 				continue;
 			}
 
+			bool isLegacyMender = offer.NameKey == "name.mercenary.mender"
+				|| offer.Id.StartsWith("mercenary.offer.mender", System.StringComparison.Ordinal);
 			_contractCompanionOffers.Add(new ContractCompanionOffer(
-				offer.Id,
-				offer.NameKey,
+				isLegacyMender ? offer.Id.Replace("mercenary.offer.mender", "mercenary.offer.arcane_healer", System.StringComparison.Ordinal) : offer.Id,
+				isLegacyMender ? "name.mercenary.arcane_healer" : offer.NameKey,
 				offer.RoleNameKey,
 				offer.CombatRole,
-				offer.SummaryKey,
+				isLegacyMender ? "mercenary.summary.arcane_healer" : offer.SummaryKey,
 				Mathf.Max(offer.Level, 1),
 				Mathf.Max(offer.Cost, 1),
 				Mathf.Max(offer.MaxHealth, 1),
@@ -1728,6 +1738,17 @@ public partial class PlayerController : CharacterBody3D
 		if (experience <= 0)
 		{
 			return;
+		}
+
+		Experience += experience;
+		while (Experience >= ExperienceToNextLevel)
+		{
+			Experience -= ExperienceToNextLevel;
+			Level++;
+			MaxHealth += 12;
+			CurrentHealth = Mathf.Min(CurrentHealth + 12, MaxHealth);
+			Attack += 2;
+			Defense += 1;
 		}
 
 		foreach (SimpleActor actor in _activeParty)
@@ -3237,7 +3258,9 @@ public partial class PlayerController : CharacterBody3D
 
 	private Vector3 GetCaptureThrowDirection()
 	{
-		return GetCameraPlanarForward();
+		Vector3 facing = -GlobalTransform.Basis.Z;
+		facing.Y = 0.0f;
+		return facing.LengthSquared() > 0.001f ? facing.Normalized() : Vector3.Forward;
 	}
 
 	private static string CameraModeToSaveId(CameraViewMode mode)

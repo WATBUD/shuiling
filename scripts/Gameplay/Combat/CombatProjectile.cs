@@ -317,13 +317,6 @@ public partial class CombatProjectile : Node3D
 				new Vector3(0.0f, 0.0f, 24.0f),
 				new Color(1.0f, 0.92f, 0.58f, 0.92f)
 			);
-			AddFxMesh(
-				"SlashGlow",
-				new CylinderMesh { TopRadius = HitRadius * 0.9f, BottomRadius = HitRadius * 0.9f, Height = 0.03f, RadialSegments = 32 },
-				Vector3.Zero,
-				new Vector3(90.0f, 0.0f, 0.0f),
-				new Color(EffectColor.R, EffectColor.G, EffectColor.B, EffectColor.A * 0.55f)
-			);
 			return;
 		}
 
