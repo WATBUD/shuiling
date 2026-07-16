@@ -1665,7 +1665,7 @@ public partial class World : Node3D
 		actor.Position = spawnPosition;
 		actor.HomePosition = spawnPosition;
 		actor.WanderRadius = 0.6f;
-		actor.MoveSpeed = 1.0f;
+		actor.MoveSpeed = 6.7f;
 		_actorsRoot.AddChild(actor);
 		return actor;
 	}
@@ -1681,7 +1681,7 @@ public partial class World : Node3D
 		actor.Position = spawnPosition;
 		actor.HomePosition = spawnPosition;
 		actor.WanderRadius = 0.6f;
-		actor.MoveSpeed = 1.05f;
+		actor.MoveSpeed = 7.1f;
 		_actorsRoot.AddChild(actor);
 		return actor;
 	}
@@ -1693,7 +1693,7 @@ public partial class World : Node3D
 			Name = isMonster ? "Monster" : "NPC",
 			ActorKind = isMonster ? "monster" : "npc",
 			MapId = isMonster ? mapId : "city",
-			MoveSpeed = isMonster ? (float)_rng.RandfRange(2.0f, 3.1f) : (float)_rng.RandfRange(1.1f, 1.8f),
+			MoveSpeed = isMonster ? (float)_rng.RandfRange(6.4f, 8.0f) : (float)_rng.RandfRange(1.1f, 1.8f),
 			WanderRadius = (float)_rng.RandfRange(8.0f, 17.0f),
 		};
 		ConfigureActorStats(actor, isMonster, forcedDisplayName, forcedCombatRole, forcedLevel);

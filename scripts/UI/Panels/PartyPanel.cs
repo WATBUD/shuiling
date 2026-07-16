@@ -12,6 +12,7 @@ public partial class PartyPanel : PanelContainer
 	private Label _levelLabel = null!;
 	private Label _attackLabel = null!;
 	private Label _defenseLabel = null!;
+	private Label _speedLabel = null!;
 	private Label _growthLabel = null!;
 	private Label _experienceLabel = null!;
 	private Label _abilityLabel = null!;
@@ -219,6 +220,7 @@ public partial class PartyPanel : PanelContainer
 		_levelLabel = AddStatRow(detailRows, "stat.level");
 		_attackLabel = AddStatRow(detailRows, "stat.attack");
 		_defenseLabel = AddStatRow(detailRows, "stat.defense");
+		_speedLabel = AddStatRow(detailRows, "stat.speed");
 		_combatRoleLabel = AddStatRow(detailRows, "stat.role");
 		_personalityLabel = AddStatRow(detailRows, "stat.personality");
 		_passiveLabel = AddStatRow(detailRows, "build.traits");
@@ -342,6 +344,7 @@ public partial class PartyPanel : PanelContainer
 			_levelLabel.Text = actor.Level.ToString();
 			_attackLabel.Text = LocaleText.F("build.effective_stat", actor.EffectiveAttack, actor.Attack);
 			_defenseLabel.Text = LocaleText.F("build.effective_stat", actor.EffectiveDefense, actor.Defense);
+			_speedLabel.Text = actor.EffectiveMoveSpeed.ToString("0.0");
 			_combatRoleLabel.Text = actor.CombatRoleName;
 			_personalityLabel.Text = actor.LocalizedPersonality;
 			_passiveLabel.Text = actor.TraitSummary;
@@ -349,7 +352,9 @@ public partial class PartyPanel : PanelContainer
 			_growthLabel.Text = actor.GrowthName;
 			_experienceLabel.Text = $"{actor.Experience} / {actor.ExperienceToNextLevel}";
 			_abilityLabel.Text = $"{actor.LocalizedSpecialAbility} {LocaleText.T("actor.level_prefix")}{actor.AbilityRank}";
-			_stateLabel.Text = actor.StateName;
+			_stateLabel.Text = _player.IsMountedCompanion(actor)
+				? $"{actor.StateName} / 寵物騎乘中"
+				: actor.StateName;
 			_buildPowerLabel.Text = actor.CurrentBuildStats.BuildPower.ToString();
 			_elementLabel.Text = $"{actor.BuildElementName} / {actor.BuildRareComboName}";
 			_equipmentLabel.Text = LocaleText.F("build.equipment_summary", actor.BuildEquipmentSummary, actor.CurrentBuildStats.EquipmentSocketCount);
@@ -367,6 +372,7 @@ public partial class PartyPanel : PanelContainer
 		_levelLabel.Text = _player.Level.ToString();
 		_attackLabel.Text = _player.Attack.ToString();
 		_defenseLabel.Text = _player.Defense.ToString();
+		_speedLabel.Text = _player.WalkSpeed.ToString("0.0");
 		_combatRoleLabel.Text = LocaleText.T("party.leader");
 		_personalityLabel.Text = "-";
 		_passiveLabel.Text = "-";
@@ -471,6 +477,8 @@ public partial class PartyPanel : PanelContainer
 		if (_player.IsInActiveParty(actor))
 		{
 			_memberContextMenu.AddItem(LocaleText.T("button.store"), 1);
+			_memberContextMenu.AddItem(_player.IsMountedCompanion(actor) ? "解除騎乘" : "騎乘這隻寵物", 6);
+			_memberContextMenu.SetItemDisabled(_memberContextMenu.GetItemIndex(6), actor.IsDefeated);
 		}
 		else
 		{
@@ -518,6 +526,9 @@ public partial class PartyPanel : PanelContainer
 				break;
 			case 5:
 				_contextActor.EnhanceAbility();
+				break;
+			case 6:
+				_player.ToggleMountCompanion(_contextActor);
 				break;
 		}
 

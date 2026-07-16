@@ -19,7 +19,7 @@ public partial class SimpleActor : CharacterBody3D
 
 	[Export] public string ActorKind { get; set; } = "npc";
 	[Export] public string MapId { get; set; } = "wild_forest";
-	[Export] public float MoveSpeed { get; set; } = 1.6f;
+	[Export] public float MoveSpeed { get; set; } = 7.0f;
 	[Export] public float WanderRadius { get; set; } = 10.0f;
 	[Export] public float ChaseRadius { get; set; } = 20.0f;
 	[Export] public Vector3 HomePosition { get; set; } = Vector3.Zero;
@@ -39,6 +39,7 @@ public partial class SimpleActor : CharacterBody3D
 	[Export] public string Personality { get; set; } = "personality.calm";
 	[Export] public string PassiveAbility { get; set; } = "ability.none";
 	[Export] public int Affinity { get; set; } = 50;
+	[Export] public string MoodStateId { get; set; } = string.Empty;
 	[Export] public string AttackModeId { get; set; } = BuildCatalog.AiAttackNearest;
 	[Export] public float DetectionRadius { get; set; } = 12.0f;
 	[Export] public float AttackRange { get; set; } = 1.8f;
@@ -47,6 +48,7 @@ public partial class SimpleActor : CharacterBody3D
 	private readonly RandomNumberGenerator _rng = new();
 	private bool _isCaptured;
 	private bool _isInActiveParty;
+	private bool _isMountedByPlayer;
 	private bool _isDefeated;
 	private bool _isWorldMapActive = true;
 	private uint _defaultCollisionLayer;
@@ -74,10 +76,151 @@ public partial class SimpleActor : CharacterBody3D
 	private float _externalRootMotionStabilizeRemaining;
 	private float _retaliationTargetRemaining;
 	private Label3D? _nameplate;
+	private Node3D? _followLagBubble;
+	private string _petDialogueText = string.Empty;
+	private float _petDialogueRemaining;
+	private float _nextPetDialogueDelay = 7.0f;
+	private bool _showingLagDialogue;
 	private MeshInstance3D? _nameplateMarker;
 	private MeshInstance3D? _nameplateHalo;
 	private StandardMaterial3D? _nameplateMarkerMaterial;
 	private StandardMaterial3D? _nameplateHaloMaterial;
+	private static readonly string[] PetDailyQuotes =
+	{
+		"今天也要帥氣地冒險！",
+		"寶箱在哪裡？我聞到了！",
+		"放心，背後交給我！",
+		"打完這場要加餐喔！",
+		"我不是迷路，是在偵察！",
+		"主人，前面好像有好東西！",
+		"這次一定會掉稀有裝備！",
+		"勇者從不回頭看爆炸！",
+		"先說好，寶物要平分喔！",
+		"冒險的祕訣？跟緊主人！",
+		"我的鼻子說前面有寶物！",
+		"今天的風很適合出發！",
+		"小心，我感覺到怪物了！",
+		"再走一下就休息，好嗎？",
+		"主人，你的背影真可靠！",
+		"我會努力成為最強夥伴！",
+		"這條路看起來很可疑喔！",
+		"遇到危險就躲到我後面！",
+		"嘿嘿，我今天狀態超好！",
+		"剛才那招是不是很帥？",
+		"怪物們，準備投降吧！",
+		"我的肚子開始唱歌了……",
+		"下一個城鎮有好吃的嗎？",
+		"我想要一個閃亮亮的頭盔！",
+		"別擔心，我還能再戰！",
+		"前進前進，冒險不能停！",
+		"這裡的空氣有故事的味道！",
+		"主人，我有認真跟路喔！",
+		"那朵雲好像一塊大肉排！",
+		"今天也沒有迷路，完美！",
+		"森林裡一定藏著祕密！",
+		"山的另一邊會有什麼呢？",
+		"我聽見金幣在呼喚我！",
+		"快看，那邊好像會發光！",
+		"勝利之後記得摸摸頭！",
+		"我負責可愛，主人負責指揮！",
+		"敵人好多，正好熱身！",
+		"只要一起走就不會害怕！",
+		"今天的幸運值肯定滿點！",
+		"危險？那只是冒險的調味料！",
+		"我的直覺通常都很準……吧！",
+		"先休息一下也算戰術喔！",
+		"雨天冒險也別有風味呢！",
+		"太陽出來了，精神滿滿！",
+		"晚上要一起看星星嗎？",
+		"這次換我來保護主人！",
+		"我已經記住敵人的弱點了！",
+		"偷偷告訴你，我不怕黑！",
+		"剛剛的聲音不是我肚子叫！",
+		"前方道路，由我來偵察！",
+		"主人，我們是最佳拍檔！",
+		"再強的敵人也有破綻！",
+		"寶箱會不會其實是怪物？",
+		"我保證不會亂咬奇怪東西！",
+		"聞起來像是稀有素材！",
+		"冒險日記今天又要寫滿了！",
+		"走慢一點，風景很好看呢！",
+		"衝太快會錯過寶箱喔！",
+		"這附近一定有隱藏道路！",
+		"我剛剛看到草叢動了一下！",
+		"不管去哪裡我都會跟著你！",
+		"主人累了就換我帶路吧！",
+		"放心，我方向感……還可以！",
+		"下一戰讓我先上吧！",
+		"我的必殺技正在充能！",
+		"這一擊要打得漂漂亮亮！",
+		"勝利姿勢我都想好了！",
+		"敵人看起來也很有精神呢！",
+		"要和平相處嗎？不行就開打！",
+		"我的尾巴說今天會贏！",
+		"有主人在，我什麼都不怕！",
+		"冒險就是不斷發現驚喜！",
+		"我們離傳說又近了一步！",
+		"休息完要吃雙倍點心！",
+		"我可以把寶石當點心嗎？",
+		"這個不能吃？真可惜……",
+		"聞到香味了，是營地嗎？",
+		"背包裡還有零食對吧？",
+		"打怪之前先補充體力嘛！",
+		"主人最好了，尤其是發點心時！",
+		"寶物和晚餐，我全都要！",
+		"再冒險一下就開飯吧！",
+		"我願意用寶箱換一頓大餐！",
+		"這片草地很適合打滾耶！",
+		"水面亮晶晶的，好漂亮！",
+		"那棵樹看起來很有年紀！",
+		"風把遠方的味道帶來了！",
+		"這裡安靜得有點不尋常！",
+		"腳印往那邊去了，追嗎？",
+		"地圖拿反也能到目的地啦！",
+		"我們好像來過這裡……吧？",
+		"走錯路也可能找到驚喜！",
+		"迷路是冒險家的浪漫！",
+		"主人放心，我有做記號！",
+		"咦？剛才的記號去哪了？",
+		"只要往前走，總會到的！",
+		"這條捷徑看起來很安全！",
+		"如果迷路，就問問風吧！",
+		"今天也一起平安回家吧！",
+		"下一段旅程也請多多指教！",
+	};
+	private static readonly string[] PetCombatQuotes =
+	{
+		"好痛....",
+		"不要打我！",
+		"看我為主人討伐你！",
+		"接招吧，壞傢伙！",
+		"主人退後，交給我！",
+		"這一擊是替主人打的！",
+		"你挑錯對手了！",
+		"別小看我的爪子！",
+		"我、我才沒有害怕！",
+		"痛歸痛，我還能打！",
+		"等一下，你犯規啦！",
+		"有本事別躲！",
+		"看我的必殺技！",
+		"吃我一記正義飛撲！",
+		"主人正在看，我不能輸！",
+		"打完你就有點心了！",
+		"為了晚餐，衝啊！",
+		"這招可是練習過的！",
+		"你的弱點被我看穿了！",
+		"再來，我還沒認真呢！",
+		"可惡，差一點就很帥了！",
+		"不准欺負我的主人！",
+		"我們一起上，主人！",
+		"勝利已經在向我招手！",
+		"先投降就不咬你！",
+		"這就是夥伴的力量！",
+		"哎呀，這下有點疼！",
+		"輪到我反擊了！",
+		"你完蛋了，我生氣了！",
+		"最後一擊讓我來！",
+	};
 	private SquadActivity _squadActivity = SquadActivity.Follow;
 	private Vector3 _squadActivityLocalOffset = Vector3.Zero;
 	private float _squadActivityRemaining;
@@ -104,6 +247,8 @@ public partial class SimpleActor : CharacterBody3D
 	public bool CanJoinByAffinity => IsNpcRecruitCandidate && Affinity >= 80;
 	public bool IsCaptured => _isCaptured;
 	public bool IsInActiveParty => _isInActiveParty;
+	public float MountSeatHeight => Mathf.Max(GetVisualTopY(this) + 0.16f, 0.9f);
+	public void SetMountedByPlayer(bool mounted) => _isMountedByPlayer = mounted;
 	public bool IsDefeated => _isDefeated;
 	public bool IsActiveWorldTarget => !_isCaptured && !_isDefeated && _isWorldMapActive && IsVisibleInTree();
 	public bool IsHostileToPlayer => ActorKind == "monster" && IsActiveWorldTarget;
@@ -135,11 +280,20 @@ public partial class SimpleActor : CharacterBody3D
 	public float EffectiveDetectionRadius => Mathf.Max(DetectionRadius + CurrentBuildStats.DetectionRadiusBonus, 3.0f);
 	public float EffectiveAttackCooldown => Mathf.Max(AttackCooldown * CurrentBuildStats.AttackCooldownMultiplier, 0.22f);
 	public string TypeName => LocaleText.T(ActorKind == "monster" ? "actor.type.monster" : "actor.type.npc");
-	public string StateName => _isDefeated
-		? LocaleText.T("actor.state.defeated")
-		: _isCaptured
-			? _isInActiveParty ? LocaleText.T("actor.state.active") : LocaleText.T("actor.state.stored")
-			: ActorKind == "monster" ? LocaleText.T("actor.state.hostile") : LocaleText.T("actor.state.neutral");
+	public string StateName
+	{
+		get
+		{
+			string baseState = _isDefeated
+				? LocaleText.T("actor.state.defeated")
+				: _isCaptured
+					? _isInActiveParty ? LocaleText.T("actor.state.active") : LocaleText.T("actor.state.stored")
+					: ActorKind == "monster" ? LocaleText.T("actor.state.hostile") : LocaleText.T("actor.state.neutral");
+			return string.IsNullOrWhiteSpace(MoodStateId)
+				? baseState
+				: $"{baseState} / {LocaleText.T(MoodStateId)}";
+		}
+	}
 	public string GrowthName => EvolutionStage <= 0
 		? LocaleText.T("actor.growth.base")
 		: EvolutionStage == 1
@@ -192,7 +346,7 @@ public partial class SimpleActor : CharacterBody3D
 		_ => string.Empty,
 	};
 	public int EvolutionMaterialCount => EvolutionStage switch { 0 => 3, 1 => 5, 2 => 2, _ => 0 };
-	public float HealthRatio => EffectiveMaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)EffectiveMaxHealth, 0.0f, 1.0f);
+	public float HealthRatio => _isDefeated || EffectiveMaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)EffectiveMaxHealth, 0.0f, 1.0f);
 
 	public override void _Ready()
 	{
@@ -245,6 +399,15 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			Velocity = SlowToStop(velocity, step);
 			MoveAndSlideWithEffects(step);
+			return;
+		}
+
+		if (_isMountedByPlayer && _followTarget != null && IsInstanceValid(_followTarget))
+		{
+			GlobalPosition = _followTarget.GlobalPosition;
+			Rotation = _followTarget.Rotation;
+			Velocity = _followTarget.Velocity;
+			UpdateMovementAnimation(step);
 			return;
 		}
 
@@ -557,7 +720,7 @@ public partial class SimpleActor : CharacterBody3D
 		CombatRole = combatRole;
 		Personality = personality;
 		PassiveAbility = passiveAbility;
-		Affinity = Mathf.Clamp(affinity, 0, 100);
+		Affinity = Mathf.Clamp(affinity, -100, 100);
 
 		switch (CombatRole)
 		{
@@ -606,7 +769,11 @@ public partial class SimpleActor : CharacterBody3D
 
 	public void IncreaseAffinity(int amount)
 	{
-		Affinity = Mathf.Clamp(Affinity + amount, 0, 100);
+		Affinity = Mathf.Clamp(Affinity + amount, -100, 100);
+		if (Affinity >= 0)
+		{
+			MoodStateId = string.Empty;
+		}
 		RefreshNameplate();
 	}
 
@@ -622,6 +789,7 @@ public partial class SimpleActor : CharacterBody3D
 			CurrentHealth = CurrentHealth,
 			Attack = Attack,
 			Defense = Defense,
+			MoveSpeed = MoveSpeed,
 			ExperienceReward = ExperienceReward,
 			GoldReward = GoldReward,
 			Experience = Experience,
@@ -632,6 +800,7 @@ public partial class SimpleActor : CharacterBody3D
 			Personality = Personality,
 			PassiveAbility = PassiveAbility,
 			Affinity = Affinity,
+			MoodStateId = MoodStateId,
 			AttackModeId = AttackModeId,
 			BuildLoadout = new CompanionBuildSaveData
 			{
@@ -655,6 +824,7 @@ public partial class SimpleActor : CharacterBody3D
 		CurrentHealth = Mathf.Clamp(data.CurrentHealth, 1, MaxHealth);
 		Attack = Mathf.Max(data.Attack, 0);
 		Defense = Mathf.Max(data.Defense, 0);
+		MoveSpeed = Mathf.Clamp(data.MoveSpeed, 0.3f, 20.0f);
 		ExperienceReward = Mathf.Max(data.ExperienceReward, 0);
 		GoldReward = Mathf.Max(data.GoldReward, 0);
 		Experience = Mathf.Max(data.Experience, 0);
@@ -664,7 +834,8 @@ public partial class SimpleActor : CharacterBody3D
 		CombatRole = string.IsNullOrWhiteSpace(data.CombatRole) ? "DPS" : data.CombatRole;
 		Personality = string.IsNullOrWhiteSpace(data.Personality) ? "personality.calm" : data.Personality;
 		PassiveAbility = string.IsNullOrWhiteSpace(data.PassiveAbility) ? "ability.none" : data.PassiveAbility;
-		Affinity = Mathf.Clamp(data.Affinity, 0, 100);
+		Affinity = Mathf.Clamp(data.Affinity, -100, 100);
+		MoodStateId = data.MoodStateId;
 		AttackModeId = string.IsNullOrWhiteSpace(data.AttackModeId)
 			? BuildCatalog.GetDefaultAttackModeId(this)
 			: BuildCatalog.GetAttackMode(data.AttackModeId).Id;
@@ -1027,10 +1198,14 @@ public partial class SimpleActor : CharacterBody3D
 	{
 		if (!_isInActiveParty || _followTarget == null || !IsInstanceValid(_followTarget))
 		{
+			SetFollowLagBubbleVisible(false);
 			Velocity = SlowToStop(velocity, step);
 			MoveAndSlideWithEffects(step);
 			return;
 		}
+
+		float distanceToPlayer = GlobalPosition.DistanceTo(_followTarget.GlobalPosition);
+		UpdatePetDialogue(distanceToPlayer, step);
 
 		if (TryUseSupportBuild(ref velocity, step))
 		{
@@ -1054,15 +1229,6 @@ public partial class SimpleActor : CharacterBody3D
 		Vector3 destination = GetLivingSquadDestination();
 		Vector3 toDestination = destination - GlobalPosition;
 		toDestination.Y = 0.0f;
-		float distanceToPlayer = GlobalPosition.DistanceTo(_followTarget.GlobalPosition);
-
-		if (distanceToPlayer > 19.0f)
-		{
-			GlobalPosition = GetFollowDestination();
-			Velocity = Vector3.Zero;
-			ResetSquadActivity();
-			return;
-		}
 
 		float followSpeed = GetLivingSquadMoveSpeed(distanceToPlayer);
 		float stopDistance = _squadActivity == SquadActivity.Rest ? 0.85f : 0.55f;
@@ -1238,12 +1404,245 @@ public partial class SimpleActor : CharacterBody3D
 			_ => 2.35f,
 		};
 
-		if (distanceToPlayer > 8.0f)
+		float normalSpeed = Mathf.Max(EffectiveMoveSpeed * multiplier, 4.8f);
+		float catchUpBonus = Mathf.Clamp((distanceToPlayer - 7.0f) * 0.65f, 0.0f, 8.3f);
+		return Mathf.Max(normalSpeed, 5.2f + catchUpBonus);
+	}
+
+	private void SetFollowLagBubbleVisible(bool visible)
+	{
+		if (!visible)
 		{
-			multiplier += 0.8f;
+			if (_followLagBubble != null)
+			{
+				_followLagBubble.Visible = false;
+			}
+
+			return;
 		}
 
-		return Mathf.Max(EffectiveMoveSpeed * multiplier, 4.8f);
+		if (_followLagBubble == null)
+		{
+			float visualTop = GetVisualTopY(this);
+			_followLagBubble = new Node3D
+			{
+				Name = "FollowLagBubble",
+				Position = new Vector3(0.0f, Mathf.Max(visualTop + 0.78f, 2.75f), 0.0f),
+			};
+			AddChild(_followLagBubble);
+			CreateFollowLagBubbleVisual(_followLagBubble, _petDialogueText);
+		}
+
+		_followLagBubble.Visible = true;
+	}
+
+	private void UpdatePetDialogue(float distanceToPlayer, float step)
+	{
+		bool isInCombat = IsPetInCombat();
+		if (isInCombat && _showingLagDialogue)
+		{
+			ClearLagDialogue();
+			_nextPetDialogueDelay = 0.0f;
+			return;
+		}
+
+		if (!isInCombat && distanceToPlayer > 12.0f)
+		{
+			_showingLagDialogue = true;
+			ShowPetDialogue("主人等等我QQ....");
+			_petDialogueRemaining = 0.0f;
+			return;
+		}
+
+		if (_showingLagDialogue)
+		{
+			ClearLagDialogue();
+			_nextPetDialogueDelay = (float)_rng.RandfRange(7.0f, 15.0f);
+			return;
+		}
+
+		if (_petDialogueRemaining > 0.0f)
+		{
+			_petDialogueRemaining = Mathf.Max(_petDialogueRemaining - step, 0.0f);
+			SetFollowLagBubbleVisible(_petDialogueRemaining > 0.0f);
+			return;
+		}
+
+		SetFollowLagBubbleVisible(false);
+		_nextPetDialogueDelay -= step;
+		if (_nextPetDialogueDelay > 0.0f)
+		{
+			return;
+		}
+
+		string[] quotePool = isInCombat ? PetCombatQuotes : PetDailyQuotes;
+		string quote = quotePool[_rng.RandiRange(0, quotePool.Length - 1)];
+		ShowPetDialogue(quote);
+		_petDialogueRemaining = (float)_rng.RandfRange(2.6f, 4.0f);
+		_nextPetDialogueDelay = (float)_rng.RandfRange(7.0f, 15.0f);
+	}
+
+	private void ClearLagDialogue()
+	{
+		_showingLagDialogue = false;
+		_petDialogueText = string.Empty;
+		_petDialogueRemaining = 0.0f;
+		SetFollowLagBubbleVisible(false);
+	}
+
+	private bool IsPetInCombat()
+	{
+		if (_combatTarget != null && IsInstanceValid(_combatTarget) && _combatTarget.IsHostileToPlayer)
+		{
+			return true;
+		}
+
+		if (_followTarget == null || !IsInstanceValid(_followTarget))
+		{
+			return false;
+		}
+
+		SimpleActor? focusedTarget = _followTarget.FocusedTarget;
+		return focusedTarget != null
+			&& IsInstanceValid(focusedTarget)
+			&& focusedTarget.IsHostileToPlayer
+			&& (GlobalPosition.DistanceTo(focusedTarget.GlobalPosition) <= Mathf.Max(EffectiveDetectionRadius * 1.85f, 18.0f)
+				|| _followTarget.GlobalPosition.DistanceTo(focusedTarget.GlobalPosition) <= Mathf.Max(EffectiveDetectionRadius * 1.85f, 18.0f));
+	}
+
+	private void ShowPetDialogue(string text)
+	{
+		if (_petDialogueText != text)
+		{
+			_petDialogueText = text;
+			if (_followLagBubble != null)
+			{
+				_followLagBubble.QueueFree();
+				_followLagBubble = null;
+			}
+		}
+
+		SetFollowLagBubbleVisible(true);
+	}
+
+	private static void CreateFollowLagBubbleVisual(Node3D bubble, string bubbleText)
+	{
+		const int fontSize = 80;
+		const int horizontalPadding = 36;
+		const int verticalPadding = 22;
+		const int outerMargin = 3;
+		const int tailHeight = 20;
+		Vector2 measuredText = ThemeDB.FallbackFont.GetStringSize(bubbleText, HorizontalAlignment.Left, -1, fontSize);
+		int panelWidth = Mathf.CeilToInt(measuredText.X) + horizontalPadding;
+		int panelHeight = Mathf.CeilToInt(measuredText.Y) + verticalPadding;
+		int viewportWidth = panelWidth + outerMargin * 2;
+		int viewportHeight = panelHeight + outerMargin + tailHeight;
+		float centerX = viewportWidth * 0.5f;
+
+		var viewport = new SubViewport
+		{
+			Name = "BubbleViewport",
+			Size = new Vector2I(viewportWidth, viewportHeight),
+			TransparentBg = true,
+			RenderTargetUpdateMode = SubViewport.UpdateMode.Once,
+		};
+		bubble.AddChild(viewport);
+
+		var root = new Control
+		{
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			CustomMinimumSize = new Vector2(viewportWidth, viewportHeight),
+		};
+		viewport.AddChild(root);
+
+		var tail = new Polygon2D
+		{
+			Polygon = new Vector2[]
+			{
+				new(centerX - 14.0f, outerMargin + panelHeight - 2.0f),
+				new(centerX + 14.0f, outerMargin + panelHeight - 2.0f),
+				new(centerX, viewportHeight - 1.0f),
+			},
+			Color = new Color(0.96f, 0.94f, 0.88f, 0.80f),
+		};
+		root.AddChild(tail);
+
+		var panel = new PanelContainer
+		{
+			Position = new Vector2(outerMargin, outerMargin),
+			Size = new Vector2(panelWidth, panelHeight),
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			ClipContents = true,
+		};
+		var panelStyle = new StyleBoxFlat
+		{
+			BgColor = new Color(0.96f, 0.94f, 0.88f, 0.55f),
+			BorderColor = new Color(0.27f, 0.22f, 0.20f, 0.80f),
+			BorderWidthLeft = 2,
+			BorderWidthTop = 2,
+			BorderWidthRight = 2,
+			BorderWidthBottom = 2,
+			CornerRadiusTopLeft = 13,
+			CornerRadiusTopRight = 13,
+			CornerRadiusBottomLeft = 13,
+			CornerRadiusBottomRight = 13,
+			ContentMarginLeft = 12.0f,
+			ContentMarginRight = 12.0f,
+			ContentMarginTop = 5.0f,
+			ContentMarginBottom = 5.0f,
+		};
+		panel.AddThemeStyleboxOverride("panel", panelStyle);
+		root.AddChild(panel);
+
+		var bubbleGradient = new Gradient
+		{
+			Offsets = new float[] { 0.0f, 0.52f, 1.0f },
+			Colors = new Color[]
+			{
+				new(1.0f, 0.99f, 0.95f, 0.56f),
+				new(0.98f, 0.94f, 0.84f, 0.56f),
+				new(0.93f, 0.82f, 0.63f, 0.56f),
+			},
+		};
+		var gradientTexture = new GradientTexture2D
+		{
+			Gradient = bubbleGradient,
+			Width = panelWidth,
+			Height = panelHeight,
+			FillFrom = new Vector2(0.5f, 0.0f),
+			FillTo = new Vector2(0.5f, 1.0f),
+		};
+		var gradientLayer = new TextureRect
+		{
+			Texture = gradientTexture,
+			ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+			StretchMode = TextureRect.StretchModeEnum.Scale,
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+		};
+		panel.AddChild(gradientLayer);
+
+		var label = new Label
+		{
+			Text = bubbleText,
+			HorizontalAlignment = HorizontalAlignment.Center,
+			VerticalAlignment = VerticalAlignment.Center,
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+		};
+		label.AddThemeFontSizeOverride("font_size", fontSize);
+		label.AddThemeColorOverride("font_color", new Color(0.20f, 0.16f, 0.15f, 1.0f));
+		panel.AddChild(label);
+
+		var sprite = new Sprite3D
+		{
+			Name = "BubbleSprite",
+			Texture = viewport.GetTexture(),
+			Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+			NoDepthTest = true,
+			TextureFilter = BaseMaterial3D.TextureFilterEnum.Nearest,
+			PixelSize = 0.0055f,
+			Position = new Vector3(0.0f, 0.0f, 0.0f),
+		};
+		bubble.AddChild(sprite);
 	}
 
 	private Vector3 GetLivingSquadLookDirection(Vector3 destination)
@@ -1728,6 +2127,7 @@ public partial class SimpleActor : CharacterBody3D
 	private void Defeat(SimpleActor? attacker)
 	{
 		_isDefeated = true;
+		CurrentHealth = 0;
 		Velocity = Vector3.Zero;
 		RemoveFromGroup(ActorKind == "monster" ? "monsters" : "npcs");
 		_retaliationTarget = null;
@@ -1736,7 +2136,8 @@ public partial class SimpleActor : CharacterBody3D
 
 		if (_isCaptured)
 		{
-			Affinity = Mathf.Max(Affinity - 12, 0);
+			Affinity = Mathf.Max(Affinity - 12, -100);
+			UpdateNegativeMoodAfterDefeat();
 			CollisionLayer = _defaultCollisionLayer;
 			CollisionMask = _defaultCollisionMask;
 			Visible = true;
@@ -1762,6 +2163,35 @@ public partial class SimpleActor : CharacterBody3D
 				DropMonsterLoot(attacker._followTarget);
 			}
 		}
+	}
+
+	private void UpdateNegativeMoodAfterDefeat()
+	{
+		if (Affinity >= 0)
+		{
+			MoodStateId = string.Empty;
+			return;
+		}
+
+		if (Affinity <= -60)
+		{
+			MoodStateId = "actor.mood.wants_to_escape";
+			return;
+		}
+
+		if (Affinity <= -30)
+		{
+			MoodStateId = _rng.Randf() < 0.55f ? "actor.mood.depressed" : "actor.mood.wants_to_escape";
+			return;
+		}
+
+		string[] mildNegativeMoods =
+		{
+			"actor.mood.depressed",
+			"actor.mood.afraid",
+			"actor.mood.sulking",
+		};
+		MoodStateId = mildNegativeMoods[_rng.RandiRange(0, mildNegativeMoods.Length - 1)];
 	}
 
 	private void DropMonsterLoot(PlayerController player)
