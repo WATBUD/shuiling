@@ -67,14 +67,6 @@ public partial class AttackProjectile : Node3D
 				Vector3.One,
 				new Color(1.0f, 0.92f, 0.58f, 0.92f)
 			);
-			AddFxMesh(
-				"SlashGlow",
-				new CylinderMesh { TopRadius = Radius * 1.35f, BottomRadius = Radius * 1.35f, Height = 0.035f, RadialSegments = 36 },
-				Vector3.Zero,
-				new Vector3(90.0f, 0.0f, 0.0f),
-				new Vector3(1.0f, 0.28f, 1.0f),
-				new Color(EffectColor.R, EffectColor.G, EffectColor.B, EffectColor.A * 0.58f)
-			);
 			return;
 		}
 

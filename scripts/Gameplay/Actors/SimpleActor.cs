@@ -1391,16 +1391,16 @@ public partial class SimpleActor : CharacterBody3D
 	{
 		float multiplier = _squadActivity switch
 		{
-			SquadActivity.Scout => 2.55f,
-			SquadActivity.Gather or SquadActivity.Roam => 2.25f,
-			SquadActivity.Guard => 2.05f,
-			SquadActivity.Rest => 1.35f,
-			_ => 2.35f,
+			SquadActivity.Scout => 1.10f,
+			SquadActivity.Gather or SquadActivity.Roam => 0.92f,
+			SquadActivity.Guard => 1.0f,
+			SquadActivity.Rest => 0.68f,
+			_ => 1.05f,
 		};
 
-		float normalSpeed = Mathf.Max(EffectiveMoveSpeed * multiplier, 4.8f);
-		float catchUpBonus = Mathf.Clamp((distanceToPlayer - 7.0f) * 0.65f, 0.0f, 8.3f);
-		return Mathf.Max(normalSpeed, 5.2f + catchUpBonus);
+		float normalSpeed = Mathf.Max(EffectiveMoveSpeed * multiplier, 4.2f);
+		float catchUpBonus = Mathf.Clamp((distanceToPlayer - 6.5f) * 0.58f, 0.0f, 5.2f);
+		return normalSpeed + catchUpBonus;
 	}
 
 	private void SetFollowLagBubbleVisible(bool visible)
@@ -1650,8 +1650,20 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			SquadActivity.Guard or SquadActivity.Scout => GlobalPosition - _followTarget.GlobalPosition,
 			SquadActivity.Gather or SquadActivity.Roam => destination - GlobalPosition,
-			_ => _followTarget.GlobalPosition - GlobalPosition,
+			_ => GetFollowTargetFacingDirection(),
 		};
+	}
+
+	private Vector3 GetFollowTargetFacingDirection()
+	{
+		if (_followTarget == null || !IsInstanceValid(_followTarget))
+		{
+			return Vector3.Forward;
+		}
+
+		Vector3 forward = -_followTarget.GlobalTransform.Basis.Z;
+		forward.Y = 0.0f;
+		return forward.LengthSquared() > 0.001f ? forward.Normalized() : Vector3.Forward;
 	}
 
 	private void ResetSquadActivity()
@@ -2540,7 +2552,7 @@ public partial class SimpleActor : CharacterBody3D
 		Vector3 planarVelocity = Velocity;
 		planarVelocity.Y = 0.0f;
 		float speed = planarVelocity.Length();
-		float speedReference = Mathf.Max(EffectiveMoveSpeed * 2.4f, 4.5f);
+		float speedReference = Mathf.Max(EffectiveMoveSpeed * 1.55f, 7.0f);
 		float moveRatio = Mathf.Clamp(speed / speedReference, 0.0f, 1.0f);
 		bool isMoving = speed > 0.18f && IsOnFloor() && !_isDefeated;
 		float phaseSpeed = Mathf.Lerp(5.5f, 10.8f, moveRatio);
@@ -2554,7 +2566,7 @@ public partial class SimpleActor : CharacterBody3D
 			_movementAnimationPhase = Mathf.Lerp(_movementAnimationPhase, 0.0f, Mathf.Min(step * 8.0f, 1.0f));
 		}
 
-		UpdateExternalMovementAnimation(step, isMoving, moveRatio);
+		UpdateExternalMovementAnimation(step, isMoving, speed);
 
 		if (ActorKind == "monster")
 		{
@@ -2620,7 +2632,7 @@ public partial class SimpleActor : CharacterBody3D
 		SetChildPosition("TailTip", new Vector3(phaseA * 0.05f * intensity, 0.38f + bob * 0.45f, 1.42f));
 	}
 
-	private void UpdateExternalMovementAnimation(float step, bool isMoving, float moveRatio)
+	private void UpdateExternalMovementAnimation(float step, bool isMoving, float speed)
 	{
 		if (_isDefeated)
 		{
@@ -2634,8 +2646,9 @@ public partial class SimpleActor : CharacterBody3D
 			return;
 		}
 
+		float runThreshold = Mathf.Max(EffectiveMoveSpeed * 1.12f, 6.4f);
 		string state = isMoving
-			? moveRatio > 0.58f ? "run" : "walk"
+			? speed >= runThreshold ? "run" : "walk"
 			: "idle";
 		SetExternalAnimationState(state);
 	}

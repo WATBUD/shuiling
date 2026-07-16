@@ -678,7 +678,12 @@ public static class ExternalModelLibrary
 			}
 		}
 
-		return state is "run" or "walk" ? FindAnimationName(player, "idle") : null;
+		if (state == "run")
+		{
+			return FindAnimationName(player, "walk");
+		}
+
+		return state == "walk" ? FindAnimationName(player, "idle") : null;
 	}
 
 	private static int PositiveModulo(int value, int divisor)

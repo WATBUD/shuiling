@@ -12,6 +12,7 @@ public sealed class SaveGameData
 public sealed class PlayerSaveData
 {
 	public int Level { get; set; } = 1;
+	public int Experience { get; set; }
 	public int MaxHealth { get; set; } = 150;
 	public int CurrentHealth { get; set; } = 150;
 	public int Attack { get; set; } = 16;
