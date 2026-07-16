@@ -27,6 +27,7 @@ public partial class MerchantShopPanel : PanelContainer
 	private Button _refreshButton = null!;
 	private Button _buyTabButton = null!;
 	private Button _sellTabButton = null!;
+	private Label _buySectionTitleLabel = null!;
 	private FloatingTooltip _tooltip = null!;
 	private readonly Dictionary<ItemCategory, Button> _categoryButtons = new();
 	private ItemCategory _selectedCategory = ItemCategory.Materials;
@@ -82,6 +83,7 @@ public partial class MerchantShopPanel : PanelContainer
 	public void Open(PlayerController.MerchantShopKind shopKind)
 	{
 		_shopKind = shopKind;
+		ApplyShopWindowLayout();
 		_showSellList = false;
 		_selectedCategory = ItemCategory.Materials;
 		SetPanelVisible(true);
@@ -119,12 +121,14 @@ public partial class MerchantShopPanel : PanelContainer
 		{
 			_showSellList = false;
 		}
-		_tradeModeTabs.Visible = canSell;
+		bool canRefresh = _player != null && _player.IsMerchantShopRefreshable(_shopKind);
+		_tradeModeTabs.Visible = canSell || canRefresh;
+		_sellTabButton.Visible = canSell;
+		_buySectionTitleLabel.Visible = !(_shopKind == PlayerController.MerchantShopKind.PetShop && canRefresh);
 		_buyTabButton.Text = LocaleText.T("shop.buy");
 		_sellTabButton.Text = LocaleText.T("shop.sell");
 		_buyTabButton.ButtonPressed = !_showSellList;
 		_sellTabButton.ButtonPressed = _showSellList;
-		bool canRefresh = _player != null && _player.IsMerchantShopRefreshable(_shopKind);
 		_refreshRow.Visible = canRefresh;
 		if (canRefresh)
 		{
@@ -207,14 +211,14 @@ public partial class MerchantShopPanel : PanelContainer
 		AddThemeStyleboxOverride("panel", style);
 
 		var margin = new MarginContainer();
-		margin.AddThemeConstantOverride("margin_left", 18);
-		margin.AddThemeConstantOverride("margin_right", 18);
-		margin.AddThemeConstantOverride("margin_top", 16);
-		margin.AddThemeConstantOverride("margin_bottom", 16);
+		margin.AddThemeConstantOverride("margin_left", 14);
+		margin.AddThemeConstantOverride("margin_right", 14);
+		margin.AddThemeConstantOverride("margin_top", 10);
+		margin.AddThemeConstantOverride("margin_bottom", 10);
 		AddChild(margin);
 
 		var root = new VBoxContainer();
-		root.AddThemeConstantOverride("separation", 12);
+		root.AddThemeConstantOverride("separation", 6);
 		margin.AddChild(root);
 
 		var header = new HBoxContainer();
@@ -230,9 +234,8 @@ public partial class MerchantShopPanel : PanelContainer
 		_goldLabel.CustomMinimumSize = new Vector2(170.0f, 0.0f);
 		header.AddChild(_goldLabel);
 
-		_noticeLabel = MakeLabel(15, new Color(0.76f, 0.88f, 1.0f));
+		_noticeLabel = MakeLabel(14, new Color(0.76f, 0.88f, 1.0f));
 		_noticeLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-		_noticeLabel.CustomMinimumSize = new Vector2(0.0f, 34.0f);
 		root.AddChild(_noticeLabel);
 
 		_categoryTabs = new HBoxContainer();
@@ -265,16 +268,19 @@ public partial class MerchantShopPanel : PanelContainer
 		_tradeModeTabs.AddChild(_sellTabButton);
 
 		_refreshRow = new HBoxContainer();
-		_refreshRow.AddThemeConstantOverride("separation", 10);
-		root.AddChild(_refreshRow);
+		_refreshRow.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+		_refreshRow.AddThemeConstantOverride("separation", 8);
+		_tradeModeTabs.AddChild(_refreshRow);
 
-		_refreshLabel = MakeLabel(15, new Color(0.82f, 0.92f, 1.0f));
+		_refreshLabel = MakeLabel(14, new Color(0.82f, 0.92f, 1.0f));
+		_refreshLabel.HorizontalAlignment = HorizontalAlignment.Right;
+		_refreshLabel.VerticalAlignment = VerticalAlignment.Center;
 		_refreshLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		_refreshRow.AddChild(_refreshLabel);
 
 		_refreshButton = new Button
 		{
-			CustomMinimumSize = new Vector2(148.0f, 38.0f),
+			CustomMinimumSize = new Vector2(138.0f, 32.0f),
 		};
 		_refreshButton.Pressed += () =>
 		{
@@ -288,7 +294,7 @@ public partial class MerchantShopPanel : PanelContainer
 		var columns = new HBoxContainer();
 		columns.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		columns.SizeFlagsVertical = SizeFlags.ExpandFill;
-		columns.AddThemeConstantOverride("separation", 14);
+		columns.AddThemeConstantOverride("separation", 10);
 		root.AddChild(columns);
 
 		_buyList = CreateTradeColumn(columns, "shop.buy", out _buySection);
@@ -299,10 +305,34 @@ public partial class MerchantShopPanel : PanelContainer
 		var closeButton = new Button
 		{
 			Text = LocaleText.T("dialog.button.cancel"),
-			CustomMinimumSize = new Vector2(0.0f, 42.0f),
+			CustomMinimumSize = new Vector2(0.0f, 34.0f),
 		};
 		closeButton.Pressed += () => CloseRequested?.Invoke();
 		root.AddChild(closeButton);
+	}
+
+	private void ApplyShopWindowLayout()
+	{
+		if (_shopKind == PlayerController.MerchantShopKind.PetShop)
+		{
+			AnchorLeft = 0.10f;
+			AnchorTop = 0.10f;
+			AnchorRight = 0.90f;
+			AnchorBottom = 0.90f;
+			OffsetLeft = 0.0f;
+			OffsetTop = 0.0f;
+			OffsetRight = 0.0f;
+			OffsetBottom = 0.0f;
+			CustomMinimumSize = Vector2.Zero;
+			return;
+		}
+
+		SetAnchorsPreset(LayoutPreset.Center);
+		OffsetLeft = -392.0f;
+		OffsetRight = 392.0f;
+		OffsetTop = -255.0f;
+		OffsetBottom = 255.0f;
+		CustomMinimumSize = new Vector2(784.0f, 510.0f);
 	}
 
 	private void AddCategoryTab(ItemCategory category)
@@ -378,12 +408,16 @@ public partial class MerchantShopPanel : PanelContainer
 			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 			SizeFlagsVertical = SizeFlags.ExpandFill,
 		};
-		section.AddThemeConstantOverride("separation", 8);
+		section.AddThemeConstantOverride("separation", 5);
 		parent.AddChild(section);
 
 		var title = MakeLabel(18, new Color(0.82f, 0.92f, 1.0f));
 		title.Text = LocaleText.T(titleKey);
 		section.AddChild(title);
+		if (titleKey == "shop.buy")
+		{
+			_buySectionTitleLabel = title;
+		}
 
 		var scroll = new ScrollContainer
 		{
@@ -395,7 +429,7 @@ public partial class MerchantShopPanel : PanelContainer
 
 		var list = new VBoxContainer();
 		list.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-		list.AddThemeConstantOverride("separation", 8);
+		list.AddThemeConstantOverride("separation", 5);
 		scroll.AddChild(list);
 		return list;
 	}
@@ -416,20 +450,23 @@ public partial class MerchantShopPanel : PanelContainer
 		style.SetCornerRadiusAll(6);
 		row.AddThemeStyleboxOverride("panel", style);
 		row.MouseFilter = MouseFilterEnum.Stop;
-		row.MouseEntered += () => ShowTradeTooltip(entry, isBuy);
-		row.MouseExited += HideTradeTooltip;
+		if (!isPetBuyRow)
+		{
+			row.MouseEntered += () => ShowTradeTooltip(entry, isBuy);
+			row.MouseExited += HideTradeTooltip;
+		}
 		parent.AddChild(row);
 
 		var margin = new MarginContainer();
-		margin.AddThemeConstantOverride("margin_left", isPetBuyRow ? 14 : 10);
-		margin.AddThemeConstantOverride("margin_right", isPetBuyRow ? 14 : 10);
-		margin.AddThemeConstantOverride("margin_top", isPetBuyRow ? 12 : 8);
-		margin.AddThemeConstantOverride("margin_bottom", isPetBuyRow ? 12 : 8);
+		margin.AddThemeConstantOverride("margin_left", isPetBuyRow ? 8 : 10);
+		margin.AddThemeConstantOverride("margin_right", isPetBuyRow ? 8 : 10);
+		margin.AddThemeConstantOverride("margin_top", isPetBuyRow ? 6 : 8);
+		margin.AddThemeConstantOverride("margin_bottom", isPetBuyRow ? 6 : 8);
 		row.AddChild(margin);
 
 		var line = new HBoxContainer();
 		line.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-		line.AddThemeConstantOverride("separation", isPetBuyRow ? 16 : 10);
+		line.AddThemeConstantOverride("separation", isPetBuyRow ? 10 : 10);
 		margin.AddChild(line);
 
 		Texture2D? itemIcon = ItemIconLibrary.Get(entry.ItemId);
@@ -438,15 +475,33 @@ public partial class MerchantShopPanel : PanelContainer
 			line.AddChild(ItemIconLibrary.CreateRect(entry.ItemId, 46.0f));
 		}
 
-		var name = MakeLabel(isPetBuyRow ? 18 : 16, new Color(0.96f, 0.98f, 1.0f));
-		name.Text = entry.DisplayName;
-		name.AutowrapMode = TextServer.AutowrapMode.Off;
-		name.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
-		name.ClipText = true;
-		name.VerticalAlignment = VerticalAlignment.Center;
-		name.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-		name.SizeFlagsVertical = SizeFlags.ExpandFill;
-		line.AddChild(name);
+		if (isPetBuyRow && entry.IsPetOffer)
+		{
+			SimpleActor previewActor = CreatePetOfferPreview(entry);
+			var infoCard = new CompanionInfoCard
+			{
+				SizeFlagsHorizontal = SizeFlags.ExpandFill,
+				SizeFlagsVertical = SizeFlags.ShrinkBegin,
+			};
+			infoCard.SetActor(previewActor);
+			line.AddChild(infoCard);
+			row.TreeExiting += () =>
+			{
+				if (IsInstanceValid(previewActor)) previewActor.Free();
+			};
+		}
+		else
+		{
+			var name = MakeLabel(16, new Color(0.96f, 0.98f, 1.0f));
+			name.Text = entry.DisplayName;
+			name.AutowrapMode = TextServer.AutowrapMode.Off;
+			name.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+			name.ClipText = true;
+			name.VerticalAlignment = VerticalAlignment.Center;
+			name.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+			name.SizeFlagsVertical = SizeFlags.ExpandFill;
+			line.AddChild(name);
+		}
 
 		if (!isPetBuyRow && _player != null)
 		{
@@ -469,8 +524,11 @@ public partial class MerchantShopPanel : PanelContainer
 			Disabled = _player == null || (isBuy && _player.Gold < entry.Price),
 		};
 		action.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
-		action.MouseEntered += () => ShowTradeTooltip(entry, isBuy);
-		action.MouseExited += HideTradeTooltip;
+		if (!isPetBuyRow)
+		{
+			action.MouseEntered += () => ShowTradeTooltip(entry, isBuy);
+			action.MouseExited += HideTradeTooltip;
+		}
 		action.Pressed += () =>
 		{
 			if (_player == null)
@@ -486,6 +544,20 @@ public partial class MerchantShopPanel : PanelContainer
 			}
 		};
 		line.AddChild(action);
+	}
+
+	private static SimpleActor CreatePetOfferPreview(PlayerController.ShopTradeEntry entry)
+	{
+		string combatRole = MonsterSpeciesCatalog.Current.GetDefaultRole(entry.ItemId);
+		var actor = new SimpleActor
+		{
+			ActorKind = "monster",
+			MoveSpeed = 7.1f,
+		};
+		actor.ConfigureStats(entry.ItemId, entry.PetLevel, entry.PetMaxHealth, entry.PetAttack, entry.PetDefense, entry.PetLevel * 8, 0);
+		actor.ConfigureGrowth("ability.monster.track", Mathf.Max(entry.PetLevel / 2, 1));
+		actor.ConfigureCombatProfile(combatRole, "personality.friendly", "ability.none", 5);
+		return actor;
 	}
 
 	private void RefreshCategoryTabs()

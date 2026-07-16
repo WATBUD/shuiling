@@ -238,18 +238,31 @@ public partial class CompanionInfoCard : PanelContainer
 	private (string, string) BuildSingleTraitTooltip(string traitKey)
 	{
 		if (_actor == null) return (string.Empty, string.Empty);
-		BuildStats stats = _actor.CurrentBuildStats;
+		CompanionIdentity identity = BuildCatalog.GetIdentity(_actor);
 		string value = traitKey switch
 		{
-			"identity.passive.move_speed" => $"{LocaleText.T("stat.speed")} {_actor.MoveSpeed:0.0} -> {_actor.EffectiveMoveSpeed:0.0}",
-			"identity.passive.crit_rate" => $"{LocaleText.T("tooltip.crit_chance")} {stats.CritChance * 100.0f:0.#}%",
-			"identity.passive.water_damage" or "identity.passive.fire_damage" or "identity.passive.poison_mastery" => $"{LocaleText.T("stat.attack")} {_actor.EffectiveAttack} / {_actor.BuildElementName}",
-			"identity.passive.thick_hide" or "identity.passive.team_defense" or "identity.passive.guard_oath" => $"{LocaleText.T("stat.defense")} {_actor.Defense} -> {_actor.EffectiveDefense}",
-			"identity.passive.small_target" => $"{LocaleText.T("stat.speed")} {_actor.EffectiveMoveSpeed:0.0}",
-			"identity.passive.water_aoe" => $"{LocaleText.T("tooltip.attack_range")} {_actor.EffectiveAttackRange:0.0}",
+			"identity.passive.move_speed" => $"{LocaleText.T("stat.speed")} +{(identity.MoveSpeedMultiplier - 1.0f) * 100.0f:0.#}%\n{_actor.MoveSpeed:0.0} -> {_actor.MoveSpeed * identity.MoveSpeedMultiplier:0.0}",
+			"identity.passive.crit_rate" => $"{LocaleText.T("tooltip.crit_chance")} +{identity.CritChanceBonus * 100.0f:0.#}%\n{LocaleText.T("tooltip.attack_cooldown")} {(1.0f - identity.AttackCooldownMultiplier) * 100.0f:0.#}%",
+			"identity.passive.water_damage" or "identity.passive.fire_damage" => $"{LocaleText.T($"element.{identity.ElementAffinityId}")} +{(identity.ElementAffinityDamageMultiplier - 1.0f) * 100.0f:0.#}%\n{LocaleText.T("stat.attack")} x{identity.AttackMultiplier:0.00}",
+			"identity.passive.water_aoe" or "identity.passive.attack_range" => $"{LocaleText.T("tooltip.attack_range")} +{identity.AttackRangeBonus:0.0}\n{_actor.AttackRange:0.0} -> {_actor.AttackRange + identity.AttackRangeBonus:0.0}",
+			"identity.passive.vitality" => BuildHealthTraitText(identity),
+			"identity.passive.power_strike" => $"{LocaleText.T("stat.attack")} +{identity.AttackBonus}\n{_actor.Attack} -> {_actor.Attack + identity.AttackBonus}",
+			"identity.passive.thick_hide" => $"HP +{(identity.MaxHealthMultiplier - 1.0f) * 100.0f:0.#}%\n{LocaleText.T("stat.defense")} +{(identity.DefenseMultiplier - 1.0f) * 100.0f:0.#}%",
+			"identity.passive.poison_mastery" => $"{LocaleText.T("stat.attack")} +{identity.AttackBonus}\n{LocaleText.T("element.poison")} +{(identity.ElementAffinityDamageMultiplier - 1.0f) * 100.0f:0.#}%",
+			"identity.passive.agility" => $"{LocaleText.T("stat.speed")} +{(identity.MoveSpeedMultiplier - 1.0f) * 100.0f:0.#}%\n{_actor.MoveSpeed:0.0} -> {_actor.MoveSpeed * identity.MoveSpeedMultiplier:0.0}",
+			"identity.passive.guard_oath" => $"HP +{identity.MaxHealthBonus}\n{LocaleText.T("stat.defense")} +{identity.DefenseBonus}",
+			"identity.passive.adaptable" => $"HP +{identity.MaxHealthBonus}\n{LocaleText.T("stat.attack")} +{identity.AttackBonus}\n{LocaleText.T("stat.defense")} +{identity.DefenseBonus}\n{LocaleText.T("stat.speed")} +{(identity.MoveSpeedMultiplier - 1.0f) * 100.0f:0.#}%",
 			_ => LocaleText.T(traitKey),
 		};
 		return (LocaleText.T(traitKey), value);
+	}
+
+	private static string BuildHealthTraitText(CompanionIdentity identity)
+	{
+		var lines = new List<string>();
+		if (identity.MaxHealthBonus != 0) lines.Add($"HP +{identity.MaxHealthBonus}");
+		if (!Mathf.IsEqualApprox(identity.MaxHealthMultiplier, 1.0f)) lines.Add($"HP +{(identity.MaxHealthMultiplier - 1.0f) * 100.0f:0.#}%");
+		return string.Join("\n", lines);
 	}
 
 	private void AddTerm(HFlowContainer flow, string text, System.Func<(string Title, string Body)> factory)
@@ -309,7 +322,6 @@ public partial class CompanionInfoCard : PanelContainer
 		var lines = new List<string>
 		{
 			$"{_actor.LocalizedSpecialAbility} {LocaleText.T("actor.level_prefix")}{_actor.AbilityRank}",
-			_actor.LocalizedPassiveAbility,
 			$"{LocaleText.T("stat.attack")} {_actor.EffectiveAttack}",
 			$"{LocaleText.T("tooltip.attack_range")} {_actor.EffectiveAttackRange:0.0}",
 			$"{LocaleText.T("tooltip.attack_cooldown")} {_actor.EffectiveAttackCooldown:0.00}s",

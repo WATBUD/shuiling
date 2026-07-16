@@ -323,14 +323,7 @@ public partial class SimpleActor : CharacterBody3D
 
 	private string[] GetTraitKeys()
 	{
-		var keys = new System.Collections.Generic.List<string>();
-		if (!string.IsNullOrWhiteSpace(PassiveAbility) && PassiveAbility != "ability.none")
-		{
-			keys.Add(PassiveAbility);
-		}
-
-		keys.AddRange(CurrentBuildStats.TraitKeys);
-		return keys.ToArray();
+		return (string[])CurrentBuildStats.TraitKeys.Clone();
 	}
 	public string BuildElementName => LocaleText.T(CurrentBuildStats.DamageElementNameKey);
 	public bool IsRangedCombatant => CombatRole == "Ranged" || CombatRole == "Support" || EffectiveAttackRange > 3.0f;
