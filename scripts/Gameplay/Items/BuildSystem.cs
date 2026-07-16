@@ -305,7 +305,7 @@ public static class BuildCatalog
 		["identity.water_spirit"] = new CompanionIdentity
 		{
 			Id = "identity.water_spirit",
-			PassiveKeys = new[] { "identity.passive.water_damage", "identity.passive.swim_fast", "identity.passive.water_aoe" },
+			PassiveKeys = new[] { "identity.passive.water_damage", "identity.passive.water_aoe", "identity.passive.vitality" },
 			UniqueSkillKeys = new[] { "identity.skill.water_cannon" },
 			MaxHealthBonus = 18,
 			AttackMultiplier = 1.04f,
@@ -327,7 +327,7 @@ public static class BuildCatalog
 		["identity.dragon"] = new CompanionIdentity
 		{
 			Id = "identity.dragon",
-			PassiveKeys = new[] { "identity.passive.fly", "identity.passive.fire_resist", "identity.passive.fire_damage" },
+			PassiveKeys = new[] { "identity.passive.fire_damage", "identity.passive.vitality", "identity.passive.attack_range" },
 			UniqueSkillKeys = new[] { "identity.skill.dragon_breath" },
 			MaxHealthMultiplier = 1.18f,
 			AttackMultiplier = 1.12f,
@@ -340,7 +340,7 @@ public static class BuildCatalog
 		["identity.redhorn"] = new CompanionIdentity
 		{
 			Id = "identity.redhorn",
-			PassiveKeys = new[] { "identity.passive.horn_charge", "identity.passive.thick_hide" },
+			PassiveKeys = new[] { "identity.passive.power_strike", "identity.passive.thick_hide" },
 			UniqueSkillKeys = new[] { "identity.skill.horn_crash" },
 			MaxHealthMultiplier = 1.12f,
 			DefenseMultiplier = 1.12f,
@@ -350,7 +350,7 @@ public static class BuildCatalog
 		["identity.venom_imp"] = new CompanionIdentity
 		{
 			Id = "identity.venom_imp",
-			PassiveKeys = new[] { "identity.passive.poison_mastery", "identity.passive.small_target" },
+			PassiveKeys = new[] { "identity.passive.poison_mastery", "identity.passive.agility" },
 			UniqueSkillKeys = new[] { "identity.skill.venom_spit" },
 			AttackBonus = 5,
 			MoveSpeedMultiplier = 1.08f,
@@ -360,7 +360,7 @@ public static class BuildCatalog
 		["identity.guardian"] = new CompanionIdentity
 		{
 			Id = "identity.guardian",
-			PassiveKeys = new[] { "identity.passive.guard_oath", "identity.passive.team_defense" },
+			PassiveKeys = new[] { "identity.passive.guard_oath" },
 			UniqueSkillKeys = new[] { "identity.skill.guardian_stance" },
 			MaxHealthBonus = 24,
 			DefenseBonus = 6,
@@ -368,7 +368,7 @@ public static class BuildCatalog
 		["identity.traveler"] = new CompanionIdentity
 		{
 			Id = "identity.traveler",
-			PassiveKeys = new[] { "identity.passive.adaptable", "identity.passive.fast_growth" },
+			PassiveKeys = new[] { "identity.passive.adaptable" },
 			UniqueSkillKeys = new[] { "identity.skill.quick_order" },
 			MaxHealthBonus = 10,
 			AttackBonus = 2,
@@ -598,7 +598,6 @@ public static class BuildCatalog
 	{
 		var keys = new List<string>();
 		keys.AddRange(identity.PassiveKeys);
-		keys.AddRange(identity.UniqueSkillKeys);
 		return keys.ToArray();
 	}
 

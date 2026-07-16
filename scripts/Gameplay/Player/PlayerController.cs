@@ -19,7 +19,18 @@ public partial class PlayerController : CharacterBody3D
 		PetShop,
 	}
 
-	public sealed record ShopTradeEntry(string ItemId, string DisplayName, string Detail, int Price);
+	public sealed record ShopTradeEntry(
+		string ItemId,
+		string DisplayName,
+		string Detail,
+		int Price,
+		int PetLevel = 0,
+		int PetMaxHealth = 0,
+		int PetAttack = 0,
+		int PetDefense = 0)
+	{
+		public bool IsPetOffer => PetLevel > 0;
+	}
 
 	private readonly record struct PetShopOffer(string MonsterNameKey, int Level, int Price, int MaxHealth, int Attack, int Defense);
 
@@ -867,7 +878,15 @@ public partial class PlayerController : CharacterBody3D
 					continue;
 				}
 
-				entries.Add(new ShopTradeEntry(offer.MonsterNameKey, LocaleText.T(offer.MonsterNameKey), GetPetShopDetail(offer), offer.Price));
+				entries.Add(new ShopTradeEntry(
+					offer.MonsterNameKey,
+					LocaleText.T(offer.MonsterNameKey),
+					GetPetShopDetail(offer),
+					offer.Price,
+					offer.Level,
+					offer.MaxHealth,
+					offer.Attack,
+					offer.Defense));
 			}
 		}
 		else
