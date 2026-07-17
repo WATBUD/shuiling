@@ -1787,11 +1787,6 @@ public partial class PlayerController : CharacterBody3D
 		TeleportToSafePosition();
 	}
 
-	private void SpawnDamageEffect(int damage)
-	{
-		SpawnFloatingEffect(damage.ToString(), new Color(1.0f, 0.18f, 0.14f, 0.92f), 0.48f, 0.62f);
-	}
-
 	private void SpawnFloatingEffect(string text, Color color, float lifetime, float radius)
 	{
 		SpawnWorldCombatEffect(text, color, GlobalPosition + new Vector3(0.0f, 1.15f, 0.0f), lifetime, radius);
@@ -1845,8 +1840,38 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
-		SimpleActor bunny = world.SpawnPurchasedPet("name.monster.bunny", 2, 130, 21, 12);
+		// High level so every core slot (1 main + 6 support) is already unlocked, then
+		// deck it out with a full fire-mage core chain to showcase the system.
+		SimpleActor bunny = world.SpawnPurchasedPet("name.monster.bunny", 40, 1100, 150, 80);
 		CaptureActor(bunny);
+		EquipFullCoreShowcase(bunny);
+	}
+
+	private static void EquipFullCoreShowcase(SimpleActor actor)
+	{
+		if (!IsInstanceValid(actor))
+		{
+			return;
+		}
+
+		// Main core (attack element).
+		actor.EquipAttributeGem("gem.attribute.fire");
+
+		// Support core chain (max 6). The ranged active skill (fireball) must go first so
+		// the projectile-support cores that follow are accepted.
+		string[] supportCores =
+		{
+			"gem.skill.fireball",
+			"gem.skill.explosion",
+			"gem.skill.split",
+			"gem.skill.multishot",
+			"gem.skill.chain",
+			"gem.skill.piercing",
+		};
+		for (int index = 0; index < supportCores.Length; index++)
+		{
+			actor.EquipSkillGem(index, supportCores[index]);
+		}
 	}
 
 	private void UpdateCaptureNetRecharge(float step)
@@ -3248,12 +3273,6 @@ public partial class PlayerController : CharacterBody3D
 	private Vector3 GetCameraPlanarForward()
 	{
 		return -GetCameraPlanarBackward();
-	}
-
-	private Vector3 GetCameraPlanarRight()
-	{
-		Vector3 forward = GetCameraPlanarForward();
-		return new Vector3(-forward.Z, 0.0f, forward.X).Normalized();
 	}
 
 	private Vector3 GetCameraAimDirection()

@@ -18,19 +18,12 @@ When adding a new feature, place the script in the narrowest matching folder. If
 
 ## AI-Friendly Entry Points
 
-Read `../AI_CONTEXT.md` first for a minimal routing map.
+Read `../AI_CONTEXT.md` first — it owns the per-feature routing map and the domain model
+(including the "gem" (code) = "core" (game) naming). This file only describes the folder
+layout, so the two don't drift.
 
-Common routes:
-
-- Camera, movement, keybinds, HUD, shops, save hooks: `Gameplay/Player/PlayerController.cs`.
-- Formation board state and companion slot offsets: `Gameplay/Player/PlayerController.Formation.cs`.
-- Formation drag/drop UI: `UI/Panels/FormationPanel.cs`.
-- Companion combat/follow/AI/build behavior: `Gameplay/Actors/SimpleActor.cs`.
-- World generation, portals, spawning, map switching: `World/World.cs`.
-- Build/equipment/gem definitions: `Gameplay/Items/BuildSystem.cs`.
-- Model loading and fallback materials: `Core/Assets/ExternalModelLibrary.cs`.
-
-Avoid opening the largest orchestration files unless the route points there. Prefer reading the focused panel/catalog/helper first, then open the owner file only around the call site.
+Avoid opening the largest orchestration files whole. Route to the method via `AI_CONTEXT.md`,
+then read only around the call site.
 
 ## Split Policy
 

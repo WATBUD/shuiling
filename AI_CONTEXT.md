@@ -1,55 +1,87 @@
 # AI Session Context
 
-Use this file as the first read for future AI/code sessions. It is intentionally short so the session can route to the right files without loading the whole project.
+First read for any AI/code session. Kept short so you can route to the right file
+without loading the whole project. When you change something structural here, update
+this file.
 
 ## Project
 
-Godot 4.7 C# creature-collecting action RPG.
+Godot 4.7 C# creature-collecting action RPG. You capture monsters, build their "cores",
+and they fight for you. Build with: `dotnet build "新遊戲專案.csproj"` after any C# change.
 
-Main scenes:
-- `main_menu.tscn`: startup/main menu.
-- `node_3d.tscn`: gameplay world scene, script `scripts/World/World.cs`.
+- `main_menu.tscn` — startup/main menu (`scripts/UI/Screens/MainMenu.cs`).
+- `node_3d.tscn` — gameplay world (`scripts/World/World.cs`).
+- Rendering: desktop `Forward+`; Windows driver `d3d12`; mobile `gl_compatibility`.
 
-Current rendering setup:
-- Desktop: `Forward+`.
-- Windows driver override: `d3d12`.
-- Mobile: `gl_compatibility`.
+## Domain model — READ THIS BEFORE TOUCHING COMBAT/BUILD
 
-## Read Only What You Need
+Naming mismatch (the #1 source of confusion): **the code says "gem"; the game/UI says
+"core".** They are the same thing. Map:
 
-Player input, camera, HUD, party, inventory, shops, save hooks:
-- `scripts/Gameplay/Player/PlayerController.cs`
+| Design / UI term | Code symbol |
+| --- | --- |
+| Main core (attack element) | `AttributeGem` / `AttributeGemId` (element: fire/water/… ; none = physical) |
+| Support core (chain of ≤6) | `SkillGem` / `SkillGemIds[]` / `SkillGemLevels[]` |
+| Core chain display `[核心] a-b-c` | `SimpleActor.SupportCoreChain` |
+| (Core Resonance — REMOVED) | no `RareCombo`/`Resonance` code remains; cores just stack |
 
-Player formation board state and companion slot offsets:
-- `scripts/Gameplay/Player/PlayerController.Formation.cs`
-- `scripts/UI/Panels/FormationPanel.cs`
+Combat facts:
+- **The player has no outgoing attack** — combat is entirely companion-driven. The player
+  only takes damage (`PlayerController.ReceiveDamage`) and throws the capture net.
+- Captured companions (and NPCs/monsters) are all `SimpleActor`. Companion attacks spawn a
+  live `CombatProjectile` that travels, collides, and applies damage on hit. Monsters use
+  the legacy instant-hit path (`SimpleActor.LegacyAttackActor`).
+- Core slots are **level-gated**: main core unlocks at Lv3; the 6 support slots unlock at
+  Lv 6/10/15/21/28/36 (`BuildCatalog.SupportCoreSlotCount`, `SupportCoreUnlockLevels`).
+- Support-core behaviors stack freely and are applied on projectile hit: split, multishot,
+  chain, pierce, explosion (`ProjectileBehavior` + `ProjectileBehaviorProfile`). The
+  projectile-support cores only work when a ranged active skill (fireball/meteor/laser) is
+  equipped (`IsRangedActiveSkill` / `IsProjectileSupportGem`).
+- 9 elements with an `ElementChart` multiplier and status effects (slow/stun/poison/burn)
+  applied in `SimpleActor.ReceiveDamage` / `ApplyElementStatus`.
+- Attack modes (`BuildCatalog.AttackModes`): `command_priority` (auto, but favors the
+  player's designated `FocusedTarget`), `independent` (auto nearest, ignores orders —
+  `AiAttackNearest` behavior), `manual` (only strikes the designated `FocusedTarget`).
 
-NPC/monster/companion behavior, combat, capture, build stats:
-- `scripts/Gameplay/Actors/SimpleActor.cs`
+## Route to the right file
 
-Map generation, spawning, portals, map save/load:
-- `scripts/World/World.cs`
+- Player input, camera, HUD, party, inventory/shop hooks, save, capture net, starter pet
+  (`GrantStarterBunny`): `scripts/Gameplay/Player/PlayerController.cs` (large — jump to the
+  method, don't read whole).
+- Formation board state / slot offsets: `scripts/Gameplay/Player/PlayerController.Formation.cs`,
+  `scripts/UI/Panels/FormationPanel.cs`.
+- Actor state, AI, movement, combat, capture, core-driven attack, save round-trip:
+  `scripts/Gameplay/Actors/SimpleActor.cs` (large).
+- Live projectile + behaviors (split/chain/pierce/explosion): `scripts/Gameplay/Combat/CombatProjectile.cs`.
+- Core/build data: elements, support cores, levels/upgrade, catalogs, `CalculateStats`:
+  `scripts/Gameplay/Items/BuildSystem.cs`.
+- Build-editing UI (equip/unequip via drag or double-click, upgrade, locked slots, core
+  chain): `scripts/UI/Panels/InventoryPanel.cs`.
+- Companion info card / party panel: `scripts/UI/Components/CompanionInfoCard.cs`,
+  `scripts/UI/Panels/PartyPanel.cs`.
+- Monster species / loot tables: `scripts/Gameplay/Monsters/MonsterSpeciesCatalog.cs`,
+  `scripts/Gameplay/Items/MonsterLootCatalog.cs`.
+- World gen, spawning, portals, map travel/save: `scripts/World/World.cs` (large).
+- Save contracts / manager: `scripts/Core/Save/SaveGameData.cs`, `SaveGameManager.cs`.
+- Localization: `scripts/Core/Localization/LocaleText.cs` + `locales/{zh_TW,en}.json`
+  (keep both files key-for-key in parity).
+- Model/asset loading + fallback materials: `scripts/Core/Assets/ExternalModelLibrary.cs`.
 
-Build system data:
-- `scripts/Gameplay/Items/BuildSystem.cs`
+## Invariants / gotchas
 
-Localization:
-- `scripts/Core/Localization/LocaleText.cs`
-- `scripts/Core/Localization/locales/zh_TW.json`
-- `scripts/Core/Localization/locales/en.json`
+- `CompanionBuildLoadout.SkillGemIds`/`SkillGemLevels` are normalized to
+  `SupportCoreSlotCount` by `EnsureSkillSlots()`; old saves with a different length are
+  padded/truncated on load. Index cores through `GetSkillGemId(i)`/`GetSkillGemLevel(i)`.
+- Equipping never consumes inventory; unequip just sets the slot to `gem.*.none`.
+- Every localization key must exist in **both** locale files with the same format args.
+- The three large files (`PlayerController`, `SimpleActor`, `World`) are split candidates —
+  add focused `*.partial.cs` files rather than growing them.
 
-Save contracts:
-- `scripts/Core/Save/SaveGameData.cs`
-- `scripts/Core/Save/SaveGameManager.cs`
+## Maintenance rules
 
-Asset/model loading:
-- `scripts/Core/Assets/ExternalModelLibrary.cs`
-
-## Maintenance Rules
-
-- Prefer adding small partial files or focused helper classes over growing `PlayerController.cs`, `World.cs`, or `SimpleActor.cs`.
-- Keep scene orchestration in `World` or `PlayerController`; keep data contracts in `Core`.
-- New UI panels belong in `scripts/UI/Panels`.
-- New full-screen screens belong in `scripts/UI/Screens`.
-- New gameplay entities belong in the narrowest `scripts/Gameplay/*` folder.
-- When changing C# code, run `dotnet build "新遊戲專案.csproj"`.
+- Keep scene orchestration in `World`/`PlayerController`; keep data contracts in `Core`.
+- New UI panels → `scripts/UI/Panels`; full-screen screens → `scripts/UI/Screens`;
+  reusable widgets → `scripts/UI/Components`.
+- New gameplay entities → the narrowest `scripts/Gameplay/*` folder.
+- Don't create generic "utility" layers just to move code; split only on a real feature
+  boundary that reduces what a maintainer must read.

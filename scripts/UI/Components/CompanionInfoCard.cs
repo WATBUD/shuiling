@@ -174,7 +174,7 @@ public partial class CompanionInfoCard : PanelContainer
 			$"{_actor.TypeName} / {_actor.CombatRangeName}",
 			$"{LocaleText.T("stat.role")} {_actor.CombatRoleName}",
 			$"{LocaleText.T("stat.affinity")} {_actor.Affinity} / 100",
-			$"{LocaleText.T("build.element")} {_actor.BuildElementName} / {_actor.BuildRareComboName}");
+			$"{LocaleText.T("build.element")} {_actor.BuildElementName}");
 		_mood.Text = $"{LocaleText.T("stat.mood")}：{_actor.MoodName}";
 		_mood.Visible = true;
 		_ability.Text = $"{LocaleText.T("stat.ability")} {_actor.LocalizedSpecialAbility} {LocaleText.T("actor.level_prefix")}{_actor.AbilityRank}";
@@ -306,10 +306,16 @@ public partial class CompanionInfoCard : PanelContainer
 			AddTerm(_equipmentFlow, name, () => (name, InventoryPanel.BuildItemTooltipBody(capturedId, capturedSlot)));
 		}
 
-		for (int index = 0; index < loadout.SkillGemIds.Length; index++)
+		int unlockedCores = BuildCatalog.GetUnlockedSupportCoreCount(_actor.Level);
+		for (int index = 0; index < loadout.SkillGemIds.Length && index < unlockedCores; index++)
 		{
-			string id = loadout.SkillGemIds[index];
-			string slot = LocaleText.T($"build.slot.skill{index + 1}");
+			string id = loadout.GetSkillGemId(index);
+			if (id == "gem.skill.none")
+			{
+				continue;
+			}
+
+			string slot = LocaleText.F("build.slot.support_core", index + 1);
 			SkillGemDefinition gem = BuildCatalog.GetSkillGem(id);
 			string name = $"{LocaleText.T(gem.NameKey)} Lv.{loadout.GetSkillGemLevel(index)}";
 			AddTerm(_skillGemFlow, name, () => (name, InventoryPanel.BuildItemTooltipBody(id, slot)));
@@ -477,11 +483,17 @@ public partial class CompanionInfoCard : PanelContainer
 		if (_actor == null) return (string.Empty, string.Empty);
 		CompanionBuildLoadout loadout = _actor.BuildLoadout;
 		var blocks = new List<string>();
-		for (int index = 0; index < loadout.SkillGemIds.Length; index++)
+		int unlockedCores = BuildCatalog.GetUnlockedSupportCoreCount(_actor.Level);
+		for (int index = 0; index < loadout.SkillGemIds.Length && index < unlockedCores; index++)
 		{
-			string id = loadout.SkillGemIds[index];
+			string id = loadout.GetSkillGemId(index);
+			if (id == "gem.skill.none")
+			{
+				continue;
+			}
+
 			SkillGemDefinition gem = BuildCatalog.GetSkillGem(id);
-			string slot = LocaleText.T($"build.slot.skill{index + 1}");
+			string slot = LocaleText.F("build.slot.support_core", index + 1);
 			blocks.Add($"{LocaleText.T(gem.NameKey)} Lv.{loadout.GetSkillGemLevel(index)}\n{InventoryPanel.BuildItemTooltipBody(id, slot)}");
 		}
 		return (LocaleText.T("build.skill_gems"), string.Join("\n\n", blocks));

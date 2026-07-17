@@ -176,7 +176,6 @@ public sealed class BuildStats
 	public string DamageElementId { get; set; } = "physical";
 	public string DamageElementNameKey { get; set; } = "element.physical";
 	public string AiBehaviorId { get; set; } = BuildCatalog.AiAttackNearest;
-	public string RareComboKey { get; set; } = string.Empty;
 	public Color AttackColor { get; set; } = new(1.0f, 0.54f, 0.24f, 0.92f);
 	public string[] TraitKeys { get; set; } = System.Array.Empty<string>();
 	public ProjectileBehaviorProfile Behavior { get; set; } = new();
@@ -208,6 +207,12 @@ public sealed class CompanionBuildLoadout
 		}
 
 		return Mathf.Max(SkillGemLevels[index], 1);
+	}
+
+	public string GetSkillGemId(int index)
+	{
+		EnsureSkillSlots();
+		return index >= 0 && index < SkillGemIds.Length ? SkillGemIds[index] : "gem.skill.none";
 	}
 
 	public string GetEquipmentId(EquipmentSlot slot)
@@ -271,25 +276,26 @@ public sealed class CompanionBuildLoadout
 		return false;
 	}
 
-	private void EnsureSkillSlots()
+	public void EnsureSkillSlots()
 	{
-		if (SkillGemIds.Length != 3)
+		int target = BuildCatalog.SupportCoreSlotCount;
+		if (SkillGemIds.Length != target)
 		{
 			string[] previous = SkillGemIds;
-			SkillGemIds = new[] { "gem.skill.none", "gem.skill.none", "gem.skill.none" };
-			for (int index = 0; index < Mathf.Min(previous.Length, SkillGemIds.Length); index++)
+			SkillGemIds = new string[target];
+			for (int index = 0; index < target; index++)
 			{
-				SkillGemIds[index] = previous[index];
+				SkillGemIds[index] = index < previous.Length && !string.IsNullOrEmpty(previous[index]) ? previous[index] : "gem.skill.none";
 			}
 		}
 
-		if (SkillGemLevels.Length != 3)
+		if (SkillGemLevels.Length != target)
 		{
 			int[] previousLevels = SkillGemLevels;
-			SkillGemLevels = new[] { 1, 1, 1 };
-			for (int index = 0; index < Mathf.Min(previousLevels.Length, SkillGemLevels.Length); index++)
+			SkillGemLevels = new int[target];
+			for (int index = 0; index < target; index++)
 			{
-				SkillGemLevels[index] = Mathf.Max(previousLevels[index], 1);
+				SkillGemLevels[index] = index < previousLevels.Length ? Mathf.Max(previousLevels[index], 1) : 1;
 			}
 		}
 	}
@@ -547,6 +553,7 @@ public static class BuildCatalog
 
 	public static BuildStats CalculateStats(SimpleActor actor, CompanionBuildLoadout loadout)
 	{
+		loadout.EnsureSkillSlots();
 		CompanionIdentity identity = GetIdentity(actor);
 		var stats = new BuildStats
 		{
@@ -567,22 +574,34 @@ public static class BuildCatalog
 		ApplyEquipment(stats, GetEquipment(loadout.ArmorId));
 		ApplyEquipment(stats, GetEquipment(loadout.AccessoryId));
 
-		AttributeGemDefinition attributeGem = GetAttributeGem(loadout.AttributeGemId);
-		stats.DamageElementId = attributeGem.ElementId;
-		stats.DamageElementNameKey = attributeGem.ElementNameKey;
-		stats.AttackColor = attributeGem.AttackColor;
-		stats.Attack += attributeGem.AttackBonus;
-		stats.Defense += attributeGem.DefenseBonus;
-		stats.MoveSpeedMultiplier += attributeGem.MoveSpeedBonus;
-		stats.AttackRangeBonus += attributeGem.AttackRangeBonus;
-		stats.CritChance += attributeGem.CritChanceBonus;
-		stats.LifeStealPercent += attributeGem.LifeStealPercent;
-		stats.ControlChance += attributeGem.ControlChance;
-		stats.KnockbackForce += attributeGem.KnockbackForce;
+		// Main core (attack core) only takes effect once unlocked; before that the
+		// creature attacks with the default physical core.
+		if (IsMainCoreUnlocked(actor.Level))
+		{
+			AttributeGemDefinition attributeGem = GetAttributeGem(loadout.AttributeGemId);
+			stats.DamageElementId = attributeGem.ElementId;
+			stats.DamageElementNameKey = attributeGem.ElementNameKey;
+			stats.AttackColor = attributeGem.AttackColor;
+			stats.Attack += attributeGem.AttackBonus;
+			stats.Defense += attributeGem.DefenseBonus;
+			stats.MoveSpeedMultiplier += attributeGem.MoveSpeedBonus;
+			stats.AttackRangeBonus += attributeGem.AttackRangeBonus;
+			stats.CritChance += attributeGem.CritChanceBonus;
+			stats.LifeStealPercent += attributeGem.LifeStealPercent;
+			stats.ControlChance += attributeGem.ControlChance;
+			stats.KnockbackForce += attributeGem.KnockbackForce;
+		}
 
+		// Support cores only contribute up to the number of unlocked support slots.
+		int unlockedSupportCores = GetUnlockedSupportCoreCount(actor.Level);
 		bool hasRangedActiveSkill = HasRangedActiveSkill(loadout);
 		for (int slot = 0; slot < loadout.SkillGemIds.Length; slot++)
 		{
+			if (slot >= unlockedSupportCores)
+			{
+				break;
+			}
+
 			SkillGemDefinition gem = GetSkillGem(loadout.SkillGemIds[slot]);
 			if (IsProjectileSupportGem(gem.Id) && !hasRangedActiveSkill)
 			{
@@ -603,7 +622,6 @@ public static class BuildCatalog
 			stats.Attack = Mathf.RoundToInt(stats.Attack * identity.ElementAffinityDamageMultiplier);
 		}
 
-		ApplyRareCombos(stats, loadout);
 		stats.MoveSpeedMultiplier = Mathf.Clamp(stats.MoveSpeedMultiplier, 0.55f, 2.4f);
 		stats.AttackCooldownMultiplier = Mathf.Clamp(stats.AttackCooldownMultiplier, 0.42f, 1.85f);
 		stats.CritChance = Mathf.Clamp(stats.CritChance, 0.0f, 0.75f);
@@ -837,6 +855,48 @@ public static class BuildCatalog
 
 	public const int MaxSkillGemLevel = 5;
 
+	// --- Core slots (level-gated) ---
+	// The main core slot holds the attack core (attribute gem, decides attack element).
+	// Support core slots hold support/trait cores (skill gems). Both unlock as the
+	// creature grows, per the Core System design: 0 cores at low level, then main, then
+	// support slots one by one.
+	public const int MainCoreUnlockLevel = 3;
+
+	// Maximum support core slots that can be chained together in the whole system.
+	public const int SupportCoreSlotCount = 6;
+
+	// Level at which each support core slot unlocks. Length must equal SupportCoreSlotCount.
+	private static readonly int[] SupportCoreUnlockLevels = { 6, 10, 15, 21, 28, 36 };
+
+	public static bool IsMainCoreUnlocked(int level)
+	{
+		return level >= MainCoreUnlockLevel;
+	}
+
+	public static int GetUnlockedSupportCoreCount(int level)
+	{
+		int count = 0;
+		foreach (int threshold in SupportCoreUnlockLevels)
+		{
+			if (level >= threshold)
+			{
+				count++;
+			}
+		}
+
+		return count;
+	}
+
+	public static int GetSupportCoreUnlockLevel(int index)
+	{
+		return index >= 0 && index < SupportCoreUnlockLevels.Length ? SupportCoreUnlockLevels[index] : int.MaxValue;
+	}
+
+	public static int GetTotalCoreSlots(int level)
+	{
+		return (IsMainCoreUnlocked(level) ? 1 : 0) + GetUnlockedSupportCoreCount(level);
+	}
+
 	public static bool IsUpgradeableSkillGem(string gemId)
 	{
 		return GetSkillGem(gemId).BehaviorId != ProjectileBehavior.None;
@@ -965,11 +1025,6 @@ public static class BuildCatalog
 		});
 	}
 
-	public static string LocalizedRareCombo(BuildStats stats)
-	{
-		return string.IsNullOrEmpty(stats.RareComboKey) ? LocaleText.T("build.combo.none") : LocaleText.T(stats.RareComboKey);
-	}
-
 	private static void ApplyEquipment(BuildStats stats, EquipmentDefinition equipment)
 	{
 		stats.MaxHealth += equipment.MaxHealthBonus;
@@ -1026,33 +1081,4 @@ public static class BuildCatalog
 		}
 	}
 
-	private static void ApplyRareCombos(BuildStats stats, CompanionBuildLoadout loadout)
-	{
-		if (stats.DamageElementId == "lightning" && loadout.HasSkill("gem.skill.chain"))
-		{
-			stats.RareComboKey = "build.combo.chain_lightning";
-			stats.Attack += 6;
-			stats.DetectionRadiusBonus += 2.5f;
-			stats.ControlChance += 0.08f;
-		}
-		else if (stats.DamageElementId == "fire" && loadout.HasSkill("gem.skill.explosion"))
-		{
-			stats.RareComboKey = "build.combo.explosive_fire";
-			stats.Attack += 9;
-			stats.AttackRangeBonus += 1.0f;
-		}
-		else if (stats.DamageElementId == "poison" && loadout.HasSkill("gem.skill.life_steal"))
-		{
-			stats.RareComboKey = "build.combo.poison_lifesteal";
-			stats.Attack += 4;
-			stats.LifeStealPercent += 0.14f;
-		}
-		else if (stats.DamageElementId == "ice" && loadout.HasSkill("gem.skill.piercing"))
-		{
-			stats.RareComboKey = "build.combo.piercing_ice";
-			stats.Attack += 4;
-			stats.AttackRangeBonus += 2.2f;
-			stats.ControlChance += 0.06f;
-		}
-	}
 }

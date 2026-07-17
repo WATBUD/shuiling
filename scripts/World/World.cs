@@ -669,12 +669,6 @@ public partial class World : Node3D
 		return offset + inward * frontDistance;
 	}
 
-	private void CreateStreetLanternPair(Vector3 center, float halfWidth)
-	{
-		CreateExternalProp($"LanternPairL{center.Z:0.0}", "res://assets/models/environment/lantern.glb", center + new Vector3(-halfWidth, 0.0f, 0.0f), Vector3.Zero, new Vector3(1.18f, 1.18f, 1.18f), new Vector3(0.6f, 2.2f, 0.6f), new Vector3(0.0f, 1.1f, 0.0f));
-		CreateExternalProp($"LanternPairR{center.Z:0.0}", "res://assets/models/environment/lantern.glb", center + new Vector3(halfWidth, 0.0f, 0.0f), Vector3.Zero, new Vector3(1.18f, 1.18f, 1.18f), new Vector3(0.6f, 2.2f, 0.6f), new Vector3(0.0f, 1.1f, 0.0f));
-	}
-
 	private void CreateCityFountain(Vector3 position)
 	{
 		var fountain = new StaticBody3D
@@ -886,27 +880,6 @@ public partial class World : Node3D
 		return mesh;
 	}
 
-	private void CreateFountainSeahorse(Node3D fountain, float angle, Material bronzeMaterial, Material waterMaterial, Material foamMaterial)
-	{
-		float yaw = Mathf.RadToDeg(angle);
-		Vector3 direction = new(Mathf.Sin(angle), 0.0f, Mathf.Cos(angle));
-		Vector3 position = direction * 2.82f + new Vector3(0.0f, 0.98f, 0.0f);
-		var horse = new Node3D
-		{
-			Name = "BuckinghamBronzeSeahorse",
-			Position = position,
-			RotationDegrees = new Vector3(0.0f, yaw + 180.0f, 0.0f),
-		};
-		fountain.AddChild(horse);
-
-		AddMesh(horse, "Body", new SphereMesh { Radius = 0.30f, Height = 0.74f }, new Vector3(0.0f, 0.28f, 0.0f), new Vector3(0.0f, 0.0f, -14.0f), new Vector3(0.72f, 1.0f, 0.52f), bronzeMaterial);
-		AddMesh(horse, "Head", new SphereMesh { Radius = 0.18f, Height = 0.28f }, new Vector3(0.0f, 0.78f, -0.28f), new Vector3(-18.0f, 0.0f, 0.0f), new Vector3(0.9f, 0.72f, 1.22f), bronzeMaterial);
-		AddMesh(horse, "Snout", new CylinderMesh { TopRadius = 0.055f, BottomRadius = 0.085f, Height = 0.34f }, new Vector3(0.0f, 0.78f, -0.52f), new Vector3(90.0f, 0.0f, 0.0f), Vector3.One, bronzeMaterial);
-		AddMesh(horse, "Crest", CylinderMeshFor(0.0f, 0.11f, 0.28f), new Vector3(0.0f, 1.02f, -0.18f), new Vector3(-20.0f, 0.0f, 0.0f), Vector3.One, bronzeMaterial);
-		AddMesh(horse, "CurledTail", new TorusMesh { InnerRadius = 0.055f, OuterRadius = 0.24f }, new Vector3(0.0f, -0.08f, 0.22f), new Vector3(90.0f, 0.0f, 0.0f), new Vector3(0.72f, 1.0f, 1.0f), bronzeMaterial);
-		AddMesh(horse, "SeahorseJet", new CylinderMesh { TopRadius = 0.026f, BottomRadius = 0.044f, Height = 1.55f }, new Vector3(0.0f, 0.78f, -1.16f), new Vector3(82.0f, 0.0f, 0.0f), Vector3.One, waterMaterial);
-		AddMesh(horse, "SeahorseSplash", new SphereMesh { Radius = 0.13f, Height = 0.08f }, new Vector3(0.0f, 0.62f, -1.88f), Vector3.Zero, new Vector3(1.3f, 0.32f, 1.0f), foamMaterial);
-	}
 
 	private void AddFountainMistParticles(Node3D fountain, Material waterMaterial, Vector3 position, int amount, double lifetime, float minVelocity, float maxVelocity, float emissionRadius, float spread)
 	{
