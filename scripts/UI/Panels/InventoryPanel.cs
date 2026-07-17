@@ -93,6 +93,7 @@ public partial class InventoryPanel : PanelContainer
 	private Button _attributeButton = null!;
 	private readonly List<Button> _supportButtons = new();
 	private FloatingTooltip _tooltip = null!;
+	private AcceptDialog? _warningDialog;
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -498,11 +499,9 @@ public partial class InventoryPanel : PanelContainer
 			return;
 		}
 
-		_selectedActor.EquipSkillGem(index, itemId);
 		_selectedSupportIndex = index;
 		_selectedTarget = EquipTarget.SupportCore;
-		HideItemTooltip();
-		RefreshAll();
+		PerformEquip(itemId);
 	}
 
 	private void UnequipSupportSlot(int index)
@@ -512,7 +511,9 @@ public partial class InventoryPanel : PanelContainer
 			return;
 		}
 
+		string displaced = _selectedActor.BuildLoadout.GetSkillGemId(index);
 		_selectedActor.EquipSkillGem(index, "gem.skill.none");
+		_player?.ReturnInventoryItemFromUnequip(displaced);
 		HideItemTooltip();
 		RefreshAll();
 	}
@@ -543,8 +544,8 @@ public partial class InventoryPanel : PanelContainer
 			&& (_selectedActor == null || !IsInstanceValid(_selectedActor) || !BuildCatalog.HasRangedActiveSkill(_selectedActor.BuildLoadout)));
 	}
 
-	// Double-clicking an equipped slot takes the item off. Equipping never removed it
-	// from the bag, so unequipping just empties the slot; the item stays available.
+	// Double-clicking an equipped slot takes the item off and returns it to the bag
+	// (equipping consumed it, so unequipping must give it back).
 	private void UnequipSlot(EquipTarget target)
 	{
 		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
@@ -552,6 +553,7 @@ public partial class InventoryPanel : PanelContainer
 			return;
 		}
 
+		string displaced = GetEquippedItemId(target);
 		switch (target)
 		{
 			case EquipTarget.Helmet:
@@ -569,6 +571,7 @@ public partial class InventoryPanel : PanelContainer
 				break;
 		}
 
+		_player?.ReturnInventoryItemFromUnequip(displaced);
 		HideItemTooltip();
 		RefreshAll();
 	}
@@ -889,64 +892,104 @@ public partial class InventoryPanel : PanelContainer
 		{
 			if (inputEvent is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left, DoubleClick: true })
 			{
-				_selectedItemId = itemId;
-				ToggleItemEquipment(itemId);
+				OnItemActivated(itemId);
 				button.AcceptEvent();
 			}
 		};
 		_itemGrid.AddChild(button);
 	}
 
-	private void ToggleItemEquipment(string itemId)
+	// Double-clicking a bag item equips it to the first valid slot in priority order
+	// (equipment → its slot; gem → main core; support core → first empty unlocked slot).
+	// If no slot accepts it, warn and leave the item alone.
+	private void OnItemActivated(string itemId)
 	{
-		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
+		_selectedItemId = itemId;
+		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor) || !_player.HasInventoryItem(itemId))
 		{
 			return;
 		}
 
-		CompanionBuildLoadout loadout = _selectedActor.BuildLoadout;
-		InventoryItemKind kind = BuildCatalog.GetItemKind(itemId);
-		if (kind == InventoryItemKind.Equipment)
+		if (!ResolveFirstValidTarget(itemId, out string reasonKey))
 		{
-			EquipmentDefinition equipment = BuildCatalog.GetEquipment(itemId);
-			if (loadout.GetEquipmentId(equipment.Slot) == itemId)
-			{
-				_selectedActor.EquipBuildEquipment(equipment.Slot, GetEmptyEquipmentId(equipment.Slot));
-				RefreshAll();
-				return;
-			}
-		}
-		else if (kind == InventoryItemKind.AttributeGem && loadout.AttributeGemId == itemId)
-		{
-			_selectedActor.EquipAttributeGem("gem.attribute.none");
-			RefreshAll();
+			ShowEquipWarning(reasonKey);
 			return;
 		}
-		else if (kind == InventoryItemKind.SkillGem)
+
+		if (!PerformEquip(itemId))
 		{
-			// Already equipped somewhere? Toggle it off.
-			for (int index = 0; index < loadout.SkillGemIds.Length; index++)
-			{
-				if (loadout.GetSkillGemId(index) == itemId)
+			ShowEquipWarning("inventory.warn.not_equippable");
+		}
+	}
+
+	// Picks the first slot that can accept the item, preferring an empty support slot.
+	// Returns false (with a reason key) when the item cannot be equipped anywhere.
+	private bool ResolveFirstValidTarget(string itemId, out string reasonKey)
+	{
+		reasonKey = "inventory.warn.not_equippable";
+		if (MonsterLootCatalog.IsMonsterLoot(itemId) || _selectedActor == null || !IsInstanceValid(_selectedActor))
+		{
+			return false;
+		}
+
+		switch (BuildCatalog.GetItemKind(itemId))
+		{
+			case InventoryItemKind.Equipment:
+				_selectedTarget = EquipTargetForSlot(BuildCatalog.GetEquipment(itemId).Slot);
+				return true;
+			case InventoryItemKind.AttributeGem:
+				if (!BuildCatalog.IsMainCoreUnlocked(_selectedActor.Level))
 				{
-					_selectedActor.EquipSkillGem(index, "gem.skill.none");
-					RefreshAll();
-					return;
+					reasonKey = "inventory.warn.core_locked";
+					return false;
 				}
-			}
 
-			int emptySlot = FindFirstOpenSupportSlot(loadout);
-			if (emptySlot >= 0)
-			{
-				_selectedSupportIndex = emptySlot;
+				_selectedTarget = EquipTarget.AttributeGem;
+				return true;
+			case InventoryItemKind.SkillGem:
+				if (BuildCatalog.IsProjectileSupportGem(itemId) && !BuildCatalog.HasRangedActiveSkill(_selectedActor.BuildLoadout))
+				{
+					reasonKey = "tooltip.requires_ranged_skill";
+					return false;
+				}
+
+				if (BuildCatalog.GetUnlockedSupportCoreCount(_selectedActor.Level) <= 0)
+				{
+					reasonKey = "inventory.warn.core_locked";
+					return false;
+				}
+
+				int open = FindFirstOpenSupportSlot(_selectedActor.BuildLoadout);
+				_selectedSupportIndex = open >= 0 ? open : 0;
 				_selectedTarget = EquipTarget.SupportCore;
-				_selectedActor.EquipSkillGem(emptySlot, itemId);
-				RefreshAll();
-				return;
-			}
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	private static EquipTarget EquipTargetForSlot(EquipmentSlot slot)
+	{
+		return slot switch
+		{
+			EquipmentSlot.Helmet => EquipTarget.Helmet,
+			EquipmentSlot.Weapon => EquipTarget.Weapon,
+			EquipmentSlot.Armor => EquipTarget.Armor,
+			_ => EquipTarget.Accessory,
+		};
+	}
+
+	private void ShowEquipWarning(string reasonKey)
+	{
+		if (_warningDialog == null)
+		{
+			_warningDialog = new AcceptDialog { Title = LocaleText.T("inventory.warn.title") };
+			AddChild(_warningDialog);
 		}
 
-		EquipItem(itemId);
+		_warningDialog.Title = LocaleText.T("inventory.warn.title");
+		_warningDialog.DialogText = LocaleText.T(reasonKey);
+		_warningDialog.PopupCentered();
 	}
 
 	// First empty support slot that is already unlocked for the selected creature.
@@ -1198,43 +1241,74 @@ public partial class InventoryPanel : PanelContainer
 		};
 	}
 
-	private void EquipItem(string itemId)
+	private bool EquipItem(string itemId)
 	{
 		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor) || !_player.HasInventoryItem(itemId))
 		{
-			return;
+			return false;
 		}
 
 		if (!IsCompatibleItemForTarget(itemId, _selectedTarget) && !TrySelectCompatibleTarget(itemId))
 		{
 			RefreshAll();
-			return;
+			return false;
 		}
 
+		return PerformEquip(itemId);
+	}
+
+	// Applies itemId to the already-resolved _selectedTarget (+ _selectedSupportIndex),
+	// consumes one from the bag, and returns whatever it displaced. No consume when the
+	// slot already holds this exact item. Returns true if something was equipped.
+	private bool PerformEquip(string itemId)
+	{
+		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor))
+		{
+			return false;
+		}
+
+		string displaced = GetEquippedItemId(_selectedTarget);
+		if (displaced == itemId)
+		{
+			return true;
+		}
+
+		ApplyEquipToSelectedTarget(itemId);
+		if (GetEquippedItemId(_selectedTarget) != itemId)
+		{
+			return false;
+		}
+
+		_player.ConsumeInventoryItemForEquip(itemId);
+		_player.ReturnInventoryItemFromUnequip(displaced);
+		HideItemTooltip();
+		RefreshAll();
+		return true;
+	}
+
+	private void ApplyEquipToSelectedTarget(string itemId)
+	{
 		switch (_selectedTarget)
 		{
 			case EquipTarget.Helmet:
-				_selectedActor.EquipBuildEquipment(EquipmentSlot.Helmet, itemId);
+				_selectedActor!.EquipBuildEquipment(EquipmentSlot.Helmet, itemId);
 				break;
 			case EquipTarget.Weapon:
-				_selectedActor.EquipBuildEquipment(EquipmentSlot.Weapon, itemId);
+				_selectedActor!.EquipBuildEquipment(EquipmentSlot.Weapon, itemId);
 				break;
 			case EquipTarget.Armor:
-				_selectedActor.EquipBuildEquipment(EquipmentSlot.Armor, itemId);
+				_selectedActor!.EquipBuildEquipment(EquipmentSlot.Armor, itemId);
 				break;
 			case EquipTarget.Accessory:
-				_selectedActor.EquipBuildEquipment(EquipmentSlot.Accessory, itemId);
+				_selectedActor!.EquipBuildEquipment(EquipmentSlot.Accessory, itemId);
 				break;
 			case EquipTarget.AttributeGem:
-				_selectedActor.EquipAttributeGem(itemId);
+				_selectedActor!.EquipAttributeGem(itemId);
 				break;
 			case EquipTarget.SupportCore:
-				_selectedActor.EquipSkillGem(_selectedSupportIndex, itemId);
+				_selectedActor!.EquipSkillGem(_selectedSupportIndex, itemId);
 				break;
 		}
-
-		HideItemTooltip();
-		RefreshAll();
 	}
 
 	private void EquipItemToTarget(string itemId, EquipTarget target)
