@@ -488,7 +488,15 @@ public partial class InventoryPanel : PanelContainer
 			return;
 		}
 
-		ShowItemTooltip(_selectedActor.BuildLoadout.GetSkillGemId(index), LocaleText.F("build.slot.support_core", index + 1));
+		ShowItemTooltip(_selectedActor.BuildLoadout.GetSkillGemId(index), SupportSlotName(index));
+	}
+
+	// Skill-core slot 0 is the single main core; the rest are support cores.
+	private static string SupportSlotName(int index)
+	{
+		return index == 0
+			? LocaleText.T("build.slot.main_core")
+			: LocaleText.F("build.slot.support_core", index);
 	}
 
 	private void EquipSupportCore(string itemId, int index)
@@ -512,7 +520,21 @@ public partial class InventoryPanel : PanelContainer
 		}
 
 		string displaced = _selectedActor.BuildLoadout.GetSkillGemId(index);
-		_selectedActor.EquipSkillGem(index, "gem.skill.none");
+		if (displaced == "gem.skill.none")
+		{
+			return;
+		}
+
+		// The primary core (a ranged active skill, e.g. fireball) is removed in place and
+		// leaves the other slots untouched. Removing any other core closes the gap by
+		// re-packing the remaining cores in slot order.
+		bool isPrimary = BuildCatalog.IsRangedActiveSkillGem(displaced);
+		_selectedActor.ClearSkillGemSlot(index);
+		if (!isPrimary)
+		{
+			_selectedActor.CompactSupportCores();
+		}
+
 		_player?.ReturnInventoryItemFromUnequip(displaced);
 		HideItemTooltip();
 		RefreshAll();
@@ -733,7 +755,7 @@ public partial class InventoryPanel : PanelContainer
 
 	private void SetSupportSlotButton(Button button, int index, CompanionBuildLoadout loadout)
 	{
-		string coreName = LocaleText.F("build.slot.support_core", index + 1);
+		string coreName = SupportSlotName(index);
 		if (!IsSupportSlotUnlocked(index))
 		{
 			button.Text = $"{coreName}\n{LocaleText.F("inventory.core_locked", BuildCatalog.GetSupportCoreUnlockLevel(index))}";
@@ -833,16 +855,8 @@ public partial class InventoryPanel : PanelContainer
 			AddItemListMessage("inventory.no_items");
 		}
 
-		int totalCount = 0;
-		foreach (KeyValuePair<string, int> item in _player.InventoryItems)
-		{
-			if (item.Value > 0)
-			{
-				totalCount++;
-			}
-		}
-
-		_bagCountLabel.Text = LocaleText.F("inventory.bag_count", totalCount);
+		// Count reflects the currently-selected tab, not the whole bag.
+		_bagCountLabel.Text = LocaleText.F("inventory.bag_count", itemIds.Count);
 	}
 
 	private List<string> GetVisibleInventoryItems()
@@ -1581,7 +1595,7 @@ public partial class InventoryPanel : PanelContainer
 			EquipTarget.Armor => LocaleText.T("build.slot.armor"),
 			EquipTarget.Accessory => LocaleText.T("build.slot.accessory"),
 			EquipTarget.AttributeGem => LocaleText.T("build.slot.attribute"),
-			EquipTarget.SupportCore => LocaleText.F("build.slot.support_core", _selectedSupportIndex + 1),
+			EquipTarget.SupportCore => SupportSlotName(_selectedSupportIndex),
 			_ => LocaleText.T("build.slot.attribute"),
 		};
 	}
