@@ -45,11 +45,22 @@ Combat facts:
 
 ## Route to the right file
 
-- Player input, camera, HUD, party, inventory/shop hooks, save, capture net, starter pet
-  (`GrantStarterBunny`): `scripts/Gameplay/Player/PlayerController.cs` (large — jump to the
-  method, don't read whole).
-- Formation board state / slot offsets: `scripts/Gameplay/Player/PlayerController.Formation.cs`,
-  `scripts/UI/Panels/FormationPanel.cs`.
+- `PlayerController` is one `partial class` split across `PlayerController.*.cs` by
+  responsibility. The main `PlayerController.cs` holds only state (fields/consts/enums/
+  records), lifecycle (`_Ready`/`_Process`/`_PhysicsProcess`/`_UnhandledInput`), and input
+  routing — open a partial for the actual logic:
+  - `.Combat.cs` — capture net, `ReceiveDamage`/heal, XP, damage flash
+  - `.Camera.cs` — camera modes / orbit / zoom, aim & capture-throw direction
+  - `.Visual.cs` — movement fx, animation, player model/equipment, safe-ground recovery
+  - `.Party.cs` — capture→party, deploy/store/mount, revive, `GrantStarterBunny`
+  - `.Interaction.cs` — interaction prompt, portals, NPC recruit/quest triggers
+  - `.Targeting.cs` — click-select / focus target / target markers
+  - `.Dialogs.cs` — NPC-quest & map-travel dialogs
+  - `.Inventory.cs` — bag counts, gold, equip-consume/return, evolve, gem upgrade, drops
+  - `.Shops.cs` — merchant/blacksmith/pet-shop trade + stock; `.Mercenary.cs` — mercenary offers
+  - `.Hud.cs` — HUD widgets + status; `.Panels.cs` — panel construction/visibility + pause menu
+  - `.Save.cs` — `ExportSaveData`/`ApplySaveData`; `.Formation.cs` — formation board
+  - Formation UI: `scripts/UI/Panels/FormationPanel.cs`.
 - Actor state, AI, movement, combat, capture, core-driven attack, save round-trip:
   `scripts/Gameplay/Actors/SimpleActor.cs` (large).
 - Live projectile + behaviors (split/chain/pierce/explosion): `scripts/Gameplay/Combat/CombatProjectile.cs`.
@@ -74,8 +85,10 @@ Combat facts:
   padded/truncated on load. Index cores through `GetSkillGemId(i)`/`GetSkillGemLevel(i)`.
 - Equipping never consumes inventory; unequip just sets the slot to `gem.*.none`.
 - Every localization key must exist in **both** locale files with the same format args.
-- The three large files (`PlayerController`, `SimpleActor`, `World`) are split candidates —
-  add focused `*.partial.cs` files rather than growing them.
+- `PlayerController` is already split into `PlayerController.*.cs` partials (see routing
+  above) — put new player logic in the matching partial, keep the main file orchestration-
+  only. `SimpleActor` and `World` are still large: add focused partial files by
+  responsibility rather than growing them.
 
 ## Maintenance rules
 
