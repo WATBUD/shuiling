@@ -55,9 +55,7 @@ public partial class InventoryPanel : PanelContainer
 		Armor,
 		Accessory,
 		AttributeGem,
-		SkillGem1,
-		SkillGem2,
-		SkillGem3,
+		SupportCore,
 	}
 
 	private enum InventoryCategory
@@ -71,6 +69,7 @@ public partial class InventoryPanel : PanelContainer
 	private PlayerController? _player;
 	private SimpleActor? _selectedActor;
 	private EquipTarget _selectedTarget = EquipTarget.Weapon;
+	private int _selectedSupportIndex;
 	private InventoryCategory _selectedCategory = InventoryCategory.All;
 	private string _selectedItemId = string.Empty;
 	private readonly Dictionary<InventoryCategory, Button> _categoryButtons = new();
@@ -92,9 +91,7 @@ public partial class InventoryPanel : PanelContainer
 	private Button _armorButton = null!;
 	private Button _accessoryButton = null!;
 	private Button _attributeButton = null!;
-	private Button _skill1Button = null!;
-	private Button _skill2Button = null!;
-	private Button _skill3Button = null!;
+	private readonly List<Button> _supportButtons = new();
 	private FloatingTooltip _tooltip = null!;
 
 	public System.Action? CloseRequested { get; set; }
@@ -257,9 +254,11 @@ public partial class InventoryPanel : PanelContainer
 		_armorButton = AddSlotButton(slotGrid, EquipTarget.Armor);
 		_accessoryButton = AddSlotButton(slotGrid, EquipTarget.Accessory);
 		_attributeButton = AddSlotButton(slotGrid, EquipTarget.AttributeGem);
-		_skill1Button = AddSlotButton(slotGrid, EquipTarget.SkillGem1);
-		_skill2Button = AddSlotButton(slotGrid, EquipTarget.SkillGem2);
-		_skill3Button = AddSlotButton(slotGrid, EquipTarget.SkillGem3);
+		_supportButtons.Clear();
+		for (int index = 0; index < BuildCatalog.SupportCoreSlotCount; index++)
+		{
+			_supportButtons.Add(AddSupportSlotButton(slotGrid, index));
+		}
 
 		_selectedSlotLabel = MakeLabel(14, new Color(0.98f, 0.98f, 0.98f));
 		buildSection.AddChild(_selectedSlotLabel);
@@ -447,6 +446,103 @@ public partial class InventoryPanel : PanelContainer
 		return button;
 	}
 
+	// One support core slot, addressed by index instead of a fixed enum value so the
+	// number of slots can grow with the creature.
+	private Button AddSupportSlotButton(GridContainer parent, int index)
+	{
+		var button = new InventoryEquipDropButton
+		{
+			Text = string.Empty,
+			CanAcceptItem = itemId => IsSupportCoreCompatible(itemId, index),
+			ItemDropped = itemId => EquipSupportCore(itemId, index),
+		};
+		ApplyButtonStyle(button);
+		button.CustomMinimumSize = new Vector2(0.0f, 42.0f);
+		button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		button.Pressed += () => SelectSupportSlot(index);
+		button.MouseEntered += () => ShowSupportTooltip(index);
+		button.MouseExited += HideItemTooltip;
+		button.GuiInput += inputEvent =>
+		{
+			if (inputEvent is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left, DoubleClick: true })
+			{
+				UnequipSupportSlot(index);
+				button.AcceptEvent();
+			}
+		};
+		parent.AddChild(button);
+		return button;
+	}
+
+	private void SelectSupportSlot(int index)
+	{
+		_selectedSupportIndex = index;
+		SelectTarget(EquipTarget.SupportCore);
+	}
+
+	private void ShowSupportTooltip(int index)
+	{
+		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
+		{
+			return;
+		}
+
+		ShowItemTooltip(_selectedActor.BuildLoadout.GetSkillGemId(index), LocaleText.F("build.slot.support_core", index + 1));
+	}
+
+	private void EquipSupportCore(string itemId, int index)
+	{
+		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor)
+			|| !_player.HasInventoryItem(itemId) || !IsSupportCoreCompatible(itemId, index))
+		{
+			return;
+		}
+
+		_selectedActor.EquipSkillGem(index, itemId);
+		_selectedSupportIndex = index;
+		_selectedTarget = EquipTarget.SupportCore;
+		HideItemTooltip();
+		RefreshAll();
+	}
+
+	private void UnequipSupportSlot(int index)
+	{
+		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
+		{
+			return;
+		}
+
+		_selectedActor.EquipSkillGem(index, "gem.skill.none");
+		HideItemTooltip();
+		RefreshAll();
+	}
+
+	private bool IsSupportSlotUnlocked(int index)
+	{
+		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
+		{
+			return true;
+		}
+
+		return BuildCatalog.GetUnlockedSupportCoreCount(_selectedActor.Level) > index;
+	}
+
+	private bool IsSupportCoreCompatible(string itemId, int index)
+	{
+		if (!IsSupportSlotUnlocked(index) || MonsterLootCatalog.IsMonsterLoot(itemId))
+		{
+			return false;
+		}
+
+		if (BuildCatalog.GetItemKind(itemId) != InventoryItemKind.SkillGem)
+		{
+			return false;
+		}
+
+		return !(BuildCatalog.IsProjectileSupportGem(itemId)
+			&& (_selectedActor == null || !IsInstanceValid(_selectedActor) || !BuildCatalog.HasRangedActiveSkill(_selectedActor.BuildLoadout)));
+	}
+
 	// Double-clicking an equipped slot takes the item off. Equipping never removed it
 	// from the bag, so unequipping just empties the slot; the item stays available.
 	private void UnequipSlot(EquipTarget target)
@@ -468,14 +564,8 @@ public partial class InventoryPanel : PanelContainer
 			case EquipTarget.AttributeGem:
 				_selectedActor.EquipAttributeGem("gem.attribute.none");
 				break;
-			case EquipTarget.SkillGem1:
-				_selectedActor.EquipSkillGem(0, "gem.skill.none");
-				break;
-			case EquipTarget.SkillGem2:
-				_selectedActor.EquipSkillGem(1, "gem.skill.none");
-				break;
-			case EquipTarget.SkillGem3:
-				_selectedActor.EquipSkillGem(2, "gem.skill.none");
+			case EquipTarget.SupportCore:
+				_selectedActor.EquipSkillGem(_selectedSupportIndex, "gem.skill.none");
 				break;
 		}
 
@@ -605,35 +695,108 @@ public partial class InventoryPanel : PanelContainer
 		SetSlotButton(_armorButton, EquipTarget.Armor, loadout.ArmorId, BuildCatalog.GetEquipment(loadout.ArmorId).NameKey);
 		SetSlotButton(_accessoryButton, EquipTarget.Accessory, loadout.AccessoryId, BuildCatalog.GetEquipment(loadout.AccessoryId).NameKey);
 		SetSlotButton(_attributeButton, EquipTarget.AttributeGem, loadout.AttributeGemId, BuildCatalog.GetAttributeGem(loadout.AttributeGemId).NameKey);
-		SetSkillSlotButton(_skill1Button, EquipTarget.SkillGem1, 0, loadout);
-		SetSkillSlotButton(_skill2Button, EquipTarget.SkillGem2, 1, loadout);
-		SetSkillSlotButton(_skill3Button, EquipTarget.SkillGem3, 2, loadout);
+
+		// Show the unlocked support cores plus one locked preview of the next slot; the
+		// rest stay hidden until the creature grows into them.
+		int unlockedSupport = BuildCatalog.GetUnlockedSupportCoreCount(_selectedActor.Level);
+		int visibleSupport = Mathf.Min(unlockedSupport + 1, _supportButtons.Count);
+		for (int index = 0; index < _supportButtons.Count; index++)
+		{
+			Button button = _supportButtons[index];
+			button.Visible = index < visibleSupport;
+			if (button.Visible)
+			{
+				SetSupportSlotButton(button, index, loadout);
+			}
+		}
+
+		if (_selectedTarget == EquipTarget.SupportCore && _selectedSupportIndex >= visibleSupport)
+		{
+			_selectedTarget = EquipTarget.Weapon;
+		}
 	}
 
 	private void SetSlotButton(Button button, EquipTarget target, string itemId, string itemNameKey)
 	{
+		if (ShowLockedSlot(button, target))
+		{
+			return;
+		}
+
 		button.Text = $"{GetTargetName(target)}\n{LocaleText.T(itemNameKey)}";
 		ItemIconLibrary.Apply(button, itemId, 26);
 		button.AddThemeColorOverride("font_color", target == _selectedTarget ? new Color(1.0f, 0.92f, 0.50f) : new Color(0.92f, 0.96f, 1.0f));
 	}
 
-	private void SetSkillSlotButton(Button button, EquipTarget target, int slot, CompanionBuildLoadout loadout)
+	private void SetSupportSlotButton(Button button, int index, CompanionBuildLoadout loadout)
 	{
-		string gemId = loadout.SkillGemIds[slot];
+		string coreName = LocaleText.F("build.slot.support_core", index + 1);
+		if (!IsSupportSlotUnlocked(index))
+		{
+			button.Text = $"{coreName}\n{LocaleText.F("inventory.core_locked", BuildCatalog.GetSupportCoreUnlockLevel(index))}";
+			button.Icon = null;
+			button.AddThemeColorOverride("font_color", new Color(0.52f, 0.55f, 0.60f));
+			return;
+		}
+
+		string gemId = loadout.GetSkillGemId(index);
 		string gemName = LocaleText.T(BuildCatalog.GetSkillGem(gemId).NameKey);
 		if (BuildCatalog.IsUpgradeableSkillGem(gemId))
 		{
-			gemName = LocaleText.F("inventory.gem_level", gemName, loadout.GetSkillGemLevel(slot));
+			gemName = LocaleText.F("inventory.gem_level", gemName, loadout.GetSkillGemLevel(index));
 		}
 
-		button.Text = $"{GetTargetName(target)}\n{gemName}";
+		button.Text = $"{coreName}\n{gemName}";
 		ItemIconLibrary.Apply(button, gemId, 26);
-		button.AddThemeColorOverride("font_color", target == _selectedTarget ? new Color(1.0f, 0.92f, 0.50f) : new Color(0.92f, 0.96f, 1.0f));
+		bool selected = _selectedTarget == EquipTarget.SupportCore && _selectedSupportIndex == index;
+		button.AddThemeColorOverride("font_color", selected ? new Color(1.0f, 0.92f, 0.50f) : new Color(0.92f, 0.96f, 1.0f));
+	}
+
+	// Core slots unlock with the creature's level. A locked slot shows the level it
+	// needs and cannot hold a core yet.
+	private bool IsSlotUnlocked(EquipTarget target)
+	{
+		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
+		{
+			return true;
+		}
+
+		return target switch
+		{
+			EquipTarget.AttributeGem => BuildCatalog.IsMainCoreUnlocked(_selectedActor.Level),
+			EquipTarget.SupportCore => IsSupportSlotUnlocked(_selectedSupportIndex),
+			_ => true,
+		};
+	}
+
+	private int SlotUnlockLevel(EquipTarget target)
+	{
+		return target switch
+		{
+			EquipTarget.AttributeGem => BuildCatalog.MainCoreUnlockLevel,
+			EquipTarget.SupportCore => BuildCatalog.GetSupportCoreUnlockLevel(_selectedSupportIndex),
+			_ => 0,
+		};
+	}
+
+	private bool ShowLockedSlot(Button button, EquipTarget target)
+	{
+		if (IsSlotUnlocked(target))
+		{
+			return false;
+		}
+
+		button.Text = $"{GetTargetName(target)}\n{LocaleText.F("inventory.core_locked", SlotUnlockLevel(target))}";
+		button.Icon = null;
+		button.AddThemeColorOverride("font_color", new Color(0.52f, 0.55f, 0.60f));
+		return true;
 	}
 
 	private void SetSlotsDisabled(bool disabled)
 	{
-		foreach (Button button in new[] { _helmetButton, _weaponButton, _armorButton, _accessoryButton, _attributeButton, _skill1Button, _skill2Button, _skill3Button })
+		var buttons = new List<Button> { _helmetButton, _weaponButton, _armorButton, _accessoryButton, _attributeButton };
+		buttons.AddRange(_supportButtons);
+		foreach (Button button in buttons)
 		{
 			button.Disabled = disabled;
 			if (disabled)
@@ -761,50 +924,46 @@ public partial class InventoryPanel : PanelContainer
 		}
 		else if (kind == InventoryItemKind.SkillGem)
 		{
-			int emptySlot = FindFirstEmptySkillGemSlot(loadout);
-			if (emptySlot >= 0)
-			{
-				_selectedTarget = SkillTargetFromIndex(emptySlot);
-				_selectedActor.EquipSkillGem(emptySlot, itemId);
-				RefreshAll();
-				return;
-			}
-
+			// Already equipped somewhere? Toggle it off.
 			for (int index = 0; index < loadout.SkillGemIds.Length; index++)
 			{
-				if (loadout.SkillGemIds[index] == itemId)
+				if (loadout.GetSkillGemId(index) == itemId)
 				{
 					_selectedActor.EquipSkillGem(index, "gem.skill.none");
 					RefreshAll();
 					return;
 				}
 			}
+
+			int emptySlot = FindFirstOpenSupportSlot(loadout);
+			if (emptySlot >= 0)
+			{
+				_selectedSupportIndex = emptySlot;
+				_selectedTarget = EquipTarget.SupportCore;
+				_selectedActor.EquipSkillGem(emptySlot, itemId);
+				RefreshAll();
+				return;
+			}
 		}
 
 		EquipItem(itemId);
 	}
 
-	private static int FindFirstEmptySkillGemSlot(CompanionBuildLoadout loadout)
+	// First empty support slot that is already unlocked for the selected creature.
+	private int FindFirstOpenSupportSlot(CompanionBuildLoadout loadout)
 	{
-		for (int index = 0; index < loadout.SkillGemIds.Length; index++)
+		int unlocked = _selectedActor != null && IsInstanceValid(_selectedActor)
+			? BuildCatalog.GetUnlockedSupportCoreCount(_selectedActor.Level)
+			: 0;
+		for (int index = 0; index < unlocked && index < loadout.SkillGemIds.Length; index++)
 		{
-			if (loadout.SkillGemIds[index] == "gem.skill.none")
+			if (loadout.GetSkillGemId(index) == "gem.skill.none")
 			{
 				return index;
 			}
 		}
 
 		return -1;
-	}
-
-	private static EquipTarget SkillTargetFromIndex(int index)
-	{
-		return index switch
-		{
-			0 => EquipTarget.SkillGem1,
-			1 => EquipTarget.SkillGem2,
-			_ => EquipTarget.SkillGem3,
-		};
 	}
 
 	private static string GetEmptyEquipmentId(EquipmentSlot slot)
@@ -844,19 +1003,13 @@ public partial class InventoryPanel : PanelContainer
 
 	private int SelectedSkillSlotIndex()
 	{
-		return _selectedTarget switch
-		{
-			EquipTarget.SkillGem1 => 0,
-			EquipTarget.SkillGem2 => 1,
-			EquipTarget.SkillGem3 => 2,
-			_ => -1,
-		};
+		return _selectedTarget == EquipTarget.SupportCore ? _selectedSupportIndex : -1;
 	}
 
 	private void RefreshUpgradeButton()
 	{
 		int slot = SelectedSkillSlotIndex();
-		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor) || slot < 0)
+		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor) || slot < 0 || !IsSlotUnlocked(_selectedTarget))
 		{
 			_upgradeSkillGemButton.Visible = false;
 			return;
@@ -935,6 +1088,12 @@ public partial class InventoryPanel : PanelContainer
 			return false;
 		}
 
+		// Cannot slot a core into a slot the creature has not unlocked yet.
+		if (!IsSlotUnlocked(target))
+		{
+			return false;
+		}
+
 		InventoryItemKind kind = BuildCatalog.GetItemKind(itemId);
 		if (kind == InventoryItemKind.SkillGem
 			&& BuildCatalog.IsProjectileSupportGem(itemId)
@@ -955,9 +1114,7 @@ public partial class InventoryPanel : PanelContainer
 				return BuildCatalog.GetItemKind(itemId) == InventoryItemKind.Equipment && BuildCatalog.GetEquipment(itemId).Slot == EquipmentSlot.Accessory;
 			case EquipTarget.AttributeGem:
 				return BuildCatalog.GetItemKind(itemId) == InventoryItemKind.AttributeGem;
-			case EquipTarget.SkillGem1:
-			case EquipTarget.SkillGem2:
-			case EquipTarget.SkillGem3:
+			case EquipTarget.SupportCore:
 				return BuildCatalog.GetItemKind(itemId) == InventoryItemKind.SkillGem;
 			default:
 				return false;
@@ -973,14 +1130,21 @@ public partial class InventoryPanel : PanelContainer
 			EquipTarget.Armor,
 			EquipTarget.Accessory,
 			EquipTarget.AttributeGem,
-			EquipTarget.SkillGem1,
-			EquipTarget.SkillGem2,
-			EquipTarget.SkillGem3,
 		})
 		{
 			if (IsCompatibleItemForTarget(itemId, target))
 			{
 				_selectedTarget = target;
+				return true;
+			}
+		}
+
+		for (int index = 0; index < _supportButtons.Count; index++)
+		{
+			if (IsSupportCoreCompatible(itemId, index))
+			{
+				_selectedSupportIndex = index;
+				_selectedTarget = EquipTarget.SupportCore;
 				return true;
 			}
 		}
@@ -1034,22 +1198,6 @@ public partial class InventoryPanel : PanelContainer
 		};
 	}
 
-	private static string GetItemIconText(string itemId)
-	{
-		if (MonsterLootCatalog.IsMonsterLoot(itemId))
-		{
-			return "[M]";
-		}
-
-		return BuildCatalog.GetItemKind(itemId) switch
-		{
-			InventoryItemKind.Equipment => "[E]",
-			InventoryItemKind.AttributeGem => "[A]",
-			InventoryItemKind.SkillGem => "[S]",
-			_ => "[?]",
-		};
-	}
-
 	private void EquipItem(string itemId)
 	{
 		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor) || !_player.HasInventoryItem(itemId))
@@ -1080,14 +1228,8 @@ public partial class InventoryPanel : PanelContainer
 			case EquipTarget.AttributeGem:
 				_selectedActor.EquipAttributeGem(itemId);
 				break;
-			case EquipTarget.SkillGem1:
-				_selectedActor.EquipSkillGem(0, itemId);
-				break;
-			case EquipTarget.SkillGem2:
-				_selectedActor.EquipSkillGem(1, itemId);
-				break;
-			case EquipTarget.SkillGem3:
-				_selectedActor.EquipSkillGem(2, itemId);
+			case EquipTarget.SupportCore:
+				_selectedActor.EquipSkillGem(_selectedSupportIndex, itemId);
 				break;
 		}
 
@@ -1133,7 +1275,12 @@ public partial class InventoryPanel : PanelContainer
 		}
 
 		_companionInfoCard.SetActor(_selectedActor);
-		_buildSummaryLabel.Text = _selectedActor.BuildRareComboName;
+		string coreChain = _selectedActor.SupportCoreChain;
+		string elementLine = $"{LocaleText.T("build.element")} {_selectedActor.BuildElementName}";
+		_buildSummaryLabel.Text = string.IsNullOrEmpty(coreChain)
+			? elementLine
+			: $"{elementLine}\n{LocaleText.F("build.core_chain", coreChain)}";
+		_buildSummaryLabel.AddThemeColorOverride("font_color", new Color(0.74f, 0.83f, 0.90f));
 		_selectedSlotLabel.Text = LocaleText.F("inventory.selected_slot", GetTargetName(_selectedTarget));
 	}
 
@@ -1162,9 +1309,7 @@ public partial class InventoryPanel : PanelContainer
 			EquipTarget.Armor => loadout.ArmorId,
 			EquipTarget.Accessory => loadout.AccessoryId,
 			EquipTarget.AttributeGem => loadout.AttributeGemId,
-			EquipTarget.SkillGem1 => loadout.SkillGemIds[0],
-			EquipTarget.SkillGem2 => loadout.SkillGemIds[1],
-			EquipTarget.SkillGem3 => loadout.SkillGemIds[2],
+			EquipTarget.SupportCore => loadout.GetSkillGemId(_selectedSupportIndex),
 			_ => string.Empty,
 		};
 	}
@@ -1362,10 +1507,8 @@ public partial class InventoryPanel : PanelContainer
 			EquipTarget.Armor => LocaleText.T("build.slot.armor"),
 			EquipTarget.Accessory => LocaleText.T("build.slot.accessory"),
 			EquipTarget.AttributeGem => LocaleText.T("build.slot.attribute"),
-			EquipTarget.SkillGem1 => LocaleText.T("build.slot.skill1"),
-			EquipTarget.SkillGem2 => LocaleText.T("build.slot.skill2"),
-			EquipTarget.SkillGem3 => LocaleText.T("build.slot.skill3"),
-			_ => LocaleText.T("build.slot.skill1"),
+			EquipTarget.SupportCore => LocaleText.F("build.slot.support_core", _selectedSupportIndex + 1),
+			_ => LocaleText.T("build.slot.attribute"),
 		};
 	}
 

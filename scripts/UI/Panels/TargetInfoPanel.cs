@@ -147,7 +147,7 @@ public partial class TargetInfoPanel : PanelContainer
 		_levelLabel.Text = actor.Level.ToString();
 		_attackLabel.Text = LocaleText.F("build.effective_stat", actor.EffectiveAttack, actor.Attack);
 		_defenseLabel.Text = LocaleText.F("build.effective_stat", actor.EffectiveDefense, actor.Defense);
-		_buildLabel.Text = $"{actor.BuildElementName} / {actor.BuildRareComboName}";
+		_buildLabel.Text = actor.BuildElementName;
 		_rewardLabel.Text = LocaleText.F("stat.reward_value", actor.ExperienceReward, actor.GoldReward);
 		_stateLabel.Text = actor.StateName;
 	}

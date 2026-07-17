@@ -337,8 +337,31 @@ public partial class SimpleActor : CharacterBody3D
 	public string BuildSkillSummary => BuildCatalog.LocalizedSkillGems(BuildLoadout);
 	public string BuildAttributeGemName => LocaleText.T(BuildCatalog.GetAttributeGem(BuildLoadout.AttributeGemId).NameKey);
 	public string AttackModeName => LocaleText.T(BuildCatalog.GetAttackMode(AttackModeId).NameKey);
-	public string BuildRareComboName => BuildCatalog.LocalizedRareCombo(CurrentBuildStats);
 	public string FormationBonusSummary => _formationBonusSummary;
+
+	// The active support cores strung together, e.g. "火球-爆炸-分裂". Only equipped,
+	// already-unlocked slots are included, in slot order.
+	public string SupportCoreChain
+	{
+		get
+		{
+			CompanionBuildLoadout loadout = BuildLoadout;
+			int unlocked = BuildCatalog.GetUnlockedSupportCoreCount(Level);
+			var names = new List<string>();
+			for (int index = 0; index < unlocked && index < loadout.SkillGemIds.Length; index++)
+			{
+				string id = loadout.GetSkillGemId(index);
+				if (id == "gem.skill.none")
+				{
+					continue;
+				}
+
+				names.Add(LocaleText.T(BuildCatalog.GetSkillGem(id).NameKey));
+			}
+
+			return string.Join("-", names);
+		}
+	}
 
 	private string[] GetTraitKeys()
 	{
@@ -843,8 +866,8 @@ public partial class SimpleActor : CharacterBody3D
 				ArmorId = loadout.ArmorId,
 				AccessoryId = loadout.AccessoryId,
 				AttributeGemId = loadout.AttributeGemId,
-				SkillGemIds = new[] { loadout.SkillGemIds[0], loadout.SkillGemIds[1], loadout.SkillGemIds[2] },
-				SkillGemLevels = new[] { loadout.GetSkillGemLevel(0), loadout.GetSkillGemLevel(1), loadout.GetSkillGemLevel(2) },
+				SkillGemIds = MakeSkillGemIdArray(loadout),
+				SkillGemLevels = MakeSkillGemLevelArray(loadout),
 			},
 		};
 	}
@@ -880,19 +903,42 @@ public partial class SimpleActor : CharacterBody3D
 			ArmorId = data.BuildLoadout.ArmorId,
 			AccessoryId = data.BuildLoadout.AccessoryId,
 			AttributeGemId = data.BuildLoadout.AttributeGemId,
-			SkillGemIds = data.BuildLoadout.SkillGemIds.Length >= 3
-				? new[] { data.BuildLoadout.SkillGemIds[0], data.BuildLoadout.SkillGemIds[1], data.BuildLoadout.SkillGemIds[2] }
+			SkillGemIds = data.BuildLoadout.SkillGemIds is { Length: > 0 } savedIds
+				? (string[])savedIds.Clone()
 				: new[] { "gem.skill.none", "gem.skill.none", "gem.skill.none" },
-			SkillGemLevels = data.BuildLoadout.SkillGemLevels.Length >= 3
-				? new[] { Mathf.Max(data.BuildLoadout.SkillGemLevels[0], 1), Mathf.Max(data.BuildLoadout.SkillGemLevels[1], 1), Mathf.Max(data.BuildLoadout.SkillGemLevels[2], 1) }
+			SkillGemLevels = data.BuildLoadout.SkillGemLevels is { Length: > 0 } savedLevels
+				? (int[])savedLevels.Clone()
 				: new[] { 1, 1, 1 },
 		};
+		_buildLoadout.EnsureSkillSlots();
 		RemoveUnsupportedProjectileGems();
 		_buildConfigured = true;
 		_buildStatsDirty = true;
 		RecalculateBuildStats();
 		CurrentHealth = Mathf.Clamp(data.CurrentHealth, 1, EffectiveMaxHealth);
 		RefreshNameplate();
+	}
+
+	private static string[] MakeSkillGemIdArray(CompanionBuildLoadout loadout)
+	{
+		var ids = new string[BuildCatalog.SupportCoreSlotCount];
+		for (int index = 0; index < ids.Length; index++)
+		{
+			ids[index] = loadout.GetSkillGemId(index);
+		}
+
+		return ids;
+	}
+
+	private static int[] MakeSkillGemLevelArray(CompanionBuildLoadout loadout)
+	{
+		var levels = new int[BuildCatalog.SupportCoreSlotCount];
+		for (int index = 0; index < levels.Length; index++)
+		{
+			levels[index] = loadout.GetSkillGemLevel(index);
+		}
+
+		return levels;
 	}
 
 	private void EnsureBuildLoadout()
