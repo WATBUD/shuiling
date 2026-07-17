@@ -41,7 +41,6 @@ public static class ItemIconLibrary
 		["gem.skill.meteor"] = "gem_01.png",
 		["gem.skill.dash"] = "gem_04.png",
 		["gem.skill.laser"] = "gem_03.png",
-		["gem.skill.summon"] = "gem_07.png",
 		["gem.skill.chain"] = "gem_02.png",
 		["gem.skill.explosion"] = "gem_01.png",
 		["gem.skill.piercing"] = "gem_04.png",

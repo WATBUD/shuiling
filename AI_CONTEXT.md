@@ -20,10 +20,15 @@ Naming mismatch (the #1 source of confusion): **the code says "gem"; the game/UI
 
 | Design / UI term | Code symbol |
 | --- | --- |
-| Main core (attack element) | `AttributeGem` / `AttributeGemId` (element: fire/water/… ; none = physical) |
-| Support core (chain of ≤6) | `SkillGem` / `SkillGemIds[]` / `SkillGemLevels[]` |
+| Main core / 主核心 (the skill chain, ≤6) | code `SkillGem` / `SkillGemIds[]` / `SkillGemLevels[]` (a.k.a. `SupportCore*` internally) |
+| Support core / 輔助核心 (attack element) | code `AttributeGem` / `AttributeGemId` (fire/water/… ; none = physical; a.k.a. `MainCore*` internally) |
 | Core chain display `[核心] a-b-c` | `SimpleActor.SupportCoreChain` |
 | (Core Resonance — REMOVED) | no `RareCombo`/`Resonance` code remains; cores just stack |
+
+NOTE: the game/UI terminology was flipped so **skills = 主核心 (main), element = 輔助核心
+(support)**, but the code identifiers still use the legacy names — code `MainCore*`
+(`IsMainCoreUnlocked`) refers to the element/attribute slot, and code `SupportCore*`
+(`SupportCoreSlotCount`, `EquipSupportCore`) refers to the skill chain. Trust the table above.
 
 Combat facts:
 - **The player has no outgoing attack** — combat is entirely companion-driven. The player

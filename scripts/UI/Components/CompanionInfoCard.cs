@@ -315,7 +315,7 @@ public partial class CompanionInfoCard : PanelContainer
 				continue;
 			}
 
-			string slot = LocaleText.F("build.slot.support_core", index + 1);
+			string slot = index == 0 ? LocaleText.T("build.slot.main_core") : LocaleText.F("build.slot.support_core", index);
 			SkillGemDefinition gem = BuildCatalog.GetSkillGem(id);
 			string name = $"{LocaleText.T(gem.NameKey)} Lv.{loadout.GetSkillGemLevel(index)}";
 			AddTerm(_skillGemFlow, name, () => (name, InventoryPanel.BuildItemTooltipBody(id, slot)));
@@ -493,7 +493,7 @@ public partial class CompanionInfoCard : PanelContainer
 			}
 
 			SkillGemDefinition gem = BuildCatalog.GetSkillGem(id);
-			string slot = LocaleText.F("build.slot.support_core", index + 1);
+			string slot = index == 0 ? LocaleText.T("build.slot.main_core") : LocaleText.F("build.slot.support_core", index);
 			blocks.Add($"{LocaleText.T(gem.NameKey)} Lv.{loadout.GetSkillGemLevel(index)}\n{InventoryPanel.BuildItemTooltipBody(id, slot)}");
 		}
 		return (LocaleText.T("build.skill_gems"), string.Join("\n\n", blocks));

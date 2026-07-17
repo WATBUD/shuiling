@@ -721,6 +721,42 @@ public partial class SimpleActor : CharacterBody3D
 		MarkBuildChanged();
 	}
 
+	// Empties one support core slot without the ranged-skill cascade that EquipSkillGem
+	// applies, so removing the primary (fireball) core leaves the other slots untouched.
+	public void ClearSkillGemSlot(int slotIndex)
+	{
+		int safeSlot = Mathf.Clamp(slotIndex, 0, BuildLoadout.SkillGemIds.Length - 1);
+		BuildLoadout.SkillGemIds[safeSlot] = "gem.skill.none";
+		BuildLoadout.SkillGemLevels[safeSlot] = 1;
+		MarkBuildChanged();
+	}
+
+	// Packs the equipped support cores toward the front, preserving order, so the chain
+	// has no gaps after a non-primary core is removed.
+	public void CompactSupportCores()
+	{
+		string[] ids = BuildLoadout.SkillGemIds;
+		int[] levels = BuildLoadout.SkillGemLevels;
+		var packedIds = new List<string>();
+		var packedLevels = new List<int>();
+		for (int index = 0; index < ids.Length; index++)
+		{
+			if (ids[index] != "gem.skill.none")
+			{
+				packedIds.Add(ids[index]);
+				packedLevels.Add(levels[index]);
+			}
+		}
+
+		for (int index = 0; index < ids.Length; index++)
+		{
+			ids[index] = index < packedIds.Count ? packedIds[index] : "gem.skill.none";
+			levels[index] = index < packedLevels.Count ? packedLevels[index] : 1;
+		}
+
+		MarkBuildChanged();
+	}
+
 	public int GetSkillGemLevel(int slotIndex)
 	{
 		return BuildLoadout.GetSkillGemLevel(slotIndex);
