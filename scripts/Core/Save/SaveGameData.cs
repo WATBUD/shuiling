@@ -76,6 +76,7 @@ public sealed class CompanionBuildSaveData
 	public string HelmetId { get; set; } = "equip.helmet.traveler";
 	public string WeaponId { get; set; } = "equip.weapon.sword";
 	public string ArmorId { get; set; } = "equip.armor.scout";
+	public string BootsId { get; set; } = "equip.boots.traveler";
 	public string AccessoryId { get; set; } = "equip.accessory.swift_ring";
 	public string AttributeGemId { get; set; } = "gem.attribute.none";
 	public string[] SkillGemIds { get; set; } =

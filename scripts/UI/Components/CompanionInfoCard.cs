@@ -293,6 +293,7 @@ public partial class CompanionInfoCard : PanelContainer
 			(loadout.HelmetId, LocaleText.T("build.slot.helmet")),
 			(loadout.WeaponId, LocaleText.T("build.slot.weapon")),
 			(loadout.ArmorId, LocaleText.T("build.slot.armor")),
+			(loadout.BootsId, LocaleText.T("build.slot.boots")),
 			(loadout.AccessoryId, LocaleText.T("build.slot.accessory")),
 			(loadout.AttributeGemId, LocaleText.T("build.slot.attribute")),
 		};
@@ -315,7 +316,7 @@ public partial class CompanionInfoCard : PanelContainer
 				continue;
 			}
 
-			string slot = index == 0 ? LocaleText.T("build.slot.main_core") : LocaleText.F("build.slot.support_core", index);
+			string slot = index == 0 ? LocaleText.T("build.slot.main_core") : LocaleText.T("build.slot.support_core_plain");
 			SkillGemDefinition gem = BuildCatalog.GetSkillGem(id);
 			string name = $"{LocaleText.T(gem.NameKey)} Lv.{loadout.GetSkillGemLevel(index)}";
 			AddTerm(_skillGemFlow, name, () => (name, InventoryPanel.BuildItemTooltipBody(id, slot)));
@@ -333,6 +334,7 @@ public partial class CompanionInfoCard : PanelContainer
 			loadout.HelmetId,
 			loadout.WeaponId,
 			loadout.ArmorId,
+			loadout.BootsId,
 			loadout.AccessoryId,
 			loadout.AttributeGemId,
 			string.Join(",", loadout.SkillGemIds),
@@ -466,6 +468,7 @@ public partial class CompanionInfoCard : PanelContainer
 			(loadout.HelmetId, LocaleText.T("build.slot.helmet")),
 			(loadout.WeaponId, LocaleText.T("build.slot.weapon")),
 			(loadout.ArmorId, LocaleText.T("build.slot.armor")),
+			(loadout.BootsId, LocaleText.T("build.slot.boots")),
 			(loadout.AccessoryId, LocaleText.T("build.slot.accessory")),
 			(loadout.AttributeGemId, LocaleText.T("build.slot.attribute")),
 		};
@@ -493,7 +496,7 @@ public partial class CompanionInfoCard : PanelContainer
 			}
 
 			SkillGemDefinition gem = BuildCatalog.GetSkillGem(id);
-			string slot = index == 0 ? LocaleText.T("build.slot.main_core") : LocaleText.F("build.slot.support_core", index);
+			string slot = index == 0 ? LocaleText.T("build.slot.main_core") : LocaleText.T("build.slot.support_core_plain");
 			blocks.Add($"{LocaleText.T(gem.NameKey)} Lv.{loadout.GetSkillGemLevel(index)}\n{InventoryPanel.BuildItemTooltipBody(id, slot)}");
 		}
 		return (LocaleText.T("build.skill_gems"), string.Join("\n\n", blocks));

@@ -20,15 +20,16 @@ Naming mismatch (the #1 source of confusion): **the code says "gem"; the game/UI
 
 | Design / UI term | Code symbol |
 | --- | --- |
-| Main core / 主核心 (the skill chain, ≤6) | code `SkillGem` / `SkillGemIds[]` / `SkillGemLevels[]` (a.k.a. `SupportCore*` internally) |
-| Support core / 輔助核心 (attack element) | code `AttributeGem` / `AttributeGemId` (fire/water/… ; none = physical; a.k.a. `MainCore*` internally) |
+| Core skill / 核心技能 (the active attack, slot 0) | code `SkillGem` / `SkillGemIds[0]` / `SkillGemLevels[0]` (a.k.a. `SupportCore*` internally) |
+| Support core / 輔助核心 (extensions, slots 1–6) | code `SkillGem` / `SkillGemIds[1..6]` / `SkillGemLevels[1..6]` |
+| Legacy hidden attack element | code `AttributeGem` / `AttributeGemId` (fire/water/… ; none = physical; a.k.a. `MainCore*` internally) |
 | Core chain display `[核心] a-b-c` | `SimpleActor.SupportCoreChain` |
 | (Core Resonance — REMOVED) | no `RareCombo`/`Resonance` code remains; cores just stack |
 
-NOTE: the game/UI terminology was flipped so **skills = 主核心 (main), element = 輔助核心
-(support)**, but the code identifiers still use the legacy names — code `MainCore*`
-(`IsMainCoreUnlocked`) refers to the element/attribute slot, and code `SupportCore*`
-(`SupportCoreSlotCount`, `EquipSupportCore`) refers to the skill chain. Trust the table above.
+NOTE: the game/UI calls slot 0 **核心技能** and slots 1–6 **輔助核心**, but the code
+identifiers still use the legacy names — code `MainCore*` (`IsMainCoreUnlocked`) refers
+to the hidden element/attribute data, and code `SupportCore*` (`SupportCoreSlotCount`,
+`EquipSupportCore`) refers to the complete skill-core array. Trust the table above.
 
 Combat facts:
 - **The player has no outgoing attack** — combat is entirely companion-driven. The player

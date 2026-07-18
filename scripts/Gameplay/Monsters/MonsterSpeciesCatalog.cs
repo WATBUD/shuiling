@@ -25,6 +25,8 @@ public sealed class DefaultMonsterSpeciesCatalog : IMonsterSpeciesCatalog
 	private static readonly string[] ForestMap = { "wild_forest" };
 	private static readonly string[] MarshMap = { "wild_marsh" };
 	private static readonly string[] BadlandsMap = { "wild_badlands" };
+	private static readonly string[] SnowMap = { "wild_snow" };
+	private static readonly string[] ForestSnowMaps = { "wild_forest", "wild_snow" };
 
 	public static DefaultMonsterSpeciesCatalog Instance { get; } = new();
 
@@ -48,15 +50,15 @@ public sealed class DefaultMonsterSpeciesCatalog : IMonsterSpeciesCatalog
 		new("name.monster.fox", "DPS", "loot.beast_hide", new Color(1.0f, 0.48f, 0.20f, 0.94f), new[]
 		{
 			"res://assets/models/pets/cube_pets/animal-fox.glb",
-		}, ForestMap),
+		}, ForestSnowMaps),
 		new("name.monster.deer", "DPS", "loot.soft_fur", new Color(0.78f, 0.58f, 0.34f, 0.94f), new[]
 		{
 			"res://assets/models/pets/cube_pets/animal-deer.glb",
-		}, ForestMap),
+		}, ForestSnowMaps),
 		new("name.monster.bunny", "DPS", "loot.soft_fur", new Color(0.96f, 0.86f, 0.78f, 0.94f), new[]
 		{
 			"res://assets/models/pets/cube_pets/animal-bunny.glb",
-		}, ForestMap),
+		}, ForestSnowMaps),
 		new("name.monster.beaver", "DPS", "loot.soft_fur", new Color(0.58f, 0.34f, 0.18f, 0.94f), new[]
 		{
 			"res://assets/models/pets/cube_pets/animal-beaver.glb",
@@ -92,11 +94,55 @@ public sealed class DefaultMonsterSpeciesCatalog : IMonsterSpeciesCatalog
 		new("name.monster.bear", "Tank", "loot.beast_hide", new Color(0.84f, 0.92f, 1.0f, 0.94f), new[]
 		{
 			"res://assets/models/pets/cube_pets/animal-polar.glb",
-		}, BadlandsMap),
+		}, SnowMap),
 		new("name.monster.elephant", "Tank", "loot.small_bone", new Color(0.62f, 0.68f, 0.74f, 0.94f), new[]
 		{
 			"res://assets/models/pets/cube_pets/animal-elephant.glb",
 		}, BadlandsMap),
+		new("name.monster.cat", "DPS", "loot.soft_fur", new Color(0.92f, 0.72f, 0.52f, 0.94f), new[]
+		{
+			"res://assets/models/pets/cube_pets/animal-cat.glb",
+		}, ForestMap),
+		new("name.monster.dog", "DPS", "loot.soft_fur", new Color(0.72f, 0.56f, 0.38f, 0.94f), new[]
+		{
+			"res://assets/models/pets/cube_pets/animal-dog.glb",
+		}, ForestSnowMaps),
+		new("name.monster.chick", "Support", "loot.insect_wing", new Color(1.0f, 0.88f, 0.34f, 0.96f), new[]
+		{
+			"res://assets/models/pets/cube_pets/animal-chick.glb",
+		}, ForestMap),
+		new("name.monster.cow", "Tank", "loot.beast_hide", new Color(0.88f, 0.84f, 0.76f, 0.94f), new[]
+		{
+			"res://assets/models/pets/cube_pets/animal-cow.glb",
+		}, ForestMap),
+		new("name.monster.pig", "Tank", "loot.beast_hide", new Color(1.0f, 0.62f, 0.68f, 0.94f), new[]
+		{
+			"res://assets/models/pets/cube_pets/animal-pig.glb",
+		}, MarshMap),
+		new("name.monster.giraffe", "Ranged", "loot.beast_hide", new Color(0.96f, 0.72f, 0.28f, 0.96f), new[]
+		{
+			"res://assets/models/pets/cube_pets/animal-giraffe.glb",
+		}, BadlandsMap),
+		new("name.monster.koala", "Support", "loot.soft_fur", new Color(0.66f, 0.72f, 0.76f, 0.94f), new[]
+		{
+			"res://assets/models/pets/cube_pets/animal-koala.glb",
+		}, ForestMap),
+		new("name.monster.monkey", "DPS", "loot.sharp_claw", new Color(0.62f, 0.42f, 0.24f, 0.94f), new[]
+		{
+			"res://assets/models/pets/cube_pets/animal-monkey.glb",
+		}, ForestMap),
+		new("name.monster.panda", "Tank", "loot.soft_fur", new Color(0.90f, 0.92f, 0.90f, 0.94f), new[]
+		{
+			"res://assets/models/pets/cube_pets/animal-panda.glb",
+		}, ForestSnowMaps),
+		new("name.monster.parrot", "Ranged", "loot.insect_wing", new Color(0.24f, 0.90f, 0.48f, 0.96f), new[]
+		{
+			"res://assets/models/pets/cube_pets/animal-parrot.glb",
+		}, ForestMap),
+		new("name.monster.penguin", "Support", "loot.water_core", new Color(0.48f, 0.72f, 0.92f, 0.96f), new[]
+		{
+			"res://assets/models/pets/cube_pets/animal-penguin.glb",
+		}, SnowMap),
 	};
 
 	private readonly Dictionary<string, MonsterSpeciesDefinition> _byName = new();

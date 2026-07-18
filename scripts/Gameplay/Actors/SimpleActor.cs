@@ -670,6 +670,7 @@ public partial class SimpleActor : CharacterBody3D
 			HelmetId = "equip.helmet.none",
 			WeaponId = "equip.weapon.none",
 			ArmorId = "equip.armor.none",
+			BootsId = "equip.boots.none",
 			AccessoryId = "equip.accessory.none",
 			AttributeGemId = "gem.attribute.none",
 			SkillGemIds = new[] { "gem.skill.none", "gem.skill.none", "gem.skill.none" },
@@ -700,6 +701,20 @@ public partial class SimpleActor : CharacterBody3D
 	{
 		int safeSlot = Mathf.Clamp(slotIndex, 0, BuildLoadout.SkillGemIds.Length - 1);
 		string validatedGemId = BuildCatalog.GetSkillGem(gemId).Id;
+		if (validatedGemId == "gem.skill.none")
+		{
+			ClearSkillGemSlot(safeSlot);
+			return;
+		}
+		if ((safeSlot == 0 && !BuildCatalog.IsMainAttackCore(validatedGemId))
+			|| (safeSlot > 0 && !BuildCatalog.IsSupportCore(validatedGemId)))
+		{
+			return;
+		}
+		if (safeSlot > 0 && !BuildCatalog.HasMainAttackCore(BuildLoadout))
+		{
+			return;
+		}
 		if (BuildCatalog.IsProjectileSupportGem(validatedGemId) && !BuildCatalog.HasRangedActiveSkill(BuildLoadout))
 		{
 			return;
@@ -731,27 +746,28 @@ public partial class SimpleActor : CharacterBody3D
 		MarkBuildChanged();
 	}
 
-	// Packs the equipped support cores toward the front, preserving order, so the chain
-	// has no gaps after a non-primary core is removed.
+	// Packs slots 1..N inside the support area only. Slot 0 is the permanent main-core
+	// slot and must never receive a promoted support core.
 	public void CompactSupportCores()
 	{
 		string[] ids = BuildLoadout.SkillGemIds;
 		int[] levels = BuildLoadout.SkillGemLevels;
 		var packedIds = new List<string>();
 		var packedLevels = new List<int>();
-		for (int index = 0; index < ids.Length; index++)
+		for (int index = 1; index < ids.Length; index++)
 		{
-			if (ids[index] != "gem.skill.none")
+			if (BuildCatalog.IsSupportCore(ids[index]))
 			{
 				packedIds.Add(ids[index]);
 				packedLevels.Add(levels[index]);
 			}
 		}
 
-		for (int index = 0; index < ids.Length; index++)
+		for (int index = 1; index < ids.Length; index++)
 		{
-			ids[index] = index < packedIds.Count ? packedIds[index] : "gem.skill.none";
-			levels[index] = index < packedLevels.Count ? packedLevels[index] : 1;
+			int packedIndex = index - 1;
+			ids[index] = packedIndex < packedIds.Count ? packedIds[packedIndex] : "gem.skill.none";
+			levels[index] = packedIndex < packedLevels.Count ? packedLevels[packedIndex] : 1;
 		}
 
 		MarkBuildChanged();
@@ -900,6 +916,7 @@ public partial class SimpleActor : CharacterBody3D
 				HelmetId = loadout.HelmetId,
 				WeaponId = loadout.WeaponId,
 				ArmorId = loadout.ArmorId,
+				BootsId = loadout.BootsId,
 				AccessoryId = loadout.AccessoryId,
 				AttributeGemId = loadout.AttributeGemId,
 				SkillGemIds = MakeSkillGemIdArray(loadout),
@@ -937,6 +954,7 @@ public partial class SimpleActor : CharacterBody3D
 			HelmetId = data.BuildLoadout.HelmetId,
 			WeaponId = data.BuildLoadout.WeaponId,
 			ArmorId = data.BuildLoadout.ArmorId,
+			BootsId = string.IsNullOrWhiteSpace(data.BuildLoadout.BootsId) ? "equip.boots.traveler" : data.BuildLoadout.BootsId,
 			AccessoryId = data.BuildLoadout.AccessoryId,
 			AttributeGemId = data.BuildLoadout.AttributeGemId,
 			SkillGemIds = data.BuildLoadout.SkillGemIds is { Length: > 0 } savedIds
@@ -947,6 +965,7 @@ public partial class SimpleActor : CharacterBody3D
 				: new[] { 1, 1, 1 },
 		};
 		_buildLoadout.EnsureSkillSlots();
+		NormalizeSkillCoreSlots();
 		RemoveUnsupportedProjectileGems();
 		_buildConfigured = true;
 		_buildStatsDirty = true;
@@ -985,10 +1004,45 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		_buildLoadout = BuildCatalog.CreateStarterLoadout(this);
+		NormalizeSkillCoreSlots();
 		RemoveUnsupportedProjectileGems();
 		AttackModeId = BuildCatalog.GetAttackMode(AttackModeId).Id;
 		_buildConfigured = true;
 		_buildStatsDirty = true;
+	}
+
+	private void NormalizeSkillCoreSlots()
+	{
+		_buildLoadout.EnsureSkillSlots();
+		string[] ids = _buildLoadout.SkillGemIds;
+		int[] levels = _buildLoadout.SkillGemLevels;
+		string mainId = "gem.skill.none";
+		int mainLevel = 1;
+		var supportIds = new List<string>();
+		var supportLevels = new List<int>();
+
+		for (int index = 0; index < ids.Length; index++)
+		{
+			if (mainId == "gem.skill.none" && BuildCatalog.IsMainAttackCore(ids[index]))
+			{
+				mainId = ids[index];
+				mainLevel = Mathf.Max(levels[index], 1);
+			}
+			else if (BuildCatalog.IsSupportCore(ids[index]))
+			{
+				supportIds.Add(ids[index]);
+				supportLevels.Add(Mathf.Max(levels[index], 1));
+			}
+		}
+
+		ids[0] = mainId;
+		levels[0] = mainLevel;
+		for (int index = 1; index < ids.Length; index++)
+		{
+			int supportIndex = index - 1;
+			ids[index] = supportIndex < supportIds.Count ? supportIds[supportIndex] : "gem.skill.none";
+			levels[index] = supportIndex < supportLevels.Count ? supportLevels[supportIndex] : 1;
+		}
 	}
 
 	private void RemoveUnsupportedProjectileGems()
@@ -2410,6 +2464,7 @@ public partial class SimpleActor : CharacterBody3D
 			EquipmentSlot.Helmet,
 			EquipmentSlot.Weapon,
 			EquipmentSlot.Armor,
+			EquipmentSlot.Boots,
 			EquipmentSlot.Accessory,
 		};
 		EquipmentSlot slot = slots[_rng.RandiRange(0, slots.Length - 1)];

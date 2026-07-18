@@ -6,6 +6,7 @@ public enum EquipmentSlot
 	Helmet,
 	Weapon,
 	Armor,
+	Boots,
 	Accessory,
 }
 
@@ -186,6 +187,7 @@ public sealed class CompanionBuildLoadout
 	public string HelmetId { get; set; } = "equip.helmet.traveler";
 	public string WeaponId { get; set; } = "equip.weapon.sword";
 	public string ArmorId { get; set; } = "equip.armor.scout";
+	public string BootsId { get; set; } = "equip.boots.traveler";
 	public string AccessoryId { get; set; } = "equip.accessory.swift_ring";
 	public string AttributeGemId { get; set; } = "gem.attribute.none";
 	public string[] SkillGemIds { get; set; } =
@@ -222,6 +224,7 @@ public sealed class CompanionBuildLoadout
 			EquipmentSlot.Helmet => HelmetId,
 			EquipmentSlot.Weapon => WeaponId,
 			EquipmentSlot.Armor => ArmorId,
+			EquipmentSlot.Boots => BootsId,
 			_ => AccessoryId,
 		};
 	}
@@ -238,6 +241,9 @@ public sealed class CompanionBuildLoadout
 				break;
 			case EquipmentSlot.Armor:
 				ArmorId = id;
+				break;
+			case EquipmentSlot.Boots:
+				BootsId = id;
 				break;
 			default:
 				AccessoryId = id;
@@ -403,6 +409,7 @@ public static class BuildCatalog
 		new EquipmentDefinition { Id = "equip.helmet.none", NameKey = "equipment.none", SummaryKey = "gem.summary.none", Slot = EquipmentSlot.Helmet },
 		new EquipmentDefinition { Id = "equip.weapon.none", NameKey = "equipment.none", SummaryKey = "gem.summary.none", Slot = EquipmentSlot.Weapon },
 		new EquipmentDefinition { Id = "equip.armor.none", NameKey = "equipment.none", SummaryKey = "gem.summary.none", Slot = EquipmentSlot.Armor },
+		new EquipmentDefinition { Id = "equip.boots.none", NameKey = "equipment.none", SummaryKey = "gem.summary.none", Slot = EquipmentSlot.Boots },
 		new EquipmentDefinition { Id = "equip.accessory.none", NameKey = "equipment.none", SummaryKey = "gem.summary.none", Slot = EquipmentSlot.Accessory },
 		new EquipmentDefinition { Id = "equip.helmet.traveler", NameKey = "equip.helmet.traveler", SummaryKey = "equip.summary.traveler_helmet", Slot = EquipmentSlot.Helmet, MaxHealthBonus = 10, DefenseBonus = 3, SocketCount = 1 },
 		new EquipmentDefinition { Id = "equip.helmet.guardian", NameKey = "equip.helmet.guardian", SummaryKey = "equip.summary.guardian_helmet", Slot = EquipmentSlot.Helmet, MaxHealthBonus = 26, DefenseBonus = 8, SocketCount = 1 },
@@ -410,18 +417,22 @@ public static class BuildCatalog
 
 		new EquipmentDefinition { Id = "equip.weapon.sword", NameKey = "equip.weapon.sword", SummaryKey = "equip.summary.sword", Slot = EquipmentSlot.Weapon, AttackBonus = 10, AttackCooldownReduction = 0.04f, SocketCount = 1 },
 		new EquipmentDefinition { Id = "equip.weapon.short_sword", NameKey = "equip.weapon.short_sword", SummaryKey = "equip.summary.short_sword", Slot = EquipmentSlot.Weapon, AttackBonus = 8, AttackCooldownReduction = 0.10f, CritChanceBonus = 0.03f, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.weapon.dagger", NameKey = "equip.weapon.dagger", SummaryKey = "equip.summary.dagger", Slot = EquipmentSlot.Weapon, AttackBonus = 6, MoveSpeedBonus = 0.05f, AttackCooldownReduction = 0.14f, CritChanceBonus = 0.10f, SocketCount = 1 },
+		new EquipmentDefinition { Id = "equip.weapon.dagger", NameKey = "equip.weapon.dagger", SummaryKey = "equip.summary.dagger", Slot = EquipmentSlot.Weapon, AttackBonus = 6, AttackCooldownReduction = 0.18f, CritChanceBonus = 0.10f, SocketCount = 1 },
 		new EquipmentDefinition { Id = "equip.weapon.longbow", NameKey = "equip.weapon.longbow", SummaryKey = "equip.summary.longbow", Slot = EquipmentSlot.Weapon, AttackBonus = 9, AttackRangeBonus = 3.2f, AttackCooldownReduction = 0.02f, CritChanceBonus = 0.04f, SocketCount = 2 },
 		new EquipmentDefinition { Id = "equip.weapon.spear", NameKey = "equip.weapon.spear", SummaryKey = "equip.summary.spear", Slot = EquipmentSlot.Weapon, AttackBonus = 12, DefenseBonus = 3, AttackRangeBonus = 1.4f, SocketCount = 1 },
 		new EquipmentDefinition { Id = "equip.weapon.warhammer", NameKey = "equip.weapon.warhammer", SummaryKey = "equip.summary.warhammer", Slot = EquipmentSlot.Weapon, AttackBonus = 20, DefenseBonus = 4, AttackCooldownReduction = -0.12f, SocketCount = 1 },
 		new EquipmentDefinition { Id = "equip.weapon.scepter", NameKey = "equip.weapon.scepter", SummaryKey = "equip.summary.scepter", Slot = EquipmentSlot.Weapon, AttackBonus = 8, DefenseBonus = 5, AttackRangeBonus = 1.6f, AttackCooldownReduction = 0.05f, SocketCount = 2 },
 		new EquipmentDefinition { Id = "equip.weapon.staff", NameKey = "equip.weapon.staff", SummaryKey = "equip.summary.staff", Slot = EquipmentSlot.Weapon, AttackBonus = 7, AttackRangeBonus = 2.0f, AttackCooldownReduction = 0.08f, SocketCount = 2 },
 		new EquipmentDefinition { Id = "equip.weapon.great_axe", NameKey = "equip.weapon.great_axe", SummaryKey = "equip.summary.great_axe", Slot = EquipmentSlot.Weapon, AttackBonus = 18, DefenseBonus = 2, AttackCooldownReduction = -0.08f, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.weapon.claws", NameKey = "equip.weapon.claws", SummaryKey = "equip.summary.claws", Slot = EquipmentSlot.Weapon, AttackBonus = 8, MoveSpeedBonus = 0.10f, CritChanceBonus = 0.06f, SocketCount = 1 },
+		new EquipmentDefinition { Id = "equip.weapon.claws", NameKey = "equip.weapon.claws", SummaryKey = "equip.summary.claws", Slot = EquipmentSlot.Weapon, AttackBonus = 8, AttackCooldownReduction = 0.16f, CritChanceBonus = 0.06f, SocketCount = 1 },
 
 		new EquipmentDefinition { Id = "equip.armor.scout", NameKey = "equip.armor.scout", SummaryKey = "equip.summary.scout_armor", Slot = EquipmentSlot.Armor, MaxHealthBonus = 18, DefenseBonus = 5, MoveSpeedBonus = 0.05f, SocketCount = 1 },
 		new EquipmentDefinition { Id = "equip.armor.plate", NameKey = "equip.armor.plate", SummaryKey = "equip.summary.plate_armor", Slot = EquipmentSlot.Armor, MaxHealthBonus = 44, DefenseBonus = 16, MoveSpeedBonus = -0.05f, SocketCount = 1 },
 		new EquipmentDefinition { Id = "equip.armor.spirit_robe", NameKey = "equip.armor.spirit_robe", SummaryKey = "equip.summary.spirit_robe", Slot = EquipmentSlot.Armor, MaxHealthBonus = 24, DefenseBonus = 7, AttackCooldownReduction = 0.10f, AttackRangeBonus = 0.7f, SocketCount = 2 },
+
+		new EquipmentDefinition { Id = "equip.boots.traveler", NameKey = "equip.boots.traveler", SummaryKey = "equip.summary.traveler_shoes", Slot = EquipmentSlot.Boots, DefenseBonus = 1, MoveSpeedBonus = 0.07f },
+		new EquipmentDefinition { Id = "equip.boots.reinforced", NameKey = "equip.boots.reinforced", SummaryKey = "equip.summary.reinforced_boots", Slot = EquipmentSlot.Boots, MaxHealthBonus = 10, DefenseBonus = 5, MoveSpeedBonus = 0.03f },
+		new EquipmentDefinition { Id = "equip.boots.windrunner", NameKey = "equip.boots.windrunner", SummaryKey = "equip.summary.windrunner_boots", Slot = EquipmentSlot.Boots, DefenseBonus = 2, MoveSpeedBonus = 0.15f, AttackCooldownReduction = 0.03f },
 
 		new EquipmentDefinition { Id = "equip.accessory.swift_ring", NameKey = "equip.accessory.swift_ring", SummaryKey = "equip.summary.swift_ring", Slot = EquipmentSlot.Accessory, MoveSpeedBonus = 0.12f, AttackCooldownReduction = 0.05f, SocketCount = 1 },
 		new EquipmentDefinition { Id = "equip.accessory.crit_charm", NameKey = "equip.accessory.crit_charm", SummaryKey = "equip.summary.crit_charm", Slot = EquipmentSlot.Accessory, AttackBonus = 4, CritChanceBonus = 0.12f, SocketCount = 1 },
@@ -543,6 +554,7 @@ public static class BuildCatalog
 				"wild_marsh" => "gem.attribute.water",
 				"wild_badlands" => "gem.attribute.fire",
 				"wild_forest" => "gem.attribute.wind",
+				"wild_snow" => "gem.attribute.ice",
 				_ => loadout.AttributeGemId,
 			};
 		}
@@ -571,6 +583,7 @@ public static class BuildCatalog
 		ApplyEquipment(stats, GetEquipment(loadout.HelmetId));
 		ApplyEquipment(stats, GetEquipment(loadout.WeaponId));
 		ApplyEquipment(stats, GetEquipment(loadout.ArmorId));
+		ApplyEquipment(stats, GetEquipment(loadout.BootsId));
 		ApplyEquipment(stats, GetEquipment(loadout.AccessoryId));
 
 		// Main core (attack core) only takes effect once unlocked; before that the
@@ -594,6 +607,7 @@ public static class BuildCatalog
 		// Support cores only contribute up to the number of unlocked support slots.
 		int unlockedSupportCores = GetUnlockedSupportCoreCount(actor.Level);
 		bool hasRangedActiveSkill = HasRangedActiveSkill(loadout);
+		bool hasMainAttackCore = HasMainAttackCore(loadout);
 		for (int slot = 0; slot < loadout.SkillGemIds.Length; slot++)
 		{
 			if (slot >= unlockedSupportCores)
@@ -602,6 +616,14 @@ public static class BuildCatalog
 			}
 
 			SkillGemDefinition gem = GetSkillGem(loadout.SkillGemIds[slot]);
+			if ((slot == 0 && !IsMainAttackCore(gem.Id)) || (slot > 0 && !IsSupportCore(gem.Id)))
+			{
+				continue;
+			}
+			if (slot > 0 && !hasMainAttackCore)
+			{
+				continue;
+			}
 			if (IsProjectileSupportGem(gem.Id) && !hasRangedActiveSkill)
 			{
 				continue;
@@ -855,17 +877,19 @@ public static class BuildCatalog
 	public const int MaxSkillGemLevel = 5;
 
 	// --- Core slots (level-gated) ---
-	// The main core slot holds the attack core (attribute gem, decides attack element).
+	// The core-skill slot holds the attack core (attribute gem, decides attack element).
 	// Support core slots hold support/trait cores (skill gems). Both unlock as the
 	// creature grows, per the Core System design: 0 cores at low level, then main, then
 	// support slots one by one.
 	public const int MainCoreUnlockLevel = 3;
 
-	// Maximum support core slots that can be chained together in the whole system.
-	public const int SupportCoreSlotCount = 6;
+	// One fixed main attack core (index 0) plus six extension support cores (1..6).
+	// The historical name is retained because this value is serialized as the skill
+	// core array length throughout the existing save system.
+	public const int SupportCoreSlotCount = 7;
 
-	// Level at which each support core slot unlocks. Length must equal SupportCoreSlotCount.
-	private static readonly int[] SupportCoreUnlockLevels = { 6, 10, 15, 21, 28, 36 };
+	// Unlock levels for the core skill, then support cores 1 through 6.
+	private static readonly int[] SupportCoreUnlockLevels = { 6, 10, 15, 21, 28, 36, 45 };
 
 	public static bool IsMainCoreUnlocked(int level)
 	{
@@ -905,6 +929,21 @@ public static class BuildCatalog
 
 	public static bool IsProjectileSupportGem(string gemId) => GetSkillGem(gemId).BehaviorId != ProjectileBehavior.None;
 
+	public static bool IsMainAttackCore(string gemId)
+	{
+		return IsRangedActiveSkillGem(gemId) || gemId == "gem.skill.whirlwind";
+	}
+
+	public static bool IsSupportCore(string gemId)
+	{
+		return gemId != "gem.skill.none" && !IsMainAttackCore(gemId);
+	}
+
+	public static bool HasMainAttackCore(CompanionBuildLoadout loadout)
+	{
+		return IsMainAttackCore(loadout.GetSkillGemId(0));
+	}
+
 	public static string GetSkillGemCategoryKey(string gemId)
 	{
 		SkillGemDefinition gem = GetSkillGem(gemId);
@@ -923,15 +962,7 @@ public static class BuildCatalog
 
 	public static bool HasRangedActiveSkill(CompanionBuildLoadout loadout)
 	{
-		foreach (string gemId in loadout.SkillGemIds)
-		{
-			if (IsRangedActiveSkillGem(gemId))
-			{
-				return true;
-			}
-		}
-
-		return false;
+		return IsRangedActiveSkillGem(loadout.GetSkillGemId(0));
 	}
 
 	// Cost to raise a behavior gem from its current level to the next one, or null if
@@ -1020,6 +1051,7 @@ public static class BuildCatalog
 			LocaleText.T(GetEquipment(loadout.HelmetId).NameKey),
 			LocaleText.T(GetEquipment(loadout.WeaponId).NameKey),
 			LocaleText.T(GetEquipment(loadout.ArmorId).NameKey),
+			LocaleText.T(GetEquipment(loadout.BootsId).NameKey),
 			LocaleText.T(GetEquipment(loadout.AccessoryId).NameKey),
 		});
 	}

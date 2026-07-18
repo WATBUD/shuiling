@@ -62,7 +62,7 @@ public partial class PlayerController
 	{
 		_blacksmithStockItemIds.Clear();
 		var equipmentIds = new List<string>();
-		foreach (EquipmentSlot slot in new[] { EquipmentSlot.Helmet, EquipmentSlot.Weapon, EquipmentSlot.Armor, EquipmentSlot.Accessory })
+		foreach (EquipmentSlot slot in new[] { EquipmentSlot.Helmet, EquipmentSlot.Weapon, EquipmentSlot.Armor, EquipmentSlot.Boots, EquipmentSlot.Accessory })
 		{
 			foreach (EquipmentDefinition equipment in BuildCatalog.GetEquipmentDefinitions(slot))
 			{

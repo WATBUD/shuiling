@@ -22,6 +22,9 @@ public static class ItemIconLibrary
 		["equip.armor.scout"] = "armor_scout.png",
 		["equip.armor.plate"] = "armor_plate.png",
 		["equip.armor.spirit_robe"] = "armor_spirit.png",
+		["equip.boots.traveler"] = "boots_traveler.png",
+		["equip.boots.reinforced"] = "boots_reinforced.png",
+		["equip.boots.windrunner"] = "boots_windrunner.png",
 		["equip.accessory.swift_ring"] = "accessory_swift.png",
 		["equip.accessory.crit_charm"] = "accessory_magic.png",
 		["equip.accessory.turtle_amulet"] = "accessory_guard.png",
@@ -90,7 +93,12 @@ public static class ItemIconLibrary
 	public static void Apply(Button button, string itemId, int maxWidth)
 	{
 		button.Icon = Get(itemId);
+		// Every item icon is rendered inside the same square visual boundary.  Source
+		// textures may be 46px, 512px, 1254px, or have a different aspect ratio;
+		// Button keeps that aspect ratio while this cap prevents large sources from
+		// changing the layout or appearing larger than neighbouring equipment.
 		button.ExpandIcon = true;
+		button.AddThemeConstantOverride("icon_max_width", Mathf.Max(1, maxWidth));
 		button.IconAlignment = HorizontalAlignment.Left;
 	}
 
@@ -100,8 +108,11 @@ public static class ItemIconLibrary
 		{
 			Texture = Get(itemId),
 			CustomMinimumSize = new Vector2(size, size),
+			SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter,
+			SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
 			ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
 			StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+			ClipContents = true,
 			MouseFilter = Control.MouseFilterEnum.Ignore,
 		};
 	}
