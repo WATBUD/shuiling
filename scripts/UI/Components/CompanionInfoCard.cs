@@ -164,7 +164,8 @@ public partial class CompanionInfoCard : PanelContainer
 			$"HP {(_actor.IsDefeated ? 0 : _actor.CurrentHealth)} / {_actor.EffectiveMaxHealth}",
 			$"{LocaleText.T("stat.attack")} {LocaleText.F("build.effective_stat", _actor.EffectiveAttack, _actor.Attack)}",
 			$"{LocaleText.T("stat.defense")} {LocaleText.F("build.effective_stat", _actor.EffectiveDefense, _actor.Defense)}",
-			$"{LocaleText.T("stat.speed")} {_actor.EffectiveMoveSpeed:0.0}",
+			$"{LocaleText.T("stat.move_speed")} {_actor.EffectiveMoveSpeed:0.0}",
+			LocaleText.F("stat.attack_speed_value", GetAttackSpeed(_actor.EffectiveAttackCooldown).ToString("0.00")),
 			$"{LocaleText.T("tooltip.attack_range")} {_actor.EffectiveAttackRange:0.0}",
 			$"{LocaleText.T("tooltip.detection_radius")} {_actor.EffectiveDetectionRadius:0.0}",
 			$"{LocaleText.T("tooltip.crit_chance")} {stats.CritChance * 100.0f:0.#}%",
@@ -208,7 +209,8 @@ public partial class CompanionInfoCard : PanelContainer
 			$"HP {_player.CurrentHealth} / {_player.MaxHealth}",
 			$"{LocaleText.T("stat.attack")} {_player.Attack}",
 			$"{LocaleText.T("stat.defense")} {_player.Defense}",
-			$"{LocaleText.T("stat.speed")} {_player.WalkSpeed:0.0}",
+			$"{LocaleText.T("stat.move_speed")} {_player.WalkSpeed:0.0}",
+			LocaleText.F("stat.attack_speed_value", GetAttackSpeed(_player.AttackCooldown).ToString("0.00")),
 			$"{LocaleText.T("tooltip.attack_range")} {_player.AttackRange:0.0}",
 			$"{LocaleText.T("tooltip.detection_radius")} {_player.DetectionRadius:0.0}",
 			$"{LocaleText.T("tooltip.crit_chance")} {_player.CritChance * 100.0f:0.#}%",
@@ -227,7 +229,7 @@ public partial class CompanionInfoCard : PanelContainer
 		_traitsTitle.Text = LocaleText.T("build.traits");
 		_equipmentTitle.Text = LocaleText.T("build.equipment");
 		_skillGemsTitle.Text = LocaleText.T("stat.ability");
-		string playerSignature = $"player|{_player.Level}|{_player.Attack}|{_player.Defense}|{_player.WalkSpeed}|{_player.SprintSpeed}|{_player.CaptureNetCapacity}|{_player.CaptureNetRechargeSeconds}";
+		string playerSignature = $"player|{_player.Level}|{_player.Attack}|{_player.Defense}|{_player.WalkSpeed}|{_player.SprintSpeed}|{_player.AttackCooldown}|{_player.CaptureNetCapacity}|{_player.CaptureNetRechargeSeconds}";
 		if (_detailSignature != playerSignature)
 		{
 			_detailSignature = playerSignature;
@@ -243,7 +245,7 @@ public partial class CompanionInfoCard : PanelContainer
 		if (_player == null) return;
 
 		AddTerm(_traitFlow, LocaleText.T("player.trait.runner"), () =>
-			(LocaleText.T("player.trait.runner"), $"{LocaleText.T("stat.speed")} {_player.WalkSpeed:0.0} -> {_player.SprintSpeed:0.0}"));
+			(LocaleText.T("player.trait.runner"), $"{LocaleText.T("stat.move_speed")} {_player.WalkSpeed:0.0} -> {_player.SprintSpeed:0.0}"));
 		AddTerm(_traitFlow, LocaleText.T("player.trait.resilience"), () =>
 			(LocaleText.T("player.trait.resilience"), $"HP {_player.MaxHealth}\n{LocaleText.T("stat.defense")} {_player.Defense}"));
 		AddTerm(_equipmentFlow, LocaleText.T("player.equipment.sword"), () =>
@@ -253,7 +255,7 @@ public partial class CompanionInfoCard : PanelContainer
 		AddTerm(_skillGemFlow, LocaleText.T("player.skill.capture"), () =>
 			(LocaleText.T("player.skill.capture"), $"Capacity {_player.CaptureNetCapacity}\nRecharge {_player.CaptureNetRechargeSeconds:0.0}s"));
 		AddTerm(_skillGemFlow, LocaleText.T("player.skill.sprint"), () =>
-			(LocaleText.T("player.skill.sprint"), $"{LocaleText.T("stat.speed")} {_player.WalkSpeed:0.0} -> {_player.SprintSpeed:0.0}\nJump {_player.JumpVelocity:0.0}"));
+			(LocaleText.T("player.skill.sprint"), $"{LocaleText.T("stat.move_speed")} {_player.WalkSpeed:0.0} -> {_player.SprintSpeed:0.0}\nJump {_player.JumpVelocity:0.0}"));
 	}
 
 	private void SetPetSectionsVisible(bool visible)
@@ -347,7 +349,7 @@ public partial class CompanionInfoCard : PanelContainer
 		CompanionIdentity identity = BuildCatalog.GetIdentity(_actor);
 		string value = traitKey switch
 		{
-			"identity.passive.move_speed" => $"{LocaleText.T("stat.speed")} +{(identity.MoveSpeedMultiplier - 1.0f) * 100.0f:0.#}%\n{_actor.MoveSpeed:0.0} -> {_actor.MoveSpeed * identity.MoveSpeedMultiplier:0.0}",
+			"identity.passive.move_speed" => $"{LocaleText.T("stat.move_speed")} +{(identity.MoveSpeedMultiplier - 1.0f) * 100.0f:0.#}%\n{_actor.MoveSpeed:0.0} -> {_actor.MoveSpeed * identity.MoveSpeedMultiplier:0.0}",
 			"identity.passive.crit_rate" => $"{LocaleText.T("tooltip.crit_chance")} +{identity.CritChanceBonus * 100.0f:0.#}%\n{LocaleText.T("tooltip.attack_cooldown")} {(1.0f - identity.AttackCooldownMultiplier) * 100.0f:0.#}%",
 			"identity.passive.water_damage" or "identity.passive.fire_damage" => $"{LocaleText.T($"element.{identity.ElementAffinityId}")} +{(identity.ElementAffinityDamageMultiplier - 1.0f) * 100.0f:0.#}%\n{LocaleText.T("stat.attack")} x{identity.AttackMultiplier:0.00}",
 			"identity.passive.water_aoe" or "identity.passive.attack_range" => $"{LocaleText.T("tooltip.attack_range")} +{identity.AttackRangeBonus:0.0}\n{_actor.AttackRange:0.0} -> {_actor.AttackRange + identity.AttackRangeBonus:0.0}",
@@ -355,9 +357,9 @@ public partial class CompanionInfoCard : PanelContainer
 			"identity.passive.power_strike" => $"{LocaleText.T("stat.attack")} +{identity.AttackBonus}\n{_actor.Attack} -> {_actor.Attack + identity.AttackBonus}",
 			"identity.passive.thick_hide" => $"HP +{(identity.MaxHealthMultiplier - 1.0f) * 100.0f:0.#}%\n{LocaleText.T("stat.defense")} +{(identity.DefenseMultiplier - 1.0f) * 100.0f:0.#}%",
 			"identity.passive.poison_mastery" => $"{LocaleText.T("stat.attack")} +{identity.AttackBonus}\n{LocaleText.T("element.poison")} +{(identity.ElementAffinityDamageMultiplier - 1.0f) * 100.0f:0.#}%",
-			"identity.passive.agility" => $"{LocaleText.T("stat.speed")} +{(identity.MoveSpeedMultiplier - 1.0f) * 100.0f:0.#}%\n{_actor.MoveSpeed:0.0} -> {_actor.MoveSpeed * identity.MoveSpeedMultiplier:0.0}",
+			"identity.passive.agility" => $"{LocaleText.T("stat.move_speed")} +{(identity.MoveSpeedMultiplier - 1.0f) * 100.0f:0.#}%\n{_actor.MoveSpeed:0.0} -> {_actor.MoveSpeed * identity.MoveSpeedMultiplier:0.0}",
 			"identity.passive.guard_oath" => $"HP +{identity.MaxHealthBonus}\n{LocaleText.T("stat.defense")} +{identity.DefenseBonus}",
-			"identity.passive.adaptable" => $"HP +{identity.MaxHealthBonus}\n{LocaleText.T("stat.attack")} +{identity.AttackBonus}\n{LocaleText.T("stat.defense")} +{identity.DefenseBonus}\n{LocaleText.T("stat.speed")} +{(identity.MoveSpeedMultiplier - 1.0f) * 100.0f:0.#}%",
+			"identity.passive.adaptable" => $"HP +{identity.MaxHealthBonus}\n{LocaleText.T("stat.attack")} +{identity.AttackBonus}\n{LocaleText.T("stat.defense")} +{identity.DefenseBonus}\n{LocaleText.T("stat.move_speed")} +{(identity.MoveSpeedMultiplier - 1.0f) * 100.0f:0.#}%",
 			_ => LocaleText.T(traitKey),
 		};
 		return (LocaleText.T(traitKey), value);
@@ -453,7 +455,8 @@ public partial class CompanionInfoCard : PanelContainer
 			$"HP {_actor.MaxHealth} -> {_actor.EffectiveMaxHealth}",
 			$"{LocaleText.T("stat.attack")} {_actor.Attack} -> {_actor.EffectiveAttack}",
 			$"{LocaleText.T("stat.defense")} {_actor.Defense} -> {_actor.EffectiveDefense}",
-			$"{LocaleText.T("stat.speed")} {_actor.MoveSpeed:0.0} -> {_actor.EffectiveMoveSpeed:0.0}",
+			$"{LocaleText.T("stat.move_speed")} {_actor.MoveSpeed:0.0} -> {_actor.EffectiveMoveSpeed:0.0}",
+			$"{LocaleText.T("stat.attack_speed")} {GetAttackSpeed(_actor.AttackCooldown):0.00} -> {GetAttackSpeed(_actor.EffectiveAttackCooldown):0.00}",
 			$"{LocaleText.T("tooltip.crit_chance")} {stats.CritChance * 100.0f:0.#}%",
 			$"{LocaleText.T("tooltip.life_steal")} {stats.LifeStealPercent * 100.0f:0.#}%",
 			$"{LocaleText.T("tooltip.control_chance")} {stats.ControlChance * 100.0f:0.#}%"));
@@ -508,6 +511,11 @@ public partial class CompanionInfoCard : PanelContainer
 		label.AddThemeFontSizeOverride("font_size", fontSize);
 		label.AddThemeColorOverride("font_color", color);
 		return label;
+	}
+
+	private static float GetAttackSpeed(float attackCooldown)
+	{
+		return 1.0f / Mathf.Max(attackCooldown, 0.01f);
 	}
 
 	private static Label MakeLabel(int fontSize, Color color, string textKey)
