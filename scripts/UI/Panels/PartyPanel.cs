@@ -165,6 +165,10 @@ public partial class PartyPanel : PanelContainer
 		root.AddChild(content);
 
 		var listPanel = MakeSection();
+		// The roster labels share the exact same left baseline as the panel title.
+		// The detail panel keeps its inset, but the left roster must not add another
+		// section margin on top of the root margin.
+		listPanel.AddThemeConstantOverride("margin_left", 0);
 		listPanel.CustomMinimumSize = new Vector2(300.0f, 0.0f);
 		content.AddChild(listPanel);
 
@@ -176,6 +180,7 @@ public partial class PartyPanel : PanelContainer
 		listPanel.AddChild(scroll);
 
 		_memberList = new VBoxContainer();
+		_memberList.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		_memberList.AddThemeConstantOverride("separation", 8);
 		scroll.AddChild(_memberList);
 
@@ -249,12 +254,30 @@ public partial class PartyPanel : PanelContainer
 			Text = text,
 			Alignment = HorizontalAlignment.Left,
 			CustomMinimumSize = new Vector2(0.0f, 38.0f),
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 		};
+		button.AddThemeStyleboxOverride("normal", MakeRosterButtonStyle(selected
+			? new Color(0.13f, 0.17f, 0.21f, 0.82f)
+			: Colors.Transparent));
+		button.AddThemeStyleboxOverride("hover", MakeRosterButtonStyle(new Color(0.17f, 0.22f, 0.27f, 0.90f)));
+		button.AddThemeStyleboxOverride("pressed", MakeRosterButtonStyle(new Color(0.21f, 0.27f, 0.33f, 0.94f)));
+		button.AddThemeStyleboxOverride("focus", MakeRosterButtonStyle(Colors.Transparent));
 		button.AddThemeFontSizeOverride("font_size", 14);
 		button.AddThemeColorOverride("font_color", selected ? new Color(1.0f, 0.94f, 0.68f) : new Color(0.9f, 0.94f, 0.98f));
 		button.Pressed += onPressed;
 		button.GuiInput += inputEvent => OnMemberButtonGuiInput(inputEvent, actor);
 		_memberList.AddChild(button);
+	}
+
+	private static StyleBoxFlat MakeRosterButtonStyle(Color background)
+	{
+		var style = new StyleBoxFlat { BgColor = background };
+		style.SetContentMargin(Side.Left, 0.0f);
+		style.SetContentMargin(Side.Right, 8.0f);
+		style.SetContentMargin(Side.Top, 5.0f);
+		style.SetContentMargin(Side.Bottom, 5.0f);
+		style.SetCornerRadiusAll(4);
+		return style;
 	}
 
 	private static Button AddBuildButton(GridContainer parent, System.Action onPressed)
