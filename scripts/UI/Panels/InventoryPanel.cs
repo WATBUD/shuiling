@@ -67,21 +67,32 @@ public partial class InventoryPanel : PanelContainer
 		Materials,
 	}
 
+	private enum InventorySortMode
+	{
+		Category,
+		Name,
+		Quantity,
+	}
+
 	private PlayerController? _player;
 	private SimpleActor? _selectedActor;
 	private EquipTarget _selectedTarget = EquipTarget.Weapon;
 	private int _selectedSupportIndex;
 	private InventoryCategory _selectedCategory = InventoryCategory.All;
+	private InventorySortMode _selectedSortMode = InventorySortMode.Quantity;
+	private bool _sortAscending;
 	private string _selectedItemId = string.Empty;
 	private readonly Dictionary<InventoryCategory, Button> _categoryButtons = new();
 	private VBoxContainer _companionList = null!;
 	private GridContainer _itemGrid = null!;
 	private Label _titleLabel = null!;
 	private Label _goldLabel = null!;
-	private Label _selectedSlotLabel = null!;
 	private Label _buildSummaryLabel = null!;
 	private CompanionInfoCard _companionInfoCard = null!;
 	private Label _bagCountLabel = null!;
+	private Label _sortLabel = null!;
+	private OptionButton _sortOption = null!;
+	private Button _sortDirectionButton = null!;
 	private Label _itemDetailTitleLabel = null!;
 	private Label _itemDetailBodyLabel = null!;
 	private Button _equipSelectedButton = null!;
@@ -270,9 +281,6 @@ public partial class InventoryPanel : PanelContainer
 			_supportButtons.Add(AddSupportSlotButton(slotGrid, index));
 		}
 
-		_selectedSlotLabel = MakeLabel(14, new Color(0.98f, 0.98f, 0.98f));
-		buildSection.AddChild(_selectedSlotLabel);
-
 		var infoHeader = MakeLabel(15, new Color(0.86f, 0.92f, 0.98f));
 		infoHeader.Text = LocaleText.T("inventory.companion_info");
 		buildSection.AddChild(infoHeader);
@@ -295,6 +303,31 @@ public partial class InventoryPanel : PanelContainer
 		AddCategoryButton(tabRow, InventoryCategory.Equipment, "inventory.tab.equipment");
 		AddCategoryButton(tabRow, InventoryCategory.Gems, "inventory.tab.gems");
 		AddCategoryButton(tabRow, InventoryCategory.Materials, "inventory.tab.materials");
+
+		var sortRow = new HBoxContainer();
+		sortRow.AddThemeConstantOverride("separation", 8);
+		itemSection.AddChild(sortRow);
+		_sortLabel = MakeLabel(13, new Color(0.76f, 0.84f, 0.90f));
+		_sortLabel.VerticalAlignment = VerticalAlignment.Center;
+		_sortLabel.CustomMinimumSize = new Vector2(52.0f, 32.0f);
+		sortRow.AddChild(_sortLabel);
+		_sortOption = new OptionButton
+		{
+			CustomMinimumSize = new Vector2(0.0f, 32.0f),
+			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+		};
+		_sortOption.AddThemeFontSizeOverride("font_size", 13);
+		_sortOption.AddItem(LocaleText.T("inventory.sort.category"), (int)InventorySortMode.Category);
+		_sortOption.AddItem(LocaleText.T("inventory.sort.name"), (int)InventorySortMode.Name);
+		_sortOption.AddItem(LocaleText.T("inventory.sort.quantity"), (int)InventorySortMode.Quantity);
+		_sortOption.Select((int)_selectedSortMode);
+		_sortOption.ItemSelected += OnSortModeSelected;
+		sortRow.AddChild(_sortOption);
+		_sortDirectionButton = MakeButton(string.Empty);
+		_sortDirectionButton.CustomMinimumSize = new Vector2(42.0f, 32.0f);
+		_sortDirectionButton.AddThemeFontSizeOverride("font_size", 18);
+		_sortDirectionButton.Pressed += ToggleSortDirection;
+		sortRow.AddChild(_sortDirectionButton);
 
 		_bagCountLabel = MakeLabel(13, new Color(0.72f, 0.80f, 0.86f));
 		itemSection.AddChild(_bagCountLabel);
@@ -1094,6 +1127,40 @@ public partial class InventoryPanel : PanelContainer
 		}
 	}
 
+	private void OnSortModeSelected(long itemIndex)
+	{
+		if (_sortOption == null || itemIndex < 0 || itemIndex >= _sortOption.ItemCount)
+		{
+			return;
+		}
+
+		InventorySortMode nextMode = (InventorySortMode)_sortOption.GetItemId((int)itemIndex);
+		if (_selectedSortMode != nextMode)
+		{
+			_selectedSortMode = nextMode;
+			// RPG inventory convention: names/types read forward, while quantities
+			// start with the largest stack. The arrow remains available to reverse it.
+			_sortAscending = nextMode != InventorySortMode.Quantity;
+			RefreshSortDirectionButton();
+		}
+		RefreshItemList();
+	}
+
+	private void ToggleSortDirection()
+	{
+		_sortAscending = !_sortAscending;
+		RefreshSortDirectionButton();
+		RefreshItemList();
+	}
+
+	private void RefreshSortDirectionButton()
+	{
+		_sortDirectionButton.Text = _sortAscending ? "↑" : "↓";
+		_sortDirectionButton.TooltipText = LocaleText.T(_sortAscending
+			? "inventory.sort.ascending"
+			: "inventory.sort.descending");
+	}
+
 	private int SelectedSkillSlotIndex()
 	{
 		return _selectedTarget == EquipTarget.SupportCore ? _selectedSupportIndex : -1;
@@ -1269,13 +1336,50 @@ public partial class InventoryPanel : PanelContainer
 		};
 	}
 
-	private static void SortItemIds(List<string> itemIds)
+	private void SortItemIds(List<string> itemIds)
 	{
 		itemIds.Sort((left, right) =>
 		{
-			int categoryCompare = GetSortCategory(left).CompareTo(GetSortCategory(right));
-			return categoryCompare != 0 ? categoryCompare : string.Compare(GetInventoryItemName(left), GetInventoryItemName(right), System.StringComparison.Ordinal);
+			int primaryCompare = _selectedSortMode switch
+			{
+				InventorySortMode.Name => CompareItemNames(left, right),
+				InventorySortMode.Quantity => CompareItemQuantities(left, right),
+				_ => CompareItemCategories(left, right),
+			};
+			int result = primaryCompare != 0 ? primaryCompare : CompareItemStable(left, right);
+			return _sortAscending ? result : -result;
 		});
+	}
+
+	private int CompareItemQuantities(string left, string right)
+	{
+		int leftCount = _player?.GetInventoryCount(left) ?? 0;
+		int rightCount = _player?.GetInventoryCount(right) ?? 0;
+		int quantityCompare = leftCount.CompareTo(rightCount);
+		return quantityCompare != 0 ? quantityCompare : CompareItemCategories(left, right);
+	}
+
+	private static int CompareItemCategories(string left, string right)
+	{
+		int categoryCompare = GetSortCategory(left).CompareTo(GetSortCategory(right));
+		if (categoryCompare != 0)
+		{
+			return categoryCompare;
+		}
+
+		int subcategoryCompare = GetSortSubcategory(left).CompareTo(GetSortSubcategory(right));
+		return subcategoryCompare != 0 ? subcategoryCompare : CompareItemNames(left, right);
+	}
+
+	private static int CompareItemNames(string left, string right)
+	{
+		return string.Compare(GetInventoryItemName(left), GetInventoryItemName(right), StringComparison.CurrentCulture);
+	}
+
+	private static int CompareItemStable(string left, string right)
+	{
+		int categoryCompare = CompareItemCategories(left, right);
+		return categoryCompare != 0 ? categoryCompare : string.Compare(left, right, StringComparison.Ordinal);
 	}
 
 	private static int GetSortCategory(string itemId)
@@ -1288,8 +1392,27 @@ public partial class InventoryPanel : PanelContainer
 		return BuildCatalog.GetItemKind(itemId) switch
 		{
 			InventoryItemKind.Equipment => 0,
-			InventoryItemKind.AttributeGem => 1,
+			InventoryItemKind.SkillGem when BuildCatalog.IsMainAttackCore(itemId) => 1,
 			InventoryItemKind.SkillGem => 2,
+			InventoryItemKind.AttributeGem => 2,
+			_ => 9,
+		};
+	}
+
+	private static int GetSortSubcategory(string itemId)
+	{
+		if (MonsterLootCatalog.IsMonsterLoot(itemId) || BuildCatalog.GetItemKind(itemId) != InventoryItemKind.Equipment)
+		{
+			return 0;
+		}
+
+		return BuildCatalog.GetEquipment(itemId).Slot switch
+		{
+			EquipmentSlot.Helmet => 0,
+			EquipmentSlot.Weapon => 1,
+			EquipmentSlot.Armor => 2,
+			EquipmentSlot.Boots => 3,
+			EquipmentSlot.Accessory => 4,
 			_ => 9,
 		};
 	}
@@ -1399,7 +1522,6 @@ public partial class InventoryPanel : PanelContainer
 		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
 		{
 			_companionInfoCard.SetActor(null);
-			_selectedSlotLabel.Text = string.Empty;
 			_buildSummaryLabel.Text = string.Empty;
 			return;
 		}
@@ -1410,7 +1532,6 @@ public partial class InventoryPanel : PanelContainer
 			"build.core_chain",
 			string.IsNullOrEmpty(coreChain) ? LocaleText.T("gem.skill.none") : coreChain);
 		_buildSummaryLabel.AddThemeColorOverride("font_color", new Color(0.74f, 0.83f, 0.90f));
-		_selectedSlotLabel.Text = LocaleText.F("inventory.selected_slot", GetTargetName(_selectedTarget));
 	}
 
 	private void ShowTooltipForTarget(EquipTarget target)
@@ -1466,24 +1587,32 @@ public partial class InventoryPanel : PanelContainer
 	public static string BuildItemTooltipBody(string itemId, string slotName)
 	{
 		var lines = new List<string>();
-		if (!MonsterLootCatalog.IsMonsterLoot(itemId) && BuildCatalog.GetItemKind(itemId) == InventoryItemKind.SkillGem)
+		if (MonsterLootCatalog.IsMonsterLoot(itemId))
+		{
+			lines.Add(LocaleText.T("tooltip.type.material"));
+		}
+		else if (BuildCatalog.GetItemKind(itemId) == InventoryItemKind.Equipment)
+		{
+			EquipmentDefinition equipment = BuildCatalog.GetEquipment(itemId);
+			lines.Add(LocaleText.F("tooltip.equipment_slot", LocaleText.T(GetEquipmentSlotKey(equipment.Slot))));
+		}
+		else if (BuildCatalog.GetItemKind(itemId) == InventoryItemKind.SkillGem)
 		{
 			lines.Add(itemId == "gem.skill.none"
 				? slotName
-				: LocaleText.T(BuildCatalog.IsMainAttackCore(itemId)
-					? "build.slot.main_core"
-					: "build.slot.support_core_plain"));
+				: LocaleText.F(
+					"tooltip.core_role",
+					LocaleText.T(BuildCatalog.IsMainAttackCore(itemId)
+						? "tooltip.core_role.attack"
+						: "tooltip.core_role.support")));
 		}
-		else if (!MonsterLootCatalog.IsMonsterLoot(itemId) && BuildCatalog.GetItemKind(itemId) == InventoryItemKind.AttributeGem)
+		else if (BuildCatalog.GetItemKind(itemId) == InventoryItemKind.AttributeGem)
 		{
-			lines.Add(LocaleText.T("build.slot.attribute"));
+			lines.Add(LocaleText.F("tooltip.core_role", LocaleText.T("tooltip.core_role.support")));
 		}
 		else
 		{
-			string itemKind = LocaleText.T(GetItemKindKey(itemId));
-			lines.Add(string.IsNullOrWhiteSpace(slotName)
-				? itemKind
-				: LocaleText.F("tooltip.meta_line", slotName, itemKind));
+			lines.Add(LocaleText.T(GetItemKindKey(itemId)));
 		}
 
 		if (MonsterLootCatalog.IsMonsterLoot(itemId))
@@ -1542,6 +1671,19 @@ public partial class InventoryPanel : PanelContainer
 			InventoryItemKind.AttributeGem => "tooltip.type.attribute",
 			InventoryItemKind.SkillGem => "tooltip.type.skill",
 			_ => "tooltip.type.skill",
+		};
+	}
+
+	private static string GetEquipmentSlotKey(EquipmentSlot slot)
+	{
+		return slot switch
+		{
+			EquipmentSlot.Helmet => "build.slot.helmet",
+			EquipmentSlot.Weapon => "build.slot.weapon",
+			EquipmentSlot.Armor => "build.slot.armor",
+			EquipmentSlot.Boots => "build.slot.boots",
+			EquipmentSlot.Accessory => "build.slot.accessory",
+			_ => "tooltip.type.equipment",
 		};
 	}
 
@@ -1691,6 +1833,11 @@ public partial class InventoryPanel : PanelContainer
 		{
 			materialsButton.Text = LocaleText.T("inventory.tab.materials");
 		}
+		_sortLabel.Text = LocaleText.T("inventory.sort.label");
+		_sortOption.SetItemText((int)InventorySortMode.Category, LocaleText.T("inventory.sort.category"));
+		_sortOption.SetItemText((int)InventorySortMode.Name, LocaleText.T("inventory.sort.name"));
+		_sortOption.SetItemText((int)InventorySortMode.Quantity, LocaleText.T("inventory.sort.quantity"));
+		RefreshSortDirectionButton();
 		_equipSelectedButton.Text = LocaleText.T("inventory.action.equip");
 		_useSelectedButton.Text = LocaleText.T("inventory.action.use");
 	}
