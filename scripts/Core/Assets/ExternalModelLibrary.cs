@@ -128,6 +128,7 @@ public static class ExternalModelLibrary
 		{
 			"wild_marsh" => new Vector3(0.96f, 0.96f, 0.96f),
 			"wild_badlands" => new Vector3(1.12f, 1.12f, 1.12f),
+			"wild_snow" => new Vector3(1.08f, 1.08f, 1.08f),
 			_ => new Vector3(1.04f, 1.04f, 1.04f),
 		};
 	}

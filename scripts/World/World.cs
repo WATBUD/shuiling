@@ -100,6 +100,7 @@ public partial class World : Node3D
 		new("wild_forest", "map.wild.forest", "WildForestMap", new Color(0.24f, 0.46f, 0.29f)),
 		new("wild_marsh", "map.wild.marsh", "WildMarshMap", new Color(0.18f, 0.38f, 0.34f)),
 		new("wild_badlands", "map.wild.badlands", "WildBadlandsMap", new Color(0.42f, 0.30f, 0.20f)),
+		new("wild_snow", "map.wild.snow", "WildSnowMap", new Color(0.76f, 0.84f, 0.90f)),
 	};
 
 	private readonly record struct WildMapDefinition(string Id, string NameKey, string RootName, Color GroundColor);
@@ -436,6 +437,25 @@ public partial class World : Node3D
 				}
 			}
 			return;
+		}
+
+		if (mapId == "wild_snow")
+		{
+			Material snow = MakeMaterial(new Color(0.86f, 0.92f, 0.97f));
+			Material ice = MakeMaterial(new Color(0.52f, 0.78f, 0.92f, 0.88f));
+			CreateTerrainPatch("SnowFieldNorth", new Vector3(-24.0f, 0.0f, -32.0f), 34.0f, new Vector3(1.55f, 1.0f, 0.92f), 12.0f, snow, 0.066f);
+			CreateTerrainPatch("SnowFieldSouth", new Vector3(28.0f, 0.0f, 34.0f), 35.0f, new Vector3(1.48f, 1.0f, 0.90f), -16.0f, snow, 0.066f);
+			CreateTerrainPatch("FrozenLake", new Vector3(30.0f, 0.0f, -28.0f), 17.0f, new Vector3(1.25f, 1.0f, 0.62f), -18.0f, ice, 0.072f);
+			for (int index = 0; index < 18; index++)
+			{
+				Vector3 position = new((float)_rng.RandfRange(-64.0f, 64.0f), 0.0f, (float)_rng.RandfRange(-64.0f, 64.0f));
+				if (position.DistanceTo(Vector3.Zero) > 14.0f && IsPositionClear(position, 3.0f))
+				{
+					CreateRock(position);
+					CreateTerrainPatch($"SnowDrift{index}", position, (float)_rng.RandfRange(3.5f, 7.0f), new Vector3(1.3f, 1.0f, 0.62f), index * 19.0f, snow, 0.07f);
+					_obstaclePositions.Add(position);
+				}
+			}
 		}
 	}
 

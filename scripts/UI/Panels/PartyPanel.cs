@@ -382,7 +382,7 @@ public partial class PartyPanel : PanelContainer
 		if (_player.IsInActiveParty(actor))
 		{
 			_memberContextMenu.AddItem(LocaleText.T("button.store"), 1);
-			_memberContextMenu.AddItem(_player.IsMountedCompanion(actor) ? "解除騎乘" : "騎乘這隻寵物", 6);
+			_memberContextMenu.AddItem(_player.IsMountedCompanion(actor) ? "解除騎乘" : "騎乘這位夥伴", 6);
 			_memberContextMenu.SetItemDisabled(_memberContextMenu.GetItemIndex(6), actor.IsDefeated);
 		}
 		else
