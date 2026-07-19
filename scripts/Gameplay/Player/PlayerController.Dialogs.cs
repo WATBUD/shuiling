@@ -141,7 +141,7 @@ public partial class PlayerController
 
 		_acceptedNpcQuests.Add(actor);
 		string questItemId = GetNpcQuestItemId(actor);
-		PostSystemMessage(LocaleText.F("system.npc.task_posted", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, GetInventoryItemDisplayName(questItemId)), new Color(0.82f, 0.92f, 1.0f));
+		PostSystemMessage(LocaleText.F("system.npc.task_posted", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, GetInventoryItemDisplayName(questItemId)), new Color(0.82f, 0.92f, 1.0f), GameMessageChannel.Party);
 		CloseNpcQuestDialog();
 	}
 
@@ -150,7 +150,7 @@ public partial class PlayerController
 		SimpleActor? actor = _pendingQuestNpc;
 		if (actor != null && IsInstanceValid(actor))
 		{
-			PostSystemMessage(LocaleText.F("system.npc.task_declined", actor.LocalizedDisplayName), new Color(0.82f, 0.86f, 0.92f));
+			PostSystemMessage(LocaleText.F("system.npc.task_declined", actor.LocalizedDisplayName), new Color(0.82f, 0.86f, 0.92f), GameMessageChannel.Party);
 		}
 
 		CloseNpcQuestDialog();

@@ -28,6 +28,9 @@ public partial class SettingsPanel : PanelContainer
 	private Button _godViewCameraButton = null!;
 	private HSlider _damageTextScaleSlider = null!;
 	private Label _damageTextScaleValueLabel = null!;
+	private CheckButton _bossAnnouncementToggle = null!;
+	private HSlider _bossAnnouncementOpacitySlider = null!;
+	private Label _bossAnnouncementOpacityValueLabel = null!;
 	private VBoxContainer _settingsRows = null!;
 	private readonly Dictionary<SettingsCategory, Button> _categoryButtons = new();
 	private SettingsCategory _selectedCategory = SettingsCategory.Language;
@@ -159,6 +162,9 @@ public partial class SettingsPanel : PanelContainer
 		_godViewCameraButton = null!;
 		_damageTextScaleSlider = null!;
 		_damageTextScaleValueLabel = null!;
+		_bossAnnouncementToggle = null!;
+		_bossAnnouncementOpacitySlider = null!;
+		_bossAnnouncementOpacityValueLabel = null!;
 
 		switch (_selectedCategory)
 		{
@@ -247,6 +253,32 @@ public partial class SettingsPanel : PanelContainer
 		_damageTextScaleValueLabel.HorizontalAlignment = HorizontalAlignment.Right;
 		damageTextControl.AddChild(_damageTextScaleValueLabel);
 		AddSettingRow(section, "ui.damage_text_size", damageTextControl);
+
+		_bossAnnouncementToggle = new CheckButton
+		{
+			Text = LocaleText.T("ui.boss_announcement_show"),
+			CustomMinimumSize = new Vector2(230.0f, 36.0f),
+		};
+		_bossAnnouncementToggle.Toggled += OnBossAnnouncementToggled;
+		AddSettingRow(section, "ui.boss_announcement", _bossAnnouncementToggle);
+
+		var bossOpacityControl = new HBoxContainer();
+		bossOpacityControl.AddThemeConstantOverride("separation", 12);
+		_bossAnnouncementOpacitySlider = new HSlider
+		{
+			MinValue = 0.20,
+			MaxValue = 1.0,
+			Step = 0.05,
+			CustomMinimumSize = new Vector2(230.0f, 36.0f),
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		_bossAnnouncementOpacitySlider.ValueChanged += OnBossAnnouncementOpacityChanged;
+		bossOpacityControl.AddChild(_bossAnnouncementOpacitySlider);
+		_bossAnnouncementOpacityValueLabel = MakeLabel(string.Empty, 15, new Color(1.0f, 0.92f, 0.66f));
+		_bossAnnouncementOpacityValueLabel.CustomMinimumSize = new Vector2(64.0f, 36.0f);
+		_bossAnnouncementOpacityValueLabel.HorizontalAlignment = HorizontalAlignment.Right;
+		bossOpacityControl.AddChild(_bossAnnouncementOpacityValueLabel);
+		AddSettingRow(section, "ui.boss_announcement_opacity", bossOpacityControl);
 	}
 
 	private void BuildShortcutSection(VBoxContainer rows)
@@ -320,6 +352,45 @@ public partial class SettingsPanel : PanelContainer
 		if (_damageTextScaleSlider != null)
 		{
 			SyncDamageTextScale();
+		}
+
+		if (_bossAnnouncementToggle != null && _bossAnnouncementOpacitySlider != null)
+		{
+			SyncBossAnnouncementSettings();
+		}
+	}
+
+	private void SyncBossAnnouncementSettings()
+	{
+		bool enabled = _player?.BossAnnouncementsEnabled ?? true;
+		float opacity = _player?.BossAnnouncementOpacity ?? 0.90f;
+		_bossAnnouncementToggle.SetPressedNoSignal(enabled);
+		_bossAnnouncementOpacitySlider.SetValueNoSignal(opacity);
+		_bossAnnouncementOpacitySlider.Editable = enabled;
+		UpdateBossAnnouncementOpacityLabel(opacity);
+	}
+
+	private void OnBossAnnouncementToggled(bool enabled)
+	{
+		_player?.SetBossAnnouncementsEnabled(enabled);
+		if (_bossAnnouncementOpacitySlider != null)
+		{
+			_bossAnnouncementOpacitySlider.Editable = enabled;
+		}
+	}
+
+	private void OnBossAnnouncementOpacityChanged(double value)
+	{
+		float opacity = (float)value;
+		_player?.SetBossAnnouncementOpacity(opacity);
+		UpdateBossAnnouncementOpacityLabel(opacity);
+	}
+
+	private void UpdateBossAnnouncementOpacityLabel(float opacity)
+	{
+		if (_bossAnnouncementOpacityValueLabel != null)
+		{
+			_bossAnnouncementOpacityValueLabel.Text = LocaleText.F("ui.opacity_value", Mathf.RoundToInt(opacity * 100.0f));
 		}
 	}
 

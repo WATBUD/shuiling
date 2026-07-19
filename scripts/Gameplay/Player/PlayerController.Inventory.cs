@@ -28,7 +28,7 @@ public partial class PlayerController
 		}
 
 		Gold += gainedGold;
-		PostSystemMessage(LocaleText.F("system.pickup.gold", gainedGold, Gold), new Color(1.0f, 0.82f, 0.26f));
+		PostSystemMessage(LocaleText.F("system.pickup.gold", gainedGold, Gold), new Color(1.0f, 0.82f, 0.26f), GameMessageChannel.Loot);
 		_mercenaryShopPanel?.RefreshAll();
 	}
 
@@ -41,7 +41,7 @@ public partial class PlayerController
 
 		_inventoryItems.TryGetValue(itemId, out int currentCount);
 		_inventoryItems[itemId] = Mathf.Max(currentCount + amount, 0);
-		PostSystemMessage(LocaleText.F("system.pickup.item", GetInventoryItemDisplayName(itemId), Mathf.Max(amount, 0)), new Color(1.0f, 0.88f, 0.48f));
+		PostSystemMessage(LocaleText.F("system.pickup.item", GetInventoryItemDisplayName(itemId), Mathf.Max(amount, 0)), new Color(1.0f, 0.88f, 0.48f), GameMessageChannel.Loot);
 		if (_inventoryPanel != null)
 		{
 			_inventoryPanel.RefreshAll();
@@ -95,7 +95,7 @@ public partial class PlayerController
 			_inventoryItems[itemId] = nextCount;
 		}
 
-		PostSystemMessage(LocaleText.F("system.item.used", GetInventoryItemDisplayName(itemId), requestedAmount), new Color(0.72f, 0.88f, 1.0f));
+		PostSystemMessage(LocaleText.F("system.item.used", GetInventoryItemDisplayName(itemId), requestedAmount), new Color(0.72f, 0.88f, 1.0f), GameMessageChannel.Loot);
 		if (_inventoryPanel != null)
 		{
 			_inventoryPanel.RefreshAll();
@@ -143,7 +143,7 @@ public partial class PlayerController
 		SkillGemUpgradeCost? maybeCost = GetCompanionSkillGemUpgradeCost(actor, slot);
 		if (maybeCost is not SkillGemUpgradeCost cost)
 		{
-			PostSystemMessage(LocaleText.T("system.gem.max_level"), new Color(1.0f, 0.82f, 0.42f));
+			PostSystemMessage(LocaleText.T("system.gem.max_level"), new Color(1.0f, 0.82f, 0.42f), GameMessageChannel.Loot);
 			return false;
 		}
 
@@ -151,7 +151,8 @@ public partial class PlayerController
 		{
 			PostSystemMessage(
 				LocaleText.F("system.gem.upgrade_not_enough", cost.Gold, cost.MaterialCount, GetInventoryItemDisplayName(cost.MaterialId)),
-				new Color(1.0f, 0.62f, 0.48f));
+				new Color(1.0f, 0.62f, 0.48f),
+				GameMessageChannel.Loot);
 			return false;
 		}
 
@@ -159,7 +160,7 @@ public partial class PlayerController
 		TryConsumeInventoryItem(cost.MaterialId, cost.MaterialCount);
 		int newLevel = actor.RaiseSkillGemLevel(slot);
 		string gemName = LocaleText.T(BuildCatalog.GetSkillGem(actor.BuildLoadout.SkillGemIds[slot]).NameKey);
-		PostSystemMessage(LocaleText.F("system.gem.upgraded", gemName, newLevel), new Color(0.62f, 1.0f, 0.68f));
+		PostSystemMessage(LocaleText.F("system.gem.upgraded", gemName, newLevel), new Color(0.62f, 1.0f, 0.68f), GameMessageChannel.Loot);
 		_inventoryPanel?.RefreshAll();
 		return true;
 	}
@@ -200,6 +201,7 @@ public partial class PlayerController
 
 		_worldDropCollectRefreshRemaining = WorldDropCollectRefreshSeconds;
 		CollectNearbyWorldDrops();
+		CollectNearbyFallenCompanions();
 	}
 
 	private static string GetInventoryItemDisplayName(string itemId)

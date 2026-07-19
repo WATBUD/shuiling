@@ -14,7 +14,7 @@ public partial class PlayerController
 
 		_capturedCollection.Add(actor);
 		actor.Recruit(this);
-		PostSystemMessage(LocaleText.F("system.npc.joined", actor.LocalizedDisplayName), new Color(0.62f, 1.0f, 0.78f));
+		PostSystemMessage(LocaleText.F("system.npc.joined", actor.LocalizedDisplayName), new Color(0.62f, 1.0f, 0.78f), GameMessageChannel.Party);
 
 		if (_activeParty.Count < ActivePartyLimit)
 		{
@@ -76,7 +76,7 @@ public partial class PlayerController
 
 	public bool DeployCompanion(SimpleActor actor, bool replaceLastIfFull)
 	{
-		if (!_capturedCollection.Contains(actor))
+		if (!_capturedCollection.Contains(actor) || actor.IsDefeated || actor.IsAwaitingRecovery)
 		{
 			return false;
 		}
@@ -133,34 +133,105 @@ public partial class PlayerController
 		return true;
 	}
 
+	public void OnCompanionFallen(SimpleActor actor)
+	{
+		if (!IsInstanceValid(actor) || !_capturedCollection.Contains(actor))
+		{
+			return;
+		}
+
+		bool removed = _activeParty.Remove(actor);
+		if (_mountedCompanion == actor)
+		{
+			actor.SetMountedByPlayer(false);
+			_mountedCompanion = null;
+			UpdateMountedVisualOffset();
+		}
+
+		ClearFormationAssignment(actor);
+		if (removed)
+		{
+			ReassignFollowSlots();
+		}
+		RecalculateFormationBonuses();
+		_partyPanel.RefreshParty();
+		_formationPanel.RefreshAll();
+		PostSystemMessage(
+			LocaleText.F("system.companion.fallen_recover", actor.LocalizedDisplayName),
+			new Color(1.0f, 0.58f, 0.42f),
+			GameMessageChannel.Party);
+	}
+
+	private void CollectNearbyFallenCompanions()
+	{
+		foreach (SimpleActor actor in _capturedCollection)
+		{
+			if (!IsInstanceValid(actor)
+				|| !actor.TryRecoverFallenCompanion(this, FallenCompanionPickupRadius))
+			{
+				continue;
+			}
+
+			PostSystemMessage(
+				LocaleText.F("system.companion.recovered", actor.LocalizedDisplayName),
+				new Color(0.56f, 1.0f, 0.76f),
+				GameMessageChannel.Party);
+			_partyPanel.RefreshParty();
+			_formationPanel.RefreshAll();
+			_inventoryPanel.RefreshAll();
+		}
+	}
+
+	public void RefreshFallenCompanionMapVisibility(string activeMapId)
+	{
+		foreach (SimpleActor actor in _capturedCollection)
+		{
+			if (IsInstanceValid(actor))
+			{
+				actor.UpdateFallenMapVisibility(activeMapId);
+			}
+		}
+	}
+
 	public int ReviveDefeatedCompanions()
 	{
 		int fallenCount = 0;
+		int awaitingRecoveryCount = 0;
 		foreach (SimpleActor actor in _capturedCollection)
 		{
 			if (IsInstanceValid(actor) && actor.IsDefeated)
 			{
-				fallenCount++;
+				if (actor.IsAwaitingRecovery)
+				{
+					awaitingRecoveryCount++;
+				}
+				else
+				{
+					fallenCount++;
+				}
 			}
 		}
 
 		if (fallenCount <= 0)
 		{
-			PostSystemMessage(LocaleText.T("system.revive.no_fallen"), new Color(0.78f, 0.88f, 1.0f));
+			PostSystemMessage(
+				LocaleText.T(awaitingRecoveryCount > 0 ? "system.revive.retrieve_first" : "system.revive.no_fallen"),
+				new Color(0.78f, 0.88f, 1.0f),
+				GameMessageChannel.Party);
 			return 0;
 		}
 
 		int totalCost = fallenCount * PetReviveGoldCost;
 		if (Gold < totalCost)
 		{
-			PostSystemMessage(LocaleText.F("system.revive.not_enough_gold", totalCost, Gold), new Color(1.0f, 0.62f, 0.48f));
+			PostSystemMessage(LocaleText.F("system.revive.not_enough_gold", totalCost, Gold), new Color(1.0f, 0.62f, 0.48f), GameMessageChannel.Party);
 			return 0;
 		}
 
 		int revivedCount = 0;
 		foreach (SimpleActor actor in _capturedCollection)
 		{
-			if (!IsInstanceValid(actor) || !actor.IsDefeated)
+			if (!IsInstanceValid(actor) || !actor.IsDefeated || actor.IsAwaitingRecovery)
 			{
 				continue;
 			}
@@ -179,7 +250,7 @@ public partial class PlayerController
 			_partyPanel.RefreshParty();
 			_formationPanel.RefreshAll();
 			_inventoryPanel.RefreshAll();
-			PostSystemMessage(LocaleText.F("system.revive.count_paid", revivedCount, paidGold, Gold), new Color(0.54f, 1.0f, 0.70f));
+			PostSystemMessage(LocaleText.F("system.revive.count_paid", revivedCount, paidGold, Gold), new Color(0.54f, 1.0f, 0.70f), GameMessageChannel.Party);
 		}
 
 		return revivedCount;

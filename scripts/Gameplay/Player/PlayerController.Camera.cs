@@ -142,9 +142,62 @@ public partial class PlayerController
 
 	private Vector3 GetCaptureThrowDirection()
 	{
+		return GetPlayerProjectileDirection();
+	}
+
+	public Vector3 GetPlayerProjectileDirection()
+	{
+		return GetPlayerProjectileDirectionAtScreenPosition(GetViewport().GetMousePosition());
+	}
+
+	public Vector3 GetPlayerProjectileDirectionAtScreenPosition(Vector2 screenPosition)
+	{
+		if (_cameraMode == CameraViewMode.GodView && TryGetMouseGroundAimDirection(screenPosition, out Vector3 mouseDirection))
+		{
+			return mouseDirection;
+		}
+
+		// Third person remains independent: projectiles follow the character's
+		// facing direction instead of inheriting top-down mouse aiming.
 		Vector3 facing = -GlobalTransform.Basis.Z;
 		facing.Y = 0.0f;
-		return facing.LengthSquared() > 0.001f ? facing.Normalized() : Vector3.Forward;
+		return facing.LengthSquared() > 0.001f ? facing.Normalized() : GetCameraPlanarForward();
+	}
+
+	private bool TryGetMouseGroundAimDirection(Vector2 screenPosition, out Vector3 direction)
+	{
+		direction = Vector3.Zero;
+		if (_camera == null || !IsInstanceValid(_camera))
+		{
+			return false;
+		}
+
+		Vector3 rayOrigin = _camera.ProjectRayOrigin(screenPosition);
+		Vector3 rayDirection = _camera.ProjectRayNormal(screenPosition).Normalized();
+		if (Mathf.Abs(rayDirection.Y) <= 0.0001f)
+		{
+			return false;
+		}
+
+		// Aim at the horizontal ground plane under the player. This deliberately
+		// ignores monsters, trees and props between the camera and cursor so the
+		// projectile always follows the floor point selected by the player.
+		float rayDistance = (GlobalPosition.Y - rayOrigin.Y) / rayDirection.Y;
+		if (rayDistance <= 0.0f)
+		{
+			return false;
+		}
+
+		Vector3 groundPoint = rayOrigin + rayDirection * rayDistance;
+		direction = groundPoint - GlobalPosition;
+		direction.Y = 0.0f;
+		if (direction.LengthSquared() <= 0.0025f)
+		{
+			return false;
+		}
+
+		direction = direction.Normalized();
+		return true;
 	}
 
 	private static string CameraModeToSaveId(CameraViewMode mode)

@@ -667,14 +667,14 @@ public partial class InventoryPanel : PanelContainer
 			return;
 		}
 
-		if (_selectedActor != null && IsInstanceValid(_selectedActor) && _selectedActor.IsCaptured)
+		if (_selectedActor != null && IsInstanceValid(_selectedActor) && _selectedActor.IsCaptured && !_selectedActor.IsAwaitingRecovery)
 		{
 			return;
 		}
 
 		foreach (SimpleActor actor in _player.ActiveParty)
 		{
-			if (IsInstanceValid(actor) && actor.IsCaptured)
+			if (IsInstanceValid(actor) && actor.IsCaptured && !actor.IsAwaitingRecovery)
 			{
 				_selectedActor = actor;
 				return;
@@ -683,7 +683,7 @@ public partial class InventoryPanel : PanelContainer
 
 		foreach (SimpleActor actor in _player.CapturedCollection)
 		{
-			if (IsInstanceValid(actor) && actor.IsCaptured)
+			if (IsInstanceValid(actor) && actor.IsCaptured && !actor.IsAwaitingRecovery)
 			{
 				_selectedActor = actor;
 				return;
@@ -724,7 +724,7 @@ public partial class InventoryPanel : PanelContainer
 
 		foreach (SimpleActor actor in _player.ActiveParty)
 		{
-			if (IsInstanceValid(actor) && actor.IsCaptured)
+			if (IsInstanceValid(actor) && actor.IsCaptured && !actor.IsAwaitingRecovery)
 			{
 				AddCompanionButton(actor, LocaleText.T("party.active"));
 			}
@@ -732,7 +732,7 @@ public partial class InventoryPanel : PanelContainer
 
 		foreach (SimpleActor actor in _player.CapturedCollection)
 		{
-			if (IsInstanceValid(actor) && actor.IsCaptured && !_player.IsInActiveParty(actor))
+			if (IsInstanceValid(actor) && actor.IsCaptured && !actor.IsAwaitingRecovery && !_player.IsInActiveParty(actor))
 			{
 				AddCompanionButton(actor, LocaleText.T("party.collection"));
 			}

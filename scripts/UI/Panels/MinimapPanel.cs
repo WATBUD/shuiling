@@ -11,7 +11,6 @@ public partial class MinimapPanel : PanelContainer
 	private Label _companionLegendLabel = null!;
 	private Label _npcLegendLabel = null!;
 	private Label _monsterLegendLabel = null!;
-	private Label _monsterCountLabel = null!;
 	private float _monsterCountRefreshRemaining;
 
 	public override void _Ready()
@@ -32,7 +31,7 @@ public partial class MinimapPanel : PanelContainer
 		if (_monsterCountRefreshRemaining <= 0.0f)
 		{
 			_monsterCountRefreshRemaining = 0.25f;
-			RefreshMonsterCount();
+			RefreshMapInfo();
 		}
 	}
 
@@ -43,7 +42,19 @@ public partial class MinimapPanel : PanelContainer
 		{
 			_mapView.Player = player;
 		}
-		RefreshMonsterCount();
+		RefreshMapInfo();
+	}
+
+	public void RefreshMapInfo()
+	{
+		if (_titleLabel == null || _monsterLegendLabel == null)
+		{
+			return;
+		}
+
+		World? world = _player?.GetParent() as World;
+		_titleLabel.Text = world?.GetActiveMapDisplayName() ?? LocaleText.T("minimap.title");
+		_monsterLegendLabel.Text = $"● {LocaleText.F("minimap.monster_count", world?.CurrentLivingMonsterCount ?? 0)}";
 	}
 
 	private void BuildPanel()
@@ -80,8 +91,18 @@ public partial class MinimapPanel : PanelContainer
 		rows.AddThemeConstantOverride("separation", 6);
 		margin.AddChild(rows);
 
+		var header = new HBoxContainer
+		{
+			Name = "MinimapHeader",
+		};
+		header.AddThemeConstantOverride("separation", 8);
+		rows.AddChild(header);
+
 		_titleLabel = MakeLabel(14, new Color(0.90f, 0.96f, 1.0f));
-		rows.AddChild(_titleLabel);
+		_titleLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		_titleLabel.ClipText = true;
+		_titleLabel.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+		header.AddChild(_titleLabel);
 
 		var mapStack = new Control
 		{
@@ -99,33 +120,6 @@ public partial class MinimapPanel : PanelContainer
 		};
 		_mapView.Player = _player;
 		mapStack.AddChild(_mapView);
-
-		var countBadge = new PanelContainer
-		{
-			Name = "MonsterCountBadge",
-			MouseFilter = Control.MouseFilterEnum.Ignore,
-			OffsetLeft = 7.0f,
-			OffsetRight = 100.0f,
-			OffsetTop = 7.0f,
-			OffsetBottom = 33.0f,
-		};
-		var badgeStyle = new StyleBoxFlat
-		{
-			BgColor = new Color(0.12f, 0.035f, 0.035f, 0.82f),
-			BorderColor = new Color(1.0f, 0.32f, 0.24f, 0.72f),
-		};
-		badgeStyle.SetBorderWidthAll(1);
-		badgeStyle.SetCornerRadiusAll(5);
-		badgeStyle.SetContentMargin(Side.Left, 7.0f);
-		badgeStyle.SetContentMargin(Side.Right, 7.0f);
-		badgeStyle.SetContentMargin(Side.Top, 3.0f);
-		badgeStyle.SetContentMargin(Side.Bottom, 3.0f);
-		countBadge.AddThemeStyleboxOverride("panel", badgeStyle);
-		mapStack.AddChild(countBadge);
-
-		_monsterCountLabel = MakeLabel(12, new Color(1.0f, 0.78f, 0.72f));
-		_monsterCountLabel.MouseFilter = Control.MouseFilterEnum.Ignore;
-		countBadge.AddChild(_monsterCountLabel);
 
 		var legend = new GridContainer
 		{
@@ -153,23 +147,11 @@ public partial class MinimapPanel : PanelContainer
 			return;
 		}
 
-		_titleLabel.Text = LocaleText.T("minimap.title");
 		_playerLegendLabel.Text = $"● {LocaleText.T("minimap.player")}";
 		_companionLegendLabel.Text = $"● {LocaleText.T("minimap.companion")}";
 		_npcLegendLabel.Text = $"● {LocaleText.T("minimap.npc")}";
 		_monsterLegendLabel.Text = $"● {LocaleText.T("minimap.monster")}";
-		RefreshMonsterCount();
-	}
-
-	private void RefreshMonsterCount()
-	{
-		if (_monsterCountLabel == null)
-		{
-			return;
-		}
-
-		int count = _player?.GetParent() is World world ? world.CurrentLivingMonsterCount : 0;
-		_monsterCountLabel.Text = LocaleText.F("minimap.monster_count", count);
+		RefreshMapInfo();
 	}
 
 	private static Label MakeLabel(int fontSize, Color color)

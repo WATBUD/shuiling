@@ -20,6 +20,8 @@ public sealed class PlayerSaveData
 	public int Gold { get; set; }
 	public string CameraMode { get; set; } = "god_view";
 	public float DamageTextScale { get; set; } = 1.0f;
+	public bool BossAnnouncementsEnabled { get; set; } = true;
+	public float BossAnnouncementOpacity { get; set; } = 0.90f;
 	public Dictionary<string, int> InventoryItems { get; set; } = new();
 	public List<string> AcceptedNpcQuestNames { get; set; } = new();
 	public List<string> CompletedNpcQuestNames { get; set; } = new();
@@ -53,6 +55,10 @@ public sealed class ActorSaveData
 	public int Level { get; set; } = 1;
 	public int MaxHealth { get; set; } = 100;
 	public int CurrentHealth { get; set; } = 100;
+	public bool IsDefeated { get; set; }
+	public bool IsAwaitingRecovery { get; set; }
+	public string FallenMapId { get; set; } = string.Empty;
+	public SaveVector3 WorldPosition { get; set; } = new();
 	public int Attack { get; set; } = 10;
 	public int Defense { get; set; } = 6;
 	public float MoveSpeed { get; set; } = 7.0f;

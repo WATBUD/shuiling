@@ -220,7 +220,7 @@ public partial class CompanionInfoCard : PanelContainer
 			$"{LocaleText.T("stat.role")} {LocaleText.T("role.dps")} / {LocaleText.T("personality.brave")}",
 			$"{LocaleText.T("build.element")} {LocaleText.T("element.physical")}",
 			LocaleText.F("inventory.gold", _player.Gold),
-			LocaleText.F("party.title", _player.ActiveParty.Count, _player.ActivePartyLimit, _player.CapturedCollection.Count));
+			LocaleText.F("party.title", _player.ActiveParty.Count, _player.ActivePartyLimit, _player.AvailableCompanionCount));
 		_ability.Text = string.Empty;
 		_mode.Visible = false;
 		_mood.Visible = false;

@@ -24,7 +24,7 @@ public partial class PlayerController
 
 		SimpleActor actor = world.SpawnContractCompanion(offer);
 		Gold = Mathf.Max(Gold - offer.Cost, 0);
-		PostSystemMessage(LocaleText.F("system.mercenary.hired", LocaleText.T(offer.NameKey), offer.Cost, Gold), new Color(1.0f, 0.86f, 0.46f));
+		PostSystemMessage(LocaleText.F("system.mercenary.hired", LocaleText.T(offer.NameKey), offer.Cost, Gold), new Color(1.0f, 0.86f, 0.46f), GameMessageChannel.Party);
 		_contractCompanionOffers.Remove(offer);
 		RecruitNpc(actor);
 		_inventoryPanel.RefreshAll();
