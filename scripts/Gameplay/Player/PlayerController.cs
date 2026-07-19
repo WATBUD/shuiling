@@ -144,6 +144,8 @@ public partial class PlayerController : CharacterBody3D
 	private PanelContainer _pauseMenuPanel = null!;
 	private MinimapPanel _minimapPanel = null!;
 	private SystemLogPanel _systemLogPanel = null!;
+	private PanelContainer _bossAnnouncementPanel = null!;
+	private PanelContainer _bossHudPanel = null!;
 	private PanelContainer _captureAmmoPanel = null!;
 	private PanelContainer _npcQuestDialog = null!;
 	private PanelContainer _mapTravelDialog = null!;
@@ -156,6 +158,11 @@ public partial class PlayerController : CharacterBody3D
 	private Label _npcQuestTitleLabel = null!;
 	private Label _npcQuestBodyLabel = null!;
 	private Label _npcQuestRewardLabel = null!;
+	private Label _bossAnnouncementTitleLabel = null!;
+	private Label _bossAnnouncementBodyLabel = null!;
+	private Label _bossHudNameLabel = null!;
+	private Label _bossHudHealthLabel = null!;
+	private ProgressBar _bossHudHealthBar = null!;
 	private Button _npcQuestAcceptButton = null!;
 	private Button _npcQuestDeclineButton = null!;
 	private Node3D? _selectedTargetMarker;
@@ -175,6 +182,8 @@ public partial class PlayerController : CharacterBody3D
 	private float _damageFlashRemaining;
 	private float _footstepEffectRemaining;
 	private float _movementAnimationPhase;
+	private SimpleActor? _activeBoss;
+	private Tween? _bossAnnouncementTween;
 
 	public IReadOnlyList<SimpleActor> CapturedCollection => _capturedCollection;
 	public IReadOnlyList<SimpleActor> ActiveParty => _activeParty;
@@ -219,6 +228,7 @@ public partial class PlayerController : CharacterBody3D
 		CreateDamageFlashHud();
 		CreateInteractionPromptHud();
 		CreateSystemLogPanel();
+		CreateBossHud();
 		CreateNpcQuestDialog();
 		CreateMapTravelDialog();
 
@@ -254,6 +264,7 @@ public partial class PlayerController : CharacterBody3D
 		UpdateMercenaryOfferRefresh();
 		UpdateMerchantStockRefresh();
 		UpdateInteractionPrompt((float)delta);
+		UpdateBossHud();
 	}
 
 	public override void _UnhandledInput(InputEvent @event)

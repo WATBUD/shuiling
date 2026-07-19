@@ -53,7 +53,7 @@ public static class ItemIconLibrary
 		["loot.slime_mucus"] = "material_magic.png",
 		["loot.beast_hide"] = "material_wood.png",
 		["loot.sharp_claw"] = "material_bones.png",
-		["loot.soft_fur"] = "material_wood.png",
+		["loot.soft_fur"] = "material_fur.png",
 		["loot.small_bone"] = "material_bones.png",
 		["loot.insect_wing"] = "gem_06.png",
 		["loot.red_horn"] = "material_ore.png",

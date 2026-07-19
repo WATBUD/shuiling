@@ -11,6 +11,8 @@ public partial class MinimapPanel : PanelContainer
 	private Label _companionLegendLabel = null!;
 	private Label _npcLegendLabel = null!;
 	private Label _monsterLegendLabel = null!;
+	private Label _monsterCountLabel = null!;
+	private float _monsterCountRefreshRemaining;
 
 	public override void _Ready()
 	{
@@ -26,6 +28,12 @@ public partial class MinimapPanel : PanelContainer
 	public override void _Process(double delta)
 	{
 		_mapView.QueueRedraw();
+		_monsterCountRefreshRemaining -= (float)delta;
+		if (_monsterCountRefreshRemaining <= 0.0f)
+		{
+			_monsterCountRefreshRemaining = 0.25f;
+			RefreshMonsterCount();
+		}
 	}
 
 	public void Bind(PlayerController player)
@@ -35,6 +43,7 @@ public partial class MinimapPanel : PanelContainer
 		{
 			_mapView.Player = player;
 		}
+		RefreshMonsterCount();
 	}
 
 	private void BuildPanel()
@@ -74,15 +83,49 @@ public partial class MinimapPanel : PanelContainer
 		_titleLabel = MakeLabel(14, new Color(0.90f, 0.96f, 1.0f));
 		rows.AddChild(_titleLabel);
 
+		var mapStack = new Control
+		{
+			CustomMinimumSize = new Vector2(178.0f, 178.0f),
+			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+		};
+		rows.AddChild(mapStack);
+
 		_mapView = new MinimapView
 		{
 			Name = "MinimapView",
 			RadarRange = RadarRange,
-			CustomMinimumSize = new Vector2(178.0f, 178.0f),
-			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+			AnchorRight = 1.0f,
+			AnchorBottom = 1.0f,
 		};
 		_mapView.Player = _player;
-		rows.AddChild(_mapView);
+		mapStack.AddChild(_mapView);
+
+		var countBadge = new PanelContainer
+		{
+			Name = "MonsterCountBadge",
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			OffsetLeft = 7.0f,
+			OffsetRight = 100.0f,
+			OffsetTop = 7.0f,
+			OffsetBottom = 33.0f,
+		};
+		var badgeStyle = new StyleBoxFlat
+		{
+			BgColor = new Color(0.12f, 0.035f, 0.035f, 0.82f),
+			BorderColor = new Color(1.0f, 0.32f, 0.24f, 0.72f),
+		};
+		badgeStyle.SetBorderWidthAll(1);
+		badgeStyle.SetCornerRadiusAll(5);
+		badgeStyle.SetContentMargin(Side.Left, 7.0f);
+		badgeStyle.SetContentMargin(Side.Right, 7.0f);
+		badgeStyle.SetContentMargin(Side.Top, 3.0f);
+		badgeStyle.SetContentMargin(Side.Bottom, 3.0f);
+		countBadge.AddThemeStyleboxOverride("panel", badgeStyle);
+		mapStack.AddChild(countBadge);
+
+		_monsterCountLabel = MakeLabel(12, new Color(1.0f, 0.78f, 0.72f));
+		_monsterCountLabel.MouseFilter = Control.MouseFilterEnum.Ignore;
+		countBadge.AddChild(_monsterCountLabel);
 
 		var legend = new GridContainer
 		{
@@ -115,6 +158,18 @@ public partial class MinimapPanel : PanelContainer
 		_companionLegendLabel.Text = $"● {LocaleText.T("minimap.companion")}";
 		_npcLegendLabel.Text = $"● {LocaleText.T("minimap.npc")}";
 		_monsterLegendLabel.Text = $"● {LocaleText.T("minimap.monster")}";
+		RefreshMonsterCount();
+	}
+
+	private void RefreshMonsterCount()
+	{
+		if (_monsterCountLabel == null)
+		{
+			return;
+		}
+
+		int count = _player?.GetParent() is World world ? world.CurrentLivingMonsterCount : 0;
+		_monsterCountLabel.Text = LocaleText.F("minimap.monster_count", count);
 	}
 
 	private static Label MakeLabel(int fontSize, Color color)
@@ -181,10 +236,16 @@ public partial class MinimapView : Control
 			}
 
 			Vector2 point = WorldToMap(actor.GlobalPosition, center, radius, out bool clipped);
-			DrawCircle(point, clipped ? dotRadius * 0.78f : dotRadius, color);
+			Color actorColor = actor.IsBoss ? new Color(1.0f, 0.72f, 0.16f, 1.0f) : color;
+			float actorRadius = actor.IsBoss ? dotRadius * 1.65f : dotRadius;
+			DrawCircle(point, clipped ? actorRadius * 0.78f : actorRadius, actorColor);
+			if (actor.IsBoss)
+			{
+				DrawArc(point, actorRadius + 2.2f, 0.0f, Mathf.Tau, 24, new Color(1.0f, 0.88f, 0.42f, 0.92f), 1.6f, true);
+			}
 			if (clipped)
 			{
-				DrawArc(point, dotRadius + 1.8f, 0.0f, Mathf.Tau, 18, color, 1.2f, true);
+				DrawArc(point, actorRadius + 1.8f, 0.0f, Mathf.Tau, 18, actorColor, 1.2f, true);
 			}
 		}
 	}

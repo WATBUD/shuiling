@@ -44,6 +44,9 @@ public partial class SimpleActor : CharacterBody3D
 	[Export] public float DetectionRadius { get; set; } = 12.0f;
 	[Export] public float AttackRange { get; set; } = 1.8f;
 	[Export] public float AttackCooldown { get; set; } = 1.35f;
+	[Export] public bool IsBoss { get; set; }
+	[Export] public string BossNameKey { get; set; } = string.Empty;
+	[Export] public string BossPrimaryLootId { get; set; } = string.Empty;
 
 	private readonly RandomNumberGenerator _rng = new();
 	private bool _isCaptured;
@@ -241,8 +244,15 @@ public partial class SimpleActor : CharacterBody3D
 	private float _formationIncomingDamageMultiplier = 1.0f;
 	private float _formationRangeBonus;
 	private string _formationBonusSummary = string.Empty;
+	private bool _bossEnraged;
+	private int _bossAttackCounter;
+	private Vector3 _bossLastChasePosition;
+	private Vector3 _bossAvoidDirection;
+	private float _bossStuckTime;
+	private float _bossAvoidRemaining;
+	private float _bossAvoidSide = 1.0f;
 
-	public bool CanBeCaptured => ActorKind == "monster" && !_isCaptured && !_isDefeated;
+	public bool CanBeCaptured => ActorKind == "monster" && !IsBoss && !_isCaptured && !_isDefeated;
 	public bool IsNpcRecruitCandidate => ActorKind == "npc" && !_isCaptured && !_isDefeated;
 	public bool CanJoinByAffinity => IsNpcRecruitCandidate && Affinity >= 80;
 	public bool IsCaptured => _isCaptured;
@@ -273,13 +283,15 @@ public partial class SimpleActor : CharacterBody3D
 		}
 	}
 	public int EffectiveMaxHealth => CurrentBuildStats.MaxHealth;
-	public int EffectiveAttack => CurrentBuildStats.Attack;
+	public int EffectiveAttack => IsBoss && _bossEnraged
+		? Mathf.Max(Mathf.RoundToInt(CurrentBuildStats.Attack * 1.35f), 1)
+		: CurrentBuildStats.Attack;
 	public int EffectiveDefense => CurrentBuildStats.Defense;
-	public float EffectiveMoveSpeed => Mathf.Max(MoveSpeed * CurrentBuildStats.MoveSpeedMultiplier * (_slowRemaining > 0.0f ? 0.55f : 1.0f), 0.3f);
+	public float EffectiveMoveSpeed => Mathf.Max(MoveSpeed * CurrentBuildStats.MoveSpeedMultiplier * (IsBoss && _bossEnraged ? 1.16f : 1.0f) * (_slowRemaining > 0.0f ? 0.55f : 1.0f), 0.3f);
 	public float EffectiveAttackRange => Mathf.Max(AttackRange + CurrentBuildStats.AttackRangeBonus, 0.75f);
 	public float EffectiveDetectionRadius => Mathf.Max(DetectionRadius + CurrentBuildStats.DetectionRadiusBonus, 3.0f);
-	public float EffectiveAttackCooldown => Mathf.Max(AttackCooldown * CurrentBuildStats.AttackCooldownMultiplier, 0.22f);
-	public string TypeName => LocaleText.T(ActorKind == "monster" ? "actor.type.monster" : "actor.type.npc");
+	public float EffectiveAttackCooldown => Mathf.Max(AttackCooldown * CurrentBuildStats.AttackCooldownMultiplier * (IsBoss && _bossEnraged ? 0.72f : 1.0f), 0.22f);
+	public string TypeName => LocaleText.T(IsBoss ? "actor.type.boss" : ActorKind == "monster" ? "actor.type.monster" : "actor.type.npc");
 	public string StateName
 	{
 		get
@@ -327,7 +339,8 @@ public partial class SimpleActor : CharacterBody3D
 		"Builder" => LocaleText.T("role.builder"),
 		_ => LocaleText.T("role.dps"),
 	};
-	public string LocalizedDisplayName => LocaleText.T(DisplayName);
+	public string LocalizedDisplayName => LocaleText.T(IsBoss && !string.IsNullOrWhiteSpace(BossNameKey) ? BossNameKey : DisplayName);
+	public bool IsBossEnraged => IsBoss && _bossEnraged;
 	public string LocalizedSpecialAbility => LocaleText.T(SpecialAbility);
 	public string LocalizedPersonality => LocaleText.T(Personality);
 	public string LocalizedPassiveAbility => LocaleText.T(PassiveAbility);
@@ -497,6 +510,7 @@ public partial class SimpleActor : CharacterBody3D
 
 		if (!chasing)
 		{
+			ResetBossObstacleAvoidance();
 			_waitTime = Mathf.Max(_waitTime - step, 0.0f);
 			if (_waitTime > 0.0f)
 			{
@@ -518,6 +532,10 @@ public partial class SimpleActor : CharacterBody3D
 		else
 		{
 			Vector3 direction = toDestination.Normalized();
+			if (chasing && IsBoss)
+			{
+				direction = GetBossChaseDirection(direction, step);
+			}
 			float activeSpeed = EffectiveMoveSpeed * (chasing ? 1.35f : 1.0f);
 			velocity.X = Mathf.MoveToward(velocity.X, direction.X * activeSpeed, activeSpeed * 6.0f * step);
 			velocity.Z = Mathf.MoveToward(velocity.Z, direction.Z * activeSpeed, activeSpeed * 6.0f * step);
@@ -815,6 +833,19 @@ public partial class SimpleActor : CharacterBody3D
 		GoldReward = Mathf.Max(goldReward, 0);
 		_buildConfigured = false;
 		_buildStatsDirty = true;
+		RefreshNameplate();
+	}
+
+	public void ConfigureBoss(string bossNameKey, string primaryLootId)
+	{
+		IsBoss = true;
+		BossNameKey = bossNameKey;
+		BossPrimaryLootId = primaryLootId;
+		_bossEnraged = false;
+		_bossAttackCounter = 0;
+		ResetBossObstacleAvoidance();
+		ChaseRadius = Mathf.Max(ChaseRadius, 28.0f);
+		WanderRadius = Mathf.Max(WanderRadius, 14.0f);
 		RefreshNameplate();
 	}
 
@@ -1158,6 +1189,10 @@ public partial class SimpleActor : CharacterBody3D
 		RememberAttacker(attacker);
 		CurrentHealth = Mathf.Max(CurrentHealth - mitigatedDamage, 0);
 		SpawnCombatEffect(mitigatedDamage, attacker?.GetAttackColor() ?? new Color(1.0f, 0.5f, 0.22f, 0.92f));
+		if (IsBoss && !_bossEnraged && CurrentHealth > 0 && HealthRatio <= 0.50f)
+		{
+			TriggerBossEnrage(attacker);
+		}
 
 		if (CurrentHealth <= 0)
 		{
@@ -1166,6 +1201,27 @@ public partial class SimpleActor : CharacterBody3D
 
 		RefreshNameplate();
 		return mitigatedDamage;
+	}
+
+	private void TriggerBossEnrage(SimpleActor? attacker)
+	{
+		_bossEnraged = true;
+		Node effectParent = GetTree().CurrentScene ?? GetParent();
+		SkillAttackVfx.SpawnSpecial(
+			effectParent,
+			SkillAttackVfx.ExplosionEvent,
+			GlobalPosition + Vector3.Up * 0.35f,
+			Vector3.Up,
+			"gem.skill.meteor",
+			"fire",
+			new Color(1.0f, 0.16f, 0.04f, 0.94f),
+			4.2f,
+			new ProjectileBehaviorProfile());
+		if (attacker?._followTarget != null && IsInstanceValid(attacker._followTarget))
+		{
+			attacker._followTarget.ShowBossEnraged(this);
+		}
+		RefreshNameplate();
 	}
 
 	public int ReceiveHealing(int rawHealing)
@@ -1264,7 +1320,10 @@ public partial class SimpleActor : CharacterBody3D
 			: _isCaptured
 			? _isInActiveParty ? LocaleText.T("actor.nameplate.active") : LocaleText.T("actor.nameplate.stored")
 			: string.Empty;
-		_nameplate.Text = $"{LocaleText.T("actor.level_prefix")}{Level} {LocalizedDisplayName}{capturedText}";
+		_nameplate.Text = IsBoss
+			? LocaleText.F("boss.nameplate", Level, LocalizedDisplayName, capturedText)
+			: $"{LocaleText.T("actor.level_prefix")}{Level} {LocalizedDisplayName}{capturedText}";
+		_nameplate.FontSize = IsBoss ? 28 : 20;
 		Color markerColor = GetNameplateStatusColor();
 		_nameplate.Modulate = markerColor;
 		_nameplate.OutlineModulate = new Color(0.02f, 0.025f, 0.03f, 0.96f);
@@ -1297,13 +1356,15 @@ public partial class SimpleActor : CharacterBody3D
 		if (_nameplateMarker != null)
 		{
 			_nameplateMarker.Position = new Vector3(0.0f, labelY + 0.34f, 0.0f);
-			_nameplateMarker.Scale = _isCaptured ? new Vector3(1.18f, 1.18f, 1.18f) : Vector3.One;
+			float markerScale = IsBoss ? 1.65f : _isCaptured ? 1.18f : 1.0f;
+			_nameplateMarker.Scale = Vector3.One * markerScale;
 		}
 
 		if (_nameplateHalo != null)
 		{
 			_nameplateHalo.Position = new Vector3(0.0f, labelY + 0.28f, 0.0f);
-			_nameplateHalo.Scale = _isCaptured ? new Vector3(1.18f, 1.18f, 1.18f) : Vector3.One;
+			float haloScale = IsBoss ? 2.15f : _isCaptured ? 1.18f : 1.0f;
+			_nameplateHalo.Scale = Vector3.One * haloScale;
 		}
 	}
 
@@ -1324,6 +1385,13 @@ public partial class SimpleActor : CharacterBody3D
 		if (ActorKind != "monster")
 		{
 			return new Color(0.64f, 0.86f, 1.0f, 0.94f);
+		}
+
+		if (IsBoss)
+		{
+			return _bossEnraged
+				? new Color(1.0f, 0.22f, 0.08f, 0.98f)
+				: new Color(1.0f, 0.76f, 0.18f, 0.98f);
 		}
 
 		return MonsterSpeciesCatalog.Current.GetMarkerColor(DisplayName);
@@ -2082,6 +2150,8 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			ReceiveHealing(Mathf.RoundToInt(dealtDamage * stats.LifeStealPercent));
 		}
+
+		AdvanceBossAttackPattern(target);
 	}
 
 	// Base attack of the pet, shaped by whatever behavior gems the build carries.
@@ -2106,6 +2176,20 @@ public partial class SimpleActor : CharacterBody3D
 		Vector3 toTarget = target.GlobalPosition - GlobalPosition;
 		toTarget.Y = 0.0f;
 		Vector3 forward = toTarget.LengthSquared() > 0.001f ? toTarget.Normalized() : -GlobalTransform.Basis.Z;
+		string visualSkillId = BuildLoadout.GetSkillGemId(0);
+		if (BuildCatalog.IsMainAttackCore(visualSkillId))
+		{
+			Node effectParent = GetTree().CurrentScene ?? GetParent();
+			SkillAttackVfx.SpawnCast(
+				effectParent,
+				GlobalPosition + Vector3.Up * 1.05f + forward * 0.34f,
+				forward,
+				visualSkillId,
+				stats.DamageElementId,
+				GetAttackColor(),
+				stats.Behavior,
+				stats.LifeStealPercent > 0.0f);
+		}
 
 		bool usesWhirlwind = isMelee && BuildLoadout.HasSkill("gem.skill.whirlwind");
 		int projectileCount = usesWhirlwind ? 3 : 1 + Mathf.Max(stats.Behavior.ExtraProjectiles, 0);
@@ -2134,7 +2218,11 @@ public partial class SimpleActor : CharacterBody3D
 			EffectColor = GetAttackColor(),
 			IsMelee = isMelee,
 			IsArrow = UsesArrowProjectile(false),
-			VisualSkillId = stats.ActiveRangedSkillId,
+			VisualSkillId = BuildCatalog.IsMainAttackCore(BuildLoadout.GetSkillGemId(0))
+				? BuildLoadout.GetSkillGemId(0)
+				: stats.ActiveRangedSkillId,
+			ElementId = stats.DamageElementId,
+			HasLifeSteal = stats.LifeStealPercent > 0.0f,
 			Speed = isMelee ? 26.0f : 17.0f,
 			MaxRange = Mathf.Max(EffectiveAttackRange * 1.6f, isMelee ? 3.0f : 9.0f),
 			HitRadius = isMelee ? 1.35f : 1.0f,
@@ -2272,11 +2360,61 @@ public partial class SimpleActor : CharacterBody3D
 			SpawnPlayerAttackCue(player.GlobalPosition);
 			PlayAttackAction(player.GlobalPosition, false);
 			playerController.ReceiveDamage(EffectiveAttack, this);
+			AdvanceBossAttackPattern(playerController);
 			_attackCooldownRemaining = EffectiveAttackCooldown;
 		}
 
 		MoveAndSlideWithEffects(step);
 		return true;
+	}
+
+	private void AdvanceBossAttackPattern(Node primaryTarget)
+	{
+		if (!IsBoss || _isDefeated)
+		{
+			return;
+		}
+
+		_bossAttackCounter++;
+		int attackInterval = _bossEnraged ? 2 : 3;
+		if (_bossAttackCounter % attackInterval != 0)
+		{
+			return;
+		}
+
+		const float novaRadius = 4.8f;
+		Node effectParent = GetTree().CurrentScene ?? GetParent();
+		SkillAttackVfx.SpawnSpecial(
+			effectParent,
+			SkillAttackVfx.ExplosionEvent,
+			GlobalPosition + Vector3.Up * 0.24f,
+			Vector3.Up,
+			"gem.skill.explosion",
+			"fire",
+			_bossEnraged ? new Color(1.0f, 0.18f, 0.035f, 0.94f) : new Color(1.0f, 0.68f, 0.12f, 0.92f),
+			novaRadius,
+			new ProjectileBehaviorProfile { ExplosionRadius = novaRadius });
+
+		int splashDamage = Mathf.Max(Mathf.RoundToInt(EffectiveAttack * (_bossEnraged ? 0.68f : 0.52f)), 1);
+		foreach (Node node in GetTree().GetNodesInGroup("captured_actors"))
+		{
+			if (node is SimpleActor companion
+				&& companion != primaryTarget
+				&& companion.IsInActiveParty
+				&& !companion.IsDefeated
+				&& companion.GlobalPosition.DistanceTo(GlobalPosition) <= novaRadius)
+			{
+				companion.ReceiveDamage(splashDamage, this);
+			}
+		}
+
+		Node3D? player = GetCachedPlayerNode();
+		if (player is PlayerController playerController
+			&& playerController != primaryTarget
+			&& playerController.GlobalPosition.DistanceTo(GlobalPosition) <= novaRadius)
+		{
+			playerController.ReceiveDamage(Mathf.Max(Mathf.RoundToInt(splashDamage * 0.72f), 1), this);
+		}
 	}
 
 	private bool TryAttackActorTarget(SimpleActor target, Vector3 velocity, float step)
@@ -2376,6 +2514,10 @@ public partial class SimpleActor : CharacterBody3D
 			{
 				DropMonsterLoot(attacker._followTarget);
 			}
+			if (IsBoss)
+			{
+				attacker._followTarget.ShowBossDefeated(this);
+			}
 		}
 	}
 
@@ -2410,6 +2552,12 @@ public partial class SimpleActor : CharacterBody3D
 
 	private void DropMonsterLoot(PlayerController player)
 	{
+		if (IsBoss)
+		{
+			DropBossLoot(player);
+			return;
+		}
+
 		Vector3 origin = GlobalPosition;
 		int goldAmount = Mathf.Max(GoldReward + _rng.RandiRange(1, Mathf.Max(Level + 2, 3)), 1);
 		SpawnWorldDrop(origin + RandomDropOffset(0.45f), string.Empty, 1, goldAmount);
@@ -2434,6 +2582,31 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		player.PostSystemMessage(LocaleText.F("system.drop.loot", LocalizedDisplayName, LocaleText.T(MonsterLootCatalog.GetNameKey(primaryLootId))), new Color(1.0f, 0.86f, 0.48f));
+	}
+
+	private void DropBossLoot(PlayerController player)
+	{
+		Vector3 origin = GlobalPosition;
+		int goldAmount = Mathf.Max(GoldReward + _rng.RandiRange(Level * 4, Level * 8), 1);
+		SpawnWorldDrop(origin + RandomDropOffset(0.55f), string.Empty, 1, goldAmount);
+
+		string primaryLootId = string.IsNullOrWhiteSpace(BossPrimaryLootId)
+			? MonsterLootCatalog.PickPrimaryDropForMonster(DisplayName, IsRangedCombatant, Level)
+			: BossPrimaryLootId;
+		SpawnWorldDrop(origin + RandomDropOffset(0.85f), primaryLootId, _rng.RandiRange(4, 6), 0);
+		string secondaryLootId = MonsterLootCatalog.PickSecondaryDropForMonster(primaryLootId, Level + 5);
+		SpawnWorldDrop(origin + RandomDropOffset(1.05f), secondaryLootId, _rng.RandiRange(2, 3), 0);
+
+		// Bosses always drop two high-value equipment pieces and at least one core.
+		SpawnWorldDrop(origin + RandomDropOffset(1.25f), PickBossEquipmentDropId(), 1, 0);
+		SpawnWorldDrop(origin + RandomDropOffset(1.48f), PickBossEquipmentDropId(), 1, 0);
+		SpawnWorldDrop(origin + RandomDropOffset(1.68f), PickNonFreeSkillGem(BuildCatalog.GetSkillGemDefinitions()), 1, 0);
+		if (_rng.Randf() < 0.65f)
+		{
+			SpawnWorldDrop(origin + RandomDropOffset(1.88f), PickNonFreeSkillGem(BuildCatalog.GetSkillGemDefinitions()), 1, 0);
+		}
+
+		player.PostSystemMessage(LocaleText.F("system.drop.boss_loot", LocalizedDisplayName), new Color(1.0f, 0.78f, 0.22f));
 	}
 
 	private void SpawnWorldDrop(Vector3 position, string itemId, int amount, int goldAmount)
@@ -2470,6 +2643,44 @@ public partial class SimpleActor : CharacterBody3D
 		EquipmentSlot slot = slots[_rng.RandiRange(0, slots.Length - 1)];
 		var definitions = BuildCatalog.GetEquipmentDefinitions(slot);
 		return definitions[_rng.RandiRange(0, definitions.Count - 1)].Id;
+	}
+
+	private string PickBossEquipmentDropId()
+	{
+		EquipmentSlot[] slots =
+		{
+			EquipmentSlot.Helmet,
+			EquipmentSlot.Weapon,
+			EquipmentSlot.Armor,
+			EquipmentSlot.Boots,
+			EquipmentSlot.Accessory,
+		};
+		EquipmentSlot slot = slots[_rng.RandiRange(0, slots.Length - 1)];
+		EquipmentDefinition? best = null;
+		float bestScore = float.MinValue;
+		foreach (EquipmentDefinition item in BuildCatalog.GetEquipmentDefinitions(slot))
+		{
+			if (BuildCatalog.IsFreeItem(item.Id))
+			{
+				continue;
+			}
+
+			float score = item.MaxHealthBonus
+				+ item.AttackBonus * 3.0f
+				+ item.DefenseBonus * 2.0f
+				+ item.MoveSpeedBonus * 120.0f
+				+ item.AttackCooldownReduction * 150.0f
+				+ item.AttackRangeBonus * 12.0f
+				+ item.CritChanceBonus * 180.0f
+				+ item.SocketCount * 10.0f;
+			if (score > bestScore)
+			{
+				bestScore = score;
+				best = item;
+			}
+		}
+
+		return best?.Id ?? PickEquipmentDropId();
 	}
 
 	private string PickGemDropId()
@@ -2697,6 +2908,105 @@ public partial class SimpleActor : CharacterBody3D
 		velocity.X = Mathf.MoveToward(velocity.X, 0.0f, MoveSpeed * 5.0f * step);
 		velocity.Z = Mathf.MoveToward(velocity.Z, 0.0f, MoveSpeed * 5.0f * step);
 		return velocity;
+	}
+
+	private Vector3 GetBossChaseDirection(Vector3 directDirection, float step)
+	{
+		if (!IsBoss || directDirection.LengthSquared() <= 0.001f)
+		{
+			return directDirection;
+		}
+
+		Vector3 planarPosition = GlobalPosition;
+		planarPosition.Y = 0.0f;
+		if (_bossLastChasePosition == Vector3.Zero)
+		{
+			_bossLastChasePosition = planarPosition;
+		}
+
+		float progress = planarPosition.DistanceTo(_bossLastChasePosition);
+		_bossLastChasePosition = planarPosition;
+		_bossAvoidRemaining = Mathf.Max(_bossAvoidRemaining - step, 0.0f);
+		if (progress < 0.035f)
+		{
+			_bossStuckTime += step;
+		}
+		else
+		{
+			_bossStuckTime = Mathf.Max(_bossStuckTime - step * 2.5f, 0.0f);
+		}
+
+		Vector3 wallNormal = GetBossBlockingWallNormal();
+		bool blockedByWall = wallNormal.LengthSquared() > 0.001f;
+		bool stuck = _bossStuckTime >= 0.32f;
+		if ((blockedByWall && _bossAvoidRemaining <= 0.0f) || stuck)
+		{
+			if (blockedByWall)
+			{
+				Vector3 tangentA = new(-wallNormal.Z, 0.0f, wallNormal.X);
+				Vector3 tangentB = -tangentA;
+				float scoreA = tangentA.Dot(directDirection);
+				float scoreB = tangentB.Dot(directDirection);
+				if (Mathf.Abs(scoreA - scoreB) < 0.08f)
+				{
+					_bossAvoidDirection = _bossAvoidSide > 0.0f ? tangentA : tangentB;
+				}
+				else
+				{
+					_bossAvoidDirection = scoreA > scoreB ? tangentA : tangentB;
+					_bossAvoidSide = _bossAvoidDirection == tangentA ? 1.0f : -1.0f;
+				}
+
+				// A small outward component keeps the enlarged boss collider from
+				// continuously scraping the same tree or building corner.
+				_bossAvoidDirection = (_bossAvoidDirection + wallNormal * 0.24f).Normalized();
+			}
+			else
+			{
+				_bossAvoidSide *= -1.0f;
+				Vector3 side = new Vector3(-directDirection.Z, 0.0f, directDirection.X) * _bossAvoidSide;
+				_bossAvoidDirection = (side * 0.92f + directDirection * 0.22f).Normalized();
+			}
+
+			_bossAvoidRemaining = stuck ? 0.95f : 0.72f;
+			_bossStuckTime = 0.0f;
+		}
+
+		if (_bossAvoidRemaining > 0.0f && _bossAvoidDirection.LengthSquared() > 0.001f)
+		{
+			return (_bossAvoidDirection * 0.88f + directDirection * 0.42f).Normalized();
+		}
+
+		return directDirection;
+	}
+
+	private Vector3 GetBossBlockingWallNormal()
+	{
+		for (int index = 0; index < GetSlideCollisionCount(); index++)
+		{
+			KinematicCollision3D collision = GetSlideCollision(index);
+			Vector3 normal = collision.GetNormal();
+			normal.Y = 0.0f;
+			if (normal.LengthSquared() > 0.16f)
+			{
+				return normal.Normalized();
+			}
+		}
+
+		return Vector3.Zero;
+	}
+
+	private void ResetBossObstacleAvoidance()
+	{
+		if (!IsBoss)
+		{
+			return;
+		}
+
+		_bossLastChasePosition = Vector3.Zero;
+		_bossAvoidDirection = Vector3.Zero;
+		_bossStuckTime = 0.0f;
+		_bossAvoidRemaining = 0.0f;
 	}
 
 	private void MoveAndSlideWithEffects(float step)
