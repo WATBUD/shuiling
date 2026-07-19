@@ -265,7 +265,7 @@ public partial class PartyPanel : PanelContainer
 		button.AddThemeFontSizeOverride("font_size", 14);
 		button.AddThemeColorOverride("font_color", selected ? new Color(1.0f, 0.94f, 0.68f) : new Color(0.9f, 0.94f, 0.98f));
 		button.Pressed += onPressed;
-		button.GuiInput += inputEvent => OnMemberButtonGuiInput(inputEvent, actor);
+		button.GuiInput += inputEvent => OnMemberButtonGuiInput(button, inputEvent, actor);
 		_memberList.AddChild(button);
 	}
 
@@ -375,7 +375,7 @@ public partial class PartyPanel : PanelContainer
 		}
 	}
 
-	private void OnMemberButtonGuiInput(InputEvent inputEvent, SimpleActor? actor)
+	private void OnMemberButtonGuiInput(Button sourceButton, InputEvent inputEvent, SimpleActor? actor)
 	{
 		if (actor == null || !IsInstanceValid(actor) || _player == null)
 		{
@@ -387,9 +387,13 @@ public partial class PartyPanel : PanelContainer
 			return;
 		}
 
-		SelectMember(actor);
-		ShowMemberContextMenu(actor, mouseButton.GlobalPosition);
-		AcceptEvent();
+		// Do not call SelectMember here: it rebuilds the complete roster and queues
+		// sourceButton for deletion while its GuiInput signal is still executing.
+		// Depending on the window/embed mode, that also closes the popup immediately.
+		_selected = actor;
+		UpdateDetails();
+		sourceButton.AcceptEvent();
+		ShowMemberContextMenu(actor, GetViewport().GetMousePosition());
 	}
 
 	private void ShowMemberContextMenu(SimpleActor actor, Vector2 screenPosition)
@@ -429,6 +433,7 @@ public partial class PartyPanel : PanelContainer
 		_memberContextMenu.SetItemDisabled(_memberContextMenu.GetItemIndex(4), !_player.CanEvolveActor(actor));
 		_memberContextMenu.AddItem(LocaleText.T("button.enhance_ability"), 5);
 		_memberContextMenu.Position = new Vector2I(Mathf.RoundToInt(screenPosition.X), Mathf.RoundToInt(screenPosition.Y));
+		_memberContextMenu.ResetSize();
 		_memberContextMenu.Popup();
 	}
 

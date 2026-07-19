@@ -80,6 +80,7 @@ public partial class SimpleActor : CharacterBody3D
 	private float _combatTargetSearchRemaining;
 	private float _externalRootMotionStabilizeRemaining;
 	private float _retaliationTargetRemaining;
+	private float _specialControlCooldownRemaining;
 	private Label3D? _nameplate;
 	private Node3D? _followLagBubble;
 	private string _petDialogueText = string.Empty;
@@ -447,6 +448,7 @@ public partial class SimpleActor : CharacterBody3D
 		UpdateStatusEffects(step);
 		_attackCooldownRemaining = Mathf.Max(_attackCooldownRemaining - step, 0.0f);
 		_retaliationTargetRemaining = Mathf.Max(_retaliationTargetRemaining - step, 0.0f);
+		_specialControlCooldownRemaining = Mathf.Max(_specialControlCooldownRemaining - step, 0.0f);
 		_combatTargetSearchRemaining = Mathf.Max(_combatTargetSearchRemaining - step, 0.0f);
 		Vector3 velocity = Velocity;
 
@@ -2446,6 +2448,13 @@ public partial class SimpleActor : CharacterBody3D
 			SpawnPlayerAttackCue(player.GlobalPosition);
 			PlayAttackAction(player.GlobalPosition, false);
 			playerController.ReceiveDamage(EffectiveAttack, this);
+			if (DisplayName == "name.monster.cave_spider"
+				&& _specialControlCooldownRemaining <= 0.0f
+				&& _rng.Randf() <= 0.38f
+				&& playerController.TryApplySpiderWebSuspension(this))
+			{
+				_specialControlCooldownRemaining = 8.0f;
+			}
 			AdvanceBossAttackPattern(playerController);
 			_attackCooldownRemaining = EffectiveAttackCooldown;
 		}

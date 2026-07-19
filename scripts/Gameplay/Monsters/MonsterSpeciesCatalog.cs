@@ -27,6 +27,7 @@ public sealed class DefaultMonsterSpeciesCatalog : IMonsterSpeciesCatalog
 	private static readonly string[] BadlandsMap = { "wild_badlands" };
 	private static readonly string[] SnowMap = { "wild_snow" };
 	private static readonly string[] ForestSnowMaps = { "wild_forest", "wild_snow" };
+	private static readonly string[] CaveMaps = { "cave" };
 
 	public static DefaultMonsterSpeciesCatalog Instance { get; } = new();
 
@@ -143,6 +144,8 @@ public sealed class DefaultMonsterSpeciesCatalog : IMonsterSpeciesCatalog
 		{
 			"res://assets/models/pets/cube_pets/animal-penguin.glb",
 		}, SnowMap),
+		new("name.monster.cave_bat", "Ranged", "loot.venom_sac", new Color(0.66f, 0.42f, 0.92f, 0.96f), System.Array.Empty<string>(), CaveMaps),
+		new("name.monster.cave_spider", "DPS", "loot.insect_wing", new Color(0.72f, 0.18f, 0.26f, 0.96f), System.Array.Empty<string>(), CaveMaps),
 	};
 
 	private readonly Dictionary<string, MonsterSpeciesDefinition> _byName = new();
@@ -230,7 +233,7 @@ public sealed class DefaultMonsterSpeciesCatalog : IMonsterSpeciesCatalog
 
 		foreach (string candidate in species.MapIds)
 		{
-			if (candidate == "*" || candidate == mapId)
+			if (candidate == "*" || candidate == mapId || (candidate == "cave" && mapId.Contains("_cave_")))
 			{
 				return true;
 			}

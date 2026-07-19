@@ -103,6 +103,10 @@ public partial class World : Node3D
 	public string ActiveMapId => _activeMapId;
 	public string GetActiveMapDisplayName()
 	{
+		if (IsCaveMapId(_activeMapId))
+		{
+			return GetCaveMapDisplayName(_activeMapId);
+		}
 		return _activeMapId == "city"
 			? LocaleText.T("map.city")
 			: GetWildMapDisplayName(_activeMapId);
@@ -117,6 +121,10 @@ public partial class World : Node3D
 				{
 					return CountLivingMonsters(_activeMapId);
 				}
+			}
+			if (IsCaveMapId(_activeMapId))
+			{
+				return CountLivingMonsters(_activeMapId);
 			}
 
 			return 0;
@@ -216,6 +224,7 @@ public partial class World : Node3D
 		float step = (float)delta;
 		UpdateMonsterRespawns(step);
 		UpdateWildBosses(step);
+		UpdateCaveRespawns(step);
 	}
 
 	private void CreateMaterials()
@@ -380,6 +389,7 @@ public partial class World : Node3D
 		CreateRuinSite();
 		CreateMonsterDen();
 		CreateWildMapThemeDressing(wildMap.Id);
+		CreateWildernessCaveEntrance(wildMap.Id);
 		CreateMapPortal("ReturnToCityPortal", _wildSpawnPosition + new Vector3(0.0f, 0.0f, 5.0f), "city", "portal.return_city");
 		ScatterProps();
 		ScatterDetailProps();
@@ -1959,6 +1969,10 @@ public partial class World : Node3D
 
 	private void BuildMonsterVisual(Node3D actor)
 	{
+		if (actor is SimpleActor caveMonster && TryBuildCaveMonsterVisual(caveMonster))
+		{
+			return;
+		}
 		if (actor is SimpleActor monsterActor && ExternalModelLibrary.TryAddActorModel(monsterActor))
 		{
 			return;
@@ -2401,6 +2415,10 @@ public partial class World : Node3D
 
 	public void RequestMapTravel(string targetMapId)
 	{
+		if (TryHandleCaveTravel(targetMapId))
+		{
+			return;
+		}
 		targetMapId = NormalizeMapId(targetMapId);
 		if (!IsKnownMapId(targetMapId) || _activeMapId == targetMapId)
 		{
@@ -2448,6 +2466,7 @@ public partial class World : Node3D
 	private void ApplySaveData(SaveGameData data)
 	{
 		string mapId = NormalizeMapId(data.ActiveMapId);
+		EnsureSavedCaveMap(mapId);
 		if (!IsKnownMapId(mapId))
 		{
 			mapId = "city";
@@ -2493,6 +2512,11 @@ public partial class World : Node3D
 		}
 
 		foreach (KeyValuePair<string, Node3D> entry in _wildMapRootsById)
+		{
+			SetMapRootActive(entry.Value, mapId == entry.Key);
+		}
+
+		foreach (KeyValuePair<string, Node3D> entry in _caveMapRootsById)
 		{
 			SetMapRootActive(entry.Value, mapId == entry.Key);
 		}
@@ -2746,7 +2770,7 @@ public partial class World : Node3D
 
 	private bool IsKnownMapId(string mapId)
 	{
-		return mapId == "city" || _wildMapRootsById.ContainsKey(mapId);
+		return mapId == "city" || _wildMapRootsById.ContainsKey(mapId) || _caveMapRootsById.ContainsKey(mapId);
 	}
 
 	private static string NormalizeMapId(string mapId)
