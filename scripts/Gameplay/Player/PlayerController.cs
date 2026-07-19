@@ -488,6 +488,11 @@ public partial class PlayerController : CharacterBody3D
 		}
 
 		float step = (float)delta;
+		if (UpdateSpiderWebSuspension(step))
+		{
+			UpdateSafeGroundPosition();
+			return;
+		}
 		_captureCooldownRemaining = Mathf.Max(_captureCooldownRemaining - step, 0.0f);
 		Vector3 velocity = Velocity;
 
