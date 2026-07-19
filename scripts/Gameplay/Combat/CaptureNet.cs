@@ -136,7 +136,7 @@ public partial class CaptureNet : Area3D
 
 		if (body is SimpleActor actor)
 		{
-			if (OwnerPlayer?.CaptureActor(actor) == true)
+			if (OwnerPlayer?.BeginCaptureChallenge(actor) == true)
 			{
 				_hasHit = true;
 				QueueFree();

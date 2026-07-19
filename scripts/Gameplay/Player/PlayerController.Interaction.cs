@@ -174,7 +174,7 @@ public partial class PlayerController
 		string questItemId = GetNpcQuestItemId(actor);
 		if (!TryConsumeInventoryItem(questItemId, NpcRecruitQuestItemCount))
 		{
-			PostSystemMessage(LocaleText.F("system.npc.waiting_items", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, GetInventoryItemDisplayName(questItemId)), new Color(0.86f, 0.84f, 0.72f));
+			PostSystemMessage(LocaleText.F("system.npc.waiting_items", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, GetInventoryItemDisplayName(questItemId)), new Color(0.86f, 0.84f, 0.72f), GameMessageChannel.Party);
 			return;
 		}
 
@@ -182,14 +182,14 @@ public partial class PlayerController
 		_completedNpcQuests.Add(actor);
 		actor.IncreaseAffinity(affinityReward);
 		SpawnWorldCombatEffect(LocaleText.F("effect.affinity_gain", affinityReward), new Color(0.62f, 1.0f, 0.78f, 0.92f), actor.GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 0.85f, 0.62f);
-		PostSystemMessage(LocaleText.F("system.npc.task_complete", actor.LocalizedDisplayName, actor.Affinity, NpcRecruitAffinityRequirement), new Color(0.78f, 1.0f, 0.82f));
+		PostSystemMessage(LocaleText.F("system.npc.task_complete", actor.LocalizedDisplayName, actor.Affinity, NpcRecruitAffinityRequirement), new Color(0.78f, 1.0f, 0.82f), GameMessageChannel.Party);
 		if (actor.Affinity >= NpcRecruitAffinityRequirement)
 		{
 			RecruitNpc(actor);
 		}
 		else
 		{
-			PostSystemMessage(LocaleText.F("system.npc.need_more_tasks", actor.LocalizedDisplayName), new Color(0.82f, 0.92f, 1.0f));
+			PostSystemMessage(LocaleText.F("system.npc.need_more_tasks", actor.LocalizedDisplayName), new Color(0.82f, 0.92f, 1.0f), GameMessageChannel.Party);
 		}
 	}
 

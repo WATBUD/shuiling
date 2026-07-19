@@ -99,7 +99,7 @@ public partial class PartyPanel : PanelContainer
 			child.QueueFree();
 		}
 
-		_titleLabel.Text = LocaleText.F("party.title", _player.ActiveParty.Count, _player.ActivePartyLimit, _player.CapturedCollection.Count);
+		_titleLabel.Text = LocaleText.F("party.title", _player.ActiveParty.Count, _player.ActivePartyLimit, _player.AvailableCompanionCount);
 		AddMemberButton(FormatPlayerListText(), _selected == _player, () => SelectMember(_player), null);
 
 		AddHeader(LocaleText.T("party.active"));
@@ -414,6 +414,7 @@ public partial class PartyPanel : PanelContainer
 				? LocaleText.T("button.replace_deploy")
 				: LocaleText.T("button.add_deploy");
 			_memberContextMenu.AddItem(deployText, 2);
+			_memberContextMenu.SetItemDisabled(_memberContextMenu.GetItemIndex(2), actor.IsDefeated || actor.IsAwaitingRecovery);
 		}
 
 		_memberContextMenu.AddSeparator();
@@ -540,7 +541,7 @@ public partial class PartyPanel : PanelContainer
 			return true;
 		}
 
-		return _selected is SimpleActor actor && IsInstanceValid(actor) && IsCaptured(actor);
+		return _selected is SimpleActor actor && IsInstanceValid(actor) && IsCaptured(actor) && !actor.IsAwaitingRecovery;
 	}
 
 	private bool IsCaptured(SimpleActor actor)
@@ -558,7 +559,7 @@ public partial class PartyPanel : PanelContainer
 
 		foreach (SimpleActor actor in _player.ActiveParty)
 		{
-			if (IsInstanceValid(actor) && actor.IsCaptured)
+			if (IsInstanceValid(actor) && actor.IsCaptured && !actor.IsAwaitingRecovery)
 			{
 				companions.Add(actor);
 			}
@@ -577,7 +578,7 @@ public partial class PartyPanel : PanelContainer
 
 		foreach (SimpleActor actor in _player.CapturedCollection)
 		{
-			if (IsInstanceValid(actor) && actor.IsCaptured && !_player.IsInActiveParty(actor))
+			if (IsInstanceValid(actor) && actor.IsCaptured && !actor.IsAwaitingRecovery && !_player.IsInActiveParty(actor))
 			{
 				companions.Add(actor);
 			}

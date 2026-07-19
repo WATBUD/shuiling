@@ -204,7 +204,7 @@ public partial class PlayerController
 		}
 
 		AddInventoryItem(itemId);
-		PostSystemMessage(LocaleText.F("system.shop.bought", GetInventoryItemDisplayName(itemId), safePrice, Gold), new Color(1.0f, 0.86f, 0.46f));
+		PostSystemMessage(LocaleText.F("system.shop.bought", GetInventoryItemDisplayName(itemId), safePrice, Gold), new Color(1.0f, 0.86f, 0.46f), GameMessageChannel.Loot);
 		_merchantShopPanel.RefreshAll();
 		return true;
 	}
@@ -230,7 +230,7 @@ public partial class PlayerController
 		}
 
 		actor.Capture(this);
-		PostSystemMessage(LocaleText.F("system.shop.bought_pet", actor.LocalizedDisplayName, price, Gold), new Color(0.64f, 1.0f, 0.82f));
+		PostSystemMessage(LocaleText.F("system.shop.bought_pet", actor.LocalizedDisplayName, price, Gold), new Color(0.64f, 1.0f, 0.82f), GameMessageChannel.Party);
 
 		if (_activeParty.Count < ActivePartyLimit)
 		{
@@ -256,7 +256,7 @@ public partial class PlayerController
 
 		RemoveInventoryItemSilently(itemId, 1);
 		Gold += safePrice;
-		PostSystemMessage(LocaleText.F("system.shop.sold", GetInventoryItemDisplayName(itemId), safePrice, Gold), new Color(0.86f, 1.0f, 0.62f));
+		PostSystemMessage(LocaleText.F("system.shop.sold", GetInventoryItemDisplayName(itemId), safePrice, Gold), new Color(0.86f, 1.0f, 0.62f), GameMessageChannel.Loot);
 		_inventoryPanel.RefreshAll();
 		_merchantShopPanel.RefreshAll();
 		return true;

@@ -146,14 +146,14 @@ public partial class PlayerController
 		layer.AddChild(_systemLogPanel);
 	}
 
-	public void PostSystemMessage(string message, Color color)
+	public void PostSystemMessage(string message, Color color, GameMessageChannel channel = GameMessageChannel.System)
 	{
 		if (_systemLogPanel == null)
 		{
 			return;
 		}
 
-		_systemLogPanel.AddMessage(message, color);
+		_systemLogPanel.AddMessage(message, color, channel);
 	}
 
 	private void CreateBossHud()
@@ -161,9 +161,54 @@ public partial class PlayerController
 		var layer = new CanvasLayer
 		{
 			Name = "BossHudLayer",
-			Layer = 72,
+			// Gameplay HUD stays below inventory/party/settings layers so the
+			// overview never covers controls while the player adjusts its options.
+			Layer = 29,
 		};
 		AddChild(layer);
+
+		_bossWorldStatusPanel = new PanelContainer
+		{
+			Name = "BossWorldStatusPanel",
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			AnchorLeft = 0.5f,
+			AnchorRight = 0.5f,
+			OffsetLeft = -360.0f,
+			OffsetRight = 360.0f,
+			OffsetTop = 10.0f,
+			OffsetBottom = 88.0f,
+			Visible = false,
+		};
+		var worldStatusStyle = new StyleBoxFlat
+		{
+			BgColor = new Color(0.025f, 0.030f, 0.040f, 0.92f),
+			BorderColor = new Color(0.72f, 0.56f, 0.22f, 0.82f),
+			ShadowColor = new Color(0.0f, 0.0f, 0.0f, 0.64f),
+			ShadowSize = 6,
+		};
+		worldStatusStyle.SetBorderWidthAll(1);
+		worldStatusStyle.SetCornerRadiusAll(6);
+		_bossWorldStatusPanel.AddThemeStyleboxOverride("panel", worldStatusStyle);
+		layer.AddChild(_bossWorldStatusPanel);
+
+		var statusMargin = new MarginContainer();
+		statusMargin.AddThemeConstantOverride("margin_left", 10);
+		statusMargin.AddThemeConstantOverride("margin_right", 10);
+		statusMargin.AddThemeConstantOverride("margin_top", 6);
+		statusMargin.AddThemeConstantOverride("margin_bottom", 7);
+		_bossWorldStatusPanel.AddChild(statusMargin);
+		var statusRows = new VBoxContainer();
+		statusRows.AddThemeConstantOverride("separation", 4);
+		statusMargin.AddChild(statusRows);
+		_bossWorldStatusTitleLabel = MakeHudLabel(LocaleText.T("boss.overview.title"), 15, new Color(1.0f, 0.84f, 0.46f));
+		_bossWorldStatusTitleLabel.Name = "BossWorldStatusTitle";
+		_bossWorldStatusTitleLabel.HorizontalAlignment = HorizontalAlignment.Center;
+		statusRows.AddChild(_bossWorldStatusTitleLabel);
+		_bossWorldStatusEntryLabel = MakeHudLabel(string.Empty, 17, new Color(1.0f, 0.78f, 0.28f));
+		_bossWorldStatusEntryLabel.Name = "BossWorldStatusEntry";
+		_bossWorldStatusEntryLabel.HorizontalAlignment = HorizontalAlignment.Center;
+		_bossWorldStatusEntryLabel.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
+		statusRows.AddChild(_bossWorldStatusEntryLabel);
 
 		_bossHudPanel = new PanelContainer
 		{
@@ -173,8 +218,8 @@ public partial class PlayerController
 			AnchorRight = 0.5f,
 			OffsetLeft = -330.0f,
 			OffsetRight = 330.0f,
-			OffsetTop = 18.0f,
-			OffsetBottom = 92.0f,
+			OffsetTop = 110.0f,
+			OffsetBottom = 184.0f,
 			Visible = false,
 		};
 		var healthPanelStyle = new StyleBoxFlat
@@ -246,8 +291,8 @@ public partial class PlayerController
 			AnchorRight = 0.5f,
 			OffsetLeft = -365.0f,
 			OffsetRight = 365.0f,
-			OffsetTop = 108.0f,
-			OffsetBottom = 218.0f,
+			OffsetTop = 194.0f,
+			OffsetBottom = 304.0f,
 			PivotOffset = new Vector2(365.0f, 55.0f),
 			Visible = false,
 		};
@@ -284,15 +329,158 @@ public partial class PlayerController
 		announcementRows.AddChild(_bossAnnouncementBodyLabel);
 	}
 
+	public void RefreshBossWorldStatus(bool showOverview)
+	{
+		if (_bossWorldStatusPanel == null || GetParent() is not World world)
+		{
+			return;
+		}
+
+		IReadOnlyList<World.BossStatusSnapshot> snapshots = world.GetBossStatusSnapshots();
+		var livingBosses = new List<World.BossStatusSnapshot>(snapshots.Count);
+		foreach (World.BossStatusSnapshot snapshot in snapshots)
+		{
+			if (snapshot.IsAlive)
+			{
+				livingBosses.Add(snapshot);
+			}
+		}
+
+		var signatureParts = new List<string>(livingBosses.Count + 1) { LocaleText.CurrentLanguage };
+		foreach (World.BossStatusSnapshot snapshot in livingBosses)
+		{
+			signatureParts.Add(snapshot.MapId);
+		}
+		string signature = string.Join("|", signatureParts);
+		if (!showOverview && signature == _bossWorldStatusSignature)
+		{
+			return;
+		}
+
+		_bossWorldStatusSignature = signature;
+		StartBossWorldStatusSequence(livingBosses);
+	}
+
+	private void StartBossWorldStatusSequence(IReadOnlyList<World.BossStatusSnapshot> livingBosses)
+	{
+		_bossWorldStatusTween?.Kill();
+		if (!_bossAnnouncementsEnabled || livingBosses.Count == 0)
+		{
+			_bossWorldStatusPanel.Visible = false;
+			return;
+		}
+
+		_bossWorldStatusPanel.Visible = true;
+		_bossWorldStatusPanel.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+		_bossWorldStatusTween = CreateTween();
+		for (int index = 0; index < livingBosses.Count; index++)
+		{
+			World.BossStatusSnapshot snapshot = livingBosses[index];
+			int sequenceNumber = index + 1;
+			_bossWorldStatusTween.TweenCallback(Callable.From(() =>
+			{
+				_bossWorldStatusTitleLabel.Text = LocaleText.F("boss.overview.sequence", sequenceNumber, livingBosses.Count);
+				_bossWorldStatusEntryLabel.Text = LocaleText.F("boss.overview.entry", snapshot.MapName, snapshot.BossName);
+				_bossWorldStatusPanel.Visible = true;
+			}));
+			_bossWorldStatusTween.SetEase(Tween.EaseType.Out).SetTrans(Tween.TransitionType.Quad);
+			_bossWorldStatusTween.TweenProperty(
+				_bossWorldStatusPanel,
+				"modulate",
+				new Color(1.0f, 1.0f, 1.0f, _bossAnnouncementOpacity),
+				0.35f);
+			_bossWorldStatusTween.TweenInterval(4.15f);
+			_bossWorldStatusTween.SetEase(Tween.EaseType.In).SetTrans(Tween.TransitionType.Quad);
+			_bossWorldStatusTween.TweenProperty(
+				_bossWorldStatusPanel,
+				"modulate",
+				new Color(1.0f, 1.0f, 1.0f, 0.0f),
+				0.50f);
+		}
+		_bossWorldStatusTween.TweenCallback(Callable.From(() => _bossWorldStatusPanel.Visible = false));
+	}
+
+	public void SetBossAnnouncementsEnabled(bool enabled)
+	{
+		_bossAnnouncementsEnabled = enabled;
+		if (!enabled)
+		{
+			_bossWorldStatusTween?.Kill();
+			if (_bossWorldStatusPanel != null)
+			{
+				_bossWorldStatusPanel.Visible = false;
+			}
+		}
+		if (!enabled && _bossAnnouncementPanel != null)
+		{
+			_bossAnnouncementTween?.Kill();
+			_bossAnnouncementPanel.Visible = false;
+		}
+		if (enabled)
+		{
+			RefreshBossWorldStatus(true);
+		}
+	}
+
+	public void SetBossAnnouncementOpacity(float opacity)
+	{
+		_bossAnnouncementOpacity = Mathf.Clamp(opacity, 0.20f, 1.0f);
+		if (_bossWorldStatusPanel != null)
+		{
+			_bossWorldStatusPanel.Modulate = new Color(1.0f, 1.0f, 1.0f, _bossAnnouncementOpacity);
+		}
+		if (_bossAnnouncementPanel != null && _bossAnnouncementPanel.Visible)
+		{
+			_bossAnnouncementPanel.Modulate = new Color(1.0f, 1.0f, 1.0f, _bossAnnouncementOpacity);
+		}
+	}
+
+	private void UpdateBossWorldStatusHud(float step)
+	{
+		_bossWorldStatusRefreshRemaining = Mathf.Max(_bossWorldStatusRefreshRemaining - step, 0.0f);
+		if (_bossWorldStatusRefreshRemaining > 0.0f)
+		{
+			return;
+		}
+
+		_bossWorldStatusRefreshRemaining = 0.50f;
+		RefreshBossWorldStatus(false);
+	}
+
 	public void SetActiveBoss(SimpleActor? boss)
 	{
-		_activeBoss = boss != null && IsInstanceValid(boss) && !boss.IsDefeated ? boss : null;
-		UpdateBossHud();
+		SimpleActor? validBoss = boss != null && IsInstanceValid(boss) && !boss.IsDefeated ? boss : null;
+		if (_activeBoss != validBoss)
+		{
+			_bossHudCombatVisibleRemaining = 0.0f;
+		}
+		_activeBoss = validBoss;
+		UpdateBossHud(0.0f);
+	}
+
+	public void NotifyBossCombat(SimpleActor boss)
+	{
+		if (!IsInstanceValid(boss) || !boss.IsBoss || boss.IsDefeated || !boss.Visible)
+		{
+			return;
+		}
+
+		_activeBoss = boss;
+		_bossHudCombatVisibleRemaining = 8.0f;
+		UpdateBossHud(0.0f);
 	}
 
 	public void ShowBossAppeared(SimpleActor boss, string mapName)
 	{
-		SetActiveBoss(boss);
+		if (boss.Visible)
+		{
+			SetActiveBoss(boss);
+		}
+		RefreshBossWorldStatus(false);
+		PostSystemMessage(
+			LocaleText.F("boss.announcement.location", boss.LocalizedDisplayName, mapName),
+			new Color(1.0f, 0.76f, 0.24f),
+			GameMessageChannel.System);
 		ShowBossMessage(
 			LocaleText.T("boss.announcement.appeared"),
 			LocaleText.F("boss.announcement.location", boss.LocalizedDisplayName, mapName),
@@ -302,6 +490,10 @@ public partial class PlayerController
 	public void ShowBossEnraged(SimpleActor boss)
 	{
 		SetActiveBoss(boss);
+		PostSystemMessage(
+			LocaleText.F("boss.announcement.enraged_body", boss.LocalizedDisplayName),
+			new Color(1.0f, 0.30f, 0.14f),
+			GameMessageChannel.Combat);
 		ShowBossMessage(
 			LocaleText.T("boss.announcement.enraged"),
 			LocaleText.F("boss.announcement.enraged_body", boss.LocalizedDisplayName),
@@ -314,6 +506,11 @@ public partial class PlayerController
 		{
 			SetActiveBoss(null);
 		}
+		RefreshBossWorldStatus(false);
+		PostSystemMessage(
+			LocaleText.F("boss.announcement.defeated_body", boss.LocalizedDisplayName),
+			new Color(1.0f, 0.82f, 0.28f),
+			GameMessageChannel.Combat);
 		ShowBossMessage(
 			LocaleText.T("boss.announcement.defeated"),
 			LocaleText.F("boss.announcement.defeated_body", boss.LocalizedDisplayName),
@@ -322,7 +519,7 @@ public partial class PlayerController
 
 	private void ShowBossMessage(string title, string body, Color accentColor)
 	{
-		if (_bossAnnouncementPanel == null)
+		if (_bossAnnouncementPanel == null || !_bossAnnouncementsEnabled)
 		{
 			return;
 		}
@@ -336,7 +533,7 @@ public partial class PlayerController
 		_bossAnnouncementPanel.Scale = new Vector2(0.94f, 0.94f);
 		_bossAnnouncementTween = CreateTween();
 		_bossAnnouncementTween.SetEase(Tween.EaseType.Out).SetTrans(Tween.TransitionType.Back);
-		_bossAnnouncementTween.TweenProperty(_bossAnnouncementPanel, "modulate", Colors.White, 0.22f);
+		_bossAnnouncementTween.TweenProperty(_bossAnnouncementPanel, "modulate", new Color(1.0f, 1.0f, 1.0f, _bossAnnouncementOpacity), 0.22f);
 		_bossAnnouncementTween.Parallel().TweenProperty(_bossAnnouncementPanel, "scale", Vector2.One, 0.22f);
 		_bossAnnouncementTween.TweenInterval(3.2f);
 		_bossAnnouncementTween.SetEase(Tween.EaseType.In).SetTrans(Tween.TransitionType.Quad);
@@ -344,7 +541,7 @@ public partial class PlayerController
 		_bossAnnouncementTween.TweenCallback(Callable.From(() => _bossAnnouncementPanel.Visible = false));
 	}
 
-	private void UpdateBossHud()
+	private void UpdateBossHud(float step)
 	{
 		if (_bossHudPanel == null)
 		{
@@ -354,6 +551,14 @@ public partial class PlayerController
 		if (_activeBoss == null || !IsInstanceValid(_activeBoss) || _activeBoss.IsDefeated || !_activeBoss.Visible)
 		{
 			_activeBoss = null;
+			_bossHudCombatVisibleRemaining = 0.0f;
+			_bossHudPanel.Visible = false;
+			return;
+		}
+
+		_bossHudCombatVisibleRemaining = Mathf.Max(_bossHudCombatVisibleRemaining - Mathf.Max(step, 0.0f), 0.0f);
+		if (_bossHudCombatVisibleRemaining <= 0.0f)
+		{
 			_bossHudPanel.Visible = false;
 			return;
 		}
@@ -440,6 +645,14 @@ public partial class PlayerController
 		_minimapPanel = new MinimapPanel();
 		layer.AddChild(_minimapPanel);
 		_minimapPanel.Bind(this);
+	}
+
+	public void RefreshMinimap()
+	{
+		if (_minimapPanel != null && IsInstanceValid(_minimapPanel))
+		{
+			_minimapPanel.RefreshMapInfo();
+		}
 	}
 
 	private void UpdateMouseModeForPanels()

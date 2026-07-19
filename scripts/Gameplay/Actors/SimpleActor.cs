@@ -53,6 +53,8 @@ public partial class SimpleActor : CharacterBody3D
 	private bool _isInActiveParty;
 	private bool _isMountedByPlayer;
 	private bool _isDefeated;
+	private bool _isAwaitingRecovery;
+	private string _fallenMapId = string.Empty;
 	private bool _isWorldMapActive = true;
 	private uint _defaultCollisionLayer;
 	private uint _defaultCollisionMask;
@@ -260,6 +262,8 @@ public partial class SimpleActor : CharacterBody3D
 	public float MountSeatHeight => Mathf.Max(GetVisualTopY(this) + 0.16f, 0.9f);
 	public void SetMountedByPlayer(bool mounted) => _isMountedByPlayer = mounted;
 	public bool IsDefeated => _isDefeated;
+	public bool IsAwaitingRecovery => _isAwaitingRecovery;
+	public string FallenMapId => _fallenMapId;
 	public bool IsActiveWorldTarget => !_isCaptured && !_isDefeated && _isWorldMapActive && IsVisibleInTree();
 	public bool IsHostileToPlayer => ActorKind == "monster" && IsActiveWorldTarget;
 	public CompanionBuildLoadout BuildLoadout
@@ -296,7 +300,9 @@ public partial class SimpleActor : CharacterBody3D
 	{
 		get
 		{
-			return _isDefeated
+			return _isAwaitingRecovery
+				? LocaleText.T("actor.state.awaiting_recovery")
+				: _isDefeated
 				? LocaleText.T("actor.state.defeated")
 				: _isCaptured
 					? _isInActiveParty ? LocaleText.T("actor.state.active") : LocaleText.T("actor.state.stored")
@@ -561,6 +567,8 @@ public partial class SimpleActor : CharacterBody3D
 	{
 		_isCaptured = true;
 		_isDefeated = false;
+		_isAwaitingRecovery = false;
+		_fallenMapId = string.Empty;
 		_followTarget = followTarget;
 		_isInActiveParty = false;
 		_waitTime = 0.0f;
@@ -634,6 +642,61 @@ public partial class SimpleActor : CharacterBody3D
 		Visible = false;
 		SetPhysicsProcess(false);
 		RefreshNameplate();
+	}
+
+	public bool TryRecoverFallenCompanion(PlayerController followTarget, float pickupRadius)
+	{
+		if (!_isCaptured
+			|| !_isDefeated
+			|| !_isAwaitingRecovery
+			|| _followTarget != followTarget
+			|| followTarget.GetParent() is not World world
+			|| world.ActiveMapId != _fallenMapId
+			|| GlobalPosition.DistanceTo(followTarget.GlobalPosition) > pickupRadius)
+		{
+			return false;
+		}
+
+		_isAwaitingRecovery = false;
+		_isInActiveParty = false;
+		Velocity = Vector3.Zero;
+		CollisionLayer = 0;
+		CollisionMask = 0;
+		Visible = false;
+		SetPhysicsProcess(false);
+		RefreshNameplate();
+		return true;
+	}
+
+	public void UpdateFallenMapVisibility(string activeMapId)
+	{
+		if (_isCaptured && _isDefeated && _isAwaitingRecovery)
+		{
+			Visible = activeMapId == _fallenMapId;
+		}
+	}
+
+	public void RestoreCapturedState(PlayerController followTarget, ActorSaveData data)
+	{
+		Capture(followTarget);
+		ApplySaveData(data);
+		_followTarget = followTarget;
+		_isCaptured = true;
+		_isInActiveParty = false;
+		if (_isDefeated)
+		{
+			CurrentHealth = 0;
+			Velocity = Vector3.Zero;
+			Visible = _isAwaitingRecovery;
+			CollisionLayer = _isAwaitingRecovery ? _defaultCollisionLayer : 0;
+			CollisionMask = _isAwaitingRecovery ? _defaultCollisionMask : 0;
+			SetPhysicsProcess(false);
+			ApplyDefeatedPose();
+			RefreshNameplate();
+			return;
+		}
+
+		StoreInCollection();
 	}
 
 	public void SetFollowSlot(int followSlot)
@@ -927,6 +990,10 @@ public partial class SimpleActor : CharacterBody3D
 			Level = Level,
 			MaxHealth = MaxHealth,
 			CurrentHealth = CurrentHealth,
+			IsDefeated = _isDefeated,
+			IsAwaitingRecovery = _isAwaitingRecovery,
+			FallenMapId = _fallenMapId,
+			WorldPosition = new SaveVector3 { X = GlobalPosition.X, Y = GlobalPosition.Y, Z = GlobalPosition.Z },
 			Attack = Attack,
 			Defense = Defense,
 			MoveSpeed = MoveSpeed,
@@ -962,7 +1029,10 @@ public partial class SimpleActor : CharacterBody3D
 		DisplayName = data.DisplayName;
 		Level = Mathf.Max(data.Level, 1);
 		MaxHealth = Mathf.Max(data.MaxHealth, 1);
-		CurrentHealth = Mathf.Clamp(data.CurrentHealth, 1, MaxHealth);
+		_isDefeated = data.IsDefeated || data.CurrentHealth <= 0;
+		_isAwaitingRecovery = _isDefeated && data.IsAwaitingRecovery;
+		_fallenMapId = data.FallenMapId;
+		CurrentHealth = _isDefeated ? 0 : Mathf.Clamp(data.CurrentHealth, 1, MaxHealth);
 		Attack = Mathf.Max(data.Attack, 0);
 		Defense = Mathf.Max(data.Defense, 0);
 		MoveSpeed = Mathf.Clamp(data.MoveSpeed, 0.3f, 20.0f);
@@ -1001,7 +1071,7 @@ public partial class SimpleActor : CharacterBody3D
 		_buildConfigured = true;
 		_buildStatsDirty = true;
 		RecalculateBuildStats();
-		CurrentHealth = Mathf.Clamp(data.CurrentHealth, 1, EffectiveMaxHealth);
+		CurrentHealth = _isDefeated ? 0 : Mathf.Clamp(data.CurrentHealth, 1, EffectiveMaxHealth);
 		RefreshNameplate();
 	}
 
@@ -1189,6 +1259,14 @@ public partial class SimpleActor : CharacterBody3D
 		RememberAttacker(attacker);
 		CurrentHealth = Mathf.Max(CurrentHealth - mitigatedDamage, 0);
 		SpawnCombatEffect(mitigatedDamage, attacker?.GetAttackColor() ?? new Color(1.0f, 0.5f, 0.22f, 0.92f));
+		if (IsBoss && attacker?._followTarget != null && IsInstanceValid(attacker._followTarget))
+		{
+			attacker._followTarget.NotifyBossCombat(this);
+		}
+		else if (attacker?.IsBoss == true && _followTarget != null && IsInstanceValid(_followTarget))
+		{
+			_followTarget.NotifyBossCombat(attacker);
+		}
 		if (IsBoss && !_bossEnraged && CurrentHealth > 0 && HealthRatio <= 0.50f)
 		{
 			TriggerBossEnrage(attacker);
@@ -1246,18 +1324,20 @@ public partial class SimpleActor : CharacterBody3D
 
 	public bool ReviveFromCaretaker(PlayerController followTarget)
 	{
-		if (!_isCaptured || !_isDefeated)
+		if (!_isCaptured || !_isDefeated || _isAwaitingRecovery)
 		{
 			return false;
 		}
 
 		_isDefeated = false;
+		_isAwaitingRecovery = false;
+		_fallenMapId = string.Empty;
 		_followTarget = followTarget;
 		CurrentHealth = Mathf.Max(Mathf.RoundToInt(EffectiveMaxHealth * 0.65f), 1);
 		Velocity = Vector3.Zero;
 		Visible = _isInActiveParty;
-		CollisionLayer = _defaultCollisionLayer;
-		CollisionMask = _defaultCollisionMask;
+		CollisionLayer = _isInActiveParty ? _defaultCollisionLayer : 0;
+		CollisionMask = _isInActiveParty ? _defaultCollisionMask : 0;
 		SetPhysicsProcess(_isInActiveParty);
 		ApplyLivingPose();
 		if (_isInActiveParty)
@@ -1315,8 +1395,10 @@ public partial class SimpleActor : CharacterBody3D
 			return;
 		}
 
-		string capturedText = _isDefeated
-			? " [Dead]"
+		string capturedText = _isAwaitingRecovery
+			? LocaleText.T("actor.nameplate.awaiting_recovery")
+			: _isDefeated
+			? LocaleText.T("actor.nameplate.defeated")
 			: _isCaptured
 			? _isInActiveParty ? LocaleText.T("actor.nameplate.active") : LocaleText.T("actor.nameplate.stored")
 			: string.Empty;
@@ -1337,6 +1419,10 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			_nameplateHaloMaterial.AlbedoColor = new Color(markerColor.R, markerColor.G, markerColor.B, _isCaptured ? 0.45f : 0.30f);
 			_nameplateHaloMaterial.Emission = markerColor;
+		}
+		if (_nameplateHalo != null)
+		{
+			_nameplateHalo.Visible = !IsBoss;
 		}
 
 		UpdateNameplatePosition();
@@ -2490,6 +2576,9 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			Affinity = Mathf.Max(Affinity - 12, -100);
 			UpdateNegativeMoodAfterDefeat();
+			_isAwaitingRecovery = true;
+			_fallenMapId = _followTarget?.GetParent() is World world ? world.ActiveMapId : string.Empty;
+			_isInActiveParty = false;
 			CollisionLayer = _defaultCollisionLayer;
 			CollisionMask = _defaultCollisionMask;
 			Visible = true;
@@ -2497,6 +2586,10 @@ public partial class SimpleActor : CharacterBody3D
 			ApplyDefeatedPose();
 			SpawnCombatEffect(LocaleText.F("effect.affinity_loss", 12), new Color(1.0f, 0.28f, 0.22f, 0.92f), GlobalPosition + new Vector3(0.0f, 1.15f, 0.0f), 0.95f, 0.72f);
 			RefreshNameplate();
+			if (_followTarget != null && IsInstanceValid(_followTarget))
+			{
+				_followTarget.OnCompanionFallen(this);
+			}
 			return;
 		}
 
@@ -2508,7 +2601,7 @@ public partial class SimpleActor : CharacterBody3D
 
 		if (attacker?._followTarget != null && IsInstanceValid(attacker._followTarget))
 		{
-			attacker._followTarget.PostSystemMessage(LocaleText.F("system.combat.defeated", attacker.LocalizedDisplayName, LocalizedDisplayName), new Color(1.0f, 0.70f, 0.42f));
+			attacker._followTarget.PostSystemMessage(LocaleText.F("system.combat.defeated", attacker.LocalizedDisplayName, LocalizedDisplayName), new Color(1.0f, 0.70f, 0.42f), GameMessageChannel.Combat);
 			attacker._followTarget.GrantCombatExperience(ExperienceReward);
 			if (ActorKind == "monster")
 			{
@@ -2581,7 +2674,7 @@ public partial class SimpleActor : CharacterBody3D
 			SpawnWorldDrop(origin + RandomDropOffset(1.32f), PickGemDropId(), 1, 0);
 		}
 
-		player.PostSystemMessage(LocaleText.F("system.drop.loot", LocalizedDisplayName, LocaleText.T(MonsterLootCatalog.GetNameKey(primaryLootId))), new Color(1.0f, 0.86f, 0.48f));
+		player.PostSystemMessage(LocaleText.F("system.drop.loot", LocalizedDisplayName, LocaleText.T(MonsterLootCatalog.GetNameKey(primaryLootId))), new Color(1.0f, 0.86f, 0.48f), GameMessageChannel.Loot);
 	}
 
 	private void DropBossLoot(PlayerController player)
@@ -2606,7 +2699,7 @@ public partial class SimpleActor : CharacterBody3D
 			SpawnWorldDrop(origin + RandomDropOffset(1.88f), PickNonFreeSkillGem(BuildCatalog.GetSkillGemDefinitions()), 1, 0);
 		}
 
-		player.PostSystemMessage(LocaleText.F("system.drop.boss_loot", LocalizedDisplayName), new Color(1.0f, 0.78f, 0.22f));
+		player.PostSystemMessage(LocaleText.F("system.drop.boss_loot", LocalizedDisplayName), new Color(1.0f, 0.78f, 0.22f), GameMessageChannel.Loot);
 	}
 
 	private void SpawnWorldDrop(Vector3 position, string itemId, int amount, int goldAmount)

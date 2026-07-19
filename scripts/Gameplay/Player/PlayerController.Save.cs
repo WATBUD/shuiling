@@ -17,6 +17,8 @@ public partial class PlayerController
 			Gold = Gold,
 			CameraMode = CameraModeToSaveId(_cameraMode),
 			DamageTextScale = DamageTextScale,
+			BossAnnouncementsEnabled = BossAnnouncementsEnabled,
+			BossAnnouncementOpacity = BossAnnouncementOpacity,
 			InventoryItems = new Dictionary<string, int>(_inventoryItems),
 			MercenaryNextRefreshUnix = _mercenaryNextRefreshUnix,
 			MerchantNextRefreshUnix = _merchantNextRefreshUnix,
@@ -85,6 +87,8 @@ public partial class PlayerController
 		Defense = Mathf.Max(data.Defense, 0);
 		Gold = Mathf.Max(data.Gold, 0);
 		SetDamageTextScale(data.DamageTextScale);
+		SetBossAnnouncementsEnabled(data.BossAnnouncementsEnabled);
+		SetBossAnnouncementOpacity(data.BossAnnouncementOpacity);
 		SetCameraMode(CameraModeFromSaveId(data.CameraMode));
 		RestoreMercenaryOffers(data);
 		RestoreMerchantStock(data);
@@ -102,16 +106,17 @@ public partial class PlayerController
 		_activeParty.Clear();
 		_formationActorsBySlot.Clear();
 		_formationSlotsByActor.Clear();
-		foreach (SimpleActor actor in loadedCompanions)
+		for (int index = 0; index < loadedCompanions.Count; index++)
 		{
+			SimpleActor actor = loadedCompanions[index];
 			if (!IsInstanceValid(actor))
 			{
 				continue;
 			}
 
 			_capturedCollection.Add(actor);
-			actor.Capture(this);
-			actor.StoreInCollection();
+			ActorSaveData actorData = index < data.Companions.Count ? data.Companions[index] : actor.ExportSaveData();
+			actor.RestoreCapturedState(this, actorData);
 		}
 
 		foreach (int companionIndex in data.ActivePartyIndexes)
@@ -123,6 +128,10 @@ public partial class PlayerController
 		}
 
 		RestoreNpcQuestSets(data);
+		if (GetParent() is World world)
+		{
+			RefreshFallenCompanionMapVisibility(world.ActiveMapId);
+		}
 		_partyPanel.RefreshParty();
 		_inventoryPanel.RefreshAll();
 		_formationPanel.RefreshAll();

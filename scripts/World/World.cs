@@ -80,6 +80,7 @@ public partial class World : Node3D
 	private readonly Dictionary<string, int> _wildMonsterTargetCountsById = new();
 	private readonly Dictionary<string, SimpleActor> _wildBossesByMapId = new();
 	private readonly Dictionary<string, float> _wildBossRespawnRemainingById = new();
+	private readonly Dictionary<string, Vector3> _wildBossSpawnPositionsByMapId = new();
 	private readonly Dictionary<CollisionObject3D, (uint Layer, uint Mask)> _mapCollisionDefaults = new();
 	private readonly Vector3 _spawnCampCenter = new(0.0f, 0.0f, 8.0f);
 	private readonly Vector3 _mainCityCenter = new(0.0f, 0.0f, -20.0f);
@@ -97,8 +98,15 @@ public partial class World : Node3D
 	private string _activeMapId = "city";
 	private float _monsterRespawnRemaining;
 	private PlayerController _player = null!;
+	private bool _worldActorsGenerated;
 
 	public string ActiveMapId => _activeMapId;
+	public string GetActiveMapDisplayName()
+	{
+		return _activeMapId == "city"
+			? LocaleText.T("map.city")
+			: GetWildMapDisplayName(_activeMapId);
+	}
 	public int CurrentLivingMonsterCount
 	{
 		get
@@ -125,14 +133,15 @@ public partial class World : Node3D
 
 	private static readonly BossDefinition[] WildBosses =
 	{
-		new("wild_forest", "boss.forest.name", "name.monster.boar", "DPS", "loot.beast_hide", 12, 1450, 52, 27, 190, 120, 2.15f, new Color(0.42f, 0.92f, 0.30f, 0.94f)),
-		new("wild_marsh", "boss.marsh.name", "name.monster.slime", "Support", "loot.water_core", 14, 1750, 58, 34, 230, 150, 2.35f, new Color(0.24f, 0.88f, 0.82f, 0.94f)),
-		new("wild_badlands", "boss.badlands.name", "name.monster.lion", "DPS", "loot.red_horn", 17, 2250, 76, 40, 310, 210, 2.25f, new Color(1.0f, 0.32f, 0.06f, 0.96f)),
-		new("wild_snow", "boss.snow.name", "name.monster.bear", "Tank", "loot.dragon_scale", 19, 2750, 72, 55, 380, 260, 2.40f, new Color(0.54f, 0.86f, 1.0f, 0.96f)),
+		new("wild_forest", "boss.forest.name", "name.monster.boar", "DPS", "loot.beast_hide", 12, 1450, 52, 27, 190, 120, 2.78f, new Color(0.42f, 0.92f, 0.30f, 0.94f)),
+		new("wild_marsh", "boss.marsh.name", "name.monster.slime", "Support", "loot.water_core", 14, 1750, 58, 34, 230, 150, 3.05f, new Color(0.24f, 0.88f, 0.82f, 0.94f)),
+		new("wild_badlands", "boss.badlands.name", "name.monster.lion", "DPS", "loot.red_horn", 17, 2250, 76, 40, 310, 210, 2.92f, new Color(1.0f, 0.32f, 0.06f, 0.96f)),
+		new("wild_snow", "boss.snow.name", "name.monster.bear", "Tank", "loot.dragon_scale", 19, 2750, 72, 55, 380, 260, 3.15f, new Color(0.54f, 0.86f, 1.0f, 0.96f)),
 	};
 
 	private readonly record struct WildMapDefinition(string Id, string NameKey, string RootName, Color GroundColor);
 	private readonly record struct BossDefinition(string MapId, string NameKey, string SpeciesNameKey, string CombatRole, string PrimaryLootId, int Level, int MaxHealth, int Attack, int Defense, int ExperienceReward, int GoldReward, float VisualScale, Color AuraColor);
+	public readonly record struct BossStatusSnapshot(string MapId, string MapName, string BossName, bool IsAlive, int RespawnSeconds);
 	private readonly record struct CityNpcStation(string NameKey, Vector3 Offset, float YawDegrees, float WanderRadius, string Role);
 
 	private StandardMaterial3D _matGround = null!;
@@ -1584,6 +1593,15 @@ public partial class World : Node3D
 
 	private void SpawnActors()
 	{
+		// All wild maps share one persistent runtime state. They are populated once
+		// when the game world opens; travelling only changes visibility/activity and
+		// never rebuilds actors or rerolls their coordinates.
+		if (_worldActorsGenerated)
+		{
+			return;
+		}
+		_worldActorsGenerated = true;
+
 		foreach (WildMapDefinition wildMap in WildMaps)
 		{
 			int mapActorCount = Mathf.Max(ActorCount / WildMaps.Length, 8);
@@ -1603,6 +1621,7 @@ public partial class World : Node3D
 		_monsterRespawnRemaining = MonsterRespawnInterval;
 		UpdateActorMapActivity();
 		UpdateActiveBossHud(false);
+		_player.RefreshBossWorldStatus(true);
 	}
 
 	private SimpleActor SpawnMonsterForMap(string mapId)
@@ -1641,7 +1660,12 @@ public partial class World : Node3D
 		ScaleBossCollision(boss, definition.VisualScale);
 		AddBossAura(boss, definition.AuraColor, definition.VisualScale);
 
-		Vector3 spawnPosition = FindOpenBossSpawnPosition();
+		Vector3 spawnPosition;
+		if (!_wildBossSpawnPositionsByMapId.TryGetValue(definition.MapId, out spawnPosition))
+		{
+			spawnPosition = FindOpenBossSpawnPosition();
+			_wildBossSpawnPositionsByMapId[definition.MapId] = spawnPosition;
+		}
 		boss.Position = spawnPosition;
 		boss.HomePosition = spawnPosition;
 		_actorsRoot.AddChild(boss);
@@ -1653,11 +1677,12 @@ public partial class World : Node3D
 		if (definition.MapId == _activeMapId)
 		{
 			_player.SetActiveBoss(boss);
-			if (announce)
-			{
-				_player.ShowBossAppeared(boss, GetWildMapDisplayName(definition.MapId));
-			}
 		}
+		if (announce)
+		{
+			_player.ShowBossAppeared(boss, GetWildMapDisplayName(definition.MapId));
+		}
+		_player.RefreshBossWorldStatus(false);
 		return boss;
 	}
 
@@ -1669,7 +1694,9 @@ public partial class World : Node3D
 			return;
 		}
 
-		float collisionScale = Mathf.Clamp(visualScale * 0.72f, 1.35f, 1.85f);
+		// Keep the hit body imposing but slightly tighter than the oversized
+		// visual, so the larger boss can still navigate forests and structures.
+		float collisionScale = Mathf.Clamp(visualScale * 0.64f, 1.50f, 2.15f);
 		capsule.Radius *= collisionScale;
 		capsule.Height *= collisionScale;
 		collision.Position = new Vector3(0.0f, collision.Position.Y * collisionScale, 0.0f);
@@ -1683,21 +1710,6 @@ public partial class World : Node3D
 			Position = new Vector3(0.0f, 0.08f, 0.0f),
 		};
 		boss.AddChild(auraRoot);
-
-		var ringMaterial = MakeEmissiveMaterial(new Color(auraColor.R, auraColor.G, auraColor.B, 0.44f), 2.8f, 0.18f);
-		ringMaterial.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
-		var ring = new MeshInstance3D
-		{
-			Name = "BossGroundSigil",
-			Mesh = new TorusMesh
-			{
-				InnerRadius = 1.10f * visualScale,
-				OuterRadius = 1.28f * visualScale,
-			},
-			RotationDegrees = new Vector3(90.0f, 0.0f, 0.0f),
-			MaterialOverride = ringMaterial,
-		};
-		auraRoot.AddChild(ring);
 
 		var moteMaterial = new StandardMaterial3D
 		{
@@ -2404,7 +2416,11 @@ public partial class World : Node3D
 		}
 
 		UpdateActorMapActivity();
-		UpdateActiveBossHud(targetMapId != "city");
+		UpdateActiveBossHud(false);
+		if (_player != null && IsInstanceValid(_player))
+		{
+			_player.RefreshBossWorldStatus(true);
+		}
 	}
 
 	public SaveGameData ExportSaveData()
@@ -2441,7 +2457,7 @@ public partial class World : Node3D
 		foreach (ActorSaveData actorData in data.Player.Companions)
 		{
 			SimpleActor actor = CreateActor(actorData.ActorKind == "monster");
-			actor.Position = FromSaveVector(data.PlayerPosition);
+			actor.Position = FromSaveVector(actorData.IsAwaitingRecovery ? actorData.WorldPosition : data.PlayerPosition);
 			actor.HomePosition = actor.Position;
 			_actorsRoot.AddChild(actor);
 			actor.ApplySaveData(actorData);
@@ -2479,6 +2495,12 @@ public partial class World : Node3D
 		foreach (KeyValuePair<string, Node3D> entry in _wildMapRootsById)
 		{
 			SetMapRootActive(entry.Value, mapId == entry.Key);
+		}
+
+		if (_player != null && IsInstanceValid(_player))
+		{
+			_player.RefreshFallenCompanionMapVisibility(_activeMapId);
+			_player.RefreshMinimap();
 		}
 	}
 
@@ -2572,6 +2594,33 @@ public partial class World : Node3D
 		return mapId;
 	}
 
+	public IReadOnlyList<BossStatusSnapshot> GetBossStatusSnapshots()
+	{
+		var snapshots = new List<BossStatusSnapshot>(WildBosses.Length);
+		foreach (BossDefinition definition in WildBosses)
+		{
+			bool alive = _wildBossesByMapId.TryGetValue(definition.MapId, out SimpleActor? boss)
+				&& IsInstanceValid(boss)
+				&& !boss.IsDefeated;
+			float remaining = 0.0f;
+			if (!alive)
+			{
+				remaining = _wildBossRespawnRemainingById.TryGetValue(definition.MapId, out float savedRemaining)
+					? savedRemaining
+					: Mathf.Max(BossRespawnInterval, 15.0f);
+			}
+
+			snapshots.Add(new BossStatusSnapshot(
+				definition.MapId,
+				GetWildMapDisplayName(definition.MapId),
+				LocaleText.T(definition.NameKey),
+				alive,
+				alive ? 0 : Mathf.Max(Mathf.CeilToInt(remaining), 1)));
+		}
+
+		return snapshots;
+	}
+
 	private void UpdateMonsterRespawns(float step)
 	{
 		if (_actorsRoot == null || WildMaps.Length == 0)
@@ -2617,6 +2666,7 @@ public partial class World : Node3D
 				{
 					_player.SetActiveBoss(null);
 				}
+				_player.RefreshBossWorldStatus(false);
 				continue;
 			}
 

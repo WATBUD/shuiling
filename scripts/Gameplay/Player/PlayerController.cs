@@ -47,6 +47,7 @@ public partial class PlayerController : CharacterBody3D
 	private const int PetReviveGoldCost = 40;
 	private const float InteractionPromptRefreshSeconds = 0.12f;
 	private const float WorldDropCollectRefreshSeconds = 0.10f;
+	private const float FallenCompanionPickupRadius = 1.85f;
 	private const string ThirdPersonCameraModeId = "third_person";
 	private const string GodViewCameraModeId = "god_view";
 
@@ -143,9 +144,11 @@ public partial class PlayerController : CharacterBody3D
 	private SettingsPanel _settingsPanel = null!;
 	private PanelContainer _pauseMenuPanel = null!;
 	private MinimapPanel _minimapPanel = null!;
+	private CaptureRhythmPanel _captureRhythmPanel = null!;
 	private SystemLogPanel _systemLogPanel = null!;
 	private PanelContainer _bossAnnouncementPanel = null!;
 	private PanelContainer _bossHudPanel = null!;
+	private PanelContainer _bossWorldStatusPanel = null!;
 	private PanelContainer _captureAmmoPanel = null!;
 	private PanelContainer _npcQuestDialog = null!;
 	private PanelContainer _mapTravelDialog = null!;
@@ -160,6 +163,8 @@ public partial class PlayerController : CharacterBody3D
 	private Label _npcQuestRewardLabel = null!;
 	private Label _bossAnnouncementTitleLabel = null!;
 	private Label _bossAnnouncementBodyLabel = null!;
+	private Label _bossWorldStatusTitleLabel = null!;
+	private Label _bossWorldStatusEntryLabel = null!;
 	private Label _bossHudNameLabel = null!;
 	private Label _bossHudHealthLabel = null!;
 	private ProgressBar _bossHudHealthBar = null!;
@@ -183,10 +188,31 @@ public partial class PlayerController : CharacterBody3D
 	private float _footstepEffectRemaining;
 	private float _movementAnimationPhase;
 	private SimpleActor? _activeBoss;
+	private float _bossHudCombatVisibleRemaining;
 	private Tween? _bossAnnouncementTween;
+	private Tween? _bossWorldStatusTween;
+	private float _bossWorldStatusRefreshRemaining;
+	private bool _bossAnnouncementsEnabled = true;
+	private float _bossAnnouncementOpacity = 0.90f;
+	private string _bossWorldStatusSignature = string.Empty;
 
 	public IReadOnlyList<SimpleActor> CapturedCollection => _capturedCollection;
 	public IReadOnlyList<SimpleActor> ActiveParty => _activeParty;
+	public int AvailableCompanionCount
+	{
+		get
+		{
+			int count = 0;
+			foreach (SimpleActor actor in _capturedCollection)
+			{
+				if (IsInstanceValid(actor) && !actor.IsAwaitingRecovery)
+				{
+					count++;
+				}
+			}
+			return count;
+		}
+	}
 	public IReadOnlyList<ContractCompanionOffer> ContractCompanionOffers => _contractCompanionOffers;
 	public int MercenaryManualRefreshCost => MercenaryRefreshCost;
 	public int MerchantManualRefreshCost => MerchantRefreshCost;
@@ -195,6 +221,8 @@ public partial class PlayerController : CharacterBody3D
 	public string LocalizedPlayerName => LocaleText.T(PlayerName);
 	public CameraViewMode CameraMode => _cameraMode;
 	public float DamageTextScale => CombatEffect.DamageTextScale;
+	public bool BossAnnouncementsEnabled => _bossAnnouncementsEnabled;
+	public float BossAnnouncementOpacity => _bossAnnouncementOpacity;
 	public float HealthRatio => MaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)MaxHealth, 0.0f, 1.0f);
 	public int ExperienceToNextLevel => 60 + Level * 30;
 
@@ -211,6 +239,7 @@ public partial class PlayerController : CharacterBody3D
 		CreatePlayerVisual();
 		CreateTargetInfoPanel();
 		CreateMinimapPanel();
+		CreateCaptureRhythmPanel();
 		CreatePartyPanel();
 		CreateInventoryPanel();
 		CreateFormationPanel();
@@ -264,11 +293,17 @@ public partial class PlayerController : CharacterBody3D
 		UpdateMercenaryOfferRefresh();
 		UpdateMerchantStockRefresh();
 		UpdateInteractionPrompt((float)delta);
-		UpdateBossHud();
+		UpdateBossHud((float)delta);
+		UpdateBossWorldStatusHud((float)delta);
 	}
 
 	public override void _UnhandledInput(InputEvent @event)
 	{
+		if (_captureRhythmPanel != null && _captureRhythmPanel.IsChallengeActive)
+		{
+			return;
+		}
+
 		if (@event.IsActionPressed("ui_cancel"))
 		{
 			if (_mapTravelDialog != null && _mapTravelDialog.Visible)

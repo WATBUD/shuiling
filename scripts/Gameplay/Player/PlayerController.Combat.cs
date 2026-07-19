@@ -3,6 +3,49 @@ using System.Collections.Generic;
 
 public partial class PlayerController
 {
+	private void CreateCaptureRhythmPanel()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "CaptureRhythmLayer",
+			Layer = 90,
+		};
+		AddChild(layer);
+
+		_captureRhythmPanel = new CaptureRhythmPanel();
+		_captureRhythmPanel.ChallengeSucceeded += OnCaptureChallengeSucceeded;
+		_captureRhythmPanel.ChallengeFailed += OnCaptureChallengeFailed;
+		layer.AddChild(_captureRhythmPanel);
+	}
+
+	public bool BeginCaptureChallenge(SimpleActor actor)
+	{
+		if (!IsInstanceValid(actor)
+			|| !actor.CanBeCaptured
+			|| _capturedCollection.Contains(actor)
+			|| _captureRhythmPanel == null)
+		{
+			return false;
+		}
+
+		return _captureRhythmPanel.Begin(actor);
+	}
+
+	private void OnCaptureChallengeSucceeded(SimpleActor actor)
+	{
+		if (!CaptureActor(actor))
+		{
+			PostSystemMessage(LocaleText.T("system.capture.target_lost"), new Color(1.0f, 0.58f, 0.42f), GameMessageChannel.Party);
+		}
+	}
+
+	private void OnCaptureChallengeFailed(SimpleActor actor)
+	{
+		PostSystemMessage(
+			LocaleText.F("system.capture.rhythm_failed", actor.LocalizedDisplayName),
+			new Color(1.0f, 0.58f, 0.42f),
+			GameMessageChannel.Party);
+	}
 
 	private void ThrowCaptureNet()
 	{
@@ -43,7 +86,7 @@ public partial class PlayerController
 
 		_capturedCollection.Add(actor);
 		actor.Capture(this);
-		PostSystemMessage(LocaleText.F("system.capture.success", actor.LocalizedDisplayName), new Color(0.62f, 0.90f, 1.0f));
+		PostSystemMessage(LocaleText.F("system.capture.success", actor.LocalizedDisplayName), new Color(0.62f, 0.90f, 1.0f), GameMessageChannel.Party);
 
 		if (_activeParty.Count < ActivePartyLimit)
 		{
@@ -67,6 +110,10 @@ public partial class PlayerController
 		SpawnWorldCombatEffect($"-{mitigatedDamage}", hitColor, GlobalPosition + new Vector3(0.0f, 1.45f, 0.0f), 0.78f, 0.88f);
 		SpawnIncomingAttackCue(attacker, hitColor);
 		TriggerDamageFlash();
+		if (attacker?.IsBoss == true)
+		{
+			NotifyBossCombat(attacker);
+		}
 
 		if (CurrentHealth <= 0)
 		{
@@ -117,7 +164,7 @@ public partial class PlayerController
 			}
 		}
 
-		PostSystemMessage(LocaleText.F("system.exp.party_gain", experience), new Color(0.86f, 0.78f, 1.0f));
+		PostSystemMessage(LocaleText.F("system.exp.party_gain", experience), new Color(0.86f, 0.78f, 1.0f), GameMessageChannel.Combat);
 		_partyPanel.RefreshParty();
 	}
 
