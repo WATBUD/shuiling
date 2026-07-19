@@ -140,7 +140,12 @@ public partial class TargetInfoPanel : PanelContainer
 	private void UpdateFromActor(SimpleActor actor)
 	{
 		int displayedHealth = actor.IsDefeated ? 0 : actor.CurrentHealth;
-		_nameLabel.Text = actor.LocalizedDisplayName;
+		_nameLabel.Text = actor.IsBoss ? $"★ {actor.LocalizedDisplayName} ★" : actor.LocalizedDisplayName;
+		_nameLabel.AddThemeColorOverride(
+			"font_color",
+			actor.IsBoss
+				? actor.IsBossEnraged ? new Color(1.0f, 0.24f, 0.10f) : new Color(1.0f, 0.78f, 0.30f)
+				: new Color(0.96f, 0.98f, 1.0f));
 		_typeLabel.Text = $"{actor.TypeName}  /  {actor.CombatSummary}";
 		_healthBar.Value = actor.HealthRatio * 100.0f;
 		_healthLabel.Text = LocaleText.F("stat.health_value", displayedHealth, actor.EffectiveMaxHealth);

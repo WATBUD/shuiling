@@ -238,11 +238,22 @@ public partial class PlayerController
 
 	private Node3D? GetNearestRevivalNpc()
 	{
+		// Every map shares the same world coordinates. Without a map guard, the
+		// hidden city caretaker can still be found by distance while exploring a
+		// wild map and pressing E opens its dialog remotely.
+		if (!IsInCityMap())
+		{
+			return null;
+		}
+
 		Node3D? nearest = null;
 		float bestDistance = RevivalNpcInteractRange;
 		foreach (Node node in GetTree().GetNodesInGroup("revival_npc"))
 		{
-			if (node is not Node3D npc || !IsInstanceValid(npc))
+			if (node is not Node3D npc
+				|| !IsInstanceValid(npc)
+				|| !npc.IsVisibleInTree()
+				|| !npc.IsProcessing())
 			{
 				continue;
 			}

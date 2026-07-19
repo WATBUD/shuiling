@@ -156,6 +156,219 @@ public partial class PlayerController
 		_systemLogPanel.AddMessage(message, color);
 	}
 
+	private void CreateBossHud()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "BossHudLayer",
+			Layer = 72,
+		};
+		AddChild(layer);
+
+		_bossHudPanel = new PanelContainer
+		{
+			Name = "BossHealthHud",
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			AnchorLeft = 0.5f,
+			AnchorRight = 0.5f,
+			OffsetLeft = -330.0f,
+			OffsetRight = 330.0f,
+			OffsetTop = 18.0f,
+			OffsetBottom = 92.0f,
+			Visible = false,
+		};
+		var healthPanelStyle = new StyleBoxFlat
+		{
+			BgColor = new Color(0.025f, 0.018f, 0.022f, 0.90f),
+			BorderColor = new Color(0.92f, 0.65f, 0.18f, 0.86f),
+			ShadowColor = new Color(0.0f, 0.0f, 0.0f, 0.72f),
+			ShadowSize = 8,
+		};
+		healthPanelStyle.SetBorderWidthAll(2);
+		healthPanelStyle.SetCornerRadiusAll(6);
+		_bossHudPanel.AddThemeStyleboxOverride("panel", healthPanelStyle);
+		layer.AddChild(_bossHudPanel);
+
+		var healthMargin = new MarginContainer();
+		healthMargin.AddThemeConstantOverride("margin_left", 16);
+		healthMargin.AddThemeConstantOverride("margin_right", 16);
+		healthMargin.AddThemeConstantOverride("margin_top", 7);
+		healthMargin.AddThemeConstantOverride("margin_bottom", 8);
+		_bossHudPanel.AddChild(healthMargin);
+
+		var healthRows = new VBoxContainer();
+		healthRows.AddThemeConstantOverride("separation", 4);
+		healthMargin.AddChild(healthRows);
+
+		var bossTitleRow = new HBoxContainer();
+		bossTitleRow.AddThemeConstantOverride("separation", 12);
+		healthRows.AddChild(bossTitleRow);
+		_bossHudNameLabel = MakeHudLabel(string.Empty, 19, new Color(1.0f, 0.78f, 0.30f));
+		_bossHudNameLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		_bossHudNameLabel.AddThemeColorOverride("font_outline_color", new Color(0.03f, 0.01f, 0.01f, 0.96f));
+		_bossHudNameLabel.AddThemeConstantOverride("outline_size", 5);
+		bossTitleRow.AddChild(_bossHudNameLabel);
+		_bossHudHealthLabel = MakeHudLabel(string.Empty, 15, new Color(1.0f, 0.92f, 0.82f));
+		_bossHudHealthLabel.HorizontalAlignment = HorizontalAlignment.Right;
+		bossTitleRow.AddChild(_bossHudHealthLabel);
+
+		_bossHudHealthBar = new ProgressBar
+		{
+			MinValue = 0.0,
+			MaxValue = 100.0,
+			ShowPercentage = false,
+			CustomMinimumSize = new Vector2(0.0f, 18.0f),
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+		};
+		var barBackground = new StyleBoxFlat
+		{
+			BgColor = new Color(0.10f, 0.075f, 0.075f, 0.96f),
+			BorderColor = new Color(0.48f, 0.32f, 0.18f, 0.92f),
+		};
+		barBackground.SetBorderWidthAll(1);
+		barBackground.SetCornerRadiusAll(4);
+		var barFill = new StyleBoxFlat
+		{
+			BgColor = new Color(0.86f, 0.11f, 0.07f, 0.98f),
+			BorderColor = new Color(1.0f, 0.50f, 0.12f, 0.95f),
+		};
+		barFill.SetBorderWidthAll(1);
+		barFill.SetCornerRadiusAll(4);
+		_bossHudHealthBar.AddThemeStyleboxOverride("background", barBackground);
+		_bossHudHealthBar.AddThemeStyleboxOverride("fill", barFill);
+		healthRows.AddChild(_bossHudHealthBar);
+
+		_bossAnnouncementPanel = new PanelContainer
+		{
+			Name = "BossAnnouncement",
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			AnchorLeft = 0.5f,
+			AnchorRight = 0.5f,
+			OffsetLeft = -365.0f,
+			OffsetRight = 365.0f,
+			OffsetTop = 108.0f,
+			OffsetBottom = 218.0f,
+			PivotOffset = new Vector2(365.0f, 55.0f),
+			Visible = false,
+		};
+		var announcementStyle = new StyleBoxFlat
+		{
+			BgColor = new Color(0.035f, 0.018f, 0.025f, 0.91f),
+			BorderColor = new Color(1.0f, 0.60f, 0.12f, 0.94f),
+			ShadowColor = new Color(0.0f, 0.0f, 0.0f, 0.78f),
+			ShadowSize = 12,
+		};
+		announcementStyle.SetBorderWidthAll(2);
+		announcementStyle.SetCornerRadiusAll(7);
+		_bossAnnouncementPanel.AddThemeStyleboxOverride("panel", announcementStyle);
+		layer.AddChild(_bossAnnouncementPanel);
+
+		var announcementMargin = new MarginContainer();
+		announcementMargin.AddThemeConstantOverride("margin_left", 24);
+		announcementMargin.AddThemeConstantOverride("margin_right", 24);
+		announcementMargin.AddThemeConstantOverride("margin_top", 12);
+		announcementMargin.AddThemeConstantOverride("margin_bottom", 12);
+		_bossAnnouncementPanel.AddChild(announcementMargin);
+		var announcementRows = new VBoxContainer();
+		announcementRows.AddThemeConstantOverride("separation", 4);
+		announcementMargin.AddChild(announcementRows);
+
+		_bossAnnouncementTitleLabel = MakeHudLabel(string.Empty, 27, new Color(1.0f, 0.70f, 0.18f));
+		_bossAnnouncementTitleLabel.HorizontalAlignment = HorizontalAlignment.Center;
+		_bossAnnouncementTitleLabel.AddThemeColorOverride("font_outline_color", new Color(0.04f, 0.01f, 0.01f, 0.98f));
+		_bossAnnouncementTitleLabel.AddThemeConstantOverride("outline_size", 7);
+		announcementRows.AddChild(_bossAnnouncementTitleLabel);
+		_bossAnnouncementBodyLabel = MakeHudLabel(string.Empty, 17, new Color(1.0f, 0.92f, 0.80f));
+		_bossAnnouncementBodyLabel.HorizontalAlignment = HorizontalAlignment.Center;
+		_bossAnnouncementBodyLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		announcementRows.AddChild(_bossAnnouncementBodyLabel);
+	}
+
+	public void SetActiveBoss(SimpleActor? boss)
+	{
+		_activeBoss = boss != null && IsInstanceValid(boss) && !boss.IsDefeated ? boss : null;
+		UpdateBossHud();
+	}
+
+	public void ShowBossAppeared(SimpleActor boss, string mapName)
+	{
+		SetActiveBoss(boss);
+		ShowBossMessage(
+			LocaleText.T("boss.announcement.appeared"),
+			LocaleText.F("boss.announcement.location", boss.LocalizedDisplayName, mapName),
+			new Color(1.0f, 0.66f, 0.14f));
+	}
+
+	public void ShowBossEnraged(SimpleActor boss)
+	{
+		SetActiveBoss(boss);
+		ShowBossMessage(
+			LocaleText.T("boss.announcement.enraged"),
+			LocaleText.F("boss.announcement.enraged_body", boss.LocalizedDisplayName),
+			new Color(1.0f, 0.20f, 0.08f));
+	}
+
+	public void ShowBossDefeated(SimpleActor boss)
+	{
+		if (_activeBoss == boss)
+		{
+			SetActiveBoss(null);
+		}
+		ShowBossMessage(
+			LocaleText.T("boss.announcement.defeated"),
+			LocaleText.F("boss.announcement.defeated_body", boss.LocalizedDisplayName),
+			new Color(1.0f, 0.84f, 0.30f));
+	}
+
+	private void ShowBossMessage(string title, string body, Color accentColor)
+	{
+		if (_bossAnnouncementPanel == null)
+		{
+			return;
+		}
+
+		_bossAnnouncementTween?.Kill();
+		_bossAnnouncementTitleLabel.Text = title;
+		_bossAnnouncementTitleLabel.AddThemeColorOverride("font_color", accentColor);
+		_bossAnnouncementBodyLabel.Text = body;
+		_bossAnnouncementPanel.Visible = true;
+		_bossAnnouncementPanel.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+		_bossAnnouncementPanel.Scale = new Vector2(0.94f, 0.94f);
+		_bossAnnouncementTween = CreateTween();
+		_bossAnnouncementTween.SetEase(Tween.EaseType.Out).SetTrans(Tween.TransitionType.Back);
+		_bossAnnouncementTween.TweenProperty(_bossAnnouncementPanel, "modulate", Colors.White, 0.22f);
+		_bossAnnouncementTween.Parallel().TweenProperty(_bossAnnouncementPanel, "scale", Vector2.One, 0.22f);
+		_bossAnnouncementTween.TweenInterval(3.2f);
+		_bossAnnouncementTween.SetEase(Tween.EaseType.In).SetTrans(Tween.TransitionType.Quad);
+		_bossAnnouncementTween.TweenProperty(_bossAnnouncementPanel, "modulate", new Color(1.0f, 1.0f, 1.0f, 0.0f), 0.48f);
+		_bossAnnouncementTween.TweenCallback(Callable.From(() => _bossAnnouncementPanel.Visible = false));
+	}
+
+	private void UpdateBossHud()
+	{
+		if (_bossHudPanel == null)
+		{
+			return;
+		}
+
+		if (_activeBoss == null || !IsInstanceValid(_activeBoss) || _activeBoss.IsDefeated || !_activeBoss.Visible)
+		{
+			_activeBoss = null;
+			_bossHudPanel.Visible = false;
+			return;
+		}
+
+		_bossHudPanel.Visible = true;
+		_bossHudNameLabel.Text = LocaleText.F("boss.hud.name", _activeBoss.Level, _activeBoss.LocalizedDisplayName);
+		_bossHudNameLabel.AddThemeColorOverride(
+			"font_color",
+			_activeBoss.IsBossEnraged ? new Color(1.0f, 0.24f, 0.10f) : new Color(1.0f, 0.78f, 0.30f));
+		int maxHealth = Mathf.Max(_activeBoss.EffectiveMaxHealth, 1);
+		int currentHealth = Mathf.Clamp(_activeBoss.CurrentHealth, 0, maxHealth);
+		_bossHudHealthLabel.Text = LocaleText.F("boss.hud.health", currentHealth, maxHealth);
+		_bossHudHealthBar.Value = currentHealth / (double)maxHealth * 100.0;
+	}
+
 	private void UpdateCaptureAmmoHud()
 	{
 		if (_captureAmmoCountLabel == null || _captureAmmoRechargeBar == null)

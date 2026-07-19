@@ -62,11 +62,14 @@ public partial class World : Node3D
 
 	[Export] public float MapSize { get; set; } = 150.0f;
 	[Export] public int PropCount { get; set; } = 110;
-	[Export] public int ActorCount { get; set; } = 36;
+	// Total initial monster population shared evenly by all wild maps.
+	// Four maps currently receive 18 monsters each (72 total).
+	[Export] public int ActorCount { get; set; } = 72;
 	[Export] public int CityNpcCount { get; set; } = 28;
 	[Export] public float MonsterRespawnInterval { get; set; } = 14.0f;
 	[Export] public float MonsterRespawnThresholdRatio { get; set; } = 0.55f;
-	[Export] public int MonsterRespawnBatchSize { get; set; } = 3;
+	[Export] public int MonsterRespawnBatchSize { get; set; } = 6;
+	[Export] public float BossRespawnInterval { get; set; } = 180.0f;
 	[Export] public int SeedValue { get; set; }
 
 	private readonly RandomNumberGenerator _rng = new();
@@ -75,6 +78,8 @@ public partial class World : Node3D
 	private readonly Dictionary<string, Node3D> _wildMapRootsById = new();
 	private readonly Dictionary<string, List<Vector3>> _wildObstaclePositionsById = new();
 	private readonly Dictionary<string, int> _wildMonsterTargetCountsById = new();
+	private readonly Dictionary<string, SimpleActor> _wildBossesByMapId = new();
+	private readonly Dictionary<string, float> _wildBossRespawnRemainingById = new();
 	private readonly Dictionary<CollisionObject3D, (uint Layer, uint Mask)> _mapCollisionDefaults = new();
 	private readonly Vector3 _spawnCampCenter = new(0.0f, 0.0f, 8.0f);
 	private readonly Vector3 _mainCityCenter = new(0.0f, 0.0f, -20.0f);
@@ -94,6 +99,21 @@ public partial class World : Node3D
 	private PlayerController _player = null!;
 
 	public string ActiveMapId => _activeMapId;
+	public int CurrentLivingMonsterCount
+	{
+		get
+		{
+			foreach (WildMapDefinition wildMap in WildMaps)
+			{
+				if (wildMap.Id == _activeMapId)
+				{
+					return CountLivingMonsters(_activeMapId);
+				}
+			}
+
+			return 0;
+		}
+	}
 
 	private static readonly WildMapDefinition[] WildMaps =
 	{
@@ -103,7 +123,16 @@ public partial class World : Node3D
 		new("wild_snow", "map.wild.snow", "WildSnowMap", new Color(0.76f, 0.84f, 0.90f)),
 	};
 
+	private static readonly BossDefinition[] WildBosses =
+	{
+		new("wild_forest", "boss.forest.name", "name.monster.boar", "DPS", "loot.beast_hide", 12, 1450, 52, 27, 190, 120, 2.15f, new Color(0.42f, 0.92f, 0.30f, 0.94f)),
+		new("wild_marsh", "boss.marsh.name", "name.monster.slime", "Support", "loot.water_core", 14, 1750, 58, 34, 230, 150, 2.35f, new Color(0.24f, 0.88f, 0.82f, 0.94f)),
+		new("wild_badlands", "boss.badlands.name", "name.monster.lion", "DPS", "loot.red_horn", 17, 2250, 76, 40, 310, 210, 2.25f, new Color(1.0f, 0.32f, 0.06f, 0.96f)),
+		new("wild_snow", "boss.snow.name", "name.monster.bear", "Tank", "loot.dragon_scale", 19, 2750, 72, 55, 380, 260, 2.40f, new Color(0.54f, 0.86f, 1.0f, 0.96f)),
+	};
+
 	private readonly record struct WildMapDefinition(string Id, string NameKey, string RootName, Color GroundColor);
+	private readonly record struct BossDefinition(string MapId, string NameKey, string SpeciesNameKey, string CombatRole, string PrimaryLootId, int Level, int MaxHealth, int Attack, int Defense, int ExperienceReward, int GoldReward, float VisualScale, Color AuraColor);
 	private readonly record struct CityNpcStation(string NameKey, Vector3 Offset, float YawDegrees, float WanderRadius, string Role);
 
 	private StandardMaterial3D _matGround = null!;
@@ -175,7 +204,9 @@ public partial class World : Node3D
 
 	public override void _Process(double delta)
 	{
-		UpdateMonsterRespawns((float)delta);
+		float step = (float)delta;
+		UpdateMonsterRespawns(step);
+		UpdateWildBosses(step);
 	}
 
 	private void CreateMaterials()
@@ -1563,10 +1594,15 @@ public partial class World : Node3D
 				SpawnMonsterForMap(wildMap.Id);
 			}
 		}
+		foreach (BossDefinition bossDefinition in WildBosses)
+		{
+			SpawnBossForMap(bossDefinition, false);
+		}
 
 		SpawnCityNpcs();
 		_monsterRespawnRemaining = MonsterRespawnInterval;
 		UpdateActorMapActivity();
+		UpdateActiveBossHud(false);
 	}
 
 	private SimpleActor SpawnMonsterForMap(string mapId)
@@ -1578,6 +1614,140 @@ public partial class World : Node3D
 		_actorsRoot.AddChild(actor);
 		actor.SetWorldMapActive(mapId == _activeMapId);
 		return actor;
+	}
+
+	private SimpleActor SpawnBossForMap(BossDefinition definition, bool announce)
+	{
+		UseWildMapObstacleContext(definition.MapId);
+		SimpleActor boss = CreateActor(true, definition.MapId, definition.SpeciesNameKey, definition.CombatRole, definition.Level);
+		boss.Name = $"Boss_{definition.MapId}";
+		boss.ConfigureStats(
+			definition.SpeciesNameKey,
+			definition.Level,
+			definition.MaxHealth,
+			definition.Attack,
+			definition.Defense,
+			definition.ExperienceReward,
+			definition.GoldReward);
+		boss.ConfigureGrowth("ability.monster.charge", 5);
+		boss.ConfigureBoss(definition.NameKey, definition.PrimaryLootId);
+		boss.MoveSpeed = definition.CombatRole == "Tank" ? 6.0f : 6.5f;
+		boss.AttackCooldown = definition.CombatRole == "Support" ? 1.45f : 1.25f;
+		boss.DetectionRadius = 23.0f;
+		boss.ChaseRadius = 32.0f;
+		boss.WanderRadius = 17.0f;
+
+		ScaleActorVisualChildren(boss, definition.VisualScale);
+		ScaleBossCollision(boss, definition.VisualScale);
+		AddBossAura(boss, definition.AuraColor, definition.VisualScale);
+
+		Vector3 spawnPosition = FindOpenBossSpawnPosition();
+		boss.Position = spawnPosition;
+		boss.HomePosition = spawnPosition;
+		_actorsRoot.AddChild(boss);
+		boss.CurrentHealth = boss.EffectiveMaxHealth;
+		boss.SetWorldMapActive(definition.MapId == _activeMapId);
+		_wildBossesByMapId[definition.MapId] = boss;
+		_wildBossRespawnRemainingById.Remove(definition.MapId);
+
+		if (definition.MapId == _activeMapId)
+		{
+			_player.SetActiveBoss(boss);
+			if (announce)
+			{
+				_player.ShowBossAppeared(boss, GetWildMapDisplayName(definition.MapId));
+			}
+		}
+		return boss;
+	}
+
+	private static void ScaleBossCollision(SimpleActor boss, float visualScale)
+	{
+		if (boss.GetNodeOrNull<CollisionShape3D>("CollisionShape3D") is not CollisionShape3D collision
+			|| collision.Shape is not CapsuleShape3D capsule)
+		{
+			return;
+		}
+
+		float collisionScale = Mathf.Clamp(visualScale * 0.72f, 1.35f, 1.85f);
+		capsule.Radius *= collisionScale;
+		capsule.Height *= collisionScale;
+		collision.Position = new Vector3(0.0f, collision.Position.Y * collisionScale, 0.0f);
+	}
+
+	private static void AddBossAura(SimpleActor boss, Color auraColor, float visualScale)
+	{
+		var auraRoot = new Node3D
+		{
+			Name = "BossAura",
+			Position = new Vector3(0.0f, 0.08f, 0.0f),
+		};
+		boss.AddChild(auraRoot);
+
+		var ringMaterial = MakeEmissiveMaterial(new Color(auraColor.R, auraColor.G, auraColor.B, 0.44f), 2.8f, 0.18f);
+		ringMaterial.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+		var ring = new MeshInstance3D
+		{
+			Name = "BossGroundSigil",
+			Mesh = new TorusMesh
+			{
+				InnerRadius = 1.10f * visualScale,
+				OuterRadius = 1.28f * visualScale,
+			},
+			RotationDegrees = new Vector3(90.0f, 0.0f, 0.0f),
+			MaterialOverride = ringMaterial,
+		};
+		auraRoot.AddChild(ring);
+
+		var moteMaterial = new StandardMaterial3D
+		{
+			AlbedoColor = auraColor,
+			EmissionEnabled = true,
+			Emission = new Color(auraColor.R, auraColor.G, auraColor.B),
+			EmissionEnergyMultiplier = 3.2f,
+			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+			BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled,
+		};
+		var processMaterial = new ParticleProcessMaterial
+		{
+			EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere,
+			EmissionSphereRadius = 0.74f * visualScale,
+			Direction = Vector3.Up,
+			Spread = 32.0f,
+			InitialVelocityMin = 0.42f,
+			InitialVelocityMax = 1.24f,
+			Gravity = new Vector3(0.0f, 0.32f, 0.0f),
+			ScaleMin = 0.45f,
+			ScaleMax = 1.28f,
+			Color = auraColor,
+		};
+		auraRoot.AddChild(new GpuParticles3D
+		{
+			Name = "BossAuraMotes",
+			Amount = 46,
+			Lifetime = 1.75f,
+			Preprocess = 1.75f,
+			Randomness = 0.62f,
+			VisibilityAabb = new Aabb(new Vector3(-5.0f, -0.5f, -5.0f), new Vector3(10.0f, 7.0f, 10.0f)),
+			ProcessMaterial = processMaterial,
+			DrawPass1 = new QuadMesh
+			{
+				Size = new Vector2(0.085f * visualScale, 0.28f * visualScale),
+				Material = moteMaterial,
+			},
+			Emitting = true,
+		});
+
+		auraRoot.AddChild(new OmniLight3D
+		{
+			Name = "BossAuraLight",
+			Position = new Vector3(0.0f, 1.15f * visualScale, 0.0f),
+			LightColor = new Color(auraColor.R, auraColor.G, auraColor.B),
+			LightEnergy = 1.65f,
+			OmniRange = 4.2f * visualScale,
+			ShadowEnabled = false,
+		});
 	}
 
 	private void UseWildMapObstacleContext(string mapId)
@@ -1997,6 +2167,22 @@ public partial class World : Node3D
 		return new Vector3((float)_rng.RandfRange(-half, half), 0.0f, (float)_rng.RandfRange(12.0f, half));
 	}
 
+	private Vector3 FindOpenBossSpawnPosition()
+	{
+		Vector3 fallback = FindOpenMonsterSpawnPosition();
+		for (int attempt = 0; attempt < 14; attempt++)
+		{
+			Vector3 position = FindOpenMonsterSpawnPosition();
+			fallback = position;
+			if (position.DistanceTo(_wildSpawnPosition) >= 30.0f && IsPositionClear(position, 5.2f))
+			{
+				return position;
+			}
+		}
+
+		return fallback;
+	}
+
 	private bool IsPositionClear(Vector3 position, float minDistance)
 	{
 		foreach (Vector3 obstaclePosition in _obstaclePositions)
@@ -2218,6 +2404,7 @@ public partial class World : Node3D
 		}
 
 		UpdateActorMapActivity();
+		UpdateActiveBossHud(targetMapId != "city");
 	}
 
 	public SaveGameData ExportSaveData()
@@ -2350,6 +2537,41 @@ public partial class World : Node3D
 		}
 	}
 
+	private void UpdateActiveBossHud(bool announce)
+	{
+		if (_player == null || !IsInstanceValid(_player))
+		{
+			return;
+		}
+
+		if (_wildBossesByMapId.TryGetValue(_activeMapId, out SimpleActor? boss)
+			&& IsInstanceValid(boss)
+			&& !boss.IsDefeated)
+		{
+			_player.SetActiveBoss(boss);
+			if (announce)
+			{
+				_player.ShowBossAppeared(boss, GetWildMapDisplayName(_activeMapId));
+			}
+			return;
+		}
+
+		_player.SetActiveBoss(null);
+	}
+
+	private string GetWildMapDisplayName(string mapId)
+	{
+		foreach (WildMapDefinition wildMap in WildMaps)
+		{
+			if (wildMap.Id == mapId)
+			{
+				return LocaleText.T(wildMap.NameKey);
+			}
+		}
+
+		return mapId;
+	}
+
 	private void UpdateMonsterRespawns(float step)
 	{
 		if (_actorsRoot == null || WildMaps.Length == 0)
@@ -2370,10 +2592,49 @@ public partial class World : Node3D
 		}
 	}
 
+	private void UpdateWildBosses(float step)
+	{
+		if (_actorsRoot == null || WildBosses.Length == 0)
+		{
+			return;
+		}
+
+		foreach (BossDefinition definition in WildBosses)
+		{
+			bool bossAlive = _wildBossesByMapId.TryGetValue(definition.MapId, out SimpleActor? boss)
+				&& IsInstanceValid(boss)
+				&& !boss.IsDefeated;
+			if (bossAlive)
+			{
+				_wildBossRespawnRemainingById.Remove(definition.MapId);
+				continue;
+			}
+
+			if (!_wildBossRespawnRemainingById.TryGetValue(definition.MapId, out float remaining))
+			{
+				_wildBossRespawnRemainingById[definition.MapId] = Mathf.Max(BossRespawnInterval, 15.0f);
+				if (definition.MapId == _activeMapId)
+				{
+					_player.SetActiveBoss(null);
+				}
+				continue;
+			}
+
+			remaining -= step;
+			if (remaining > 0.0f)
+			{
+				_wildBossRespawnRemainingById[definition.MapId] = remaining;
+				continue;
+			}
+
+			SpawnBossForMap(definition, true);
+		}
+	}
+
 	private void RespawnMonstersIfNeeded(string mapId)
 	{
 		int targetCount = GetWildMonsterTargetCount(mapId);
-		int livingCount = CountLivingMonsters(mapId);
+		int livingCount = CountLivingMonsters(mapId, false);
 		int threshold = Mathf.Max(1, Mathf.FloorToInt(targetCount * Mathf.Clamp(MonsterRespawnThresholdRatio, 0.1f, 0.95f)));
 		if (livingCount >= threshold)
 		{
@@ -2403,12 +2664,17 @@ public partial class World : Node3D
 		return Mathf.Max(ActorCount / Mathf.Max(WildMaps.Length, 1), 8);
 	}
 
-	private int CountLivingMonsters(string mapId)
+	private int CountLivingMonsters(string mapId, bool includeBosses = true)
 	{
 		int count = 0;
 		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
 		{
-			if (node is SimpleActor actor && IsInstanceValid(actor) && actor.MapId == mapId && !actor.IsDefeated && !actor.IsCaptured)
+			if (node is SimpleActor actor
+				&& IsInstanceValid(actor)
+				&& actor.MapId == mapId
+				&& !actor.IsDefeated
+				&& !actor.IsCaptured
+				&& (includeBosses || !actor.IsBoss))
 			{
 				count++;
 			}

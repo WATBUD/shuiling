@@ -21,6 +21,8 @@ public partial class CombatProjectile : Node3D
 	public bool IsMelee { get; set; }
 	public bool IsArrow { get; set; }
 	public string VisualSkillId { get; set; } = string.Empty;
+	public string ElementId { get; set; } = "physical";
+	public bool HasLifeSteal { get; set; }
 	public float Speed { get; set; } = 17.0f;
 	public float MaxRange { get; set; } = 10.0f;
 	public float HitRadius { get; set; } = 1.15f;
@@ -161,11 +163,14 @@ public partial class CombatProjectile : Node3D
 
 		if (Behavior.PierceCount > 0)
 		{
+			SpawnSpecialEffect(SkillAttackVfx.PierceEvent, target.GlobalPosition, _direction, HitRadius * 1.35f);
 			Behavior.PierceCount--;
 			return;
 		}
 
-		Finish(true);
+		// ResolveHit already created the skill-specific impact; do not create a
+		// second generic pulse at the same position.
+		Finish(false);
 	}
 
 	private void DetonateExplosion(Vector3 center)
@@ -182,15 +187,7 @@ public partial class CombatProjectile : Node3D
 			Attacker.ResolveProjectileHit(victim, splashDamage);
 		}
 
-		var blast = new CombatEffect
-		{
-			Text = string.Empty,
-			EffectColor = new Color(EffectColor.R, EffectColor.G, EffectColor.B, 0.85f),
-			Lifetime = 0.36f,
-			Radius = Behavior.ExplosionRadius,
-		};
-		AddSibling(blast);
-		blast.GlobalPosition = center;
+		SpawnSpecialEffect(SkillAttackVfx.ExplosionEvent, center, _direction, Behavior.ExplosionRadius);
 	}
 
 	private void SpawnSplitChildren(Vector3 origin)
@@ -201,6 +198,7 @@ public partial class CombatProjectile : Node3D
 		}
 
 		int childDamage = Mathf.Max(Mathf.RoundToInt(Damage * SplitDamageScale), 1);
+		SpawnSpecialEffect(SkillAttackVfx.SplitEvent, origin, _direction, HitRadius * 1.8f);
 		List<SimpleActor> nearby = Attacker.FindProjectileTargets(origin, ChainSearchRadius, _alreadyHit);
 		for (int index = 0; index < Behavior.SplitCount; index++)
 		{
@@ -225,6 +223,8 @@ public partial class CombatProjectile : Node3D
 				IsMelee = false,
 				IsArrow = IsArrow,
 				VisualSkillId = VisualSkillId,
+				ElementId = ElementId,
+				HasLifeSteal = HasLifeSteal,
 				Speed = Speed * 0.95f,
 				MaxRange = ChainSearchRadius,
 				HitRadius = HitRadius,
@@ -269,6 +269,7 @@ public partial class CombatProjectile : Node3D
 
 		Behavior.ChainBounces--;
 		Damage = Mathf.Max(Mathf.RoundToInt(Damage * ChainDamageScale), 1);
+		SpawnSpecialEffect(SkillAttackVfx.ChainEvent, fromPosition, next.GlobalPosition - fromPosition, HitRadius);
 		_homingTarget = next;
 		_direction = FlattenOrDefault(next.GlobalPosition - GlobalPosition, _direction);
 		_traveled = 0.0f;
@@ -277,7 +278,7 @@ public partial class CombatProjectile : Node3D
 		return true;
 	}
 
-	private void Finish(bool spawnPulse)
+	private void Finish(bool spawnDissipate)
 	{
 		if (_finished)
 		{
@@ -285,9 +286,9 @@ public partial class CombatProjectile : Node3D
 		}
 
 		_finished = true;
-		if (spawnPulse)
+		if (spawnDissipate)
 		{
-			SpawnImpactPulse(GlobalPosition, IsMelee ? HitRadius * 1.1f : HitRadius * 1.35f);
+			SpawnSpecialEffect(SkillAttackVfx.DissipateEvent, GlobalPosition, _direction, IsMelee ? HitRadius : HitRadius * 1.15f);
 		}
 
 		QueueFree();
@@ -295,15 +296,14 @@ public partial class CombatProjectile : Node3D
 
 	private void SpawnImpactPulse(Vector3 position, float radius)
 	{
-		var effect = new CombatEffect
-		{
-			Text = string.Empty,
-			EffectColor = EffectColor,
-			Lifetime = IsMelee ? 0.2f : 0.28f,
-			Radius = radius,
-		};
-		AddSibling(effect);
-		effect.GlobalPosition = position;
+		Node parent = GetTree().CurrentScene ?? GetParent();
+		SkillAttackVfx.SpawnImpact(parent, position + Vector3.Up * 0.10f, _direction, VisualSkillId, ElementId, EffectColor, radius, Behavior, HasLifeSteal);
+	}
+
+	private void SpawnSpecialEffect(string eventId, Vector3 position, Vector3 travelVector, float radius)
+	{
+		Node parent = GetTree().CurrentScene ?? GetParent();
+		SkillAttackVfx.SpawnSpecial(parent, eventId, position + Vector3.Up * 0.10f, travelVector, VisualSkillId, ElementId, EffectColor, radius, Behavior, HasLifeSteal);
 	}
 
 	private void FaceTravelDirection()
@@ -324,13 +324,19 @@ public partial class CombatProjectile : Node3D
 	{
 		if (IsMelee)
 		{
-			AddFxMesh(
-				"SlashBlade",
-				new BoxMesh { Size = new Vector3(HitRadius * 1.9f, 0.06f, HitRadius * 0.4f) },
-				Vector3.Zero,
-				new Vector3(0.0f, 0.0f, 24.0f),
-				new Color(1.0f, 0.92f, 0.58f, 0.92f)
-			);
+			int bladeCount = VisualSkillId == "gem.skill.whirlwind" ? 3 : 1;
+			for (int index = 0; index < bladeCount; index++)
+			{
+				AddFxMesh(
+					$"SlashBlade{index}",
+					new BoxMesh { Size = new Vector3(HitRadius * (VisualSkillId == "gem.skill.whirlwind" ? 2.35f : 1.9f), 0.055f, HitRadius * 0.34f) },
+					new Vector3(0.0f, index * 0.08f, 0.0f),
+					new Vector3(0.0f, index * (360.0f / bladeCount), index % 2 == 0 ? 18.0f : -18.0f),
+					new Color(1.0f, 0.92f, 0.58f, 0.90f)
+				);
+			}
+			AddProjectileTrail(new Color(EffectColor.R, EffectColor.G, EffectColor.B, 0.78f), VisualSkillId == "gem.skill.whirlwind" ? 26 : 12, 0.24f, HitRadius * 0.045f, Vector3.Zero);
+			AddSupportAccents();
 			return;
 		}
 
@@ -350,13 +356,17 @@ public partial class CombatProjectile : Node3D
 				new Vector3(90.0f, 0.0f, 0.0f),
 				EffectColor
 			);
+			AddProjectileTrail(new Color(0.96f, 0.76f, 0.26f, 0.68f), 10, 0.22f, 0.025f, new Vector3(0.0f, -1.2f, 0.0f));
+			AddSupportAccents();
 			return;
 		}
 
 		if (VisualSkillId == "gem.skill.laser")
 		{
-			AddFxMesh("LaserCore", new CapsuleMesh { Radius = 0.10f, Height = 1.45f }, Vector3.Zero, new Vector3(90.0f, 0.0f, 0.0f), new Color(0.55f, 0.92f, 1.0f, 0.96f));
-			AddFxMesh("LaserGlow", new CapsuleMesh { Radius = 0.20f, Height = 1.15f }, Vector3.Zero, new Vector3(90.0f, 0.0f, 0.0f), new Color(EffectColor.R, EffectColor.G, EffectColor.B, 0.38f));
+			AddFxMesh("LaserCore", new CapsuleMesh { Radius = 0.075f, Height = 1.70f }, Vector3.Zero, new Vector3(90.0f, 0.0f, 0.0f), new Color(0.82f, 0.98f, 1.0f, 0.98f));
+			AddFxMesh("LaserGlow", new CapsuleMesh { Radius = 0.19f, Height = 1.42f }, Vector3.Zero, new Vector3(90.0f, 0.0f, 0.0f), new Color(0.18f, 0.76f, 1.0f, 0.42f));
+			AddProjectileTrail(new Color(0.26f, 0.84f, 1.0f, 0.76f), 18, 0.30f, 0.035f, Vector3.Zero);
+			AddSupportAccents();
 			return;
 		}
 
@@ -364,6 +374,9 @@ public partial class CombatProjectile : Node3D
 		{
 			AddFxMesh("MeteorCore", new SphereMesh { Radius = 0.36f, Height = 0.72f }, Vector3.Zero, Vector3.Zero, new Color(0.30f, 0.20f, 0.16f, 1.0f));
 			AddFxMesh("MeteorFlame", new SphereMesh { Radius = 0.48f, Height = 0.96f }, new Vector3(0.0f, 0.0f, 0.24f), Vector3.Zero, new Color(1.0f, 0.28f, 0.05f, 0.62f));
+			AddProjectileTrail(new Color(1.0f, 0.18f, 0.025f, 0.86f), 34, 0.48f, 0.075f, new Vector3(0.0f, 1.4f, 0.0f));
+			AddProjectileTrail(new Color(0.22f, 0.18f, 0.16f, 0.52f), 18, 0.68f, 0.13f, new Vector3(0.0f, 0.7f, 0.0f));
+			AddSupportAccents();
 			return;
 		}
 
@@ -371,6 +384,8 @@ public partial class CombatProjectile : Node3D
 		{
 			AddFxMesh("FireballCore", new SphereMesh { Radius = 0.30f, Height = 0.60f }, Vector3.Zero, Vector3.Zero, new Color(1.0f, 0.78f, 0.18f, 1.0f));
 			AddFxMesh("FireballFlame", new SphereMesh { Radius = 0.42f, Height = 0.84f }, new Vector3(0.0f, 0.0f, 0.18f), Vector3.Zero, new Color(1.0f, 0.18f, 0.03f, 0.58f));
+			AddProjectileTrail(new Color(1.0f, 0.24f, 0.035f, 0.88f), 28, 0.42f, 0.06f, new Vector3(0.0f, 0.9f, 0.0f));
+			AddSupportAccents();
 			return;
 		}
 
@@ -388,6 +403,77 @@ public partial class CombatProjectile : Node3D
 			new Vector3(90.0f, 0.0f, 0.0f),
 			new Color(EffectColor.R, EffectColor.G, EffectColor.B, EffectColor.A * 0.5f)
 		);
+		AddProjectileTrail(new Color(EffectColor.R, EffectColor.G, EffectColor.B, 0.66f), 18, 0.34f, 0.04f, Vector3.Zero);
+		AddSupportAccents();
+	}
+
+	private void AddSupportAccents()
+	{
+		if (Behavior.SplitCount > 0)
+		{
+			AddFxMesh("SplitShardLeft", new BoxMesh { Size = new Vector3(0.07f, 0.07f, 0.55f) }, new Vector3(-0.22f, 0.0f, 0.05f), new Vector3(0.0f, -24.0f, 18.0f), new Color(0.82f, 0.92f, 1.0f, 0.78f));
+			AddFxMesh("SplitShardRight", new BoxMesh { Size = new Vector3(0.07f, 0.07f, 0.55f) }, new Vector3(0.22f, 0.0f, 0.05f), new Vector3(0.0f, 24.0f, -18.0f), new Color(0.82f, 0.92f, 1.0f, 0.78f));
+		}
+		if (Behavior.ChainBounces > 0)
+		{
+			AddFxMesh("ChainSparkA", new BoxMesh { Size = new Vector3(0.55f, 0.035f, 0.035f) }, Vector3.Zero, new Vector3(24.0f, 35.0f, 18.0f), new Color(0.72f, 0.94f, 1.0f, 0.88f));
+			AddFxMesh("ChainSparkB", new BoxMesh { Size = new Vector3(0.035f, 0.55f, 0.035f) }, Vector3.Zero, new Vector3(-18.0f, -20.0f, 32.0f), new Color(0.72f, 0.94f, 1.0f, 0.72f));
+		}
+		if (Behavior.PierceCount > 0)
+		{
+			AddFxMesh("PiercingTip", new CylinderMesh { TopRadius = 0.0f, BottomRadius = 0.15f, Height = 0.48f, RadialSegments = 12 }, new Vector3(0.0f, 0.0f, -0.52f), new Vector3(90.0f, 0.0f, 0.0f), new Color(0.92f, 0.98f, 1.0f, 0.92f));
+		}
+		if (Behavior.ExplosionRadius > 0.0f)
+		{
+			AddFxMesh("ExplosionCharge", new SphereMesh { Radius = 0.50f, Height = 1.0f }, Vector3.Zero, Vector3.Zero, new Color(1.0f, 0.30f, 0.045f, 0.20f));
+		}
+		if (HasLifeSteal)
+		{
+			AddFxMesh("LifeStealCore", new SphereMesh { Radius = 0.12f, Height = 0.24f }, new Vector3(0.0f, 0.18f, 0.0f), Vector3.Zero, new Color(0.72f, 0.16f, 0.92f, 0.78f));
+		}
+	}
+
+	private void AddProjectileTrail(Color color, int amount, float lifetime, float size, Vector3 gravity)
+	{
+		var particleMaterial = new StandardMaterial3D
+		{
+			AlbedoColor = color,
+			EmissionEnabled = true,
+			Emission = new Color(color.R, color.G, color.B),
+			EmissionEnergyMultiplier = 2.7f,
+			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+			BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled,
+		};
+		var trailMesh = new QuadMesh
+		{
+			Size = new Vector2(Mathf.Max(size, 0.022f), Mathf.Max(size * 3.2f, 0.075f)),
+			Material = particleMaterial,
+		};
+		var processMaterial = new ParticleProcessMaterial
+		{
+			EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere,
+			EmissionSphereRadius = Mathf.Max(size * 1.8f, 0.04f),
+			Direction = Vector3.Back,
+			Spread = 38.0f,
+			InitialVelocityMin = 0.15f,
+			InitialVelocityMax = 1.2f,
+			Gravity = gravity,
+			ScaleMin = 0.55f,
+			ScaleMax = 1.25f,
+			Color = color,
+		};
+		AddChild(new GpuParticles3D
+		{
+			Name = "ProjectileTrail",
+			Amount = amount,
+			Lifetime = lifetime,
+			LocalCoords = false,
+			Randomness = 0.55f,
+			ProcessMaterial = processMaterial,
+			DrawPass1 = trailMesh,
+			Emitting = true,
+		});
 	}
 
 	private void AddFxMesh(string nodeName, Mesh mesh, Vector3 position, Vector3 rotationDegrees, Color color)
@@ -399,7 +485,8 @@ public partial class CombatProjectile : Node3D
 			Roughness = 0.2f,
 			EmissionEnabled = true,
 			Emission = new Color(color.R, color.G, color.B),
-			EmissionEnergyMultiplier = 0.8f,
+			EmissionEnergyMultiplier = 2.2f,
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
 		};
 		_materials.Add(material);
 

@@ -69,11 +69,11 @@ public partial class PlayerController
 		float horizontalDistance = Mathf.Max(Mathf.Cos(_cameraPitch) * distance, 1.2f);
 		float cameraHeight = Mathf.Max(ThirdPersonCameraHeight + Mathf.Sin(_cameraPitch) * distance, 0.85f);
 		float lookHeight = Mathf.Clamp(ThirdPersonLookHeight - Mathf.Sin(_cameraPitch) * 0.45f, 1.35f, 2.75f);
-		Vector3 cameraPosition = GlobalPosition + backward * horizontalDistance + Vector3.Up * cameraHeight;
-		cameraPosition = ClampCameraInsideMap(cameraPosition);
+		Vector3 intendedCameraPosition = GlobalPosition + backward * horizontalDistance + Vector3.Up * cameraHeight;
+		Vector3 boundedCameraPosition = ClampCameraInsideMap(intendedCameraPosition);
 		Vector3 lookTarget = GlobalPosition + Vector3.Up * lookHeight;
 
-		_camera.LookAtFromPosition(cameraPosition, lookTarget, Vector3.Up);
+		SetBoundedCameraTransform(intendedCameraPosition, boundedCameraPosition, lookTarget);
 	}
 
 	private void UpdateGodViewCamera()
@@ -81,11 +81,11 @@ public partial class PlayerController
 		Vector3 backward = GetCameraPlanarBackward();
 		float distance = Mathf.Max(GodViewDistance, 6.0f);
 		float height = Mathf.Max(GodViewCameraHeight, 8.0f);
-		Vector3 cameraPosition = GlobalPosition + backward * distance + Vector3.Up * height;
-		cameraPosition = ClampCameraInsideMap(cameraPosition);
+		Vector3 intendedCameraPosition = GlobalPosition + backward * distance + Vector3.Up * height;
+		Vector3 boundedCameraPosition = ClampCameraInsideMap(intendedCameraPosition);
 		Vector3 lookTarget = GlobalPosition + Vector3.Up * 0.85f;
 
-		_camera.LookAtFromPosition(cameraPosition, lookTarget, Vector3.Up);
+		SetBoundedCameraTransform(intendedCameraPosition, boundedCameraPosition, lookTarget);
 	}
 
 	private void AdjustGodViewZoom(float amount)
@@ -103,6 +103,21 @@ public partial class PlayerController
 		position.Z = Mathf.Clamp(position.Z, -halfExtent, halfExtent);
 		position.Y = Mathf.Max(position.Y, GlobalPosition.Y + 2.8f);
 		return position;
+	}
+
+	private void SetBoundedCameraTransform(Vector3 intendedPosition, Vector3 boundedPosition, Vector3 lookTarget)
+	{
+		Vector3 intendedLookDirection = lookTarget - intendedPosition;
+		if (intendedLookDirection.LengthSquared() <= 0.001f)
+		{
+			intendedLookDirection = GetCameraPlanarForward();
+		}
+
+		// Preserve the user's intended yaw and pitch even when the camera origin
+		// reaches the map boundary. Looking at the player from the clamped origin
+		// would rotate the camera automatically and offset mouse picking.
+		Basis viewBasis = Basis.LookingAt(intendedLookDirection.Normalized(), Vector3.Up);
+		_camera.GlobalTransform = new Transform3D(viewBasis, boundedPosition);
 	}
 
 	private Vector3 GetCameraPlanarBackward()
