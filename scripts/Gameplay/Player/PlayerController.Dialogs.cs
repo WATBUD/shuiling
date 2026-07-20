@@ -233,6 +233,8 @@ public partial class PlayerController
 		ClearChildren(_mapTravelButtonList);
 		// One row per biome: travel button + World Tier picker (Tiers 1..unlocked).
 		// Map = ecosystem, Tier = difficulty (docs/world_progression.md).
+		// Tier choice and unlocks are per-player, in multiplayer too — players
+		// meet when they pick the same map AND the same tier.
 		foreach ((string id, string label, int unlockedTier, int selectedTier) in world.GetWildMapTravelTierOptions())
 		{
 			var row = new HBoxContainer();

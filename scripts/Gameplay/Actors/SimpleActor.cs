@@ -52,6 +52,12 @@ public partial class SimpleActor : CharacterBody3D
 	[Export] public int WorldTier { get; set; } = 1;
 
 	private readonly RandomNumberGenerator _rng = new();
+	// Multiplayer puppet state: on clients, wild monsters are display-only
+	// mirrors of the host's actors (no AI, no local damage — see World.Network.cs).
+	private bool _isNetworkPuppet;
+	private int _networkId = -1;
+	private Vector3 _netTargetPosition;
+	private float _netTargetYaw;
 	private bool _isCaptured;
 	private bool _isInActiveParty;
 	private bool _isMountedByPlayer;
@@ -258,7 +264,8 @@ public partial class SimpleActor : CharacterBody3D
 	private float _bossAvoidRemaining;
 	private float _bossAvoidSide = 1.0f;
 
-	public bool CanBeCaptured => ActorKind == "monster" && !IsBoss && !_isCaptured && !_isDefeated;
+	public bool CanBeCaptured => ActorKind == "monster" && !IsBoss && !_isCaptured && !_isDefeated && !_isNetworkPuppet;
+	public bool IsNetworkPuppet => _isNetworkPuppet;
 	public bool IsNpcRecruitCandidate => ActorKind == "npc" && !_isCaptured && !_isDefeated;
 	public bool CanJoinByAffinity => IsNpcRecruitCandidate && Affinity >= 80;
 	public bool IsCaptured => _isCaptured;
@@ -463,6 +470,11 @@ public partial class SimpleActor : CharacterBody3D
 	public override void _PhysicsProcess(double delta)
 	{
 		float step = (float)delta;
+		if (_isNetworkPuppet)
+		{
+			UpdateNetworkPuppet(step);
+			return;
+		}
 		UpdateStatusEffects(step);
 		_attackCooldownRemaining = Mathf.Max(_attackCooldownRemaining - step, 0.0f);
 		_retaliationTargetRemaining = Mathf.Max(_retaliationTargetRemaining - step, 0.0f);
@@ -919,6 +931,48 @@ public partial class SimpleActor : CharacterBody3D
 		RefreshNameplate();
 	}
 
+	// Turns this actor into a network puppet (multiplayer client): the host
+	// drives position/health; local AI and local damage application stop.
+	public void SetNetworkPuppet(int networkId)
+	{
+		_isNetworkPuppet = true;
+		_networkId = networkId;
+		_netTargetPosition = GlobalPosition;
+		_netTargetYaw = Rotation.Y;
+	}
+
+	public void ApplyNetworkState(Vector3 position, float yaw, int health)
+	{
+		_netTargetPosition = position;
+		_netTargetYaw = yaw;
+		int clamped = Mathf.Clamp(health, 0, EffectiveMaxHealth);
+		if (clamped != CurrentHealth)
+		{
+			CurrentHealth = clamped;
+			RefreshNameplate();
+		}
+	}
+
+	private void UpdateNetworkPuppet(float step)
+	{
+		float weight = Mathf.Min(step * 10.0f, 1.0f);
+		Vector3 toTarget = _netTargetPosition - GlobalPosition;
+		if (toTarget.Length() > 12.0f)
+		{
+			GlobalPosition = _netTargetPosition;
+			Velocity = Vector3.Zero;
+		}
+		else
+		{
+			GlobalPosition += toTarget * weight;
+			Velocity = toTarget * 10.0f;
+		}
+
+		Rotation = new Vector3(0.0f, Mathf.LerpAngle(Rotation.Y, _netTargetYaw, weight), 0.0f);
+		UpdateMovementAnimation(step);
+		Velocity = Vector3.Zero;
+	}
+
 	public void ConfigureBoss(string bossNameKey, string primaryLootId)
 	{
 		IsBoss = true;
@@ -1265,6 +1319,15 @@ public partial class SimpleActor : CharacterBody3D
 	{
 		if (_isDefeated)
 		{
+			return 0;
+		}
+
+		// Network puppet: the host owns this monster's health. Forward the raw
+		// damage and show a local hit flash; real damage syncs back via state.
+		if (_isNetworkPuppet)
+		{
+			NetworkManager.Instance?.SendMonsterDamageRequest(_networkId, Mathf.Max(rawDamage, 1));
+			SpawnCombatEffect(rawDamage, attacker?.GetAttackColor() ?? new Color(1.0f, 0.5f, 0.22f, 0.92f));
 			return 0;
 		}
 
@@ -2639,14 +2702,31 @@ public partial class SimpleActor : CharacterBody3D
 			if (IsBoss)
 			{
 				attacker._followTarget.ShowBossDefeated(this);
-				// Defeating a map's boss at its highest unlocked tier unlocks
-				// the next tier for that map (docs/world_progression.md).
-				if (attacker._followTarget.GetParent() is World bossWorld)
-				{
-					bossWorld.OnWildBossDefeated(this);
-				}
 			}
 		}
+
+		// Tier unlock is per-player: only the LOCAL player's kill counts here.
+		// Remote players' kills are credited on their own machine via RPC
+		// (World.ApplyNetworkMonsterDamage → ClientReceiveBossDefeat).
+		if (IsBoss
+			&& ActorKind == "monster"
+			&& attacker?._followTarget != null
+			&& IsInstanceValid(attacker._followTarget)
+			&& FindOwningWorld() is World bossWorld)
+		{
+			bossWorld.OnWildBossDefeated(this);
+		}
+	}
+
+	private World? FindOwningWorld()
+	{
+		Node? node = GetParent();
+		while (node != null && node is not World)
+		{
+			node = node.GetParent();
+		}
+
+		return node as World;
 	}
 
 	private void UpdateNegativeMoodAfterDefeat()
