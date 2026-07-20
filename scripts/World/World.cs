@@ -79,6 +79,12 @@ public partial class World : Node3D
 	private readonly Dictionary<string, List<Vector3>> _wildObstaclePositionsById = new();
 	private readonly Dictionary<string, int> _wildMonsterTargetCountsById = new();
 	private readonly Dictionary<string, SimpleActor> _wildBossesByMapId = new();
+	// World Tier progression (docs/world_progression.md): every wild map supports
+	// Tiers 1-10; unlocked = highest reachable, selected = tier the map currently
+	// runs at, spawned = tier its living population was rolled at.
+	private readonly Dictionary<string, int> _wildMapUnlockedTiersById = new();
+	private readonly Dictionary<string, int> _wildMapSelectedTiersById = new();
+	private readonly Dictionary<string, int> _wildMapSpawnedTiersById = new();
 	private readonly Dictionary<string, float> _wildBossRespawnRemainingById = new();
 	private readonly Dictionary<string, Vector3> _wildBossSpawnPositionsByMapId = new();
 	private readonly Dictionary<CollisionObject3D, (uint Layer, uint Mask)> _mapCollisionDefaults = new();
@@ -1617,6 +1623,7 @@ public partial class World : Node3D
 		{
 			int mapActorCount = Mathf.Max(ActorCount / WildMaps.Length, 8);
 			_wildMonsterTargetCountsById[wildMap.Id] = mapActorCount;
+			_wildMapSpawnedTiersById[wildMap.Id] = GetSelectedTier(wildMap.Id);
 			UseWildMapObstacleContext(wildMap.Id);
 			for (int index = 0; index < mapActorCount; index++)
 			{
@@ -1638,6 +1645,21 @@ public partial class World : Node3D
 	private SimpleActor SpawnMonsterForMap(string mapId)
 	{
 		SimpleActor actor = CreateActor(true, mapId);
+
+		// Tier evolution cues beyond raw stats: bigger body, sharper AI.
+		int tier = actor.WorldTier;
+		if (tier > WorldTierCatalog.MinTier)
+		{
+			float visualScale = WorldTierCatalog.GetMonsterVisualScale(tier);
+			if (visualScale > 1.001f)
+			{
+				ScaleActorVisualChildren(actor, visualScale);
+			}
+			actor.DetectionRadius += WorldTierCatalog.GetDetectionRadiusBonus(tier);
+			actor.ChaseRadius += WorldTierCatalog.GetChaseRadiusBonus(tier);
+			actor.AttackCooldown *= WorldTierCatalog.GetAttackCooldownFactor(tier);
+		}
+
 		Vector3 spawnPosition = FindOpenMonsterSpawnPosition();
 		actor.Position = spawnPosition;
 		actor.HomePosition = spawnPosition;
@@ -1649,16 +1671,24 @@ public partial class World : Node3D
 	private SimpleActor SpawnBossForMap(BossDefinition definition, bool announce)
 	{
 		UseWildMapObstacleContext(definition.MapId);
-		SimpleActor boss = CreateActor(true, definition.MapId, definition.SpeciesNameKey, definition.CombatRole, definition.Level);
+		// Boss stats are hand-authored per map, so the tier layer is applied
+		// explicitly here (docs/world_progression.md).
+		int tier = GetSelectedTier(definition.MapId);
+		int bossLevel = definition.Level + WorldTierCatalog.GetBossLevelBonus(tier);
+		float bossMultiplier = WorldTierCatalog.GetBossStatMultiplier(tier);
+		float rewardMultiplier = WorldTierCatalog.GetRewardMultiplier(tier);
+
+		SimpleActor boss = CreateActor(true, definition.MapId, definition.SpeciesNameKey, definition.CombatRole, bossLevel);
 		boss.Name = $"Boss_{definition.MapId}";
 		boss.ConfigureStats(
 			definition.SpeciesNameKey,
-			definition.Level,
-			definition.MaxHealth,
-			definition.Attack,
-			definition.Defense,
-			definition.ExperienceReward,
-			definition.GoldReward);
+			bossLevel,
+			Mathf.RoundToInt(definition.MaxHealth * bossMultiplier),
+			Mathf.RoundToInt(definition.Attack * bossMultiplier),
+			Mathf.RoundToInt(definition.Defense * bossMultiplier),
+			Mathf.RoundToInt(definition.ExperienceReward * rewardMultiplier),
+			Mathf.RoundToInt(definition.GoldReward * rewardMultiplier));
+		boss.WorldTier = tier;
 		boss.ConfigureGrowth("ability.monster.charge", 5);
 		boss.ConfigureBoss(definition.NameKey, definition.PrimaryLootId);
 		boss.MoveSpeed = definition.CombatRole == "Tank" ? 6.0f : 6.5f;
@@ -2125,18 +2155,26 @@ public partial class World : Node3D
 
 	private void ConfigureActorStats(SimpleActor actor, bool isMonster, string forcedDisplayName = "", string forcedCombatRole = "", int forcedLevel = 0)
 	{
-		int level = forcedLevel > 0 ? forcedLevel : isMonster ? _rng.RandiRange(2, 10) : _rng.RandiRange(1, 7);
+		// World Tier scaling (docs/world_progression.md): the map's selected tier
+		// shifts the level band and multiplies stats/rewards on top of it.
+		int tier = isMonster ? GetSelectedTier(actor.MapId) : WorldTierCatalog.MinTier;
+		(int minLevel, int maxLevel) = WorldTierCatalog.GetMonsterLevelRange(tier);
+		float statMultiplier = WorldTierCatalog.GetStatMultiplier(tier);
+		float rewardMultiplier = WorldTierCatalog.GetRewardMultiplier(tier);
+
+		int level = forcedLevel > 0 ? forcedLevel : isMonster ? _rng.RandiRange(minLevel, maxLevel) : _rng.RandiRange(1, 7);
 		int maxHealth = isMonster
-			? 95 + level * 22 + _rng.RandiRange(0, 35)
+			? Mathf.RoundToInt((95 + level * 22 + _rng.RandiRange(0, 35)) * statMultiplier)
 			: 70 + level * 14 + _rng.RandiRange(0, 24);
 		int attack = isMonster
-			? 9 + level * 4 + _rng.RandiRange(0, 5)
+			? Mathf.RoundToInt((9 + level * 4 + _rng.RandiRange(0, 5)) * statMultiplier)
 			: 5 + level * 2 + _rng.RandiRange(0, 3);
 		int defense = isMonster
-			? 5 + level * 3 + _rng.RandiRange(0, 4)
+			? Mathf.RoundToInt((5 + level * 3 + _rng.RandiRange(0, 4)) * statMultiplier)
 			: 4 + level * 2 + _rng.RandiRange(0, 3);
-		int experience = isMonster ? level * 9 + _rng.RandiRange(3, 12) : level * 4 + _rng.RandiRange(1, 5);
-		int gold = isMonster ? level * 3 + _rng.RandiRange(0, 8) : level + _rng.RandiRange(0, 4);
+		int experience = isMonster ? Mathf.RoundToInt((level * 9 + _rng.RandiRange(3, 12)) * rewardMultiplier) : level * 4 + _rng.RandiRange(1, 5);
+		int gold = isMonster ? Mathf.RoundToInt((level * 3 + _rng.RandiRange(0, 8)) * rewardMultiplier) : level + _rng.RandiRange(0, 4);
+		actor.WorldTier = tier;
 		string[] namePool = isMonster ? MonsterSpeciesCatalog.Current.GetNamePool(actor.MapId) : NpcNames;
 		string displayName = string.IsNullOrWhiteSpace(forcedDisplayName)
 			? namePool[_rng.RandiRange(0, namePool.Length - 1)]
@@ -2416,12 +2454,23 @@ public partial class World : Node3D
 
 	public void RequestMapTravel(string targetMapId)
 	{
+		RequestMapTravel(targetMapId, 0);
+	}
+
+	public void RequestMapTravel(string targetMapId, int requestedTier)
+	{
 		if (TryHandleCaveTravel(targetMapId))
 		{
 			return;
 		}
 		targetMapId = NormalizeMapId(targetMapId);
-		if (!IsKnownMapId(targetMapId) || _activeMapId == targetMapId)
+		if (!IsKnownMapId(targetMapId))
+		{
+			return;
+		}
+
+		bool tierChanged = requestedTier > 0 && ApplySelectedTier(targetMapId, requestedTier);
+		if (_activeMapId == targetMapId && !tierChanged)
 		{
 			return;
 		}
@@ -2449,6 +2498,8 @@ public partial class World : Node3D
 			ActiveMapId = _activeMapId,
 			PlayerPosition = ToSaveVector(_player.GlobalPosition),
 			Player = _player.ExportSaveData(),
+			UnlockedMapTiers = new Dictionary<string, int>(_wildMapUnlockedTiersById),
+			SelectedMapTiers = new Dictionary<string, int>(_wildMapSelectedTiersById),
 		};
 	}
 
@@ -2472,6 +2523,40 @@ public partial class World : Node3D
 		{
 			mapId = "city";
 		}
+
+		// Restore tier progression, then re-roll any map whose living population
+		// was spawned at a different tier than the save selects.
+		_wildMapUnlockedTiersById.Clear();
+		_wildMapSelectedTiersById.Clear();
+		if (data.UnlockedMapTiers != null)
+		{
+			foreach (KeyValuePair<string, int> entry in data.UnlockedMapTiers)
+			{
+				if (IsWildMapId(entry.Key))
+				{
+					_wildMapUnlockedTiersById[entry.Key] = WorldTierCatalog.ClampTier(entry.Value);
+				}
+			}
+		}
+		if (data.SelectedMapTiers != null)
+		{
+			foreach (KeyValuePair<string, int> entry in data.SelectedMapTiers)
+			{
+				if (IsWildMapId(entry.Key))
+				{
+					_wildMapSelectedTiersById[entry.Key] = WorldTierCatalog.ClampTier(entry.Value);
+				}
+			}
+		}
+		foreach (WildMapDefinition wildMap in WildMaps)
+		{
+			int spawnedTier = _wildMapSpawnedTiersById.TryGetValue(wildMap.Id, out int spawned) ? spawned : WorldTierCatalog.MinTier;
+			if (_worldActorsGenerated && spawnedTier != GetSelectedTier(wildMap.Id))
+			{
+				RespawnMapAtTier(wildMap.Id);
+			}
+		}
+
 		SetMapVisibility(mapId);
 		var loadedCompanions = new List<SimpleActor>();
 		foreach (ActorSaveData actorData in data.Player.Companions)
@@ -2768,6 +2853,140 @@ public partial class World : Node3D
 		}
 
 		return options;
+	}
+
+	public IReadOnlyList<(string Id, string Label, int UnlockedTier, int SelectedTier)> GetWildMapTravelTierOptions()
+	{
+		var options = new List<(string Id, string Label, int UnlockedTier, int SelectedTier)>();
+		foreach (WildMapDefinition wildMap in WildMaps)
+		{
+			options.Add((wildMap.Id, LocaleText.T(wildMap.NameKey), GetUnlockedTier(wildMap.Id), GetSelectedTier(wildMap.Id)));
+		}
+
+		return options;
+	}
+
+	public int GetUnlockedTier(string mapId)
+	{
+		mapId = GetTierMapId(mapId);
+		return _wildMapUnlockedTiersById.TryGetValue(mapId, out int tier)
+			? WorldTierCatalog.ClampTier(tier)
+			: WorldTierCatalog.MinTier;
+	}
+
+	public int GetSelectedTier(string mapId)
+	{
+		mapId = GetTierMapId(mapId);
+		int selected = _wildMapSelectedTiersById.TryGetValue(mapId, out int tier)
+			? WorldTierCatalog.ClampTier(tier)
+			: WorldTierCatalog.MinTier;
+		return Mathf.Min(selected, GetUnlockedTier(mapId));
+	}
+
+	// Caves inherit the tier of the wild map that owns them ("<wildId>_cave_...").
+	private static string GetTierMapId(string mapId)
+	{
+		int caveIndex = mapId.IndexOf("_cave_", System.StringComparison.Ordinal);
+		return caveIndex > 0 ? mapId[..caveIndex] : mapId;
+	}
+
+	private bool IsWildMapId(string mapId)
+	{
+		foreach (WildMapDefinition wildMap in WildMaps)
+		{
+			if (wildMap.Id == mapId)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	// Returns true when the selected tier changed (population needs a re-roll).
+	private bool ApplySelectedTier(string mapId, int requestedTier)
+	{
+		mapId = GetTierMapId(mapId);
+		if (!IsWildMapId(mapId))
+		{
+			return false;
+		}
+
+		int tier = Mathf.Clamp(requestedTier, WorldTierCatalog.MinTier, GetUnlockedTier(mapId));
+		_wildMapSelectedTiersById[mapId] = tier;
+		int spawnedTier = _wildMapSpawnedTiersById.TryGetValue(mapId, out int spawned) ? spawned : WorldTierCatalog.MinTier;
+		if (spawnedTier == tier)
+		{
+			return false;
+		}
+
+		RespawnMapAtTier(mapId);
+		if (_player != null && IsInstanceValid(_player))
+		{
+			_player.PostSystemMessage(LocaleText.F("system.tier.applied", GetWildMapDisplayName(mapId), tier), new Color(0.72f, 0.92f, 1.0f));
+		}
+		return true;
+	}
+
+	// Despawns the map's wild population and rebuilds it at the selected tier.
+	// Captured companions are never touched.
+	private void RespawnMapAtTier(string mapId)
+	{
+		_wildMapSpawnedTiersById[mapId] = GetSelectedTier(mapId);
+		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
+		{
+			if (node is SimpleActor actor
+				&& IsInstanceValid(actor)
+				&& actor.MapId == mapId
+				&& !actor.IsCaptured)
+			{
+				actor.QueueFree();
+			}
+		}
+
+		_wildBossesByMapId.Remove(mapId);
+		_wildBossRespawnRemainingById.Remove(mapId);
+
+		UseWildMapObstacleContext(mapId);
+		int targetCount = GetWildMonsterTargetCount(mapId);
+		for (int index = 0; index < targetCount; index++)
+		{
+			SpawnMonsterForMap(mapId);
+		}
+
+		foreach (BossDefinition definition in WildBosses)
+		{
+			if (definition.MapId == mapId)
+			{
+				SpawnBossForMap(definition, false);
+				break;
+			}
+		}
+
+		UpdateActiveBossHud(false);
+	}
+
+	// Called when a wild boss dies: beating the boss at the highest unlocked
+	// tier unlocks the next tier for that map (docs/world_progression.md).
+	public void OnWildBossDefeated(SimpleActor boss)
+	{
+		string mapId = GetTierMapId(boss.MapId);
+		if (!IsWildMapId(mapId))
+		{
+			return;
+		}
+
+		int unlockedTier = GetUnlockedTier(mapId);
+		if (boss.WorldTier < unlockedTier || unlockedTier >= WorldTierCatalog.MaxTier)
+		{
+			return;
+		}
+
+		_wildMapUnlockedTiersById[mapId] = unlockedTier + 1;
+		if (_player != null && IsInstanceValid(_player))
+		{
+			_player.PostSystemMessage(LocaleText.F("system.tier.unlocked", GetWildMapDisplayName(mapId), unlockedTier + 1), new Color(1.0f, 0.9f, 0.45f));
+		}
 	}
 
 	private bool IsKnownMapId(string mapId)

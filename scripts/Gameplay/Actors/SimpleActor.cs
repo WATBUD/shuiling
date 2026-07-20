@@ -47,6 +47,9 @@ public partial class SimpleActor : CharacterBody3D
 	[Export] public bool IsBoss { get; set; }
 	[Export] public string BossNameKey { get; set; } = string.Empty;
 	[Export] public string BossPrimaryLootId { get; set; } = string.Empty;
+	// World Tier this actor was spawned at (docs/world_progression.md). Drives
+	// the evolution-stage display name; stats are already baked in at spawn.
+	[Export] public int WorldTier { get; set; } = 1;
 
 	private readonly RandomNumberGenerator _rng = new();
 	private bool _isCaptured;
@@ -346,7 +349,22 @@ public partial class SimpleActor : CharacterBody3D
 		"Builder" => LocaleText.T("role.builder"),
 		_ => LocaleText.T("role.dps"),
 	};
-	public string LocalizedDisplayName => LocaleText.T(IsBoss && !string.IsNullOrWhiteSpace(BossNameKey) ? BossNameKey : DisplayName);
+	public string LocalizedDisplayName
+	{
+		get
+		{
+			if (IsBoss && !string.IsNullOrWhiteSpace(BossNameKey))
+			{
+				return LocaleText.T(BossNameKey);
+			}
+
+			string baseName = LocaleText.T(DisplayName);
+			// Monsters carry their tier evolution stage in the name (Young/Elite/...).
+			return ActorKind == "monster"
+				? WorldTierCatalog.FormatMonsterName(WorldTier, baseName)
+				: baseName;
+		}
+	}
 	public bool IsBossEnraged => IsBoss && _bossEnraged;
 	public string LocalizedSpecialAbility => LocaleText.T(SpecialAbility);
 	public string LocalizedPersonality => LocaleText.T(Personality);
@@ -990,6 +1008,7 @@ public partial class SimpleActor : CharacterBody3D
 			ActorKind = ActorKind,
 			DisplayName = DisplayName,
 			Level = Level,
+			WorldTier = WorldTier,
 			MaxHealth = MaxHealth,
 			CurrentHealth = CurrentHealth,
 			IsDefeated = _isDefeated,
@@ -1030,6 +1049,7 @@ public partial class SimpleActor : CharacterBody3D
 		ActorKind = data.ActorKind;
 		DisplayName = data.DisplayName;
 		Level = Mathf.Max(data.Level, 1);
+		WorldTier = WorldTierCatalog.ClampTier(data.WorldTier);
 		MaxHealth = Mathf.Max(data.MaxHealth, 1);
 		_isDefeated = data.IsDefeated || data.CurrentHealth <= 0;
 		_isAwaitingRecovery = _isDefeated && data.IsAwaitingRecovery;
@@ -2619,6 +2639,12 @@ public partial class SimpleActor : CharacterBody3D
 			if (IsBoss)
 			{
 				attacker._followTarget.ShowBossDefeated(this);
+				// Defeating a map's boss at its highest unlocked tier unlocks
+				// the next tier for that map (docs/world_progression.md).
+				if (attacker._followTarget.GetParent() is World bossWorld)
+				{
+					bossWorld.OnWildBossDefeated(this);
+				}
 			}
 		}
 	}
