@@ -91,6 +91,9 @@ Combat facts:
   actor stores `WorldTier`. Tier picker UI: `ShowMapTravelDialog` in
   `PlayerController.Dialogs.cs`.
 - World gen, spawning, portals, map travel/save: `scripts/World/World.cs` (large).
+- Biome dressing (per-map sky/fog/sun atmosphere via `ApplyMapAtmosphere`, biome
+  prop scatter, landmark set-pieces): `scripts/World/World.Biomes.cs`. Scatter
+  helpers pick props by `_currentThemeMapId` (set while a map is being built).
 - Save contracts / manager: `scripts/Core/Save/SaveGameData.cs`, `SaveGameManager.cs`.
 - Localization: `scripts/Core/Localization/LocaleText.cs` + `locales/{zh_TW,en}.json`
   (keep both files key-for-key in parity).
