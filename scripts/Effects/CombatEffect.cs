@@ -88,12 +88,12 @@ public partial class CombatEffect : Node3D
 
 		if (!string.IsNullOrEmpty(Text))
 		{
+			// Two layers (shadow + main) instead of three: the extra highlight
+			// pass barely read and tripled per-hit Label3D glyph work.
 			_labelShadow = CreateDamageLabel(12, new Color(0.02f, 0.01f, 0.02f, 0.96f));
 			_label = CreateDamageLabel(8, new Color(0.10f, 0.035f, 0.025f, 0.98f));
-			_labelHighlight = CreateDamageLabel(0, Colors.Transparent);
 			AddChild(_labelShadow);
 			AddChild(_label);
-			AddChild(_labelHighlight);
 		}
 	}
 
@@ -130,7 +130,7 @@ public partial class CombatEffect : Node3D
 		var sparks = new GpuParticles3D
 		{
 			Name = "ImpactSparks",
-			Amount = 11,
+			Amount = 8,
 			Lifetime = Mathf.Clamp(Lifetime * 0.62f, 0.16f, 0.34f),
 			OneShot = true,
 			Explosiveness = 1.0f,
@@ -150,9 +150,12 @@ public partial class CombatEffect : Node3D
 			Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
 			FixedSize = false,
 			NoDepthTest = true,
-			TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
-			FontSize = 96,
-			PixelSize = 0.005f,
+			// Plain linear filtering at a smaller font: the anisotropic-mipmap
+			// filter at FontSize 96 forced an expensive per-hit texture build.
+			// FontSize 48 * PixelSize 0.01 keeps the same on-screen size.
+			TextureFilter = BaseMaterial3D.TextureFilterEnum.Linear,
+			FontSize = 48,
+			PixelSize = 0.01f,
 			OutlineSize = outlineSize,
 			HorizontalAlignment = HorizontalAlignment.Center,
 			VerticalAlignment = VerticalAlignment.Center,

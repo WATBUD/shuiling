@@ -32,6 +32,9 @@ public partial class SystemLogPanel : PanelContainer
 	private Button _resizeHandle = null!;
 	private GameMessageChannel _selectedChannel = GameMessageChannel.All;
 	private int _scrollToBottomPendingFrames;
+	// True when messages arrived while the panel was hidden; the row list is
+	// then rebuilt lazily when the panel is next shown (see _Notification).
+	private bool _messagesDirty;
 	private bool _resizePressPending;
 	private bool _isResizing;
 	private ulong _resizePressStartedAtMsec;
@@ -134,6 +137,24 @@ public partial class SystemLogPanel : PanelContainer
 
 		RefreshChannelButtons();
 		if (_selectedChannel == GameMessageChannel.All || _selectedChannel == safeChannel)
+		{
+			// Rebuilding the row list is only worth it while visible. When the
+			// log is closed (the common case during combat/looting), defer it so
+			// bursts of kill/loot messages don't rebuild the whole list each time.
+			if (IsVisibleInTree())
+			{
+				RefreshMessages(true);
+			}
+			else
+			{
+				_messagesDirty = true;
+			}
+		}
+	}
+
+	public override void _Notification(int what)
+	{
+		if (what == (int)NotificationVisibilityChanged && IsVisibleInTree() && _messagesDirty)
 		{
 			RefreshMessages(true);
 		}
@@ -330,6 +351,7 @@ public partial class SystemLogPanel : PanelContainer
 
 	private void RefreshMessages(bool scrollToBottom)
 	{
+		_messagesDirty = false;
 		foreach (Node child in _rows.GetChildren())
 		{
 			_rows.RemoveChild(child);
