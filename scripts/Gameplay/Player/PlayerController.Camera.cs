@@ -79,9 +79,14 @@ public partial class PlayerController
 	private void UpdateGodViewCamera()
 	{
 		Vector3 backward = GetCameraPlanarBackward();
-		float distance = Mathf.Max(GodViewDistance, 6.0f);
-		float height = Mathf.Max(GodViewCameraHeight, 8.0f);
-		Vector3 intendedCameraPosition = GlobalPosition + backward * distance + Vector3.Up * height;
+		// Orbit the player at a fixed distance (the zoom radius) so only the elevation
+		// angle changes as the player right-drags vertically — the player stays the same
+		// size instead of moving closer/further.
+		float radius = Mathf.Max(GodViewDistance, 6.0f);
+		float pitch = Mathf.Clamp(_godViewPitch, GodViewMinPitch, GodViewMaxPitch);
+		float horizontalDistance = Mathf.Cos(pitch) * radius;
+		float height = Mathf.Max(Mathf.Sin(pitch) * radius, 3.0f);
+		Vector3 intendedCameraPosition = GlobalPosition + backward * horizontalDistance + Vector3.Up * height;
 		Vector3 boundedCameraPosition = ClampCameraInsideMap(intendedCameraPosition);
 		Vector3 lookTarget = GlobalPosition + Vector3.Up * 0.85f;
 

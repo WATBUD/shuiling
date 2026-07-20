@@ -222,6 +222,7 @@ public partial class World : Node3D
 	public override void _Process(double delta)
 	{
 		float step = (float)delta;
+		UpdateMapTravelCooldown(step);
 		UpdateMonsterRespawns(step);
 		UpdateWildBosses(step);
 		UpdateCaveRespawns(step);
@@ -2506,6 +2507,7 @@ public partial class World : Node3D
 	private void SetMapVisibility(string mapId)
 	{
 		_activeMapId = mapId;
+		_mapTravelCooldownRemaining = MapTravelCooldownSeconds;
 		if (_cityMapRoot != null)
 		{
 			SetMapRootActive(_cityMapRoot, mapId == "city");
