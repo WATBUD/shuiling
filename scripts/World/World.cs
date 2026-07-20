@@ -277,11 +277,12 @@ public partial class World : Node3D
 		_matTentCloth = MakeMaterial(new Color(0.66f, 0.18f, 0.18f));
 		_matNest = MakeMaterial(new Color(0.18f, 0.12f, 0.10f));
 		_matPondBank = MakeMaterial(new Color(0.30f, 0.26f, 0.17f));
+		CreateBiomeMaterials();
 	}
 
 	private void BuildEnvironment()
 	{
-		var skyMaterial = new ProceduralSkyMaterial
+		_skyMaterial = new ProceduralSkyMaterial
 		{
 			SkyTopColor = new Color(0.20f, 0.45f, 0.86f),
 			SkyHorizonColor = new Color(0.82f, 0.90f, 1.0f),
@@ -294,7 +295,7 @@ public partial class World : Node3D
 		};
 		var sky = new Sky
 		{
-			SkyMaterial = skyMaterial,
+			SkyMaterial = _skyMaterial,
 		};
 		var environment = new Environment
 		{
@@ -314,14 +315,14 @@ public partial class World : Node3D
 			TonemapMode = Environment.ToneMapper.Filmic,
 		};
 
-		var worldEnvironment = new WorldEnvironment
+		_worldEnvironment = new WorldEnvironment
 		{
 			Name = "WorldEnvironment",
 			Environment = environment,
 		};
-		AddChild(worldEnvironment);
+		AddChild(_worldEnvironment);
 
-		var sun = new DirectionalLight3D
+		_sunLight = new DirectionalLight3D
 		{
 			Name = "Sun",
 			LightEnergy = 2.4f,
@@ -329,7 +330,7 @@ public partial class World : Node3D
 			ShadowEnabled = true,
 			RotationDegrees = new Vector3(-50.0f, -35.0f, 0.0f),
 		};
-		AddChild(sun);
+		AddChild(_sunLight);
 
 		CreateSkylineBackdrop();
 	}
@@ -386,6 +387,7 @@ public partial class World : Node3D
 	private void BuildWildMapScene(WildMapDefinition wildMap)
 	{
 		_obstaclePositions.Clear();
+		_currentThemeMapId = wildMap.Id;
 		_wildMapRoot = new Node3D { Name = wildMap.RootName };
 		_mapsRoot.AddChild(_wildMapRoot);
 		_wildMapRootsById[wildMap.Id] = _wildMapRoot;
@@ -420,6 +422,7 @@ public partial class World : Node3D
 	private void BuildCityMapScene()
 	{
 		_obstaclePositions.Clear();
+		_currentThemeMapId = "city";
 		_cityMapRoot = new Node3D { Name = "MainCityMap" };
 		_mapsRoot.AddChild(_cityMapRoot);
 		_mapRoot = _cityMapRoot;
@@ -468,59 +471,7 @@ public partial class World : Node3D
 		}
 	}
 
-	private void CreateWildMapThemeDressing(string mapId)
-	{
-		if (mapId == "wild_marsh")
-		{
-			CreateTerrainPatch("MarshMirrorWaterA", new Vector3(28.0f, 0.0f, -28.0f), 16.0f, new Vector3(1.25f, 1.0f, 0.62f), -18.0f, _matShallowWater, 0.062f);
-			CreateTerrainPatch("MarshMirrorWaterB", new Vector3(-22.0f, 0.0f, 44.0f), 13.0f, new Vector3(1.2f, 1.0f, 0.58f), 22.0f, _matShallowWater, 0.062f);
-			for (int index = 0; index < 18; index++)
-			{
-				Vector3 position = new((float)_rng.RandfRange(-62.0f, 62.0f), 0.0f, (float)_rng.RandfRange(-62.0f, 62.0f));
-				if (position.DistanceTo(Vector3.Zero) > 12.0f)
-				{
-					CreateMushroom(position);
-					CreateGrassPatch(position + new Vector3(0.6f, 0.0f, -0.4f));
-				}
-			}
-			return;
-		}
-
-		if (mapId == "wild_badlands")
-		{
-			CreateTerrainPatch("BadlandsAshFieldA", new Vector3(-30.0f, 0.0f, -28.0f), 18.0f, new Vector3(1.35f, 1.0f, 0.66f), 18.0f, _matNest, 0.04f);
-			CreateTerrainPatch("BadlandsAshFieldB", new Vector3(38.0f, 0.0f, 32.0f), 16.0f, new Vector3(1.25f, 1.0f, 0.62f), -28.0f, _matNest, 0.04f);
-			for (int index = 0; index < 16; index++)
-			{
-				Vector3 position = new((float)_rng.RandfRange(-64.0f, 64.0f), 0.0f, (float)_rng.RandfRange(-64.0f, 64.0f));
-				if (position.DistanceTo(Vector3.Zero) > 14.0f && IsPositionClear(position, 3.0f))
-				{
-					CreateRock(position);
-					_obstaclePositions.Add(position);
-				}
-			}
-			return;
-		}
-
-		if (mapId == "wild_snow")
-		{
-			Material snow = MakeMaterial(new Color(0.86f, 0.92f, 0.97f));
-			Material ice = MakeMaterial(new Color(0.52f, 0.78f, 0.92f, 0.88f));
-			CreateTerrainPatch("SnowFieldNorth", new Vector3(-24.0f, 0.0f, -32.0f), 34.0f, new Vector3(1.55f, 1.0f, 0.92f), 12.0f, snow, 0.066f);
-			CreateTerrainPatch("SnowFieldSouth", new Vector3(28.0f, 0.0f, 34.0f), 35.0f, new Vector3(1.48f, 1.0f, 0.90f), -16.0f, snow, 0.066f);
-			CreateTerrainPatch("FrozenLake", new Vector3(30.0f, 0.0f, -28.0f), 17.0f, new Vector3(1.25f, 1.0f, 0.62f), -18.0f, ice, 0.072f);
-			for (int index = 0; index < 18; index++)
-			{
-				Vector3 position = new((float)_rng.RandfRange(-64.0f, 64.0f), 0.0f, (float)_rng.RandfRange(-64.0f, 64.0f));
-				if (position.DistanceTo(Vector3.Zero) > 14.0f && IsPositionClear(position, 3.0f))
-				{
-					CreateRock(position);
-					CreateTerrainPatch($"SnowDrift{index}", position, (float)_rng.RandfRange(3.5f, 7.0f), new Vector3(1.3f, 1.0f, 0.62f), index * 19.0f, snow, 0.07f);
-					_obstaclePositions.Add(position);
-				}
-			}
-		}
-	}
+	// Per-biome theme dressing lives in World.Biomes.cs (CreateWildMapThemeDressing).
 
 	private void CreateCityTerrainDressing()
 	{
@@ -1324,15 +1275,7 @@ public partial class World : Node3D
 				continue;
 			}
 
-			if (_rng.Randf() < 0.68f)
-			{
-				CreateTree(position);
-			}
-			else
-			{
-				CreateRock(position);
-			}
-
+			CreateBiomePrimaryProp(position);
 			_obstaclePositions.Add(position);
 			created++;
 		}
@@ -1354,23 +1297,7 @@ public partial class World : Node3D
 				continue;
 			}
 
-			float roll = _rng.Randf();
-			if (roll < 0.48f)
-			{
-				CreateGrassPatch(position);
-			}
-			else if (roll < 0.72f)
-			{
-				CreateFlowerPatch(position);
-			}
-			else if (roll < 0.88f)
-			{
-				CreateMushroom(position);
-			}
-			else
-			{
-				CreateCrystalCluster(position, (float)_rng.RandfRange(0.42f, 0.72f), _matCrystal);
-			}
+			CreateBiomeDetailProp(position);
 		}
 	}
 
@@ -2618,6 +2545,7 @@ public partial class World : Node3D
 	{
 		_activeMapId = mapId;
 		_mapTravelCooldownRemaining = MapTravelCooldownSeconds;
+		ApplyMapAtmosphere(mapId);
 		if (_cityMapRoot != null)
 		{
 			SetMapRootActive(_cityMapRoot, mapId == "city");
