@@ -5,6 +5,18 @@ public partial class MainMenu : Control
 	private Label _saveInfoLabel = null!;
 	private Button _loadButton = null!;
 
+	// Multiplayer dialogs (host-authoritative co-op, see NetworkManager.cs).
+	private PanelContainer? _hostDialog;
+	private PanelContainer? _joinDialog;
+	private LineEdit _hostPortEdit = null!;
+	private LineEdit _joinAddressEdit = null!;
+	private LineEdit _joinPortEdit = null!;
+	private Label _hostStatusLabel = null!;
+	private Label _joinStatusLabel = null!;
+	private Button _hostNewButton = null!;
+	private Button _hostLoadButton = null!;
+	private Button _joinConfirmButton = null!;
+
 	public override void _Ready()
 	{
 		try
@@ -15,6 +27,21 @@ public partial class MainMenu : Control
 		{
 			GD.PushError($"Main menu failed to initialize: {exception}");
 			BuildFallbackMenu(exception.Message);
+		}
+
+		if (NetworkManager.Instance != null)
+		{
+			NetworkManager.Instance.JoinWelcomed += OnJoinWelcomed;
+			NetworkManager.Instance.JoinFailed += OnJoinFailed;
+		}
+	}
+
+	public override void _ExitTree()
+	{
+		if (NetworkManager.Instance != null)
+		{
+			NetworkManager.Instance.JoinWelcomed -= OnJoinWelcomed;
+			NetworkManager.Instance.JoinFailed -= OnJoinFailed;
 		}
 	}
 
@@ -45,8 +72,8 @@ public partial class MainMenu : Control
 			AnchorBottom = 0.5f,
 			OffsetLeft = -220.0f,
 			OffsetRight = 220.0f,
-			OffsetTop = -170.0f,
-			OffsetBottom = 170.0f,
+			OffsetTop = -235.0f,
+			OffsetBottom = 235.0f,
 		};
 		root.AddThemeConstantOverride("separation", 16);
 		AddChild(root);
@@ -71,7 +98,7 @@ public partial class MainMenu : Control
 		_saveInfoLabel.AddThemeColorOverride("font_color", new Color(0.78f, 0.88f, 1.0f));
 		root.AddChild(_saveInfoLabel);
 
-		Button newGameButton = MakeMenuButton(LocaleText.T("main_menu.new_game"));
+		Button newGameButton = MakeMenuButton(LocaleText.T("main_menu.singleplayer"));
 		newGameButton.Pressed += StartNewGame;
 		root.AddChild(newGameButton);
 
@@ -79,12 +106,278 @@ public partial class MainMenu : Control
 		_loadButton.Pressed += LoadGame;
 		root.AddChild(_loadButton);
 
+		Button hostButton = MakeMenuButton(LocaleText.T("main_menu.host_server"));
+		hostButton.Pressed += ShowHostDialog;
+		root.AddChild(hostButton);
+
+		Button joinButton = MakeMenuButton(LocaleText.T("main_menu.join_server"));
+		joinButton.Pressed += ShowJoinDialog;
+		root.AddChild(joinButton);
+
 		Button quitButton = MakeMenuButton(LocaleText.T("main_menu.quit"));
 		quitButton.Pressed += () => GetTree().Quit();
 		root.AddChild(quitButton);
 
+		BuildHostDialog();
+		BuildJoinDialog();
 		RefreshSaveInfo();
 	}
+
+	// ---------------------------------------------------------------- multiplayer dialogs
+
+	private PanelContainer MakeDialogPanel(string titleKey, out VBoxContainer content)
+	{
+		var panel = new PanelContainer
+		{
+			Visible = false,
+			AnchorLeft = 0.5f,
+			AnchorRight = 0.5f,
+			AnchorTop = 0.5f,
+			AnchorBottom = 0.5f,
+			OffsetLeft = -190.0f,
+			OffsetRight = 190.0f,
+			OffsetTop = -170.0f,
+			OffsetBottom = 170.0f,
+		};
+		var style = new StyleBoxFlat
+		{
+			BgColor = new Color(0.05f, 0.07f, 0.09f, 0.97f),
+			BorderColor = new Color(0.35f, 0.82f, 1.0f, 0.72f),
+		};
+		style.SetBorderWidthAll(2);
+		style.SetCornerRadiusAll(8);
+		panel.AddThemeStyleboxOverride("panel", style);
+		AddChild(panel);
+
+		var margin = new MarginContainer();
+		margin.AddThemeConstantOverride("margin_left", 18);
+		margin.AddThemeConstantOverride("margin_right", 18);
+		margin.AddThemeConstantOverride("margin_top", 16);
+		margin.AddThemeConstantOverride("margin_bottom", 16);
+		panel.AddChild(margin);
+
+		content = new VBoxContainer();
+		content.AddThemeConstantOverride("separation", 10);
+		margin.AddChild(content);
+
+		var title = new Label
+		{
+			Text = LocaleText.T(titleKey),
+			HorizontalAlignment = HorizontalAlignment.Center,
+		};
+		title.AddThemeFontSizeOverride("font_size", 24);
+		title.AddThemeColorOverride("font_color", new Color(1.0f, 0.94f, 0.78f));
+		content.AddChild(title);
+
+		return panel;
+	}
+
+	private static Label MakeFieldLabel(string key)
+	{
+		var label = new Label { Text = LocaleText.T(key) };
+		label.AddThemeFontSizeOverride("font_size", 15);
+		label.AddThemeColorOverride("font_color", new Color(0.78f, 0.88f, 1.0f));
+		return label;
+	}
+
+	private void BuildHostDialog()
+	{
+		_hostDialog = MakeDialogPanel("net.dialog.host_title", out VBoxContainer content);
+
+		content.AddChild(MakeFieldLabel("net.dialog.port"));
+		_hostPortEdit = new LineEdit { Text = NetworkManager.DefaultPort.ToString(), CustomMinimumSize = new Vector2(0.0f, 38.0f) };
+		content.AddChild(_hostPortEdit);
+
+		var playerCapLabel = new Label
+		{
+			Text = LocaleText.F("net.dialog.max_players", NetworkManager.MaxPlayers),
+			HorizontalAlignment = HorizontalAlignment.Center,
+		};
+		playerCapLabel.AddThemeFontSizeOverride("font_size", 13);
+		playerCapLabel.AddThemeColorOverride("font_color", new Color(0.62f, 0.72f, 0.82f));
+		content.AddChild(playerCapLabel);
+
+		_hostStatusLabel = new Label
+		{
+			HorizontalAlignment = HorizontalAlignment.Center,
+			AutowrapMode = TextServer.AutowrapMode.WordSmart,
+		};
+		_hostStatusLabel.AddThemeFontSizeOverride("font_size", 14);
+		_hostStatusLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.72f, 0.68f));
+		content.AddChild(_hostStatusLabel);
+
+		_hostNewButton = MakeMenuButton(LocaleText.T("net.dialog.host_new"));
+		_hostNewButton.Pressed += () => StartHosting(false);
+		content.AddChild(_hostNewButton);
+
+		_hostLoadButton = MakeMenuButton(LocaleText.T("net.dialog.host_load"));
+		_hostLoadButton.Pressed += () => StartHosting(true);
+		content.AddChild(_hostLoadButton);
+
+		Button cancel = MakeMenuButton(LocaleText.T("dialog.button.cancel"));
+		cancel.Pressed += () => _hostDialog!.Visible = false;
+		content.AddChild(cancel);
+	}
+
+	private void BuildJoinDialog()
+	{
+		_joinDialog = MakeDialogPanel("net.dialog.join_title", out VBoxContainer content);
+
+		content.AddChild(MakeFieldLabel("net.dialog.ip"));
+		_joinAddressEdit = new LineEdit { Text = "127.0.0.1", CustomMinimumSize = new Vector2(0.0f, 38.0f) };
+		content.AddChild(_joinAddressEdit);
+
+		content.AddChild(MakeFieldLabel("net.dialog.port"));
+		_joinPortEdit = new LineEdit { Text = NetworkManager.DefaultPort.ToString(), CustomMinimumSize = new Vector2(0.0f, 38.0f) };
+		content.AddChild(_joinPortEdit);
+
+		_joinStatusLabel = new Label
+		{
+			HorizontalAlignment = HorizontalAlignment.Center,
+			AutowrapMode = TextServer.AutowrapMode.WordSmart,
+		};
+		_joinStatusLabel.AddThemeFontSizeOverride("font_size", 14);
+		_joinStatusLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.72f, 0.68f));
+		content.AddChild(_joinStatusLabel);
+
+		_joinConfirmButton = MakeMenuButton(LocaleText.T("net.dialog.join"));
+		_joinConfirmButton.Pressed += StartJoining;
+		content.AddChild(_joinConfirmButton);
+
+		Button cancel = MakeMenuButton(LocaleText.T("dialog.button.cancel"));
+		cancel.Pressed += CancelJoining;
+		content.AddChild(cancel);
+	}
+
+	private void ShowHostDialog()
+	{
+		if (_joinDialog != null)
+		{
+			_joinDialog.Visible = false;
+		}
+		if (_hostDialog != null)
+		{
+			_hostStatusLabel.Text = string.Empty;
+			_hostLoadButton.Disabled = !SaveGameManager.HasSave();
+			_hostDialog.Visible = true;
+		}
+	}
+
+	private void ShowJoinDialog()
+	{
+		if (_hostDialog != null)
+		{
+			_hostDialog.Visible = false;
+		}
+		if (_joinDialog != null)
+		{
+			_joinStatusLabel.Text = string.Empty;
+			_joinConfirmButton.Disabled = false;
+			_joinDialog.Visible = true;
+		}
+	}
+
+	private static bool TryParsePort(string text, out int port)
+	{
+		return int.TryParse(text.Trim(), out port) && port >= 1024 && port <= 65535;
+	}
+
+	private void StartHosting(bool loadSave)
+	{
+		if (NetworkManager.Instance == null)
+		{
+			return;
+		}
+
+		if (!TryParsePort(_hostPortEdit.Text, out int port))
+		{
+			_hostStatusLabel.Text = LocaleText.T("net.error.invalid_port");
+			return;
+		}
+
+		string error = NetworkManager.Instance.CreateServer(port);
+		if (error.Length > 0)
+		{
+			_hostStatusLabel.Text = LocaleText.F("net.error.create_failed", error);
+			return;
+		}
+
+		if (loadSave && SaveGameManager.HasSave())
+		{
+			GameLaunchOptions.LoadSavedGame();
+		}
+		else
+		{
+			GameLaunchOptions.StartNewGame();
+		}
+		GetTree().ChangeSceneToFile("res://node_3d.tscn");
+	}
+
+	private void StartJoining()
+	{
+		if (NetworkManager.Instance == null)
+		{
+			return;
+		}
+
+		string address = _joinAddressEdit.Text.Trim();
+		if (address.Length == 0)
+		{
+			_joinStatusLabel.Text = LocaleText.T("net.error.invalid_ip");
+			return;
+		}
+
+		if (!TryParsePort(_joinPortEdit.Text, out int port))
+		{
+			_joinStatusLabel.Text = LocaleText.T("net.error.invalid_port");
+			return;
+		}
+
+		string error = NetworkManager.Instance.JoinServer(address, port);
+		if (error.Length > 0)
+		{
+			_joinStatusLabel.Text = LocaleText.F("net.error.create_failed", error);
+			return;
+		}
+
+		_joinConfirmButton.Disabled = true;
+		_joinStatusLabel.Text = LocaleText.T("net.status.connecting");
+	}
+
+	private void CancelJoining()
+	{
+		NetworkManager.Instance?.ResetSession();
+		if (_joinDialog != null)
+		{
+			_joinDialog.Visible = false;
+		}
+	}
+
+	private void OnJoinWelcomed()
+	{
+		// Seed received from the host — enter the shared world. The local save
+		// (if any) still provides this player's own character/progress.
+		if (SaveGameManager.HasSave())
+		{
+			GameLaunchOptions.LoadSavedGame();
+		}
+		else
+		{
+			GameLaunchOptions.StartNewGame();
+		}
+		GetTree().ChangeSceneToFile("res://node_3d.tscn");
+	}
+
+	private void OnJoinFailed(string reason)
+	{
+		if (_joinDialog != null && _joinDialog.Visible)
+		{
+			_joinStatusLabel.Text = reason;
+			_joinConfirmButton.Disabled = false;
+		}
+	}
+
+	// ---------------------------------------------------------------- original flows
 
 	private void BuildFallbackMenu(string errorMessage)
 	{
@@ -175,6 +468,7 @@ public partial class MainMenu : Control
 
 	private void StartNewGame()
 	{
+		NetworkManager.Instance?.ResetSession();
 		GameLaunchOptions.StartNewGame();
 		GetTree().ChangeSceneToFile("res://node_3d.tscn");
 	}
@@ -187,6 +481,7 @@ public partial class MainMenu : Control
 			return;
 		}
 
+		NetworkManager.Instance?.ResetSession();
 		GameLaunchOptions.LoadSavedGame();
 		GetTree().ChangeSceneToFile("res://node_3d.tscn");
 	}

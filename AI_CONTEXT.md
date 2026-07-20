@@ -81,16 +81,34 @@ Combat facts:
 - Monster species / loot tables: `scripts/Gameplay/Monsters/MonsterSpeciesCatalog.cs`,
   `scripts/Gameplay/Items/MonsterLootCatalog.cs`.
 - World Tier rules (level bands, stat/reward multipliers, evolution-stage names):
-  `scripts/Gameplay/Progression/WorldTierCatalog.cs`. Runtime tier state + unlock
-  (boss kill at highest unlocked tier unlocks the next) lives in `World.cs`
-  (`_wildMap*TiersById`, `ApplySelectedTier`, `OnWildBossDefeated`); persisted as
-  `SaveGameData.UnlockedMapTiers`/`SelectedMapTiers`; each actor stores `WorldTier`.
-  Tier picker UI: `ShowMapTravelDialog` in `PlayerController.Dialogs.cs`.
+  `scripts/Gameplay/Progression/WorldTierCatalog.cs`. Tiers are PER-PLAYER
+  progression (unlock = beat the map boss at your highest tier; saved in each
+  player's `SaveGameData.UnlockedMapTiers`/`SelectedMapTiers`). Each populated
+  (map, tier) pair is a parallel instance keyed `WildInstanceKey(mapId, tier)`
+  (`_spawnedWildInstancesByKey`, `EnsureWildInstancePopulated`,
+  `DespawnInactiveWildInstances`, `IsActorInstanceActive` in `World.cs`);
+  players share monsters/see each other only on the same map AND tier. Each
+  actor stores `WorldTier`. Tier picker UI: `ShowMapTravelDialog` in
+  `PlayerController.Dialogs.cs`.
 - World gen, spawning, portals, map travel/save: `scripts/World/World.cs` (large).
 - Save contracts / manager: `scripts/Core/Save/SaveGameData.cs`, `SaveGameManager.cs`.
 - Localization: `scripts/Core/Localization/LocaleText.cs` + `locales/{zh_TW,en}.json`
   (keep both files key-for-key in parity).
 - Model/asset loading + fallback materials: `scripts/Core/Assets/ExternalModelLibrary.cs`.
+- Multiplayer (host-authoritative, phase 1): autoload `Net` →
+  `scripts/Core/Network/NetworkManager.cs` (ENet host/join, custom port, max 5
+  players, handshake/seed, player-state relay, monster sync RPCs, damage
+  forwarding + kill rewards). World half: `scripts/World/World.Network.cs`
+  (host assigns net ids in `RegisterNetworkMonster`, broadcasts state batches;
+  clients build puppet monsters). Remote avatars:
+  `scripts/Core/Network/RemotePlayerPuppet.cs`. Main-menu host/join dialogs:
+  `scripts/UI/Screens/MainMenu.cs`. The host simulates every (map, tier)
+  instance that has a player in it (`EnsureWildInstancePopulated` fires from
+  `ReceivePlayerState`); tier choice/unlock stays per-player (remote kills
+  unlock via `ClientReceiveBossDefeat`). Phase-1 limits: clients see host
+  monsters and forward damage (XP/gold via RPC), but no capture of host
+  monsters, no loot drops for clients, monsters don't attack clients, caves &
+  companions are local-only.
 
 ## Invariants / gotchas
 

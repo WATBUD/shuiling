@@ -20,6 +20,13 @@ public partial class PlayerController
 
 	public bool BeginCaptureChallenge(SimpleActor actor)
 	{
+		if (IsInstanceValid(actor) && actor.IsNetworkPuppet)
+		{
+			// Multiplayer phase 1: host-owned monsters can't be captured yet.
+			PostSystemMessage(LocaleText.T("system.net.capture_blocked"), new Color(1.0f, 0.72f, 0.5f));
+			return false;
+		}
+
 		if (!IsInstanceValid(actor)
 			|| !actor.CanBeCaptured
 			|| _capturedCollection.Contains(actor)
