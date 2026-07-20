@@ -124,6 +124,10 @@ public partial class PlayerController : CharacterBody3D
 	private float _thirdPersonCameraYaw;
 	private float _godViewCameraYaw;
 	private float _cameraPitch = 0.08f;
+	// Elevation angle of the top-down camera; adjustable by right-drag vertical motion.
+	private const float GodViewMinPitch = 0.30f;
+	private const float GodViewMaxPitch = 1.40f;
+	private float _godViewPitch = 0.62f;
 	private bool _isRightMouseLookActive;
 	private CameraViewMode _cameraMode = CameraViewMode.GodView;
 	private Vector3 _lastSafePosition = new(0.0f, 0.2f, 8.0f);
@@ -415,13 +419,20 @@ public partial class PlayerController : CharacterBody3D
 			if (_cameraMode == CameraViewMode.ThirdPerson)
 			{
 				Rotation = new Vector3(Rotation.X, _cameraYaw, Rotation.Z);
-			}
-			if (_cameraMode == CameraViewMode.ThirdPerson)
-			{
 				_cameraPitch = Mathf.Clamp(
 					_cameraPitch + mouseMotion.Relative.Y * VerticalLookSensitivity,
 					-0.42f,
 					0.76f
+				);
+			}
+			else
+			{
+				// Top-down: vertical drag tilts the camera's elevation angle. Dragging
+				// down looks more overhead, dragging up looks toward the horizon.
+				_godViewPitch = Mathf.Clamp(
+					_godViewPitch + mouseMotion.Relative.Y * VerticalLookSensitivity,
+					GodViewMinPitch,
+					GodViewMaxPitch
 				);
 			}
 			return;

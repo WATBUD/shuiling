@@ -13,6 +13,38 @@ public partial class World
 	private int _activeCaveDepth;
 	private float _caveRespawnRemaining = CaveRespawnInterval;
 
+	// Brief lockout after any map change so the player teleported near an entrance/exit
+	// trigger doesn't immediately walk back through it.
+	private const float MapTravelCooldownSeconds = 0.7f;
+	private float _mapTravelCooldownRemaining;
+
+	private void AddWalkInTrigger(Node parent, string ownerMapId, string targetMap, Vector3 boxSize, Vector3 offset)
+	{
+		var trigger = new MapTravelTrigger { Name = "WalkInTrigger" };
+		parent.AddChild(trigger);
+		trigger.Configure(this, ownerMapId, targetMap, boxSize, offset);
+	}
+
+	// Called by a MapTravelTrigger when the player walks in. Ignores stale triggers on a
+	// map that is no longer active, and honours the post-travel cooldown.
+	public void TryTriggerWalkInTravel(string ownerMapId, string targetMap)
+	{
+		if (_mapTravelCooldownRemaining > 0.0f || _activeMapId != ownerMapId)
+		{
+			return;
+		}
+
+		RequestMapTravel(targetMap);
+	}
+
+	private void UpdateMapTravelCooldown(float step)
+	{
+		if (_mapTravelCooldownRemaining > 0.0f)
+		{
+			_mapTravelCooldownRemaining -= step;
+		}
+	}
+
 	private static bool IsCaveMapId(string mapId)
 	{
 		return !string.IsNullOrWhiteSpace(mapId) && mapId.Contains("_cave_");
@@ -61,10 +93,9 @@ public partial class World
 			Name = $"CaveEntrance_{wildMapId}",
 			Position = position,
 		};
-		entrance.AddToGroup("map_portal");
-		entrance.SetMeta("target_map", $"cave_enter|{wildMapId}");
-		entrance.SetMeta("label", "portal.enter_cave");
 		_propsRoot.AddChild(entrance);
+		// Walk straight into the mouth to enter the cave — no key press.
+		AddWalkInTrigger(entrance, wildMapId, $"cave_enter|{wildMapId}", new Vector3(5.0f, 3.2f, 4.6f), new Vector3(0.0f, 1.6f, 0.0f));
 
 		Material dark = MakeMaterial(new Color(0.018f, 0.014f, 0.026f));
 		Material stone = MakeMaterial(new Color(0.16f, 0.17f, 0.20f));
@@ -116,7 +147,7 @@ public partial class World
 			_activeCaveOriginMapId = originMapId;
 			_activeCaveDepth = 1;
 			EnsureCaveDepth(originMapId, 1);
-			TravelToCaveMap(MakeCaveMapId(originMapId, 1), new Vector3(0.0f, 0.2f, 27.0f), "system.cave.enter");
+			TravelToCaveMap(MakeCaveMapId(originMapId, 1), new Vector3(0.0f, 0.2f, 22.0f), "system.cave.enter");
 			return true;
 		}
 
@@ -129,7 +160,7 @@ public partial class World
 			_activeCaveOriginMapId = originMapId;
 			_activeCaveDepth = depth + 1;
 			EnsureCaveDepth(originMapId, _activeCaveDepth);
-			TravelToCaveMap(MakeCaveMapId(originMapId, _activeCaveDepth), new Vector3(0.0f, 0.2f, 27.0f), "system.cave.deeper");
+			TravelToCaveMap(MakeCaveMapId(originMapId, _activeCaveDepth), new Vector3(0.0f, 0.2f, 22.0f), "system.cave.deeper");
 			return true;
 		}
 
@@ -142,7 +173,7 @@ public partial class World
 			if (depth > 1)
 			{
 				_activeCaveDepth = depth - 1;
-				TravelToCaveMap(MakeCaveMapId(originMapId, depth - 1), new Vector3(0.0f, 0.2f, -27.0f), "system.cave.ascend");
+				TravelToCaveMap(MakeCaveMapId(originMapId, depth - 1), new Vector3(0.0f, 0.2f, -22.0f), "system.cave.ascend");
 			}
 			else
 			{
@@ -204,8 +235,8 @@ public partial class World
 		caveRoot.AddChild(_propsRoot);
 
 		BuildCaveGeometry(depth);
-		CreateCaveStonePortal(new Vector3(0.0f, 0.0f, 31.0f), "cave_back", depth == 1 ? "portal.leave_cave" : "portal.cave_back", false);
-		CreateCaveStonePortal(new Vector3(0.0f, 0.0f, -31.0f), "cave_deeper", "portal.cave_deeper", true);
+		CreateCaveStonePortal(mapId, new Vector3(0.0f, 0.0f, 31.0f), "cave_back", depth == 1 ? "portal.leave_cave" : "portal.cave_back", false);
+		CreateCaveStonePortal(mapId, new Vector3(0.0f, 0.0f, -31.0f), "cave_deeper", "portal.cave_deeper", true);
 		SpawnCaveMonsters(mapId, depth);
 		SetMapRootActive(caveRoot, false);
 		_mapRoot = previousMapRoot;
@@ -254,15 +285,15 @@ public partial class World
 		}
 	}
 
-	private void CreateCaveStonePortal(Vector3 position, string targetMap, string labelKey, bool deeper)
+	private void CreateCaveStonePortal(string ownerMapId, Vector3 position, string targetMap, string labelKey, bool deeper)
 	{
 		Material stone = MakeMaterial(new Color(0.12f, 0.11f, 0.145f));
 		Material glow = MakeEmissiveMaterial(deeper ? new Color(0.52f, 0.18f, 0.78f, 0.9f) : new Color(0.22f, 0.54f, 0.72f, 0.9f), 2.0f, 0.14f);
 		var portal = new StaticBody3D { Name = deeper ? "CaveDeeperPassage" : "CaveReturnPassage", Position = position };
-		portal.AddToGroup("map_portal");
-		portal.SetMeta("target_map", targetMap);
-		portal.SetMeta("label", labelKey);
 		_propsRoot.AddChild(portal);
+		// Walk into the passage mouth to travel — the trigger sits just inside the cave
+		// so the player crosses it before reaching the passage rocks.
+		AddWalkInTrigger(portal, ownerMapId, targetMap, new Vector3(6.0f, 3.2f, 3.6f), new Vector3(0.0f, 1.6f, deeper ? 1.9f : -1.9f));
 		AddMesh(portal, "DarkPassage", new SphereMesh { Radius = 2.5f, Height = 4.2f }, new Vector3(0.0f, 1.9f, 0.0f), Vector3.Zero, new Vector3(1.35f, 1.0f, 0.42f), MakeMaterial(new Color(0.008f, 0.006f, 0.014f)));
 		for (int index = 0; index < 7; index++)
 		{
