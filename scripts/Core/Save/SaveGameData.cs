@@ -7,6 +7,9 @@ public sealed class SaveGameData
 	public string ActiveMapId { get; set; } = "city";
 	public SaveVector3 PlayerPosition { get; set; } = new();
 	public PlayerSaveData Player { get; set; } = new();
+	// World Tier progression per wild map id (docs/world_progression.md).
+	public Dictionary<string, int> UnlockedMapTiers { get; set; } = new();
+	public Dictionary<string, int> SelectedMapTiers { get; set; } = new();
 }
 
 public sealed class PlayerSaveData
@@ -53,6 +56,7 @@ public sealed class ActorSaveData
 	public string ActorKind { get; set; } = "monster";
 	public string DisplayName { get; set; } = "name.actor.traveler";
 	public int Level { get; set; } = 1;
+	public int WorldTier { get; set; } = 1;
 	public int MaxHealth { get; set; } = 100;
 	public int CurrentHealth { get; set; } = 100;
 	public bool IsDefeated { get; set; }

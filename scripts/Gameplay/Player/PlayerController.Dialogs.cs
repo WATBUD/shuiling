@@ -231,19 +231,41 @@ public partial class PlayerController
 	private void ShowMapTravelDialog(World world)
 	{
 		ClearChildren(_mapTravelButtonList);
-		foreach ((string id, string label) in world.GetWildMapTravelOptions())
+		// One row per biome: travel button + World Tier picker (Tiers 1..unlocked).
+		// Map = ecosystem, Tier = difficulty (docs/world_progression.md).
+		foreach ((string id, string label, int unlockedTier, int selectedTier) in world.GetWildMapTravelTierOptions())
 		{
+			var row = new HBoxContainer();
+			row.AddThemeConstantOverride("separation", 8);
+
 			var button = new Button
 			{
 				Text = label,
 				CustomMinimumSize = new Vector2(0.0f, 42.0f),
+				SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
 			};
+
+			var tierSelect = new OptionButton
+			{
+				CustomMinimumSize = new Vector2(112.0f, 42.0f),
+				TooltipText = LocaleText.F("map.tier.progress", unlockedTier, WorldTierCatalog.MaxTier),
+			};
+			for (int tier = WorldTierCatalog.MinTier; tier <= unlockedTier; tier++)
+			{
+				tierSelect.AddItem(LocaleText.F("map.tier.option", tier), tier);
+			}
+			tierSelect.Selected = Mathf.Clamp(selectedTier - 1, 0, unlockedTier - 1);
+
 			button.Pressed += () =>
 			{
+				int chosenTier = tierSelect.GetSelectedId();
 				CloseMapTravelDialog();
-				world.RequestMapTravel(id);
+				world.RequestMapTravel(id, chosenTier);
 			};
-			_mapTravelButtonList.AddChild(button);
+
+			row.AddChild(button);
+			row.AddChild(tierSelect);
+			_mapTravelButtonList.AddChild(row);
 		}
 
 		_mapTravelDialog.Visible = true;

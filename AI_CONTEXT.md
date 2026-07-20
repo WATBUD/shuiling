@@ -11,6 +11,8 @@ and they fight for you. Build with: `dotnet build "新遊戲專案.csproj"` afte
 
 - `main_menu.tscn` — startup/main menu (`scripts/UI/Screens/MainMenu.cs`).
 - `node_3d.tscn` — gameplay world (`scripts/World/World.cs`).
+- World progression design: `docs/world_progression.md` — **map = biome, Tier = difficulty**.
+  Every wild map supports Tiers 1–10; never give maps fixed level ranges.
 - Rendering: desktop `Forward+`; Windows driver `d3d12`; mobile `gl_compatibility`.
 
 ## Domain model — READ THIS BEFORE TOUCHING COMBAT/BUILD
@@ -78,6 +80,12 @@ Combat facts:
   `scripts/UI/Panels/PartyPanel.cs`.
 - Monster species / loot tables: `scripts/Gameplay/Monsters/MonsterSpeciesCatalog.cs`,
   `scripts/Gameplay/Items/MonsterLootCatalog.cs`.
+- World Tier rules (level bands, stat/reward multipliers, evolution-stage names):
+  `scripts/Gameplay/Progression/WorldTierCatalog.cs`. Runtime tier state + unlock
+  (boss kill at highest unlocked tier unlocks the next) lives in `World.cs`
+  (`_wildMap*TiersById`, `ApplySelectedTier`, `OnWildBossDefeated`); persisted as
+  `SaveGameData.UnlockedMapTiers`/`SelectedMapTiers`; each actor stores `WorldTier`.
+  Tier picker UI: `ShowMapTravelDialog` in `PlayerController.Dialogs.cs`.
 - World gen, spawning, portals, map travel/save: `scripts/World/World.cs` (large).
 - Save contracts / manager: `scripts/Core/Save/SaveGameData.cs`, `SaveGameManager.cs`.
 - Localization: `scripts/Core/Localization/LocaleText.cs` + `locales/{zh_TW,en}.json`
