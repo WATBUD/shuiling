@@ -29,7 +29,13 @@ public partial class PlayerController
 
 		Gold += gainedGold;
 		PostSystemMessage(LocaleText.F("system.pickup.gold", gainedGold, Gold), new Color(1.0f, 0.82f, 0.26f), GameMessageChannel.Loot);
-		_mercenaryShopPanel?.RefreshAll();
+		// Only rebuild the mercenary shop while it's actually open — it refreshes
+		// itself on open (SetPanelVisible), so refreshing on every gold pickup
+		// just burned frames and caused loot/kill hitches.
+		if (_mercenaryShopPanel != null && _mercenaryShopPanel.Visible)
+		{
+			_mercenaryShopPanel.RefreshAll();
+		}
 	}
 
 	public void AddInventoryItem(string itemId, int amount = 1)
@@ -42,7 +48,9 @@ public partial class PlayerController
 		_inventoryItems.TryGetValue(itemId, out int currentCount);
 		_inventoryItems[itemId] = Mathf.Max(currentCount + amount, 0);
 		PostSystemMessage(LocaleText.F("system.pickup.item", GetInventoryItemDisplayName(itemId), Mathf.Max(amount, 0)), new Color(1.0f, 0.88f, 0.48f), GameMessageChannel.Loot);
-		if (_inventoryPanel != null)
+		// The inventory panel rebuilds itself on open; skip the full RefreshAll
+		// while it's closed so grabbing a monster's loot pile doesn't stutter.
+		if (_inventoryPanel != null && _inventoryPanel.Visible)
 		{
 			_inventoryPanel.RefreshAll();
 		}

@@ -1,7 +1,58 @@
 using Godot;
+using System.Collections.Generic;
 
 public partial class WorldDrop : Node3D
 {
+	// Drop visuals reuse a handful of colours, so cache their materials and
+	// meshes instead of allocating fresh ones per drop. A defeated monster can
+	// spit out 5+ drops (a boss ~8) in a single frame; building unique
+	// materials/meshes for each was a large slice of the death-frame hitch.
+	// Materials are never mutated after creation, so sharing is safe.
+	private static readonly Dictionary<int, StandardMaterial3D> BodyMaterialCache = new();
+	private static readonly Dictionary<int, StandardMaterial3D> GlowMaterialCache = new();
+	private static Mesh? _sharedGoldMesh;
+	private static Mesh? _sharedItemMesh;
+	private static Mesh? _sharedGlowMesh;
+
+	private static StandardMaterial3D GetBodyMaterial(Color color, bool isGold)
+	{
+		int key = unchecked((int)color.ToRgba32() * 2 + (isGold ? 1 : 0));
+		if (BodyMaterialCache.TryGetValue(key, out StandardMaterial3D? cached))
+		{
+			return cached;
+		}
+
+		var material = new StandardMaterial3D
+		{
+			AlbedoColor = color,
+			EmissionEnabled = true,
+			Emission = color * 0.45f,
+			Roughness = 0.35f,
+			Metallic = isGold ? 0.45f : 0.12f,
+		};
+		BodyMaterialCache[key] = material;
+		return material;
+	}
+
+	private static StandardMaterial3D GetGlowMaterial(Color color)
+	{
+		int key = unchecked((int)color.ToRgba32());
+		if (GlowMaterialCache.TryGetValue(key, out StandardMaterial3D? cached))
+		{
+			return cached;
+		}
+
+		var material = new StandardMaterial3D
+		{
+			AlbedoColor = new Color(color.R, color.G, color.B, 0.28f),
+			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			EmissionEnabled = true,
+			Emission = color * 0.25f,
+		};
+		GlowMaterialCache[key] = material;
+		return material;
+	}
+
 	[Export] public string ItemId { get; set; } = string.Empty;
 	[Export] public int Amount { get; set; } = 1;
 	[Export] public int GoldAmount { get; set; }
@@ -67,18 +118,15 @@ public partial class WorldDrop : Node3D
 			? new Color(1.0f, 0.78f, 0.18f, 0.96f)
 			: GetItemColor(ItemId);
 
-		var material = new StandardMaterial3D
+		Mesh mesh;
+		if (IsGoldDrop)
 		{
-			AlbedoColor = color,
-			EmissionEnabled = true,
-			Emission = color * 0.45f,
-			Roughness = 0.35f,
-			Metallic = IsGoldDrop ? 0.45f : 0.12f,
-		};
-
-		Mesh mesh = IsGoldDrop
-			? new CylinderMesh { TopRadius = 0.22f, BottomRadius = 0.24f, Height = 0.12f, RadialSegments = 24 }
-			: new BoxMesh { Size = new Vector3(0.42f, 0.42f, 0.42f) };
+			mesh = _sharedGoldMesh ??= new CylinderMesh { TopRadius = 0.22f, BottomRadius = 0.24f, Height = 0.12f, RadialSegments = 24 };
+		}
+		else
+		{
+			mesh = _sharedItemMesh ??= new BoxMesh { Size = new Vector3(0.42f, 0.42f, 0.42f) };
+		}
 
 		var body = new MeshInstance3D
 		{
@@ -87,7 +135,7 @@ public partial class WorldDrop : Node3D
 			Position = new Vector3(0.0f, 0.24f, 0.0f),
 			RotationDegrees = IsGoldDrop ? new Vector3(90.0f, 0.0f, 0.0f) : new Vector3(18.0f, 35.0f, 0.0f),
 		};
-		body.SetSurfaceOverrideMaterial(0, material);
+		body.SetSurfaceOverrideMaterial(0, GetBodyMaterial(color, IsGoldDrop));
 		AddChild(body);
 
 		if (!IsGoldDrop)
@@ -95,17 +143,10 @@ public partial class WorldDrop : Node3D
 			var glow = new MeshInstance3D
 			{
 				Name = "ItemGlow",
-				Mesh = new SphereMesh { Radius = 0.32f, Height = 0.42f },
+				Mesh = _sharedGlowMesh ??= new SphereMesh { Radius = 0.32f, Height = 0.42f },
 				Position = new Vector3(0.0f, 0.24f, 0.0f),
 			};
-			var glowMaterial = new StandardMaterial3D
-			{
-				AlbedoColor = new Color(color.R, color.G, color.B, 0.28f),
-				Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-				EmissionEnabled = true,
-				Emission = color * 0.25f,
-			};
-			glow.SetSurfaceOverrideMaterial(0, glowMaterial);
+			glow.SetSurfaceOverrideMaterial(0, GetGlowMaterial(color));
 			AddChild(glow);
 		}
 

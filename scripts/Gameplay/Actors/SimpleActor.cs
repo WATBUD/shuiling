@@ -1452,13 +1452,16 @@ public partial class SimpleActor : CharacterBody3D
 		};
 		AddChild(_nameplate);
 
-		_nameplateMarkerMaterial = MakeMarkerMaterial(new Color(1.0f, 0.28f, 0.20f, 0.92f), 0.6f);
+		// Shaded so the marker reads as a real 3D ball from every angle rather
+		// than a flat unshaded disc; kept self-lit via emission so it still pops
+		// in dark biomes.
+		_nameplateMarkerMaterial = MakeMarkerBallMaterial(new Color(1.0f, 0.28f, 0.20f, 0.92f));
 		_nameplateHaloMaterial = MakeMarkerMaterial(new Color(1.0f, 0.28f, 0.20f, 0.34f), 0.35f);
 		_nameplateMarker = new MeshInstance3D
 		{
 			Name = "NameplateMarker",
-			Mesh = new BoxMesh { Size = new Vector3(0.22f, 0.22f, 0.22f) },
-			RotationDegrees = new Vector3(35.0f, 45.0f, 0.0f),
+			// Full, smooth sphere (Height = 2 x Radius) — round from all 360°.
+			Mesh = new SphereMesh { Radius = 0.085f, Height = 0.17f, RadialSegments = 24, Rings = 12 },
 			MaterialOverride = _nameplateMarkerMaterial,
 		};
 		_nameplateHalo = new MeshInstance3D
@@ -1579,6 +1582,21 @@ public partial class SimpleActor : CharacterBody3D
 			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
 			NoDepthTest = true,
 			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+		};
+	}
+
+	// Marker ball: lit (per-pixel) so its curvature is visible as a rounded
+	// gradient from any direction, with mild emission so it self-illuminates.
+	private static StandardMaterial3D MakeMarkerBallMaterial(Color color)
+	{
+		return new StandardMaterial3D
+		{
+			AlbedoColor = color,
+			EmissionEnabled = true,
+			Emission = color,
+			EmissionEnergyMultiplier = 0.35f,
+			Roughness = 0.4f,
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.PerPixel,
 		};
 	}
 
