@@ -280,6 +280,8 @@
 	"inventory.tab.materials": "Materials",
 	"inventory.tab.consumables": "Consumables",
 	"item.town_portal": "Town Portal Scroll",
+	"item.town_portal.channel": "Channeling town portal… ({0}s, interrupted if hit)",
+	"item.town_portal.interrupted": "Town portal channel interrupted!",
 	"item.town_portal.used": "Used a Town Portal Scroll — returning to town.",
 	"item.town_portal.blocked": "Can't use a Town Portal Scroll right now.",
 	"item.town_portal.in_town": "You're already in town — no need for a scroll.",
