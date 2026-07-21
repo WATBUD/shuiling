@@ -113,6 +113,7 @@ public partial class PlayerController
 	{
 		int mitigatedDamage = Mathf.Max(rawDamage - Mathf.RoundToInt(Defense * 0.35f), 1);
 		CurrentHealth = Mathf.Max(CurrentHealth - mitigatedDamage, 0);
+		MarkRecentCombat();
 		Color hitColor = attacker?.AttackFxColor ?? new Color(1.0f, 0.18f, 0.14f, 0.92f);
 		SpawnWorldCombatEffect($"-{mitigatedDamage}", hitColor, GlobalPosition + new Vector3(0.0f, 1.45f, 0.0f), 0.78f, 0.88f);
 		SpawnIncomingAttackCue(attacker, hitColor);

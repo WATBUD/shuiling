@@ -73,7 +73,15 @@ Combat facts:
   `scripts/Gameplay/Actors/SimpleActor.cs` (large).
 - Live projectile + behaviors (split/chain/pierce/explosion): `scripts/Gameplay/Combat/CombatProjectile.cs`.
 - Core/build data: elements, support cores, levels/upgrade, catalogs, `CalculateStats`:
-  `scripts/Gameplay/Items/BuildSystem.cs`.
+  `scripts/Gameplay/Items/BuildSystem.cs`. `InventoryItemKind` now includes
+  `Consumable`; `BuildCatalog.TownPortalScrollId` + `Consumables` map + `IsConsumable`.
+- Town Portal Scroll (回城卷): emergency retreat consumable, `PlayerController.TownPortal.cs`.
+  5 granted on new game; used via T hotkey or the inventory Consumables tab
+  (double-click / Use button → `UseTownPortalScroll`). `CanUseTownPortalScroll`
+  gates it to the wild when safe (not city/cave, no active boss, not recently
+  damaged `MarkRecentCombat`, no monster within ~16m) then `RequestMapTravel("city")`.
+  NOTE: the design's multi-city handbook/outpost binding is deferred — the world
+  has one city today (the M-key map already covers cross-region travel).
 - Build-editing UI (equip/unequip via drag or double-click, upgrade, locked slots, core
   chain): `scripts/UI/Panels/InventoryPanel.cs`.
 - Companion info card / party panel: `scripts/UI/Components/CompanionInfoCard.cs`,
