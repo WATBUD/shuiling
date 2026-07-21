@@ -174,8 +174,7 @@ public partial class CompanionInfoCard : PanelContainer
 		_meta.Text = string.Join("\n",
 			$"{_actor.TypeName} / {_actor.CombatRangeName}",
 			$"{LocaleText.T("stat.role")} {_actor.CombatRoleName}",
-			$"{LocaleText.T("stat.affinity")} {_actor.Affinity} / 100",
-			$"{LocaleText.T("build.element")} {_actor.BuildElementName}");
+			$"{LocaleText.T("stat.affinity")} {_actor.Affinity} / 100");
 		_mood.Text = $"{LocaleText.T("stat.mood")}：{_actor.MoodName}";
 		_mood.Visible = true;
 		_ability.Text = $"{LocaleText.T("stat.ability")} {_actor.LocalizedSpecialAbility} {LocaleText.T("actor.level_prefix")}{_actor.AbilityRank}";
@@ -218,7 +217,6 @@ public partial class CompanionInfoCard : PanelContainer
 		_meta.Text = string.Join("\n",
 			$"Player / {LocaleText.T("combat.range.melee")}",
 			$"{LocaleText.T("stat.role")} {LocaleText.T("role.dps")} / {LocaleText.T("personality.brave")}",
-			$"{LocaleText.T("build.element")} {LocaleText.T("element.physical")}",
 			LocaleText.F("inventory.gold", _player.Gold),
 			LocaleText.F("party.title", _player.ActiveParty.Count, _player.ActivePartyLimit, _player.AvailableCompanionCount));
 		_ability.Text = string.Empty;

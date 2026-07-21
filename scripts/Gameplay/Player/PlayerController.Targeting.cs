@@ -61,6 +61,32 @@ public partial class PlayerController
 		return false;
 	}
 
+	// RTS-style click feedback for God View: an expanding ring at the clicked
+	// ground point (green), or on the target if a hostile was clicked (red).
+	private void ShowGodViewClickIndicator(Vector2 screenPosition)
+	{
+		bool hostile = _focusedTarget != null && IsInstanceValid(_focusedTarget);
+		Vector3 spawnPoint;
+		if (hostile)
+		{
+			spawnPoint = _focusedTarget!.GlobalPosition;
+		}
+		else if (!TryGetMouseGroundPoint(screenPosition, out spawnPoint))
+		{
+			return;
+		}
+
+		var indicator = new ClickIndicator
+		{
+			RingColor = hostile
+				? new Color(1.0f, 0.34f, 0.22f, 0.92f)
+				: new Color(0.40f, 1.0f, 0.60f, 0.92f),
+		};
+		Node parent = GetTree().CurrentScene ?? GetParent();
+		parent.AddChild(indicator);
+		indicator.GlobalPosition = new Vector3(spawnPoint.X, 0.05f, spawnPoint.Z);
+	}
+
 	private void SetSelectedActor(SimpleActor actor)
 	{
 		_selectedActor = actor;

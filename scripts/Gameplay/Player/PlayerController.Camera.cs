@@ -169,6 +169,33 @@ public partial class PlayerController
 		return facing.LengthSquared() > 0.001f ? facing.Normalized() : GetCameraPlanarForward();
 	}
 
+	// World-space point where the cursor ray meets the player's ground plane.
+	// Used by the God View click indicator (RTS-style feedback).
+	private bool TryGetMouseGroundPoint(Vector2 screenPosition, out Vector3 groundPoint)
+	{
+		groundPoint = Vector3.Zero;
+		if (_camera == null || !IsInstanceValid(_camera))
+		{
+			return false;
+		}
+
+		Vector3 rayOrigin = _camera.ProjectRayOrigin(screenPosition);
+		Vector3 rayDirection = _camera.ProjectRayNormal(screenPosition).Normalized();
+		if (Mathf.Abs(rayDirection.Y) <= 0.0001f)
+		{
+			return false;
+		}
+
+		float rayDistance = (GlobalPosition.Y - rayOrigin.Y) / rayDirection.Y;
+		if (rayDistance <= 0.0f)
+		{
+			return false;
+		}
+
+		groundPoint = rayOrigin + rayDirection * rayDistance;
+		return true;
+	}
+
 	private bool TryGetMouseGroundAimDirection(Vector2 screenPosition, out Vector3 direction)
 	{
 		direction = Vector3.Zero;

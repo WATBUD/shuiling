@@ -460,6 +460,7 @@ public partial class PlayerController : CharacterBody3D
 				if (_cameraMode == CameraViewMode.GodView && @event is InputEventMouseButton selectButton)
 				{
 					TrySelectActorTarget(selectButton.Position);
+					ShowGodViewClickIndicator(selectButton.Position);
 				}
 				else
 				{

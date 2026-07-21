@@ -307,7 +307,7 @@
 	"tooltip.move_speed": "移動速度",
 	"tooltip.attack_cooldown": "攻擊冷卻",
 	"tooltip.attack_range": "攻擊距離",
-	"tooltip.detection_radius": "偵測距離",
+	"tooltip.detection_radius": "索敵距離",
 	"tooltip.follow_distance": "跟隨距離",
 	"tooltip.crit_chance": "暴擊率",
 	"tooltip.life_steal": "吸血",
