@@ -88,8 +88,14 @@ Combat facts:
   (`_spawnedWildInstancesByKey`, `EnsureWildInstancePopulated`,
   `DespawnInactiveWildInstances`, `IsActorInstanceActive` in `World.cs`);
   players share monsters/see each other only on the same map AND tier. Each
-  actor stores `WorldTier`. Tier picker UI: `ShowMapTravelDialog` in
-  `PlayerController.Dialogs.cs`.
+  actor stores `WorldTier`. Tiers are also **level-gated**
+  (`WorldTierCatalog.GetRequiredPlayerLevel`); `ApplySelectedTier` clamps to a
+  tier the player level allows. `World.GetTierMenu(mapId, playerLevel)` returns
+  per-tier level range + unlock/level-met/available flags — shared by the portal
+  dialog and the M-key map. Tier picker + world map guide: `ShowMapTravelDialog`
+  / `ToggleWorldMapGuide` (M key) in `PlayerController.Dialogs.cs`; locked tiers
+  show a drawn `MakeLockBadge` padlock. Portal visuals incl. hexagram floor:
+  `CreateMapPortal`/`AddPortalHexagram` in `World.cs`.
 - World gen, spawning, portals, map travel/save: `scripts/World/World.cs` (large).
 - Biome dressing (per-map sky/fog/sun atmosphere via `ApplyMapAtmosphere`, biome
   prop scatter, landmark set-pieces): `scripts/World/World.Biomes.cs`. Scatter

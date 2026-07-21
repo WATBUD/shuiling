@@ -191,10 +191,10 @@ public partial class PlayerController
 			AnchorRight = 0.5f,
 			AnchorTop = 0.5f,
 			AnchorBottom = 0.5f,
-			OffsetLeft = -210.0f,
-			OffsetRight = 210.0f,
-			OffsetTop = -150.0f,
-			OffsetBottom = 150.0f,
+			OffsetLeft = -330.0f,
+			OffsetRight = 330.0f,
+			OffsetTop = -270.0f,
+			OffsetBottom = 270.0f,
 		};
 		_mapTravelDialog.AddThemeStyleboxOverride("panel", MakeDialogStyle(new Color(0.05f, 0.07f, 0.09f, 0.94f), new Color(0.35f, 0.82f, 1.0f, 0.72f)));
 		layer.AddChild(_mapTravelDialog);
@@ -219,60 +219,176 @@ public partial class PlayerController
 		title.AddThemeColorOverride("font_color", new Color(1.0f, 0.94f, 0.78f));
 		root.AddChild(title);
 
-		_mapTravelButtonList = new VBoxContainer();
-		_mapTravelButtonList.AddThemeConstantOverride("separation", 8);
-		root.AddChild(_mapTravelButtonList);
+		var scroll = new ScrollContainer
+		{
+			SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+			CustomMinimumSize = new Vector2(624.0f, 430.0f),
+		};
+		root.AddChild(scroll);
+
+		_mapTravelButtonList = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+		_mapTravelButtonList.AddThemeConstantOverride("separation", 10);
+		scroll.AddChild(_mapTravelButtonList);
 
 		var cancelButton = MakeQuestDialogButton("dialog.button.cancel");
 		cancelButton.Pressed += CloseMapTravelDialog;
 		root.AddChild(cancelButton);
 	}
 
+	// Toggle the world map guide (M key). Reuses the map travel dialog so the
+	// overview and quick-travel share one screen.
+	private void ToggleWorldMapGuide()
+	{
+		if (_mapTravelDialog != null && _mapTravelDialog.Visible)
+		{
+			CloseMapTravelDialog();
+			return;
+		}
+
+		if (GetParent() is World world)
+		{
+			ShowMapTravelDialog(world);
+		}
+	}
+
 	private void ShowMapTravelDialog(World world)
 	{
 		ClearChildren(_mapTravelButtonList);
-		// One row per biome: travel button + World Tier picker (Tiers 1..unlocked).
-		// Map = ecosystem, Tier = difficulty (docs/world_progression.md).
-		// Tier choice and unlocks are per-player, in multiplayer too — players
-		// meet when they pick the same map AND the same tier.
-		foreach ((string id, string label, int unlockedTier, int selectedTier) in world.GetWildMapTravelTierOptions())
+		// Per biome, show all tiers 1..10 with their monster level range. Tiers
+		// the player can't enter yet (not progression-unlocked, or player level
+		// below the tier's requirement) are shown with a lock badge and disabled.
+		foreach ((string id, string label) in world.GetWildMapList())
 		{
-			var row = new HBoxContainer();
-			row.AddThemeConstantOverride("separation", 8);
-
-			var button = new Button
-			{
-				Text = label,
-				CustomMinimumSize = new Vector2(0.0f, 42.0f),
-				SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-			};
-
-			var tierSelect = new OptionButton
-			{
-				CustomMinimumSize = new Vector2(112.0f, 42.0f),
-				TooltipText = LocaleText.F("map.tier.progress", unlockedTier, WorldTierCatalog.MaxTier),
-			};
-			for (int tier = WorldTierCatalog.MinTier; tier <= unlockedTier; tier++)
-			{
-				tierSelect.AddItem(LocaleText.F("map.tier.option", tier), tier);
-			}
-			tierSelect.Selected = Mathf.Clamp(selectedTier - 1, 0, unlockedTier - 1);
-
-			button.Pressed += () =>
-			{
-				int chosenTier = tierSelect.GetSelectedId();
-				CloseMapTravelDialog();
-				world.RequestMapTravel(id, chosenTier);
-			};
-
-			row.AddChild(button);
-			row.AddChild(tierSelect);
-			_mapTravelButtonList.AddChild(row);
+			_mapTravelButtonList.AddChild(BuildMapTierSection(world, id, label));
 		}
 
 		_mapTravelDialog.Visible = true;
 		_interactionPromptLabel.Visible = false;
 		UpdateMouseModeForPanels();
+	}
+
+	private Control BuildMapTierSection(World world, string mapId, string mapLabel)
+	{
+		var section = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+		section.AddThemeConstantOverride("separation", 4);
+
+		bool isHere = world.ActiveMapId == mapId;
+		var header = new Label
+		{
+			Text = isHere ? LocaleText.F("map.guide.here", mapLabel) : mapLabel,
+		};
+		header.AddThemeFontSizeOverride("font_size", 18);
+		header.AddThemeColorOverride("font_color", isHere ? new Color(0.4f, 1.0f, 0.6f) : new Color(0.72f, 0.92f, 1.0f));
+		section.AddChild(header);
+
+		// Boss status for this map (alive / respawn countdown).
+		foreach (World.BossStatusSnapshot boss in world.GetBossStatusSnapshots())
+		{
+			if (boss.MapId != mapId)
+			{
+				continue;
+			}
+
+			var bossLabel = new Label
+			{
+				Text = boss.IsAlive
+					? LocaleText.F("map.guide.boss_alive", boss.BossName)
+					: LocaleText.F("map.guide.boss_respawn", boss.BossName, boss.RespawnSeconds),
+			};
+			bossLabel.AddThemeFontSizeOverride("font_size", 12);
+			bossLabel.AddThemeColorOverride("font_color", boss.IsAlive ? new Color(1.0f, 0.72f, 0.34f) : new Color(0.6f, 0.66f, 0.72f));
+			section.AddChild(bossLabel);
+			break;
+		}
+
+		var grid = new GridContainer { Columns = 5 };
+		grid.AddThemeConstantOverride("h_separation", 6);
+		grid.AddThemeConstantOverride("v_separation", 6);
+		section.AddChild(grid);
+
+		foreach (World.TierMenuEntry entry in world.GetTierMenu(mapId, Level))
+		{
+			grid.AddChild(MakeTierButton(world, mapId, entry));
+		}
+
+		return section;
+	}
+
+	private Control MakeTierButton(World world, string mapId, World.TierMenuEntry entry)
+	{
+		var button = new Button
+		{
+			Text = LocaleText.F("map.tier.button", entry.Tier, entry.LevelMin, entry.LevelMax),
+			CustomMinimumSize = new Vector2(116.0f, 46.0f),
+			ClipText = true,
+			Disabled = !entry.Available,
+		};
+		button.AddThemeFontSizeOverride("font_size", 13);
+
+		if (entry.IsSelected && entry.Available)
+		{
+			button.AddThemeColorOverride("font_color", new Color(0.4f, 1.0f, 0.6f));
+		}
+
+		if (!entry.Available)
+		{
+			button.Modulate = new Color(0.62f, 0.64f, 0.68f);
+			button.TooltipText = entry.Unlocked
+				? LocaleText.F("map.tier.need_level", entry.RequiredLevel)
+				: LocaleText.T("map.tier.locked_boss");
+			button.AddChild(MakeLockBadge());
+		}
+		else
+		{
+			button.Pressed += () =>
+			{
+				CloseMapTravelDialog();
+				world.RequestMapTravel(mapId, entry.Tier);
+			};
+		}
+
+		return button;
+	}
+
+	// Small padlock drawn from panels so it renders regardless of the font's
+	// glyph coverage. Anchored to the top-right corner of a tier button.
+	private static Control MakeLockBadge()
+	{
+		var badge = new Control
+		{
+			CustomMinimumSize = new Vector2(16.0f, 18.0f),
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			AnchorLeft = 1.0f,
+			AnchorRight = 1.0f,
+			OffsetLeft = -19.0f,
+			OffsetRight = -3.0f,
+			OffsetTop = 3.0f,
+			OffsetBottom = 21.0f,
+		};
+
+		var shackleStyle = new StyleBoxFlat { BgColor = new Color(0, 0, 0, 0) };
+		shackleStyle.SetBorderWidthAll(2);
+		shackleStyle.BorderWidthBottom = 0;
+		shackleStyle.BorderColor = new Color(0.95f, 0.82f, 0.35f);
+		shackleStyle.CornerRadiusTopLeft = 5;
+		shackleStyle.CornerRadiusTopRight = 5;
+		var shackle = new Panel { OffsetLeft = 3, OffsetRight = 13, OffsetTop = 0, OffsetBottom = 9 };
+		shackle.AddThemeStyleboxOverride("panel", shackleStyle);
+		badge.AddChild(shackle);
+
+		var bodyStyle = new StyleBoxFlat { BgColor = new Color(0.95f, 0.82f, 0.35f) };
+		bodyStyle.SetCornerRadiusAll(2);
+		var body = new Panel { OffsetLeft = 1, OffsetRight = 15, OffsetTop = 7, OffsetBottom = 18 };
+		body.AddThemeStyleboxOverride("panel", bodyStyle);
+		badge.AddChild(body);
+
+		var keyholeStyle = new StyleBoxFlat { BgColor = new Color(0.15f, 0.12f, 0.05f) };
+		keyholeStyle.SetCornerRadiusAll(2);
+		var keyhole = new Panel { OffsetLeft = 6, OffsetRight = 10, OffsetTop = 10, OffsetBottom = 15 };
+		keyhole.AddThemeStyleboxOverride("panel", keyholeStyle);
+		badge.AddChild(keyhole);
+
+		return badge;
 	}
 
 	private void CloseMapTravelDialog()
