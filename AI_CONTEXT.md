@@ -129,6 +129,13 @@ Combat facts:
   monsters and forward damage (XP/gold via RPC), but no capture of host
   monsters, no loot drops for clients, monsters don't attack clients, caves &
   companions are local-only.
+- Listen-server reachability: `scripts/Core/Network/NetworkDiagnostics.cs`
+  (port-bind test, Godot `Upnp` discover/external-IP/auto port-map, CGNAT range
+  check, Windows `netsh` firewall rule). Host dialog "Network Test" button runs
+  it (bind on main thread, UPnP/firewall on a worker → `CallDeferred`);
+  `NetworkManager.CreateServer` also fires `TryOpenPort` for best-effort UPnP.
+  No master server, so external reachability is inferred from the router's WAN
+  IP, not a true reachback.
 
 ## Invariants / gotchas
 

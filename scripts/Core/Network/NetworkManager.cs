@@ -75,6 +75,10 @@ public partial class NetworkManager : Node
 
 		Multiplayer.MultiplayerPeer = peer;
 		Mode = NetMode.Host;
+		// Best-effort UPnP auto port-forward so most players can host without
+		// manual router setup (off-thread; failures fall back to manual/relay).
+		int forwardPort = port;
+		System.Threading.Tasks.Task.Run(() => NetworkDiagnostics.TryOpenPort(forwardPort));
 		WorldSeed = (int)(GD.Randi() % int.MaxValue);
 		if (WorldSeed == 0)
 		{
