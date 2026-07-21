@@ -1,0 +1,76 @@
+[gd_scene load_steps=10 format=3 uid="uid://cshpine0props01"]
+
+; Editable snow pine prop. Open this in the Godot editor to tweak its look
+; (mesh sizes, colours, extra branches, snow). World.Biomes.cs instantiates it
+; via CreatePineTree — the game still decides WHERE and HOW MANY to place.
+
+[sub_resource type="StandardMaterial3D" id="mat_trunk"]
+albedo_color = Color(0.33, 0.21, 0.12, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="mat_leaf"]
+albedo_color = Color(0.1, 0.32, 0.22, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="mat_snow"]
+albedo_color = Color(0.9, 0.94, 0.99, 1)
+roughness = 0.7
+
+[sub_resource type="CylinderMesh" id="mesh_trunk"]
+top_radius = 0.18
+bottom_radius = 0.26
+height = 1.2
+
+[sub_resource type="CylinderMesh" id="mesh_cone_big"]
+top_radius = 0.0
+bottom_radius = 1.35
+height = 1.15
+
+[sub_resource type="CylinderMesh" id="mesh_cone_mid"]
+top_radius = 0.0
+bottom_radius = 1.05
+height = 1.0
+
+[sub_resource type="CylinderMesh" id="mesh_cone_small"]
+top_radius = 0.0
+bottom_radius = 0.72
+height = 0.95
+
+[sub_resource type="CylinderMesh" id="mesh_tip"]
+top_radius = 0.0
+bottom_radius = 0.16
+height = 0.3
+
+[sub_resource type="BoxShape3D" id="shape_col"]
+size = Vector3(0.85, 2.6, 0.85)
+
+[node name="PineTree" type="StaticBody3D"]
+
+[node name="Trunk" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+mesh = SubResource("mesh_trunk")
+surface_material_override/0 = SubResource("mat_trunk")
+
+[node name="TierBig" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.55, 0)
+mesh = SubResource("mesh_cone_big")
+surface_material_override/0 = SubResource("mat_leaf")
+
+[node name="TierMid" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.2, 0)
+mesh = SubResource("mesh_cone_mid")
+surface_material_override/0 = SubResource("mat_leaf")
+
+[node name="TierSmall" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.8, 0)
+mesh = SubResource("mesh_cone_small")
+surface_material_override/0 = SubResource("mat_leaf")
+
+[node name="SnowTip" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.35, 0)
+mesh = SubResource("mesh_tip")
+surface_material_override/0 = SubResource("mat_snow")
+
+[node name="Collision" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3, 0)
+shape = SubResource("shape_col")

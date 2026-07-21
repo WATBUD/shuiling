@@ -1,0 +1,47 @@
+[gd_scene format=3 uid="uid://bgq22uyqlm0ig"]
+
+[sub_resource type="StandardMaterial3D" id="mf"]
+albedo_color = Color(0.85, 1.0, 0.45, 1.0)
+roughness = 0.85
+emission_enabled = true
+emission = Color(0.85, 1.0, 0.45, 1.0)
+emission_energy_multiplier = 2.6
+shading_mode = 0
+
+[sub_resource type="SphereMesh" id="m_fly"]
+radius = 0.045
+height = 0.09
+radial_segments = 6
+rings = 3
+
+[node name="FireflySwarm" type="Node3D"]
+
+[node name="Fly0" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, -0.1333, 1.2837, 1.1878)
+mesh = SubResource("m_fly")
+surface_material_override/0 = SubResource("mf")
+
+[node name="Fly1" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, -0.0962, 1.2110, 0.2447)
+mesh = SubResource("m_fly")
+surface_material_override/0 = SubResource("mf")
+
+[node name="Fly2" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, -0.8830, 1.2167, 0.3637)
+mesh = SubResource("m_fly")
+surface_material_override/0 = SubResource("mf")
+
+[node name="Fly3" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.8203, 0.6318, -0.5505)
+mesh = SubResource("m_fly")
+surface_material_override/0 = SubResource("mf")
+
+[node name="Fly4" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, -1.1461, 1.6335, 0.5416)
+mesh = SubResource("m_fly")
+surface_material_override/0 = SubResource("mf")
+
+[node name="Fly5" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, -1.2827, 1.8751, 1.3013)
+mesh = SubResource("m_fly")
+surface_material_override/0 = SubResource("mf")

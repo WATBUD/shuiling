@@ -1,0 +1,69 @@
+[gd_scene format=3 uid="uid://cshp4a7244687"]
+
+[sub_resource type="StandardMaterial3D" id="mo"]
+albedo_color = Color(0.1, 0.09, 0.12, 1.0)
+roughness = 0.4
+
+[sub_resource type="StandardMaterial3D" id="me"]
+albedo_color = Color(1.0, 0.42, 0.12, 1.0)
+roughness = 0.85
+emission_enabled = true
+emission = Color(1.0, 0.42, 0.12, 1.0)
+emission_energy_multiplier = 2.2
+shading_mode = 0
+
+[sub_resource type="CylinderMesh" id="m_rim"]
+top_radius = 1.15
+bottom_radius = 1.35
+height = 0.3
+radial_segments = 16
+
+[sub_resource type="CylinderMesh" id="m_glow"]
+top_radius = 0.85
+bottom_radius = 0.85
+height = 0.1
+radial_segments = 16
+
+[sub_resource type="SphereMesh" id="m_peb"]
+radius = 0.14
+height = 0.2
+radial_segments = 6
+rings = 3
+
+[node name="EmberVent" type="Node3D"]
+
+[node name="Rim" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.1500, 0.0000)
+mesh = SubResource("m_rim")
+surface_material_override/0 = SubResource("mo")
+
+[node name="Glow" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.3000, 0.0000)
+mesh = SubResource("m_glow")
+surface_material_override/0 = SubResource("me")
+
+[node name="Pebble0" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 1.3816, 0.0800, 0.5841)
+mesh = SubResource("m_peb")
+surface_material_override/0 = SubResource("me")
+
+[node name="Pebble1" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, -0.5841, 0.0800, 1.3816)
+mesh = SubResource("m_peb")
+surface_material_override/0 = SubResource("mo")
+
+[node name="Pebble2" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, -1.3816, 0.0800, -0.5841)
+mesh = SubResource("m_peb")
+surface_material_override/0 = SubResource("me")
+
+[node name="Pebble3" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.5841, 0.0800, -1.3816)
+mesh = SubResource("m_peb")
+surface_material_override/0 = SubResource("mo")
+
+[node name="EmberLight" type="OmniLight3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.9000, 0.0000)
+light_color = Color(1.0, 0.42, 0.12, 1.0)
+light_energy = 1.1
+omni_range = 7.0

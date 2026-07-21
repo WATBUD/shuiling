@@ -1,0 +1,78 @@
+[gd_scene format=3 uid="uid://cshp352513a48"]
+
+[sub_resource type="StandardMaterial3D" id="mr"]
+albedo_color = Color(0.32, 0.48, 0.21, 1.0)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="mh"]
+albedo_color = Color(0.45, 0.31, 0.16, 1.0)
+roughness = 0.85
+
+[sub_resource type="CylinderMesh" id="m_reed"]
+top_radius = 0.02
+bottom_radius = 0.035
+height = 1.0
+radial_segments = 5
+
+[sub_resource type="SphereMesh" id="m_head"]
+radius = 0.05
+height = 0.24
+radial_segments = 6
+rings = 3
+
+[node name="ReedCluster" type="Node3D"]
+
+[node name="Reed0" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.9945, -0.1045, 0.0000, 0.1150, 1.0940, 0.0000, 0.0000, 0.0000, 1.0000, -0.4000, 0.5500, 0.3000)
+mesh = SubResource("m_reed")
+surface_material_override/0 = SubResource("mr")
+
+[node name="Head0" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, -0.4000, 1.2000, 0.3000)
+mesh = SubResource("m_head")
+surface_material_override/0 = SubResource("mh")
+
+[node name="Reed1" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.9962, 0.0872, 0.0000, -0.1307, 1.4943, 0.0000, 0.0000, 0.0000, 1.0000, 0.3500, 0.7500, -0.2500)
+mesh = SubResource("m_reed")
+surface_material_override/0 = SubResource("mr")
+
+[node name="Reed2" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.9986, -0.0523, 0.0000, 0.0680, 1.2982, 0.0000, 0.0000, 0.0000, 1.0000, 0.1000, 0.6500, 0.4000)
+mesh = SubResource("m_reed")
+surface_material_override/0 = SubResource("mr")
+
+[node name="Head2" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.1000, 1.4000, 0.4000)
+mesh = SubResource("m_head")
+surface_material_override/0 = SubResource("mh")
+
+[node name="Reed3" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.9925, 0.1219, 0.0000, -0.1950, 1.5881, 0.0000, 0.0000, 0.0000, 1.0000, -0.2500, 0.8000, -0.3500)
+mesh = SubResource("m_reed")
+surface_material_override/0 = SubResource("mr")
+
+[node name="Reed4" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.9962, -0.0872, 0.0000, 0.0828, 0.9464, 0.0000, 0.0000, 0.0000, 1.0000, 0.4500, 0.4750, 0.1000)
+mesh = SubResource("m_reed")
+surface_material_override/0 = SubResource("mr")
+
+[node name="Head4" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.4500, 1.0500, 0.1000)
+mesh = SubResource("m_head")
+surface_material_override/0 = SubResource("mh")
+
+[node name="Reed5" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.9976, 0.0698, 0.0000, -0.0977, 1.3966, 0.0000, 0.0000, 0.0000, 1.0000, -0.1000, 0.7000, 0.0500)
+mesh = SubResource("m_reed")
+surface_material_override/0 = SubResource("mr")
+
+[node name="Reed6" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.9994, 0.0349, 0.0000, -0.0419, 1.1993, 0.0000, 0.0000, 0.0000, 1.0000, 0.2000, 0.6000, 0.2500)
+mesh = SubResource("m_reed")
+surface_material_override/0 = SubResource("mr")
+
+[node name="Head6" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.2000, 1.3000, 0.2500)
+mesh = SubResource("m_head")
+surface_material_override/0 = SubResource("mh")

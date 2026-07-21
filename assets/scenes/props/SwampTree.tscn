@@ -1,0 +1,96 @@
+[gd_scene format=3 uid="uid://bgq42rtmuqrhe"]
+
+[sub_resource type="StandardMaterial3D" id="mt"]
+albedo_color = Color(0.2, 0.16, 0.11, 1.0)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="ml"]
+albedo_color = Color(0.15, 0.33, 0.2, 1.0)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="mm"]
+albedo_color = Color(0.26, 0.46, 0.22, 1.0)
+roughness = 0.85
+
+[sub_resource type="CylinderMesh" id="m_tr"]
+top_radius = 0.22
+bottom_radius = 0.4
+height = 2.9
+radial_segments = 12
+
+[sub_resource type="CylinderMesh" id="m_ra"]
+top_radius = 0.05
+bottom_radius = 0.16
+height = 1.1
+radial_segments = 12
+
+[sub_resource type="CylinderMesh" id="m_rb"]
+top_radius = 0.05
+bottom_radius = 0.14
+height = 1.0
+radial_segments = 12
+
+[sub_resource type="BoxMesh" id="m_mo"]
+size = Vector3(0.5, 0.08, 0.4)
+
+[sub_resource type="SphereMesh" id="m_cc"]
+radius = 1.7
+height = 1.7
+radial_segments = 12
+rings = 6
+
+[sub_resource type="SphereMesh" id="m_cd1"]
+radius = 1.1
+height = 1.1
+radial_segments = 12
+rings = 6
+
+[sub_resource type="SphereMesh" id="m_cd2"]
+radius = 1.0
+height = 1.0
+radial_segments = 12
+rings = 6
+
+[sub_resource type="BoxShape3D" id="sh"]
+size = Vector3(0.9, 2.8, 0.9)
+
+[node name="SwampTree" type="StaticBody3D"]
+
+[node name="Trunk" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 1.4500, 0.0000)
+mesh = SubResource("m_tr")
+surface_material_override/0 = SubResource("mt")
+
+[node name="RootA" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.7880, -0.6157, 0.0000, 0.6157, 0.7880, 0.0000, 0.0000, 0.0000, 1.0000, 0.4500, 0.4000, 0.1000)
+mesh = SubResource("m_ra")
+surface_material_override/0 = SubResource("mt")
+
+[node name="RootB" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.7660, 0.6428, 0.0000, -0.6428, 0.7660, 0.0000, 0.0000, 0.0000, 1.0000, -0.4000, 0.3600, -0.1500)
+mesh = SubResource("m_rb")
+surface_material_override/0 = SubResource("mt")
+
+[node name="Moss" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.9397, 0.0000, -0.3420, 0.0000, 1.0000, 0.0000, 0.3420, 0.0000, 0.9397, 0.1000, 2.2000, 0.0000)
+mesh = SubResource("m_mo")
+surface_material_override/0 = SubResource("mm")
+
+[node name="CrownCore" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.2500, 0.0000, 0.0000, 0.0000, 0.5500, 0.0000, 0.0000, 0.0000, 1.2500, 0.2000, 3.1000, 0.0000)
+mesh = SubResource("m_cc")
+surface_material_override/0 = SubResource("ml")
+
+[node name="CrownA" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 0.4500, 0.0000, 0.0000, 0.0000, 1.0000, 1.5000, 2.5500, 0.4000)
+mesh = SubResource("m_cd1")
+surface_material_override/0 = SubResource("ml")
+
+[node name="CrownB" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 0.4200, 0.0000, 0.0000, 0.0000, 1.0000, -1.3000, 2.5000, -0.5000)
+mesh = SubResource("m_cd2")
+surface_material_override/0 = SubResource("ml")
+
+[node name="Collision" type="CollisionShape3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 1.4000, 0.0000)
+shape = SubResource("sh")

@@ -1,0 +1,48 @@
+[gd_scene format=3 uid="uid://cshp761265744"]
+
+[sub_resource type="StandardMaterial3D" id="msk"]
+albedo_color = Color(0.86, 0.62, 0.44, 1.0)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="mca"]
+albedo_color = Color(0.75, 0.16, 0.18, 1.0)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="mws"]
+albedo_color = Color(0.98, 0.96, 0.88, 1.0)
+roughness = 0.85
+
+[sub_resource type="CylinderMesh" id="m_st"]
+top_radius = 0.08
+bottom_radius = 0.06
+height = 0.36
+radial_segments = 12
+
+[sub_resource type="SphereMesh" id="m_cap"]
+radius = 0.22
+height = 0.18
+radial_segments = 12
+rings = 6
+
+[sub_resource type="SphereMesh" id="m_sp"]
+radius = 0.035
+height = 0.025
+radial_segments = 6
+rings = 3
+
+[node name="Mushroom" type="Node3D"]
+
+[node name="Stem" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.1800, 0.0000)
+mesh = SubResource("m_st")
+surface_material_override/0 = SubResource("msk")
+
+[node name="Cap" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.4200, 0.0000)
+mesh = SubResource("m_cap")
+surface_material_override/0 = SubResource("mca")
+
+[node name="Spot" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0700, 0.5000, -0.0800)
+mesh = SubResource("m_sp")
+surface_material_override/0 = SubResource("mws")

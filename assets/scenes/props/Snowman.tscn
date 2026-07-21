@@ -1,0 +1,103 @@
+[gd_scene format=3 uid="uid://bgq4axunom1hd"]
+
+[sub_resource type="StandardMaterial3D" id="msn"]
+albedo_color = Color(0.9, 0.94, 0.99, 1.0)
+roughness = 0.7
+
+[sub_resource type="StandardMaterial3D" id="mno"]
+albedo_color = Color(1.0, 0.63, 0.24, 1.0)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="mdk"]
+albedo_color = Color(0.08, 0.08, 0.09, 1.0)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="mw"]
+albedo_color = Color(0.32, 0.26, 0.19, 1.0)
+roughness = 0.85
+
+[sub_resource type="SphereMesh" id="m_ba"]
+radius = 0.62
+height = 1.24
+radial_segments = 12
+rings = 6
+
+[sub_resource type="SphereMesh" id="m_bo"]
+radius = 0.45
+height = 0.9
+radial_segments = 12
+rings = 6
+
+[sub_resource type="SphereMesh" id="m_he"]
+radius = 0.3
+height = 0.6
+radial_segments = 12
+rings = 6
+
+[sub_resource type="CylinderMesh" id="m_no"]
+top_radius = 0.0
+bottom_radius = 0.06
+height = 0.3
+radial_segments = 6
+
+[sub_resource type="SphereMesh" id="m_eye"]
+radius = 0.04
+height = 0.08
+radial_segments = 6
+rings = 3
+
+[sub_resource type="CylinderMesh" id="m_arm"]
+top_radius = 0.025
+bottom_radius = 0.04
+height = 0.8
+radial_segments = 5
+
+[sub_resource type="CylinderShape3D" id="sh"]
+radius = 0.65
+height = 2.0
+
+[node name="Snowman" type="StaticBody3D"]
+
+[node name="Base" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.5500, 0.0000)
+mesh = SubResource("m_ba")
+surface_material_override/0 = SubResource("msn")
+
+[node name="Body" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 1.3500, 0.0000)
+mesh = SubResource("m_bo")
+surface_material_override/0 = SubResource("msn")
+
+[node name="Head" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 1.9500, 0.0000)
+mesh = SubResource("m_he")
+surface_material_override/0 = SubResource("msn")
+
+[node name="Nose" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, -1.0000, 0.0000, 0.0000, 1.9500, -0.3800)
+mesh = SubResource("m_no")
+surface_material_override/0 = SubResource("mno")
+
+[node name="EyeL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, -0.1000, 2.0500, -0.2600)
+mesh = SubResource("m_eye")
+surface_material_override/0 = SubResource("mdk")
+
+[node name="EyeR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.1000, 2.0500, -0.2600)
+mesh = SubResource("m_eye")
+surface_material_override/0 = SubResource("mdk")
+
+[node name="ArmL" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.4695, 0.8829, 0.0000, -0.8829, 0.4695, 0.0000, 0.0000, 0.0000, 1.0000, -0.6200, 1.4200, 0.0000)
+mesh = SubResource("m_arm")
+surface_material_override/0 = SubResource("mw")
+
+[node name="ArmR" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.4695, -0.8829, 0.0000, 0.8829, 0.4695, 0.0000, 0.0000, 0.0000, 1.0000, 0.6200, 1.4200, 0.0000)
+mesh = SubResource("m_arm")
+surface_material_override/0 = SubResource("mw")
+
+[node name="Collision" type="CollisionShape3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 1.0000, 0.0000)
+shape = SubResource("sh")

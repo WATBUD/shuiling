@@ -1,0 +1,63 @@
+[gd_scene format=3 uid="uid://bgq31uynmtxie"]
+
+[sub_resource type="StandardMaterial3D" id="mr"]
+albedo_color = Color(0.6, 0.31, 0.18, 1.0)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="md"]
+albedo_color = Color(0.43, 0.21, 0.13, 1.0)
+roughness = 0.85
+
+[sub_resource type="CylinderMesh" id="m0"]
+top_radius = 0.9
+bottom_radius = 1.2
+height = 1.0
+radial_segments = 12
+
+[sub_resource type="CylinderMesh" id="m1"]
+top_radius = 0.65
+bottom_radius = 0.9
+height = 0.9
+radial_segments = 12
+
+[sub_resource type="CylinderMesh" id="m2"]
+top_radius = 0.4
+bottom_radius = 0.65
+height = 0.85
+radial_segments = 12
+
+[sub_resource type="CylinderMesh" id="m3"]
+top_radius = 0.0
+bottom_radius = 0.4
+height = 0.8
+radial_segments = 12
+
+[sub_resource type="CylinderShape3D" id="sh"]
+radius = 0.95
+height = 3.8
+
+[node name="RockSpire" type="StaticBody3D"]
+
+[node name="T0" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.5000, 0.0000)
+mesh = SubResource("m0")
+surface_material_override/0 = SubResource("mr")
+
+[node name="T1" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.9397, 0.0000, -0.3420, 0.0000, 1.0000, 0.0000, 0.3420, 0.0000, 0.9397, 0.0500, 1.4000, 0.0300)
+mesh = SubResource("m1")
+surface_material_override/0 = SubResource("md")
+
+[node name="T2" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.7660, 0.0000, -0.6428, 0.0000, 1.0000, 0.0000, 0.6428, 0.0000, 0.7660, -0.0400, 2.2500, 0.0200)
+mesh = SubResource("m2")
+surface_material_override/0 = SubResource("mr")
+
+[node name="T3" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.5000, 0.0000, -0.8660, 0.0000, 1.0000, 0.0000, 0.8660, 0.0000, 0.5000, 0.0200, 3.0000, -0.0300)
+mesh = SubResource("m3")
+surface_material_override/0 = SubResource("md")
+
+[node name="Collision" type="CollisionShape3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 1.9000, 0.0000)
+shape = SubResource("sh")
