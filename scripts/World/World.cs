@@ -1796,6 +1796,7 @@ public partial class World : Node3D
 			new("name.npc.item_merchant", RingFrontOffset(54.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(54.0f, shopRadius)), 0.8f, "Support"),
 			new("name.npc.pet_trainer", RingFrontOffset(234.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(234.0f, shopRadius)), 0.7f, "Support"),
 			new("name.npc.mercenary_broker", RingFrontOffset(126.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(126.0f, shopRadius)), 0.7f, "DPS"),
+			new("name.npc.warehouse_keeper", RingFrontOffset(0.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(0.0f, shopRadius)), 0.8f, "Support"),
 			new("name.npc.gatherer", RingFrontOffset(180.0f, 24.0f, 1.8f), YawFacingCenter(RingOffset(180.0f, 24.0f)), 1.1f, "Gatherer"),
 			new("name.npc.guard", new Vector3(-36.0f, 0.0f, -35.0f), 135.0f, 0.0f, "Tank"),
 			new("name.npc.guard", new Vector3(36.0f, 0.0f, -35.0f), -135.0f, 0.0f, "Tank"),

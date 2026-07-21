@@ -104,6 +104,7 @@ public partial class PlayerController : CharacterBody3D
 	private readonly List<SimpleActor> _activeParty = new();
 	private SimpleActor? _mountedCompanion;
 	private readonly Dictionary<string, int> _inventoryItems = new();
+	private readonly Dictionary<string, int> _storageItems = new();
 	private readonly HashSet<SimpleActor> _acceptedNpcQuests = new();
 	private readonly HashSet<SimpleActor> _completedNpcQuests = new();
 	private readonly List<ContractCompanionOffer> _contractCompanionOffers = new();
@@ -145,6 +146,7 @@ public partial class PlayerController : CharacterBody3D
 	private FormationPanel _formationPanel = null!;
 	private MerchantShopPanel _merchantShopPanel = null!;
 	private MercenaryShopPanel _mercenaryShopPanel = null!;
+	private WarehousePanel _warehousePanel = null!;
 	private SettingsPanel _settingsPanel = null!;
 	private PanelContainer _pauseMenuPanel = null!;
 	private MinimapPanel _minimapPanel = null!;
@@ -249,6 +251,7 @@ public partial class PlayerController : CharacterBody3D
 		CreateFormationPanel();
 		CreateMerchantShopPanel();
 		CreateMercenaryShopPanel();
+		CreateWarehousePanel();
 		CreateSettingsPanel();
 		CreatePauseMenuPanel();
 		InitializeStarterInventory();
@@ -345,6 +348,10 @@ public partial class PlayerController : CharacterBody3D
 			{
 				SetMercenaryShopPanelVisible(false);
 			}
+			else if (_warehousePanel.Visible)
+			{
+				SetWarehousePanelVisible(false);
+			}
 			else if (_partyPanel.Visible)
 			{
 				SetPartyPanelVisible(false);
@@ -362,7 +369,7 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
-		if (_pauseMenuPanel.Visible || _settingsPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible)
+		if (_pauseMenuPanel.Visible || _settingsPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _warehousePanel.Visible)
 		{
 			return;
 		}
