@@ -78,6 +78,21 @@ public partial class PlayerController
 		_mercenaryShopPanel.CloseRequested = () => SetMercenaryShopPanelVisible(false);
 	}
 
+	private void CreateWarehousePanel()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "WarehouseLayer",
+			Layer = 41,
+		};
+
+		AddChild(layer);
+		_warehousePanel = new WarehousePanel();
+		layer.AddChild(_warehousePanel);
+		_warehousePanel.Bind(this);
+		_warehousePanel.CloseRequested = () => SetWarehousePanelVisible(false);
+	}
+
 	private void CreateSettingsPanel()
 	{
 		var layer = new CanvasLayer
@@ -179,6 +194,7 @@ public partial class PlayerController
 			_formationPanel.SetPanelVisible(false);
 			_merchantShopPanel.SetPanelVisible(false);
 			_mercenaryShopPanel.SetPanelVisible(false);
+			_warehousePanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
 		}
@@ -197,6 +213,7 @@ public partial class PlayerController
 			_formationPanel.SetPanelVisible(false);
 			_merchantShopPanel.SetPanelVisible(false);
 			_mercenaryShopPanel.SetPanelVisible(false);
+			_warehousePanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
 		}
@@ -215,6 +232,7 @@ public partial class PlayerController
 			_settingsPanel.SetPanelVisible(false);
 			_merchantShopPanel.SetPanelVisible(false);
 			_mercenaryShopPanel.SetPanelVisible(false);
+			_warehousePanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
 		}
@@ -233,6 +251,7 @@ public partial class PlayerController
 			_formationPanel.SetPanelVisible(false);
 			_merchantShopPanel.SetPanelVisible(false);
 			_mercenaryShopPanel.SetPanelVisible(false);
+			_warehousePanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
 		}
@@ -251,6 +270,7 @@ public partial class PlayerController
 			_formationPanel.SetPanelVisible(false);
 			_mercenaryShopPanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
+			_warehousePanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
 		}
@@ -268,6 +288,26 @@ public partial class PlayerController
 			_inventoryPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
 			_merchantShopPanel.SetPanelVisible(false);
+			_settingsPanel.SetPanelVisible(false);
+			_warehousePanel.SetPanelVisible(false);
+			CloseNpcQuestDialog();
+			CloseMapTravelDialog();
+		}
+
+		UpdateMouseModeForPanels();
+	}
+
+	private void SetWarehousePanelVisible(bool visible)
+	{
+		_warehousePanel.SetPanelVisible(visible);
+		if (visible)
+		{
+			SetPauseMenuVisible(false, false);
+			_partyPanel.SetPanelVisible(false);
+			_inventoryPanel.SetPanelVisible(false);
+			_formationPanel.SetPanelVisible(false);
+			_merchantShopPanel.SetPanelVisible(false);
+			_mercenaryShopPanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
@@ -287,6 +327,7 @@ public partial class PlayerController
 			_merchantShopPanel.SetPanelVisible(false);
 			_mercenaryShopPanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
+			_warehousePanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
 		}

@@ -86,6 +86,14 @@ Combat facts:
   chain): `scripts/UI/Panels/InventoryPanel.cs`.
 - Companion info card / party panel: `scripts/UI/Components/CompanionInfoCard.cs`,
   `scripts/UI/Panels/PartyPanel.cs`.
+- Warehouse (倉庫): city NPC `name.npc.warehouse_keeper` (spawned in `SpawnCityNpcs`)
+  opens `WarehousePanel` (`scripts/UI/Panels/WarehousePanel.cs`) — two-column
+  bag|storage, category tabs, double-click/middle-click transfers. Storage is a
+  separate `_storageItems` dict on `PlayerController` with silent
+  `WarehouseDeposit`/`WarehouseWithdraw` (Inventory.cs), persisted via
+  `PlayerSaveData.StorageItems`. Interaction/prompt in Interaction.cs
+  (`GetNearestWarehouseKeeper`), panel wiring in Panels.cs
+  (`CreateWarehousePanel`/`SetWarehousePanelVisible`, layer 41).
 - Monster species / loot tables: `scripts/Gameplay/Monsters/MonsterSpeciesCatalog.cs`,
   `scripts/Gameplay/Items/MonsterLootCatalog.cs`.
 - World Tier rules (level bands, stat/reward multipliers, evolution-stage names):

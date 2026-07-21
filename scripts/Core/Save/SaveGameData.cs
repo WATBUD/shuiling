@@ -26,6 +26,7 @@ public sealed class PlayerSaveData
 	public bool BossAnnouncementsEnabled { get; set; } = true;
 	public float BossAnnouncementOpacity { get; set; } = 0.90f;
 	public Dictionary<string, int> InventoryItems { get; set; } = new();
+	public Dictionary<string, int> StorageItems { get; set; } = new();
 	public List<string> AcceptedNpcQuestNames { get; set; } = new();
 	public List<string> CompletedNpcQuestNames { get; set; } = new();
 	public double MercenaryNextRefreshUnix { get; set; }

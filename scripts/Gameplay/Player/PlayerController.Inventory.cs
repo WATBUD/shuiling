@@ -79,6 +79,60 @@ public partial class PlayerController
 		_inventoryItems[itemId] = currentCount + 1;
 	}
 
+	// --- Warehouse storage (倉庫). Silent transfers between bag and storage. ---
+
+	public IReadOnlyDictionary<string, int> StorageItems => _storageItems;
+
+	public int GetStorageCount(string itemId)
+	{
+		return _storageItems.TryGetValue(itemId, out int count) ? count : 0;
+	}
+
+	// Bag -> storage. Free/default items are never stored.
+	public bool WarehouseDeposit(string itemId, int amount = 1)
+	{
+		if (BuildCatalog.IsFreeItem(itemId))
+		{
+			return false;
+		}
+
+		int moving = Mathf.Min(Mathf.Max(amount, 1), GetInventoryCount(itemId));
+		if (moving <= 0)
+		{
+			return false;
+		}
+
+		RemoveInventoryItemSilently(itemId, moving);
+		_storageItems.TryGetValue(itemId, out int stored);
+		_storageItems[itemId] = stored + moving;
+		return true;
+	}
+
+	// Storage -> bag.
+	public bool WarehouseWithdraw(string itemId, int amount = 1)
+	{
+		int stored = GetStorageCount(itemId);
+		int moving = Mathf.Min(Mathf.Max(amount, 1), stored);
+		if (moving <= 0)
+		{
+			return false;
+		}
+
+		int remaining = stored - moving;
+		if (remaining <= 0)
+		{
+			_storageItems.Remove(itemId);
+		}
+		else
+		{
+			_storageItems[itemId] = remaining;
+		}
+
+		_inventoryItems.TryGetValue(itemId, out int bagCount);
+		_inventoryItems[itemId] = bagCount + moving;
+		return true;
+	}
+
 	public bool TryConsumeInventoryItem(string itemId, int amount = 1)
 	{
 		if (BuildCatalog.IsFreeItem(itemId))

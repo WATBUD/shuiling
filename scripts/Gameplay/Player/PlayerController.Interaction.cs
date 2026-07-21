@@ -91,6 +91,14 @@ public partial class PlayerController
 			return;
 		}
 
+		SimpleActor? warehouseKeeper = GetNearestWarehouseKeeper();
+		if (warehouseKeeper != null)
+		{
+			_interactionPromptLabel.Visible = true;
+			_interactionPromptLabel.Text = LocaleText.F("prompt.warehouse", "E", warehouseKeeper.LocalizedDisplayName);
+			return;
+		}
+
 		SimpleActor? recruitNpc = GetNearestRecruitableNpc();
 		_interactionPromptLabel.Visible = recruitNpc != null;
 		if (recruitNpc == null)
@@ -142,6 +150,12 @@ public partial class PlayerController
 		if (GetNearestMercenaryBroker() != null)
 		{
 			SetMercenaryShopPanelVisible(true);
+			return;
+		}
+
+		if (GetNearestWarehouseKeeper() != null)
+		{
+			SetWarehousePanelVisible(true);
 			return;
 		}
 
@@ -363,9 +377,42 @@ public partial class PlayerController
 			&& IsInstanceValid(actor)
 			&& !IsMerchantShopkeeper(actor)
 			&& !IsMercenaryBroker(actor)
+			&& !IsWarehouseKeeper(actor)
 			&& actor.IsNpcRecruitCandidate
 			&& actor.MapId == "city"
 			&& actor.IsActiveWorldTarget;
+	}
+
+	private static bool IsWarehouseKeeper(SimpleActor actor)
+	{
+		return IsInstanceValid(actor) && actor.DisplayName == "name.npc.warehouse_keeper";
+	}
+
+	private SimpleActor? GetNearestWarehouseKeeper()
+	{
+		if (!IsInCityMap())
+		{
+			return null;
+		}
+
+		SimpleActor? nearest = null;
+		float nearestDistance = MerchantInteractRange;
+		foreach (Node node in GetTree().GetNodesInGroup("npcs"))
+		{
+			if (node is not SimpleActor actor || !IsWarehouseKeeper(actor) || !actor.IsActiveWorldTarget)
+			{
+				continue;
+			}
+
+			float distance = GlobalPosition.DistanceTo(actor.GlobalPosition);
+			if (distance <= nearestDistance)
+			{
+				nearest = actor;
+				nearestDistance = distance;
+			}
+		}
+
+		return nearest;
 	}
 
 }

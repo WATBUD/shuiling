@@ -20,6 +20,7 @@ public partial class PlayerController
 			BossAnnouncementsEnabled = BossAnnouncementsEnabled,
 			BossAnnouncementOpacity = BossAnnouncementOpacity,
 			InventoryItems = new Dictionary<string, int>(_inventoryItems),
+			StorageItems = new Dictionary<string, int>(_storageItems),
 			MercenaryNextRefreshUnix = _mercenaryNextRefreshUnix,
 			MerchantNextRefreshUnix = _merchantNextRefreshUnix,
 			BlacksmithStockItemIds = new List<string>(_blacksmithStockItemIds),
@@ -102,6 +103,15 @@ public partial class PlayerController
 			}
 		}
 
+		_storageItems.Clear();
+		foreach (KeyValuePair<string, int> item in data.StorageItems)
+		{
+			if (!BuildCatalog.IsFreeItem(item.Key) && item.Value > 0)
+			{
+				_storageItems[item.Key] = item.Value;
+			}
+		}
+
 		_capturedCollection.Clear();
 		_activeParty.Clear();
 		_formationActorsBySlot.Clear();
@@ -136,6 +146,7 @@ public partial class PlayerController
 		_inventoryPanel.RefreshAll();
 		_formationPanel.RefreshAll();
 		_mercenaryShopPanel.RefreshAll();
+		_warehousePanel.RefreshAll();
 	}
 
 	public void SetDamageTextScale(float scale)
