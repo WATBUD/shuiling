@@ -206,11 +206,7 @@ public partial class MercenaryShopPanel : PanelContainer
 		name.Text = LocaleText.F("mercenary.offer.name", LocaleText.T(offer.NameKey), offer.Level, LocaleText.T(offer.RoleNameKey));
 		info.AddChild(name);
 
-		var summary = MakeLabel(14, new Color(0.72f, 0.82f, 0.90f));
-		summary.Text = LocaleText.T(offer.SummaryKey);
-		summary.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-		info.AddChild(summary);
-
+		// Show the stat detail directly (like the pet shop) — no flavour summary.
 		var stats = MakeLabel(14, new Color(0.82f, 0.92f, 0.78f));
 		stats.Text = LocaleText.F("mercenary.offer.stats", offer.Attack, offer.Defense, offer.MaxHealth);
 		info.AddChild(stats);

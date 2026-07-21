@@ -585,6 +585,7 @@ public partial class MerchantShopPanel : PanelContainer
 		return kind switch
 		{
 			InventoryItemKind.AttributeGem or InventoryItemKind.SkillGem => ItemCategory.Gems,
+			InventoryItemKind.Consumable => ItemCategory.Consumables,
 			_ => ItemCategory.Special,
 		};
 	}
