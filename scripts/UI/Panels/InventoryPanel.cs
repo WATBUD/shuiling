@@ -65,6 +65,7 @@ public partial class InventoryPanel : PanelContainer
 		Equipment,
 		Gems,
 		Materials,
+		Consumables,
 	}
 
 	private enum InventorySortMode
@@ -303,6 +304,7 @@ public partial class InventoryPanel : PanelContainer
 		AddCategoryButton(tabRow, InventoryCategory.Equipment, "inventory.tab.equipment");
 		AddCategoryButton(tabRow, InventoryCategory.Gems, "inventory.tab.gems");
 		AddCategoryButton(tabRow, InventoryCategory.Materials, "inventory.tab.materials");
+		AddCategoryButton(tabRow, InventoryCategory.Consumables, "inventory.tab.consumables");
 
 		var sortRow = new HBoxContainer();
 		sortRow.AddThemeConstantOverride("separation", 8);
@@ -975,7 +977,19 @@ public partial class InventoryPanel : PanelContainer
 	private void OnItemActivated(string itemId)
 	{
 		_selectedItemId = itemId;
-		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor) || !_player.HasInventoryItem(itemId))
+		if (_player == null || !_player.HasInventoryItem(itemId))
+		{
+			return;
+		}
+
+		// Consumables are used on double-click instead of equipped.
+		if (BuildCatalog.GetItemKind(itemId) == InventoryItemKind.Consumable)
+		{
+			UseConsumable(itemId);
+			return;
+		}
+
+		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
 		{
 			return;
 		}
@@ -1230,7 +1244,7 @@ public partial class InventoryPanel : PanelContainer
 		_itemDetailTitleLabel.Text = $"{GetInventoryItemName(_selectedItemId)} x{count}";
 		_itemDetailBodyLabel.Text = BuildItemTooltipBody(_selectedItemId, string.Empty);
 		_equipSelectedButton.Disabled = !CanEquipSelectedItem();
-		_useSelectedButton.Disabled = true;
+		_useSelectedButton.Disabled = BuildCatalog.GetItemKind(_selectedItemId) != InventoryItemKind.Consumable;
 	}
 
 	private bool CanEquipSelectedItem()
@@ -1332,6 +1346,7 @@ public partial class InventoryPanel : PanelContainer
 		{
 			InventoryCategory.Equipment => kind == InventoryItemKind.Equipment,
 			InventoryCategory.Gems => kind is InventoryItemKind.AttributeGem or InventoryItemKind.SkillGem,
+			InventoryCategory.Consumables => kind == InventoryItemKind.Consumable,
 			_ => false,
 		};
 	}
@@ -1395,6 +1410,7 @@ public partial class InventoryPanel : PanelContainer
 			InventoryItemKind.SkillGem when BuildCatalog.IsMainAttackCore(itemId) => 1,
 			InventoryItemKind.SkillGem => 2,
 			InventoryItemKind.AttributeGem => 2,
+			InventoryItemKind.Consumable => 4,
 			_ => 9,
 		};
 	}
@@ -1514,7 +1530,28 @@ public partial class InventoryPanel : PanelContainer
 
 	private void OnUseSelectedPressed()
 	{
+		if (_player != null && !string.IsNullOrEmpty(_selectedItemId)
+			&& BuildCatalog.GetItemKind(_selectedItemId) == InventoryItemKind.Consumable)
+		{
+			UseConsumable(_selectedItemId);
+		}
+
 		RefreshSelectedItemDetails();
+	}
+
+	private void UseConsumable(string itemId)
+	{
+		if (_player == null)
+		{
+			return;
+		}
+
+		if (itemId == BuildCatalog.TownPortalScrollId)
+		{
+			_player.UseTownPortalScroll();
+		}
+
+		RefreshAll();
 	}
 
 	private void RefreshDetails()

@@ -15,6 +15,7 @@ public enum InventoryItemKind
 	Equipment,
 	AttributeGem,
 	SkillGem,
+	Consumable,
 }
 
 public sealed class CompanionIdentity
@@ -781,6 +782,20 @@ public static class BuildCatalog
 			|| id.EndsWith(".none", System.StringComparison.Ordinal);
 	}
 
+	// Consumables (usable bag items). Town Portal Scroll returns the player to
+	// the city from the wild (emergency retreat). Keyed id -> name locale key.
+	public const string TownPortalScrollId = "consumable.town_portal";
+
+	private static readonly Dictionary<string, string> Consumables = new()
+	{
+		[TownPortalScrollId] = "item.town_portal",
+	};
+
+	public static bool IsConsumable(string id)
+	{
+		return Consumables.ContainsKey(id);
+	}
+
 	public static string GetItemNameKey(string id)
 	{
 		foreach (EquipmentDefinition equipment in Equipment)
@@ -805,6 +820,11 @@ public static class BuildCatalog
 			{
 				return gem.NameKey;
 			}
+		}
+
+		if (Consumables.TryGetValue(id, out string? consumableNameKey))
+		{
+			return consumableNameKey;
 		}
 
 		return id;
@@ -834,6 +854,11 @@ public static class BuildCatalog
 			{
 				return InventoryItemKind.SkillGem;
 			}
+		}
+
+		if (Consumables.ContainsKey(id))
+		{
+			return InventoryItemKind.Consumable;
 		}
 
 		return InventoryItemKind.SkillGem;

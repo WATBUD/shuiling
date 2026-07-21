@@ -79,7 +79,13 @@ public static class ItemIconLibrary
 
 		if (!IconFiles.TryGetValue(itemId, out string? fileName))
 		{
-			return null;
+			// Consumables have no PNG asset — draw their 2D icon procedurally.
+			Texture2D? generated = CreateProceduralIcon(itemId);
+			if (generated != null)
+			{
+				Cache[itemId] = generated;
+			}
+			return generated;
 		}
 
 		Texture2D? texture = ResourceLoader.Load<Texture2D>(Root + fileName);
@@ -88,6 +94,96 @@ public static class ItemIconLibrary
 			Cache[itemId] = texture;
 		}
 		return texture;
+	}
+
+	private static Texture2D? CreateProceduralIcon(string itemId)
+	{
+		return itemId == BuildCatalog.TownPortalScrollId ? CreateScrollTexture() : null;
+	}
+
+	// A simple 2D parchment-scroll icon: parchment sheet, two rolled ends, ink
+	// lines and a red wax seal. Drawn in code so no image import is needed.
+	private static Texture2D CreateScrollTexture()
+	{
+		const int size = 64;
+		var image = Image.CreateEmpty(size, size, false, Image.Format.Rgba8);
+		image.Fill(new Color(0, 0, 0, 0));
+
+		var parchment = new Color(0.94f, 0.87f, 0.67f);
+		var parchmentEdge = new Color(0.82f, 0.72f, 0.50f);
+		var roll = new Color(0.66f, 0.47f, 0.28f);
+		var rollDark = new Color(0.48f, 0.32f, 0.17f);
+		var ink = new Color(0.36f, 0.28f, 0.18f);
+		var seal = new Color(0.82f, 0.18f, 0.16f);
+
+		// Parchment sheet.
+		FillRect(image, 17, 13, 47, 51, parchment);
+		FillRect(image, 17, 13, 19, 51, parchmentEdge);
+		FillRect(image, 45, 13, 47, 51, parchmentEdge);
+
+		// Ink text lines.
+		FillRect(image, 22, 22, 43, 24, ink);
+		FillRect(image, 22, 28, 45, 30, ink);
+		FillRect(image, 22, 34, 41, 36, ink);
+		FillRect(image, 22, 40, 44, 42, ink);
+
+		// Rolled top and bottom ends (rounded).
+		DrawRoll(image, 11, 7, 53, 17, roll, rollDark);
+		DrawRoll(image, 11, 47, 53, 57, roll, rollDark);
+
+		// Red wax seal.
+		FillCircle(image, 39, 45, 5, seal);
+
+		return ImageTexture.CreateFromImage(image);
+	}
+
+	private static void DrawRoll(Image image, int x0, int y0, int x1, int y1, Color body, Color shade)
+	{
+		FillRect(image, x0, y0, x1, y1, body);
+		// Trim the four corners for a rounded, capsule-like roll.
+		SetSafe(image, x0, y0, new Color(0, 0, 0, 0));
+		SetSafe(image, x1 - 1, y0, new Color(0, 0, 0, 0));
+		SetSafe(image, x0, y1 - 1, new Color(0, 0, 0, 0));
+		SetSafe(image, x1 - 1, y1 - 1, new Color(0, 0, 0, 0));
+		// Shaded core stripe for a bit of depth.
+		int midY = (y0 + y1) / 2;
+		FillRect(image, x0 + 1, midY, x1 - 1, midY + 1, shade);
+	}
+
+	private static void FillRect(Image image, int x0, int y0, int x1, int y1, Color color)
+	{
+		for (int y = y0; y < y1; y++)
+		{
+			for (int x = x0; x < x1; x++)
+			{
+				SetSafe(image, x, y, color);
+			}
+		}
+	}
+
+	private static void FillCircle(Image image, int cx, int cy, int radius, Color color)
+	{
+		int radiusSquared = radius * radius;
+		for (int y = cy - radius; y <= cy + radius; y++)
+		{
+			for (int x = cx - radius; x <= cx + radius; x++)
+			{
+				int dx = x - cx;
+				int dy = y - cy;
+				if (dx * dx + dy * dy <= radiusSquared)
+				{
+					SetSafe(image, x, y, color);
+				}
+			}
+		}
+	}
+
+	private static void SetSafe(Image image, int x, int y, Color color)
+	{
+		if (x >= 0 && y >= 0 && x < image.GetWidth() && y < image.GetHeight())
+		{
+			image.SetPixel(x, y, color);
+		}
 	}
 
 	public static void Apply(Button button, string itemId, int maxWidth)

@@ -255,6 +255,7 @@ public partial class PlayerController : CharacterBody3D
 		if (!GameLaunchOptions.LoadSaveOnWorldReady)
 		{
 			CallDeferred(nameof(GrantStarterBunny));
+			GrantStarterTownPortalScrolls();
 		}
 		InitializeCaptureNetAmmo();
 		CreateCaptureAmmoHud();
@@ -487,6 +488,11 @@ public partial class PlayerController : CharacterBody3D
 			TryInteract();
 		}
 
+		if (@event.IsActionPressed("town_portal"))
+		{
+			TryUseTownPortalScroll();
+		}
+
 		// M opens the world map guide (same tiers/locks/boss view as the portal),
 		// usable from anywhere as a quick-travel + overview screen.
 		if (@event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.M })
@@ -568,6 +574,7 @@ public partial class PlayerController : CharacterBody3D
 		AddKeyAction("party_panel", Key.P);
 		AddKeyAction("inventory_panel", Key.I);
 		AddKeyAction("formation_panel", Key.F);
+		AddKeyAction("town_portal", Key.T);
 		AddKeyAction("ui_cancel", Key.Escape);
 	}
 
