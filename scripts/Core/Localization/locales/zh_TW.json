@@ -280,6 +280,8 @@
 	"inventory.tab.materials": "素材",
 	"inventory.tab.consumables": "消耗品",
 	"item.town_portal": "回城卷",
+	"item.town_portal.channel": "詠唱回城中…（{0} 秒，受擊中斷）",
+	"item.town_portal.interrupted": "回城詠唱被中斷！",
 	"item.town_portal.used": "使用回城卷，返回主城。",
 	"item.town_portal.blocked": "目前無法使用回城卷。",
 	"item.town_portal.in_town": "你已在主城，無需使用回城卷。",

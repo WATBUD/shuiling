@@ -267,6 +267,7 @@ public partial class PlayerController : CharacterBody3D
 		CreateMapTravelDialog();
 
 		AddToGroup("player");
+		CallDeferred(nameof(PrewarmTownPortalCastEffect));
 		EnsureInputActions();
 		Input.MouseMode = _cameraMode == CameraViewMode.GodView
 			? Input.MouseModeEnum.Visible
@@ -300,6 +301,7 @@ public partial class PlayerController : CharacterBody3D
 		UpdateInteractionPrompt((float)delta);
 		UpdateBossHud((float)delta);
 		UpdateBossWorldStatusHud((float)delta);
+		UpdateTownPortalChannel((float)delta);
 	}
 
 	public override void _UnhandledInput(InputEvent @event)
