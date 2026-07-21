@@ -486,6 +486,13 @@ public partial class PlayerController : CharacterBody3D
 		{
 			TryInteract();
 		}
+
+		// M opens the world map guide (same tiers/locks/boss view as the portal),
+		// usable from anywhere as a quick-travel + overview screen.
+		if (@event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.M })
+		{
+			ToggleWorldMapGuide();
+		}
 	}
 
 	public override void _PhysicsProcess(double delta)

@@ -2271,6 +2271,7 @@ public partial class World : Node3D
 			AddMesh(portal, "PortalCrownGlow", new SphereMesh { Radius = 0.64f, Height = 0.32f }, new Vector3(0.0f, 4.78f, 0.0f), Vector3.Zero, new Vector3(1.8f, 0.28f, 1.8f), portalGlowMaterial);
 		}
 		AddPortalRuneStones(portal, portalGlowMaterial, portalScale);
+		AddPortalHexagram(portal, portalSparkMaterial, portalScale);
 		AddPortalParticles(portal, portalSparkMaterial, portalScale, isCityGate);
 
 		var portalLight = new OmniLight3D
@@ -2410,6 +2411,51 @@ public partial class World : Node3D
 			RotationDegrees = Vector3.Zero,
 		};
 		portal.AddChild(orbitParticles);
+	}
+
+	// Six-pointed star (hexagram) laid flat on the portal floor: two overlapping
+	// triangles + a circumscribing ring, matching the "傳送點為六芒星地板" ask.
+	private void AddPortalHexagram(Node3D portal, Material material, float portalScale)
+	{
+		float radius = 1.98f * portalScale;
+		float y = 0.165f;
+		AddHexagramTriangle(portal, material, radius, y, 90.0f, portalScale, "A");
+		AddHexagramTriangle(portal, material, radius, y, 30.0f, portalScale, "B");
+		AddMesh(
+			portal,
+			"HexRing",
+			new TorusMesh { InnerRadius = radius * 0.99f, OuterRadius = radius * 1.03f, RingSegments = 6, Rings = 48 },
+			new Vector3(0.0f, y, 0.0f),
+			Vector3.Zero,
+			Vector3.One,
+			material);
+	}
+
+	private void AddHexagramTriangle(Node3D portal, Material material, float radius, float y, float startDegrees, float portalScale, string tag)
+	{
+		var vertices = new Vector3[3];
+		for (int index = 0; index < 3; index++)
+		{
+			float angle = Mathf.DegToRad(startDegrees + index * 120.0f);
+			vertices[index] = new Vector3(Mathf.Cos(angle) * radius, 0.0f, Mathf.Sin(angle) * radius);
+		}
+
+		for (int index = 0; index < 3; index++)
+		{
+			Vector3 p0 = vertices[index];
+			Vector3 p1 = vertices[(index + 1) % 3];
+			Vector3 mid = (p0 + p1) * 0.5f;
+			float length = p0.DistanceTo(p1);
+			float yaw = Mathf.Atan2(-(p1.Z - p0.Z), p1.X - p0.X);
+			AddMesh(
+				portal,
+				$"HexEdge{tag}{index}",
+				BoxMeshFor(new Vector3(length, 0.03f, 0.10f * portalScale)),
+				new Vector3(mid.X, y, mid.Z),
+				new Vector3(0.0f, Mathf.RadToDeg(yaw), 0.0f),
+				Vector3.One,
+				material);
+		}
 	}
 
 	private void AddPortalRuneStones(Node3D portal, Material material, float portalScale)
@@ -2888,6 +2934,42 @@ public partial class World : Node3D
 		return options;
 	}
 
+	// One row per tier (1..Max) for a map, given a player level. Shared by the
+	// portal travel dialog and the M-key world map so the lock/level rules live
+	// in one place. Available = progression-unlocked AND level requirement met.
+	public readonly record struct TierMenuEntry(
+		int Tier, int LevelMin, int LevelMax, int RequiredLevel,
+		bool Unlocked, bool LevelMet, bool Available, bool IsSelected);
+
+	public IReadOnlyList<TierMenuEntry> GetTierMenu(string mapId, int playerLevel)
+	{
+		mapId = GetTierMapId(mapId);
+		int unlockedTier = GetUnlockedTier(mapId);
+		int selectedTier = GetSelectedTier(mapId);
+		var entries = new List<TierMenuEntry>(WorldTierCatalog.MaxTier);
+		for (int tier = WorldTierCatalog.MinTier; tier <= WorldTierCatalog.MaxTier; tier++)
+		{
+			(int min, int max) = WorldTierCatalog.GetMonsterLevelRange(tier);
+			int required = WorldTierCatalog.GetRequiredPlayerLevel(tier);
+			bool unlocked = tier <= unlockedTier;
+			bool levelMet = playerLevel >= required;
+			entries.Add(new TierMenuEntry(tier, min, max, required, unlocked, levelMet, unlocked && levelMet, tier == selectedTier));
+		}
+
+		return entries;
+	}
+
+	public IReadOnlyList<(string Id, string Label)> GetWildMapList()
+	{
+		var list = new List<(string Id, string Label)>();
+		foreach (WildMapDefinition wildMap in WildMaps)
+		{
+			list.Add((wildMap.Id, LocaleText.T(wildMap.NameKey)));
+		}
+
+		return list;
+	}
+
 	public int GetUnlockedTier(string mapId)
 	{
 		mapId = GetTierMapId(mapId);
@@ -2949,6 +3031,15 @@ public partial class World : Node3D
 		}
 
 		int tier = Mathf.Clamp(requestedTier, WorldTierCatalog.MinTier, GetUnlockedTier(mapId));
+		// Level gate: never enter a tier whose required level the player hasn't
+		// reached (the UI locks these, this is the safety net).
+		if (_player != null && IsInstanceValid(_player))
+		{
+			while (tier > WorldTierCatalog.MinTier && _player.Level < WorldTierCatalog.GetRequiredPlayerLevel(tier))
+			{
+				tier--;
+			}
+		}
 		int previousTier = GetSelectedTier(mapId);
 		_wildMapSelectedTiersById[mapId] = tier;
 		if (tier == previousTier)
