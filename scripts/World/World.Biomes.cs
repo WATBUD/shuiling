@@ -54,6 +54,65 @@ public partial class World
 		_matFirefly = MakeEmissiveMaterial(new Color(0.85f, 1.0f, 0.45f), 2.6f);
 	}
 
+	// ---------------------------------------------------------------- ground palette
+
+	// Ground tones for the generic terrain overlays (meadow/field/bank/water/
+	// paths). Shared across all wild maps before, so snow showed green meadows
+	// and brown fields; now each biome recolours the whole floor to match.
+	private readonly record struct BiomeGroundPalette(
+		Material Base, Material Meadow, Material Field, Material Path,
+		Material Bank, Material Water, Material Shallow, Material Ash);
+
+	// Set in BuildWildMapScene before the terrain overlays are laid down.
+	private BiomeGroundPalette _wildGroundPalette;
+
+	private BiomeGroundPalette BuildWildGroundPalette(string mapId)
+	{
+		switch (mapId)
+		{
+			case "wild_snow":
+				return new BiomeGroundPalette(
+					Base: MakeMaterial(new Color(0.88f, 0.92f, 0.97f)),
+					Meadow: MakeMaterial(new Color(0.90f, 0.94f, 0.99f)),
+					Field: MakeMaterial(new Color(0.82f, 0.88f, 0.95f)),
+					Path: MakeMaterial(new Color(0.80f, 0.85f, 0.91f)),
+					Bank: MakeMaterial(new Color(0.74f, 0.83f, 0.91f)),
+					Water: MakeMaterial(new Color(0.58f, 0.82f, 0.96f, 0.88f), 0.14f),
+					Shallow: MakeMaterial(new Color(0.72f, 0.88f, 0.98f, 0.80f), 0.12f),
+					Ash: MakeMaterial(new Color(0.85f, 0.90f, 0.96f)));
+			case "wild_badlands":
+				return new BiomeGroundPalette(
+					Base: MakeMaterial(new Color(0.52f, 0.32f, 0.20f)),
+					Meadow: MakeMaterial(new Color(0.56f, 0.45f, 0.26f)),
+					Field: MakeMaterial(new Color(0.53f, 0.29f, 0.17f)),
+					Path: MakeMaterial(new Color(0.44f, 0.31f, 0.20f)),
+					Bank: MakeMaterial(new Color(0.47f, 0.34f, 0.21f)),
+					Water: MakeMaterial(new Color(0.34f, 0.30f, 0.18f, 0.78f), 0.10f),
+					Shallow: MakeMaterial(new Color(0.46f, 0.40f, 0.26f, 0.70f), 0.10f),
+					Ash: _matNest);
+			case "wild_marsh":
+				return new BiomeGroundPalette(
+					Base: MakeMaterial(new Color(0.22f, 0.32f, 0.24f)),
+					Meadow: MakeMaterial(new Color(0.26f, 0.40f, 0.24f)),
+					Field: MakeMaterial(new Color(0.34f, 0.31f, 0.19f)),
+					Path: MakeMaterial(new Color(0.30f, 0.27f, 0.18f)),
+					Bank: _matPondBank,
+					Water: _matWater,
+					Shallow: _matShallowWater,
+					Ash: MakeMaterial(new Color(0.24f, 0.26f, 0.18f)));
+			default: // wild_forest and any fallback keep the lush green set.
+				return new BiomeGroundPalette(
+					Base: MakeMaterial(new Color(0.24f, 0.46f, 0.29f)),
+					Meadow: _matMeadow,
+					Field: _matField,
+					Path: _matPath,
+					Bank: _matPondBank,
+					Water: _matWater,
+					Shallow: _matShallowWater,
+					Ash: _matNest);
+		}
+	}
+
 	// ---------------------------------------------------------------- atmosphere
 
 	private readonly record struct BiomeAtmosphere(

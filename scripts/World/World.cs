@@ -396,7 +396,10 @@ public partial class World : Node3D
 		_propsRoot = new Node3D { Name = "WildProps" };
 		_mapRoot.AddChild(_propsRoot);
 
-		CreateStaticBox(_mapRoot, "Ground", new Vector3(0.0f, -0.5f, 0.0f), new Vector3(MapSize, 1.0f, MapSize), MakeMaterial(wildMap.GroundColor));
+		// Biome ground palette recolours the whole floor + terrain overlays so
+		// each map reads as its ecosystem (e.g. snow = all white).
+		_wildGroundPalette = BuildWildGroundPalette(wildMap.Id);
+		CreateStaticBox(_mapRoot, "Ground", new Vector3(0.0f, -0.5f, 0.0f), new Vector3(MapSize, 1.0f, MapSize), _wildGroundPalette.Base);
 		CreateBoundaries();
 		CreateWildTerrainDressing();
 		CreateLandmarks();
@@ -447,27 +450,30 @@ public partial class World : Node3D
 
 	private void CreateWildTerrainDressing()
 	{
-		CreateTerrainPatch("WildNorthMeadow", new Vector3(-28.0f, 0.0f, -46.0f), 17.0f, new Vector3(1.55f, 1.0f, 0.72f), -18.0f, _matMeadow, 0.035f);
-		CreateTerrainPatch("WildEastMeadow", new Vector3(42.0f, 0.0f, 7.0f), 20.0f, new Vector3(1.2f, 1.0f, 0.88f), 22.0f, _matMeadow, 0.034f);
-		CreateTerrainPatch("WildSouthField", new Vector3(25.0f, 0.0f, 50.0f), 16.0f, new Vector3(1.35f, 1.0f, 0.62f), -34.0f, _matField, 0.036f);
-		CreateTerrainPatch("WildWestField", new Vector3(-50.0f, 0.0f, 3.0f), 15.0f, new Vector3(1.0f, 1.0f, 0.68f), 12.0f, _matField, 0.036f);
+		// Use the current biome's ground palette so overlays match the ecosystem
+		// (snow stays white, badlands stays red, etc.) instead of forest greens.
+		BiomeGroundPalette palette = _wildGroundPalette;
+		CreateTerrainPatch("WildNorthMeadow", new Vector3(-28.0f, 0.0f, -46.0f), 17.0f, new Vector3(1.55f, 1.0f, 0.72f), -18.0f, palette.Meadow, 0.035f);
+		CreateTerrainPatch("WildEastMeadow", new Vector3(42.0f, 0.0f, 7.0f), 20.0f, new Vector3(1.2f, 1.0f, 0.88f), 22.0f, palette.Meadow, 0.034f);
+		CreateTerrainPatch("WildSouthField", new Vector3(25.0f, 0.0f, 50.0f), 16.0f, new Vector3(1.35f, 1.0f, 0.62f), -34.0f, palette.Field, 0.036f);
+		CreateTerrainPatch("WildWestField", new Vector3(-50.0f, 0.0f, 3.0f), 15.0f, new Vector3(1.0f, 1.0f, 0.68f), 12.0f, palette.Field, 0.036f);
 
-		CreateTerrainPatch("WildRiverBankA", new Vector3(-58.0f, 0.0f, -44.0f), 9.0f, new Vector3(1.85f, 1.0f, 0.42f), 34.0f, _matPondBank, 0.052f);
-		CreateTerrainPatch("WildRiverBankB", new Vector3(-43.0f, 0.0f, -33.0f), 9.0f, new Vector3(1.9f, 1.0f, 0.44f), 34.0f, _matPondBank, 0.052f);
-		CreateTerrainPatch("WildRiverBankC", new Vector3(-27.0f, 0.0f, -22.0f), 9.0f, new Vector3(1.8f, 1.0f, 0.43f), 34.0f, _matPondBank, 0.052f);
-		CreateTerrainPatch("WildRiverA", new Vector3(-58.0f, 0.0f, -44.0f), 7.0f, new Vector3(1.76f, 1.0f, 0.30f), 34.0f, _matShallowWater, 0.068f);
-		CreateTerrainPatch("WildRiverB", new Vector3(-43.0f, 0.0f, -33.0f), 7.0f, new Vector3(1.82f, 1.0f, 0.31f), 34.0f, _matWater, 0.07f);
-		CreateTerrainPatch("WildRiverC", new Vector3(-27.0f, 0.0f, -22.0f), 7.0f, new Vector3(1.72f, 1.0f, 0.30f), 34.0f, _matShallowWater, 0.068f);
+		CreateTerrainPatch("WildRiverBankA", new Vector3(-58.0f, 0.0f, -44.0f), 9.0f, new Vector3(1.85f, 1.0f, 0.42f), 34.0f, palette.Bank, 0.052f);
+		CreateTerrainPatch("WildRiverBankB", new Vector3(-43.0f, 0.0f, -33.0f), 9.0f, new Vector3(1.9f, 1.0f, 0.44f), 34.0f, palette.Bank, 0.052f);
+		CreateTerrainPatch("WildRiverBankC", new Vector3(-27.0f, 0.0f, -22.0f), 9.0f, new Vector3(1.8f, 1.0f, 0.43f), 34.0f, palette.Bank, 0.052f);
+		CreateTerrainPatch("WildRiverA", new Vector3(-58.0f, 0.0f, -44.0f), 7.0f, new Vector3(1.76f, 1.0f, 0.30f), 34.0f, palette.Shallow, 0.068f);
+		CreateTerrainPatch("WildRiverB", new Vector3(-43.0f, 0.0f, -33.0f), 7.0f, new Vector3(1.82f, 1.0f, 0.31f), 34.0f, palette.Water, 0.07f);
+		CreateTerrainPatch("WildRiverC", new Vector3(-27.0f, 0.0f, -22.0f), 7.0f, new Vector3(1.72f, 1.0f, 0.30f), 34.0f, palette.Shallow, 0.068f);
 
-		CreateTerrainPatch("WildCampClearing", _spawnCampCenter + new Vector3(0.0f, 0.0f, 6.0f), 16.0f, new Vector3(1.18f, 1.0f, 0.82f), 0.0f, _matPath, 0.042f);
-		CreateTerrainPatch("WildRuinOvergrowth", new Vector3(-45.0f, 0.0f, -34.0f), 12.0f, new Vector3(1.0f, 1.0f, 0.72f), -8.0f, _matMeadow, 0.038f);
-		CreateTerrainPatch("WildDenAsh", new Vector3(43.0f, 0.0f, 37.0f), 13.0f, new Vector3(1.05f, 1.0f, 0.78f), 12.0f, _matNest, 0.039f);
+		CreateTerrainPatch("WildCampClearing", _spawnCampCenter + new Vector3(0.0f, 0.0f, 6.0f), 16.0f, new Vector3(1.18f, 1.0f, 0.82f), 0.0f, palette.Path, 0.042f);
+		CreateTerrainPatch("WildRuinOvergrowth", new Vector3(-45.0f, 0.0f, -34.0f), 12.0f, new Vector3(1.0f, 1.0f, 0.72f), -8.0f, palette.Meadow, 0.038f);
+		CreateTerrainPatch("WildDenAsh", new Vector3(43.0f, 0.0f, 37.0f), 13.0f, new Vector3(1.05f, 1.0f, 0.78f), 12.0f, palette.Ash, 0.039f);
 
 		for (int index = 0; index < 10; index++)
 		{
 			float x = -62.0f + index * 13.5f;
 			float z = index % 2 == 0 ? -62.0f : 62.0f;
-			CreateTerrainPatch($"WildTreeLinePatch{index}", new Vector3(x, 0.0f, z), 8.0f, new Vector3(1.4f, 1.0f, 0.5f), index * 17.0f, _matMeadow, 0.033f);
+			CreateTerrainPatch($"WildTreeLinePatch{index}", new Vector3(x, 0.0f, z), 8.0f, new Vector3(1.4f, 1.0f, 0.5f), index * 17.0f, palette.Meadow, 0.033f);
 		}
 	}
 
@@ -509,7 +515,9 @@ public partial class World : Node3D
 			Vector3 position = new(Mathf.Cos(angle) * 58.0f, 0.0f, Mathf.Sin(angle) * 58.0f);
 			if (IsPositionClear(position, 4.0f))
 			{
-				CreateTree(position);
+				// Biome-appropriate boundary trees (pines on snow, spires in the
+				// badlands, …) instead of forcing green oaks onto every map.
+				CreateBiomePrimaryProp(position);
 				_obstaclePositions.Add(position);
 			}
 		}
@@ -527,14 +535,9 @@ public partial class World : Node3D
 				continue;
 			}
 
-			if (_rng.Randf() < 0.6f)
-			{
-				CreateGrassPatch(position);
-			}
-			else
-			{
-				CreateFlowerPatch(position);
-			}
+			// Biome-appropriate ground detail (snow lumps/ice on snow, dry shrubs
+			// in the badlands, grass/flowers in the forest, …).
+			CreateBiomeDetailProp(position);
 		}
 	}
 
