@@ -1,0 +1,114 @@
+[gd_scene format=3 uid="uid://bgq150wpomyhb"]
+
+[sub_resource type="StandardMaterial3D" id="mt"]
+albedo_color = Color(0.33, 0.21, 0.12, 1.0)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="ml"]
+albedo_color = Color(0.12, 0.44, 0.22, 1.0)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="mgb"]
+albedo_color = Color(0.36, 0.64, 0.24, 1.0)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="mm"]
+albedo_color = Color(0.26, 0.46, 0.22, 1.0)
+roughness = 0.85
+
+[sub_resource type="CylinderMesh" id="m_tr"]
+top_radius = 0.65
+bottom_radius = 1.05
+height = 5.6
+radial_segments = 12
+
+[sub_resource type="CylinderMesh" id="m_root"]
+top_radius = 0.1
+bottom_radius = 0.42
+height = 1.7
+radial_segments = 12
+
+[sub_resource type="SphereMesh" id="m_cc"]
+radius = 3.4
+height = 3.4
+radial_segments = 12
+rings = 6
+
+[sub_resource type="SphereMesh" id="m_ce"]
+radius = 2.2
+height = 2.2
+radial_segments = 12
+rings = 6
+
+[sub_resource type="SphereMesh" id="m_cw"]
+radius = 2.0
+height = 2.0
+radial_segments = 12
+rings = 6
+
+[sub_resource type="SphereMesh" id="m_ct"]
+radius = 1.7
+height = 1.7
+radial_segments = 12
+rings = 6
+
+[sub_resource type="CylinderShape3D" id="sh"]
+radius = 1.5
+height = 5.6
+
+[node name="AncientTree" type="StaticBody3D"]
+
+[node name="Trunk" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 2.8000, 0.0000)
+mesh = SubResource("m_tr")
+surface_material_override/0 = SubResource("mt")
+
+[node name="RootN" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 0.7431, 0.6691, 0.0000, -0.6691, 0.7431, 0.0000, 0.6000, 1.0500)
+mesh = SubResource("m_root")
+surface_material_override/0 = SubResource("mt")
+
+[node name="RootS" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 0.7431, -0.6691, 0.0000, 0.6691, 0.7431, 0.0000, 0.6000, -1.0500)
+mesh = SubResource("m_root")
+surface_material_override/0 = SubResource("mt")
+
+[node name="RootE" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.7431, -0.6691, 0.0000, 0.6691, 0.7431, 0.0000, 0.0000, 0.0000, 1.0000, 1.0500, 0.6000, 0.0000)
+mesh = SubResource("m_root")
+surface_material_override/0 = SubResource("mt")
+
+[node name="RootW" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.7431, 0.6691, 0.0000, -0.6691, 0.7431, 0.0000, 0.0000, 0.0000, 1.0000, -1.0500, 0.6000, 0.0000)
+mesh = SubResource("m_root")
+surface_material_override/0 = SubResource("mt")
+
+[node name="CrownCore" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.1500, 0.0000, 0.0000, 0.0000, 0.8200, 0.0000, 0.0000, 0.0000, 1.1500, 0.0000, 6.6000, 0.0000)
+mesh = SubResource("m_cc")
+surface_material_override/0 = SubResource("ml")
+
+[node name="CrownE" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 2.6000, 5.9000, 0.6000)
+mesh = SubResource("m_ce")
+surface_material_override/0 = SubResource("mgb")
+
+[node name="CrownW" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, -2.5000, 6.1000, -0.7000)
+mesh = SubResource("m_cw")
+surface_material_override/0 = SubResource("ml")
+
+[node name="CrownTop" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.3000, 8.2000, 0.2000)
+mesh = SubResource("m_ct")
+surface_material_override/0 = SubResource("mgb")
+
+[node name="AncientGlow" type="OmniLight3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 4.6000, 0.0000)
+light_color = Color(0.75, 1.0, 0.55, 1.0)
+light_energy = 0.7
+omni_range = 10.0
+
+[node name="Collision" type="CollisionShape3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 2.8000, 0.0000)
+shape = SubResource("sh")

@@ -1,10 +1,39 @@
 using Godot;
+using System.Collections.Generic;
 
 // Biome dressing for the wild maps: per-map atmosphere (sky/fog/sun), biome
 // specific procedural props and landmark set-pieces. Goal: each wild map reads
 // as its own ecosystem at a glance (docs/world_progression.md — map = biome).
 public partial class World
 {
+	// Cache of prop scenes (.tscn) so repeated visual elements can be authored
+	// in the Godot editor while code still decides where/how many to place.
+	// Missing scenes cache as null so we fall back to the procedural build
+	// without re-hitting the disk. See CreatePineTree for the pattern.
+	private static readonly Dictionary<string, PackedScene?> PropSceneCache = new();
+
+	// Instantiate an editable prop scene at a placement. Returns false when the
+	// scene file isn't present, so the caller can build its procedural version.
+	private bool TryPlacePropScene(string scenePath, Vector3 position, float yawDegrees, float scale)
+	{
+		if (!PropSceneCache.TryGetValue(scenePath, out PackedScene? packed))
+		{
+			packed = ResourceLoader.Exists(scenePath) ? ResourceLoader.Load<PackedScene>(scenePath) : null;
+			PropSceneCache[scenePath] = packed;
+		}
+
+		if (packed == null || packed.Instantiate() is not Node3D node)
+		{
+			return false;
+		}
+
+		node.Position = position;
+		node.RotationDegrees = new Vector3(0.0f, yawDegrees, 0.0f);
+		node.Scale = Vector3.One * scale;
+		_propsRoot.AddChild(node);
+		return true;
+	}
+
 	// Which map is currently being BUILT (not the active map) — set by
 	// BuildWildMapScene/BuildCityMapScene so scatter helpers pick biome props.
 	private string _currentThemeMapId = "wild_forest";
@@ -408,6 +437,11 @@ public partial class World
 
 	private void CreateSwampTree(Vector3 position)
 	{
+		if (TryPlacePropScene("res://assets/scenes/props/SwampTree.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), 1.0f))
+		{
+			return;
+		}
+
 		var tree = new StaticBody3D
 		{
 			Name = "SwampTree",
@@ -439,6 +473,11 @@ public partial class World
 
 	private void CreateReedCluster(Vector3 position)
 	{
+		if (TryPlacePropScene("res://assets/scenes/props/ReedCluster.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), 1.0f))
+		{
+			return;
+		}
+
 		var cluster = new Node3D
 		{
 			Name = "ReedCluster",
@@ -464,6 +503,11 @@ public partial class World
 
 	private void CreateLilyPad(Vector3 position)
 	{
+		if (TryPlacePropScene("res://assets/scenes/props/LilyPad.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), 1.0f))
+		{
+			return;
+		}
+
 		var pad = new Node3D
 		{
 			Name = "LilyPad",
@@ -482,6 +526,11 @@ public partial class World
 
 	private void CreateFireflySwarm(Vector3 position)
 	{
+		if (TryPlacePropScene("res://assets/scenes/props/FireflySwarm.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), 1.0f))
+		{
+			return;
+		}
+
 		var swarm = new Node3D { Name = "FireflySwarm", Position = position };
 		_propsRoot.AddChild(swarm);
 
@@ -503,6 +552,11 @@ public partial class World
 
 	private void CreateDeadTree(Vector3 position)
 	{
+		if (TryPlacePropScene("res://assets/scenes/props/DeadTree.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), 1.0f))
+		{
+			return;
+		}
+
 		var tree = new StaticBody3D
 		{
 			Name = "DeadTree",
@@ -526,6 +580,11 @@ public partial class World
 
 	private void CreateRockSpire(Vector3 position)
 	{
+		if (TryPlacePropScene("res://assets/scenes/props/RockSpire.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), 1.0f))
+		{
+			return;
+		}
+
 		var spire = new StaticBody3D
 		{
 			Name = "RockSpire",
@@ -564,6 +623,11 @@ public partial class World
 
 	private void CreateMesa(Vector3 position, float scale)
 	{
+		if (TryPlacePropScene("res://assets/scenes/props/Mesa.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), scale))
+		{
+			return;
+		}
+
 		var mesa = new StaticBody3D
 		{
 			Name = "Mesa",
@@ -600,6 +664,11 @@ public partial class World
 
 	private void CreateEmberVent(Vector3 position, bool withLight)
 	{
+		if (TryPlacePropScene("res://assets/scenes/props/EmberVent.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), 1.0f))
+		{
+			return;
+		}
+
 		var vent = new Node3D { Name = "EmberVent", Position = position };
 		_propsRoot.AddChild(vent);
 
@@ -626,6 +695,11 @@ public partial class World
 
 	private void CreateDryShrub(Vector3 position)
 	{
+		if (TryPlacePropScene("res://assets/scenes/props/DryShrub.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), 1.0f))
+		{
+			return;
+		}
+
 		var shrub = new Node3D
 		{
 			Name = "DryShrub",
@@ -671,6 +745,11 @@ public partial class World
 
 	private void CreateObsidianSpike(Vector3 position)
 	{
+		if (TryPlacePropScene("res://assets/scenes/props/ObsidianSpike.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), 1.0f))
+		{
+			return;
+		}
+
 		var spike = new Node3D
 		{
 			Name = "ObsidianSpike",
@@ -698,15 +777,24 @@ public partial class World
 
 	private void CreatePineTree(Vector3 position)
 	{
+		float yaw = (float)_rng.RandfRange(0.0f, 360.0f);
+		float editorScale = (float)_rng.RandfRange(0.85f, 1.3f);
+		// Prefer the editable scene (assets/scenes/props/PineTree.tscn); the
+		// procedural version below is the fallback if the file is missing.
+		if (TryPlacePropScene("res://assets/scenes/props/PineTree.tscn", position, yaw, editorScale))
+		{
+			return;
+		}
+
 		var pine = new StaticBody3D
 		{
 			Name = "PineTree",
 			Position = position,
-			RotationDegrees = new Vector3(0.0f, (float)_rng.RandfRange(0.0f, 360.0f), 0.0f),
+			RotationDegrees = new Vector3(0.0f, yaw, 0.0f),
 		};
 		_propsRoot.AddChild(pine);
 
-		float scale = (float)_rng.RandfRange(0.85f, 1.3f);
+		float scale = editorScale;
 		AddMesh(pine, "Trunk", CylinderMeshFor(0.16f * scale, 0.24f * scale, 1.2f * scale), new Vector3(0.0f, 0.6f * scale, 0.0f), Vector3.Zero, Vector3.One, _matTrunk);
 		float[] tierRadii = { 1.35f, 1.05f, 0.72f };
 		float[] tierHeights = { 1.15f, 1.0f, 0.95f };
@@ -731,6 +819,11 @@ public partial class World
 
 	private void CreateSnowRock(Vector3 position)
 	{
+		if (TryPlacePropScene("res://assets/scenes/props/SnowRock.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), 1.0f))
+		{
+			return;
+		}
+
 		var rock = new StaticBody3D { Name = "SnowRock", Position = position };
 		_propsRoot.AddChild(rock);
 
@@ -751,6 +844,11 @@ public partial class World
 
 	private void CreateSnowLump(Vector3 position)
 	{
+		if (TryPlacePropScene("res://assets/scenes/props/SnowLump.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), 1.0f))
+		{
+			return;
+		}
+
 		var lump = new Node3D { Name = "SnowLump", Position = position };
 		_propsRoot.AddChild(lump);
 		int lumpCount = _rng.RandiRange(1, 3);
@@ -770,6 +868,11 @@ public partial class World
 
 	private void CreateIceShardMonolith(Vector3 position)
 	{
+		if (TryPlacePropScene("res://assets/scenes/props/IceShardMonolith.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), 1.0f))
+		{
+			return;
+		}
+
 		var monolith = new StaticBody3D { Name = "IceShardMonolith", Position = position };
 		_propsRoot.AddChild(monolith);
 
@@ -806,6 +909,11 @@ public partial class World
 
 	private void CreateSnowman(Vector3 position)
 	{
+		if (TryPlacePropScene("res://assets/scenes/props/Snowman.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), 1.0f))
+		{
+			return;
+		}
+
 		var snowman = new StaticBody3D
 		{
 			Name = "Snowman",
@@ -834,6 +942,11 @@ public partial class World
 
 	private void CreateAncientTree(Vector3 position)
 	{
+		if (TryPlacePropScene("res://assets/scenes/props/AncientTree.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), 1.0f))
+		{
+			return;
+		}
+
 		var tree = new StaticBody3D
 		{
 			Name = "AncientTree",

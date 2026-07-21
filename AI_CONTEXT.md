@@ -94,6 +94,17 @@ Combat facts:
 - Biome dressing (per-map sky/fog/sun atmosphere via `ApplyMapAtmosphere`, biome
   prop scatter, landmark set-pieces): `scripts/World/World.Biomes.cs`. Scatter
   helpers pick props by `_currentThemeMapId` (set while a map is being built).
+  Per-biome ground palette (snow=white, badlands=red, …): `BuildWildGroundPalette`.
+- Prop visuals are authored as editable scenes in `assets/scenes/props/*.tscn`
+  (tree/rock/landmark/biome props). Each `CreateXxx` calls `TryPlacePropScene`
+  first (scene = editor-tweakable look) and only runs its procedural build if the
+  `.tscn` is missing (safe fallback). Layout/placement stays in code. NOTE: do
+  NOT make grass/flowers into `.tscn` — they are GPU-batched (see below).
+- Vegetation perf: grass blades + flowers are NOT individual nodes. During a map
+  build (`BeginVegetationBatch`/`EndVegetationBatch`, `scripts/World/World.Vegetation.cs`)
+  they accumulate into `MultiMeshInstance3D` (few draw calls total, per-instance
+  colour). `CreateGrassPatch`/`CreateFlowerPatch` push into the active batch and
+  only build per-node versions if no batch is active.
 - Save contracts / manager: `scripts/Core/Save/SaveGameData.cs`, `SaveGameManager.cs`.
 - Localization: `scripts/Core/Localization/LocaleText.cs` + `locales/{zh_TW,en}.json`
   (keep both files key-for-key in parity).

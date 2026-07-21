@@ -1,0 +1,28 @@
+[gd_scene format=3 uid="uid://bgq23utqqoudc"]
+
+[sub_resource type="StandardMaterial3D" id="mo"]
+albedo_color = Color(0.1, 0.09, 0.12, 1.0)
+roughness = 0.3
+
+[sub_resource type="CylinderMesh" id="m_sp"]
+top_radius = 0.0
+bottom_radius = 0.16
+height = 1.0
+radial_segments = 6
+
+[node name="ObsidianSpike" type="Node3D"]
+
+[node name="Spike0" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.9829, 0.1843, 0.0000, -0.1909, 1.0183, 0.0000, 0.0000, 0.0000, 1.0000, 0.1693, 0.5180, 0.2066)
+mesh = SubResource("m_sp")
+surface_material_override/0 = SubResource("mo")
+
+[node name="Spike1" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.9999, -0.0144, 0.0000, 0.0161, 1.1178, 0.0000, 0.0000, 0.0000, 1.0000, 0.2956, 0.5590, -0.3297)
+mesh = SubResource("m_sp")
+surface_material_override/0 = SubResource("mo")
+
+[node name="Spike2" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.9869, -0.1613, 0.0000, 0.2033, 1.2438, 0.0000, 0.0000, 0.0000, 1.0000, 0.1043, 0.6302, 0.2806)
+mesh = SubResource("m_sp")
+surface_material_override/0 = SubResource("mo")

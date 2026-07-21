@@ -1,0 +1,33 @@
+[gd_scene format=3 uid="uid://bgq08tvlnnwdc"]
+
+[sub_resource type="StandardMaterial3D" id="mp"]
+albedo_color = Color(0.17, 0.47, 0.26, 1.0)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="mb"]
+albedo_color = Color(0.98, 0.74, 0.86, 1.0)
+roughness = 0.85
+
+[sub_resource type="CylinderMesh" id="m_pad"]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 0.03
+radial_segments = 16
+
+[sub_resource type="SphereMesh" id="m_bloom"]
+radius = 0.12
+height = 0.16
+radial_segments = 12
+rings = 6
+
+[node name="LilyPad" type="Node3D"]
+
+[node name="Pad" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0850, 0.0000)
+mesh = SubResource("m_pad")
+surface_material_override/0 = SubResource("mp")
+
+[node name="Bloom" type="MeshInstance3D" parent="."]
+transform = Transform3D(1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.0000, 0.0000, 0.0000, 1.0000, 0.1500, 0.1600, 0.0000)
+mesh = SubResource("m_bloom")
+surface_material_override/0 = SubResource("mb")

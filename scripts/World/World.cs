@@ -399,6 +399,7 @@ public partial class World : Node3D
 		// Biome ground palette recolours the whole floor + terrain overlays so
 		// each map reads as its ecosystem (e.g. snow = all white).
 		_wildGroundPalette = BuildWildGroundPalette(wildMap.Id);
+		BeginVegetationBatch(_propsRoot);
 		CreateStaticBox(_mapRoot, "Ground", new Vector3(0.0f, -0.5f, 0.0f), new Vector3(MapSize, 1.0f, MapSize), _wildGroundPalette.Base);
 		CreateBoundaries();
 		CreateWildTerrainDressing();
@@ -412,6 +413,7 @@ public partial class World : Node3D
 		ScatterProps();
 		ScatterDetailProps();
 		CreateWildScenicEdges();
+		EndVegetationBatch();
 
 		var obstacleCopy = new List<Vector3>(_obstaclePositions);
 		_wildObstaclePositionsById[wildMap.Id] = obstacleCopy;
@@ -433,6 +435,7 @@ public partial class World : Node3D
 		_propsRoot = new Node3D { Name = "CityProps" };
 		_mapRoot.AddChild(_propsRoot);
 
+		BeginVegetationBatch(_propsRoot);
 		CreateStaticBox(_mapRoot, "CityGround", new Vector3(0.0f, -0.5f, 0.0f), new Vector3(MapSize, 1.0f, MapSize), _matGround);
 		CreateBoundaries();
 		CreateCityTerrainDressing();
@@ -443,6 +446,7 @@ public partial class World : Node3D
 		CreateMainCity();
 		CreateCityScenicEdges();
 		CreateMapPortal("WildMapGate", CityPortalPosition, "wild_select", "portal.travel_wild");
+		EndVegetationBatch();
 
 		_obstaclePositions.Clear();
 		_obstaclePositions.AddRange(_wildObstaclePositions);
@@ -1415,6 +1419,13 @@ public partial class World : Node3D
 
 	private void CreateGrassPatch(Vector3 position)
 	{
+		// Batched into a MultiMesh during map builds (World.Vegetation.cs); the
+		// per-node version below is a defensive fallback if no batch is active.
+		if (TryBatchGrassPatch(position))
+		{
+			return;
+		}
+
 		var patch = new Node3D
 		{
 			Name = "GrassPatch",
@@ -1444,6 +1455,11 @@ public partial class World : Node3D
 
 	private void CreateFlowerPatch(Vector3 position)
 	{
+		if (TryBatchFlowerPatch(position))
+		{
+			return;
+		}
+
 		CreateGrassPatch(position);
 		var patch = new Node3D { Name = "FlowerPatch", Position = position };
 		_propsRoot.AddChild(patch);
@@ -1462,6 +1478,11 @@ public partial class World : Node3D
 
 	private void CreateMushroom(Vector3 position)
 	{
+		if (TryPlacePropScene("res://assets/scenes/props/Mushroom.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), 1.0f))
+		{
+			return;
+		}
+
 		var mushroom = new Node3D
 		{
 			Name = "Mushroom",
