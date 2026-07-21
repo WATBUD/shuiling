@@ -758,7 +758,6 @@ public partial class World : Node3D
 		AddMesh(fountain, "OuterRippleRingA", new TorusMesh { InnerRadius = 0.018f, OuterRadius = 1.48f }, new Vector3(0.0f, 0.405f, 0.0f), Vector3.Zero, new Vector3(1.0f, 0.06f, 1.0f), foamMaterial);
 		AddMesh(fountain, "OuterRippleRingB", new TorusMesh { InnerRadius = 0.014f, OuterRadius = 1.92f }, new Vector3(0.0f, 0.415f, 0.0f), Vector3.Zero, new Vector3(1.0f, 0.045f, 1.0f), mistMaterial);
 		AddMesh(fountain, "MainPressureJet", CreateFountainVerticalJetMesh(0.065f, 2.75f, 18, 10), new Vector3(0.0f, 0.86f, 0.0f), Vector3.Zero, Vector3.One, streamMaterial);
-		AddMesh(fountain, "MainJetMistCrown", new SphereMesh { Radius = 0.32f, Height = 0.22f }, new Vector3(0.0f, 3.48f, 0.0f), Vector3.Zero, new Vector3(1.85f, 0.34f, 1.85f), foamMaterial);
 		AddMesh(fountain, "UpperSpillFoam", CylinderMeshFor(0.88f, 0.88f, 0.025f), new Vector3(0.0f, 0.92f, 0.0f), Vector3.Zero, Vector3.One, foamMaterial);
 
 		for (int index = 0; index < 18; index++)
@@ -2265,11 +2264,8 @@ public partial class World : Node3D
 		var outerRing = AddMesh(portal, "PortalOuterHalo", CylinderMeshFor(1.12f * portalScale, 1.12f * portalScale, 0.028f), new Vector3(0.0f, 0.19f, 0.0f), Vector3.Zero, Vector3.One, portalCoreMaterial);
 		var innerRing = AddMesh(portal, "PortalInnerHalo", CylinderMeshFor(0.68f * portalScale, 0.68f * portalScale, 0.032f), new Vector3(0.0f, 0.225f, 0.0f), Vector3.Zero, Vector3.One, portalGlowMaterial);
 		AddMesh(portal, "PortalCenterGlow", new SphereMesh { Radius = 0.50f * portalScale, Height = 0.26f * portalScale }, new Vector3(0.0f, 0.32f, 0.0f), Vector3.Zero, new Vector3(1.25f, 0.24f, 1.25f), portalCoreMaterial);
-		if (isCityGate)
-		{
-			AddMesh(portal, "PortalLightColumn", CylinderMeshFor(0.34f, 0.72f, 4.8f), new Vector3(0.0f, 2.34f, 0.0f), Vector3.Zero, new Vector3(1.0f, 1.0f, 1.0f), portalCoreMaterial);
-			AddMesh(portal, "PortalCrownGlow", new SphereMesh { Radius = 0.64f, Height = 0.32f }, new Vector3(0.0f, 4.78f, 0.0f), Vector3.Zero, new Vector3(1.8f, 0.28f, 1.8f), portalGlowMaterial);
-		}
+		// City gate uses the same hexagram/ring/particle design as the wild
+		// portals (just a larger, richer version) — no separate light column.
 		AddPortalRuneStones(portal, portalGlowMaterial, portalScale);
 		AddPortalHexagram(portal, portalSparkMaterial, portalScale);
 		AddPortalParticles(portal, portalSparkMaterial, portalScale, isCityGate);
