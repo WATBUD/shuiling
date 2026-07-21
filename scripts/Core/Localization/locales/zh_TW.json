@@ -289,6 +289,7 @@
 	"item.town_portal.boss": "首領戰鬥中無法使用回城卷。",
 	"item.town_portal.combat": "戰鬥中無法使用回城卷。",
 	"item.town_portal.none": "沒有回城卷了。",
+	"item.town_portal.shop_detail": "使用後返回主城的消耗品",
 	"inventory.sort.label": "排序",
 	"inventory.sort.category": "類型",
 	"inventory.sort.name": "道具名稱",

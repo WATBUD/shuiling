@@ -152,6 +152,13 @@ public partial class PlayerController
 			{
 				entries.Add(new ShopTradeEntry(materialId, GetInventoryItemDisplayName(materialId), LocaleText.T("shop.detail.material"), GetShopBuyPrice(materialId)));
 			}
+
+			// Consumables — the merchant restocks Town Portal Scrolls infinitely.
+			entries.Add(new ShopTradeEntry(
+				BuildCatalog.TownPortalScrollId,
+				LocaleText.T(BuildCatalog.GetItemNameKey(BuildCatalog.TownPortalScrollId)),
+				LocaleText.T("item.town_portal.shop_detail"),
+				GetShopBuyPrice(BuildCatalog.TownPortalScrollId)));
 		}
 
 		return entries;
@@ -223,6 +230,9 @@ public partial class PlayerController
 		}
 
 		SimpleActor actor = world.SpawnPurchasedPet(offer.MonsterNameKey, offer.Level, offer.MaxHealth, offer.Attack, offer.Defense);
+		// Sold out: this pet offer is consumed and won't be purchasable again
+		// until the shop restocks.
+		_petShopStockNameKeys.Remove(monsterNameKey);
 		actor.ClearBuildLoadout();
 		if (!_capturedCollection.Contains(actor))
 		{
@@ -304,7 +314,7 @@ public partial class PlayerController
 		}
 
 		InventoryItemKind kind = BuildCatalog.GetItemKind(itemId);
-		return kind is InventoryItemKind.AttributeGem or InventoryItemKind.SkillGem;
+		return kind is InventoryItemKind.AttributeGem or InventoryItemKind.SkillGem or InventoryItemKind.Consumable;
 	}
 
 	private static int GetShopBuyPrice(string itemId)
@@ -343,6 +353,7 @@ public partial class PlayerController
 			InventoryItemKind.Equipment => 120 + GetEquipmentPriceBonus(itemId),
 			InventoryItemKind.AttributeGem => 90,
 			InventoryItemKind.SkillGem => 115,
+			InventoryItemKind.Consumable => 40,
 			_ => 50,
 		};
 	}
