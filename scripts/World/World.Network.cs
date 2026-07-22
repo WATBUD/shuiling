@@ -15,6 +15,13 @@ public partial class World
 	private readonly List<int> _netRemovalScratch = new();
 	private int _nextNetMonsterId;
 
+	// Reused across ticks so the 10 Hz state broadcast allocates nothing (avoids
+	// GC hitches that showed up as combat/pickup stutter in multiplayer).
+	private int[] _netStateIds = System.Array.Empty<int>();
+	private Vector3[] _netStatePositions = System.Array.Empty<Vector3>();
+	private float[] _netStateYaws = System.Array.Empty<float>();
+	private int[] _netStateHealths = System.Array.Empty<int>();
+
 	public PlayerController ActivePlayer => _player;
 
 	private static NetworkManager? Net => NetworkManager.Instance;
@@ -77,6 +84,7 @@ public partial class World
 		}
 
 		int netId = ++_nextNetMonsterId;
+		actor.NetworkMonsterId = netId;
 		_netMonstersById[netId] = new NetMonsterInfo(actor, visualScale, auraColor);
 		Net!.BroadcastMonsterSpawn(netId, actor.MapId, actor.DisplayName, actor.Level, actor.WorldTier,
 			actor.MaxHealth, actor.CurrentHealth, actor.IsBoss, actor.BossNameKey, visualScale, auraColor, actor.Position);
@@ -137,22 +145,47 @@ public partial class World
 			return;
 		}
 
-		var netIds = new int[count];
-		var positions = new Vector3[count];
-		var yaws = new float[count];
-		var healths = new int[count];
+		// Reuse buffers; only reallocate when the population size changes.
+		if (_netStateIds.Length != count)
+		{
+			_netStateIds = new int[count];
+			_netStatePositions = new Vector3[count];
+			_netStateYaws = new float[count];
+			_netStateHealths = new int[count];
+		}
+
 		int index = 0;
 		foreach (KeyValuePair<int, NetMonsterInfo> entry in _netMonstersById)
 		{
 			SimpleActor actor = entry.Value.Actor;
-			netIds[index] = entry.Key;
-			positions[index] = actor.GlobalPosition;
-			yaws[index] = actor.Rotation.Y;
-			healths[index] = actor.CurrentHealth;
+			_netStateIds[index] = entry.Key;
+			_netStatePositions[index] = actor.GlobalPosition;
+			_netStateYaws[index] = actor.Rotation.Y;
+			_netStateHealths[index] = actor.CurrentHealth;
 			index++;
 		}
 
-		Net!.BroadcastMonsterStates(netIds, positions, yaws, healths);
+		Net!.BroadcastMonsterStates(_netStateIds, _netStatePositions, _netStateYaws, _netStateHealths);
+	}
+
+	// Host: a wild monster just died — broadcast its removal immediately so
+	// clients don't wait for the next periodic sweep (kills feel instant).
+	public void OnNetworkMonsterDefeated(SimpleActor actor)
+	{
+		if (!IsNetworkHostWorld || actor == null)
+		{
+			return;
+		}
+
+		int netId = actor.NetworkMonsterId;
+		if (netId < 0 || !_netMonstersById.ContainsKey(netId))
+		{
+			return;
+		}
+
+		Net!.BroadcastMonsterRemoved(netId, true);
+		_netMonstersById.Remove(netId);
+		_netLastDamagePeerByNetId.Remove(netId);
 	}
 
 	// A client's companion hit one of our monsters; host applies real damage.

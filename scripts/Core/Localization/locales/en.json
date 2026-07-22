@@ -153,7 +153,6 @@
 	"map.tier.option": "Tier {0}",
 	"map.tier.progress": "Unlocked tiers: {0} / {1}",
 	"map.tier.button": "Tier {0}\nLv {1}-{2}",
-	"map.tier.need_level": "Requires level {0}",
 	"map.tier.locked_boss": "Defeat the previous tier's boss first",
 	"map.guide.here": "{0} (you are here)",
 	"map.guide.boss_alive": "Boss: {0} (active)",
