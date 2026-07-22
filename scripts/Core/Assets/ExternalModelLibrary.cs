@@ -32,19 +32,196 @@ public static class ExternalModelLibrary
 		("res://assets/models/characters/guard.gltf", "character.guard"),
 	};
 
-	// Returns the selectable models that actually exist on disk.
-	public static List<(string Path, string NameKey)> GetAvailablePlayerModels()
+	// Every model the player can pick on the character-select screen: humanoids
+	// AND monsters/pets, so you can play as a human or a creature. Deduplicated
+	// by display name (so the same character/model never appears twice) and
+	// filtered to models that exist. Returns (path, display name).
+	public static List<(string Path, string Display)> GetAvailableCharacterModels()
 	{
-		var available = new List<(string Path, string NameKey)>();
+		var result = new List<(string Path, string Display)>();
+		var seenKeys = new HashSet<string>();
+
+		void TryAdd(string path, string display)
+		{
+			if (string.IsNullOrEmpty(path) || !ResourceLoader.Exists(path) || HasInvalidImportRemap(path))
+			{
+				return;
+			}
+
+			// Dedup by a filename-derived identity so the SAME creature never
+			// appears twice even across folders (e.g. player_barbarian.glb and
+			// characters/barbarian.glb both map to "barbarian").
+			if (!seenKeys.Add(CanonicalModelKey(path)))
+			{
+				return;
+			}
+
+			result.Add((path, display));
+		}
+
+		// Humanoids first, with localized names.
 		foreach ((string path, string nameKey) in SelectablePlayerModels)
 		{
-			if (ResourceLoader.Exists(path) && !HasInvalidImportRemap(path))
+			TryAdd(path, LocaleText.T(nameKey));
+		}
+
+		// Then every monster / pet model, with a localized name where known.
+		foreach (string path in MonsterMelee)
+		{
+			TryAdd(path, MonsterModelDisplay(path));
+		}
+		foreach (string path in MonsterRanged)
+		{
+			TryAdd(path, MonsterModelDisplay(path));
+		}
+
+		// Scan the whole cube-pets folder so EVERY pet model is selectable
+		// (not just the handful referenced by the combat pools).
+		foreach (string path in ListModelFiles("res://assets/models/pets/cube_pets/"))
+		{
+			TryAdd(path, MonsterModelDisplay(path));
+		}
+
+		return result;
+	}
+
+	private static List<string> ListModelFiles(string directory)
+	{
+		var files = new List<string>();
+		using DirAccess dir = DirAccess.Open(directory);
+		if (dir == null)
+		{
+			return files;
+		}
+
+		dir.ListDirBegin();
+		for (string name = dir.GetNext(); !string.IsNullOrEmpty(name); name = dir.GetNext())
+		{
+			if (dir.CurrentIsDir())
 			{
-				available.Add((path, nameKey));
+				continue;
+			}
+
+			if (name.EndsWith(".glb", System.StringComparison.OrdinalIgnoreCase)
+				|| name.EndsWith(".gltf", System.StringComparison.OrdinalIgnoreCase))
+			{
+				files.Add(directory + name);
 			}
 		}
 
-		return available;
+		dir.ListDirEnd();
+		return files;
+	}
+
+	// Localized monster/pet names keyed by canonical model id, so a Chinese
+	// locale shows Chinese names instead of the English filename.
+	private static readonly Dictionary<string, string> MonsterModelNameKeys = new()
+	{
+		["rat street"] = "character.mob.rat",
+		["lion"] = "character.mob.lion",
+		["tiger"] = "character.mob.tiger",
+		["polar"] = "character.mob.polar_bear",
+		["hog"] = "character.mob.hog",
+		["fox"] = "character.mob.fox",
+		["orc"] = "character.mob.orc",
+		["golem"] = "character.mob.golem",
+		["beast"] = "character.mob.beast",
+		["slime"] = "character.mob.slime",
+		["demon"] = "character.mob.demon",
+		["wolf"] = "character.mob.wolf",
+		["bee"] = "character.mob.bee",
+		["parrot"] = "character.mob.parrot",
+		["crab"] = "character.mob.crab",
+		["fish"] = "character.mob.fish",
+		["imp"] = "character.mob.imp",
+		["spitter"] = "character.mob.spitter",
+		["blue demon"] = "character.mob.blue_demon",
+		["dragon"] = "character.mob.dragon",
+		["ghost"] = "character.mob.ghost",
+		["beaver"] = "character.mob.beaver",
+		["bunny"] = "character.mob.bunny",
+		["cat"] = "character.mob.cat",
+		["caterpillar"] = "character.mob.caterpillar",
+		["chick"] = "character.mob.chick",
+		["cow"] = "character.mob.cow",
+		["deer"] = "character.mob.deer",
+		["dog"] = "character.mob.dog",
+		["elephant"] = "character.mob.elephant",
+		["giraffe"] = "character.mob.giraffe",
+		["koala"] = "character.mob.koala",
+		["monkey"] = "character.mob.monkey",
+		["panda"] = "character.mob.panda",
+		["penguin"] = "character.mob.penguin",
+		["pig"] = "character.mob.pig",
+	};
+
+	private static string MonsterModelDisplay(string path)
+	{
+		return MonsterModelNameKeys.TryGetValue(CanonicalModelKey(path), out string? nameKey)
+			? LocaleText.T(nameKey)
+			: PrettifyModelName(path);
+	}
+
+	// Canonical identity of a model, ignoring folder, extension, the "player_"
+	// prefix and cosmetic/size tokens — so visually-identical models collapse.
+	private static string CanonicalModelKey(string path)
+	{
+		string file = path;
+		int slash = file.LastIndexOf('/');
+		if (slash >= 0)
+		{
+			file = file[(slash + 1)..];
+		}
+		int dot = file.IndexOf('.');
+		if (dot >= 0)
+		{
+			file = file[..dot];
+		}
+
+		file = file.Replace('-', ' ').Replace('_', ' ').ToLowerInvariant();
+		var kept = new List<string>();
+		foreach (string token in file.Split(' ', System.StringSplitOptions.RemoveEmptyEntries))
+		{
+			if (token is "player" or "hooded" or "1k" or "poly" or "pizza" or "enemy" or "animal")
+			{
+				continue;
+			}
+
+			kept.Add(token);
+		}
+
+		kept.Sort(System.StringComparer.Ordinal);
+		return string.Join(" ", kept);
+	}
+
+	private static string PrettifyModelName(string path)
+	{
+		string file = path;
+		int slash = file.LastIndexOf('/');
+		if (slash >= 0)
+		{
+			file = file[(slash + 1)..];
+		}
+		int dot = file.IndexOf('.');
+		if (dot >= 0)
+		{
+			file = file[..dot];
+		}
+
+		file = file.Replace('-', ' ').Replace('_', ' ');
+		var words = new List<string>();
+		foreach (string token in file.Split(' ', System.StringSplitOptions.RemoveEmptyEntries))
+		{
+			string lower = token.ToLowerInvariant();
+			if (lower is "1k" or "poly" or "pizza" or "enemy" or "animal")
+			{
+				continue;
+			}
+
+			words.Add(char.ToUpperInvariant(token[0]) + (token.Length > 1 ? token[1..] : string.Empty));
+		}
+
+		return words.Count > 0 ? string.Join(" ", words) : file;
 	}
 
 	// Instantiate a model for a UI preview (character select). Applies fallback

@@ -658,7 +658,9 @@ public partial class World : Node3D
 		CreateBlacksmithShop(center + blacksmithOffset, YawFacingCenter(blacksmithOffset));
 		CreateMercenaryGuild(center + mercenaryOffset, YawFacingCenter(mercenaryOffset));
 		CreatePetShop(center + petShopOffset, YawFacingCenter(petShopOffset));
-		CreatePetRevivalShop(center + revivalOffset, YawFacingCenter(revivalOffset));
+		// This spot is now the warehouse (the warehouse keeper stands here);
+		// revival moved to the pet merchant.
+		CreateWarehouseBuilding(center + revivalOffset, YawFacingCenter(revivalOffset));
 
 		for (int index = 0; index < 8; index++)
 		{
@@ -1044,24 +1046,23 @@ public partial class World : Node3D
 		AddMesh(shop, "PetShopRibbonRight", BoxMeshFor(new Vector3(0.10f, 0.70f, 0.055f)), new Vector3(1.55f, 2.16f, -3.14f), new Vector3(0.0f, 0.0f, 14.0f), Vector3.One, _matCrystal);
 	}
 
-	private void CreatePetRevivalShop(Vector3 position, float yawDegrees)
+	private void CreateWarehouseBuilding(Vector3 position, float yawDegrees)
 	{
 		StaticBody3D shop = CreateCityShopShell(
-			"CityPetRevivalShop",
+			"CityWarehouse",
 			position,
 			yawDegrees,
 			new Vector3(7.4f, 3.0f, 5.8f),
 			_matWall,
 			_matCrystal,
-			"shop.pet_revival",
-			new Color(0.72f, 1.0f, 0.92f)
+			"shop.warehouse",
+			new Color(0.72f, 0.9f, 1.0f)
 		);
 
-		AddMesh(shop, "RevivalAltar", CylinderMeshFor(0.72f, 0.92f, 0.44f), new Vector3(0.0f, 0.42f, -3.35f), Vector3.Zero, Vector3.One, _matWall);
-		AddMesh(shop, "RevivalCrystal", new SphereMesh { Radius = 0.28f, Height = 0.42f }, new Vector3(0.0f, 0.92f, -3.35f), Vector3.Zero, Vector3.One, _matCrystal);
-		AddMesh(shop, "RevivalGlow", CylinderMeshFor(1.0f, 1.0f, 0.035f), new Vector3(0.0f, 0.14f, -3.35f), Vector3.Zero, Vector3.One, _matCrystal);
-		AddMesh(shop, "RevivalWallHalo", CylinderMeshFor(0.46f, 0.46f, 0.035f), new Vector3(0.0f, 2.08f, -3.08f), new Vector3(90.0f, 0.0f, 0.0f), Vector3.One, _matCrystal);
-		CreateRevivalNpc(position + LocalOffset(yawDegrees, new Vector3(0.0f, 0.0f, -4.8f)), yawDegrees);
+		// Storage crates instead of a revival altar.
+		AddMesh(shop, "WarehouseCrateA", BoxMeshFor(new Vector3(0.9f, 0.9f, 0.9f)), new Vector3(-0.9f, 0.45f, -3.3f), new Vector3(0.0f, 14.0f, 0.0f), Vector3.One, _matWood);
+		AddMesh(shop, "WarehouseCrateB", BoxMeshFor(new Vector3(0.8f, 0.8f, 0.8f)), new Vector3(0.5f, 0.4f, -3.4f), new Vector3(0.0f, -22.0f, 0.0f), Vector3.One, _matWood);
+		AddMesh(shop, "WarehouseCrateC", BoxMeshFor(new Vector3(0.7f, 0.7f, 0.7f)), new Vector3(0.2f, 1.15f, -3.35f), new Vector3(0.0f, 8.0f, 0.0f), Vector3.One, _matWood);
 	}
 
 	private void CreateMercenaryGuild(Vector3 position, float yawDegrees)
