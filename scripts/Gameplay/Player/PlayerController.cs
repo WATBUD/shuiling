@@ -233,6 +233,7 @@ public partial class PlayerController : CharacterBody3D
 	public string LocalizedPlayerName => LocaleText.T(PlayerName);
 	public CameraViewMode CameraMode => _cameraMode;
 	public float DamageTextScale => CombatEffect.DamageTextScale;
+	public float NameplateScale => SimpleActor.NameplateScale;
 	public bool BossAnnouncementsEnabled => _bossAnnouncementsEnabled;
 	public float BossAnnouncementOpacity => _bossAnnouncementOpacity;
 	public float HealthRatio => MaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)MaxHealth, 0.0f, 1.0f);

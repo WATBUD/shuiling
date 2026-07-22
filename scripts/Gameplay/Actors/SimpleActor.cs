@@ -266,6 +266,23 @@ public partial class SimpleActor : CharacterBody3D
 
 	public bool CanBeCaptured => ActorKind == "monster" && !IsBoss && !_isCaptured && !_isDefeated && !_isNetworkPuppet;
 	public bool IsNetworkPuppet => _isNetworkPuppet;
+
+	// Overhead nameplate (Lv + name) font multiplier — 3x by default, adjustable
+	// in settings. Base font is 20 (28 for bosses).
+	public const float MinNameplateScale = 1.0f;
+	public const float MaxNameplateScale = 6.0f;
+	public static float NameplateScale { get; private set; } = 3.0f;
+
+	public static void SetNameplateScale(float scale)
+	{
+		NameplateScale = Mathf.Clamp(scale, MinNameplateScale, MaxNameplateScale);
+	}
+
+	// Public so a settings change can re-apply the scale to a live actor.
+	public void RefreshNameplateDisplay()
+	{
+		RefreshNameplate();
+	}
 	// Host & client both tag their wild monsters with the shared network id so
 	// death can be broadcast/looked up without scanning (multiplayer).
 	public int NetworkMonsterId { get; set; } = -1;
@@ -1497,7 +1514,7 @@ public partial class SimpleActor : CharacterBody3D
 		_nameplate.Text = IsBoss
 			? LocaleText.F("boss.nameplate", Level, LocalizedDisplayName, capturedText)
 			: $"{LocaleText.T("actor.level_prefix")}{Level} {LocalizedDisplayName}{capturedText}";
-		_nameplate.FontSize = IsBoss ? 28 : 20;
+		_nameplate.FontSize = Mathf.RoundToInt((IsBoss ? 28 : 20) * NameplateScale);
 		Color markerColor = GetNameplateStatusColor();
 		_nameplate.Modulate = markerColor;
 		_nameplate.OutlineModulate = new Color(0.02f, 0.025f, 0.03f, 0.96f);

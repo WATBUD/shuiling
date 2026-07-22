@@ -17,6 +17,7 @@
 	"ui.camera_third_person": "Third Person",
 	"ui.camera_god_view": "God View",
 	"ui.damage_text_size": "Damage Text Size",
+	"ui.nameplate_size": "Overhead Name Size",
 	"ui.damage_text_size_value": "{0}%",
 	"ui.boss_announcement": "Boss Notices",
 	"ui.boss_announcement_show": "Show all-map Boss notices",

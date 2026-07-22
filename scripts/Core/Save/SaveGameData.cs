@@ -25,6 +25,7 @@ public sealed class PlayerSaveData
 	public int Gold { get; set; }
 	public string CameraMode { get; set; } = "god_view";
 	public float DamageTextScale { get; set; } = 1.0f;
+	public float NameplateScale { get; set; } = 3.0f;
 	public bool BossAnnouncementsEnabled { get; set; } = true;
 	public float BossAnnouncementOpacity { get; set; } = 0.90f;
 	public Dictionary<string, int> InventoryItems { get; set; } = new();

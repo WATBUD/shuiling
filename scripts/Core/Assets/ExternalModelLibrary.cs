@@ -330,6 +330,47 @@ public static class ExternalModelLibrary
 		return TryAddFirstExisting(actor, paths, "ExternalModel", Vector3.Zero, new Vector3(0.0f, 180.0f, 0.0f), scale, GetActorVariantSeed(actor));
 	}
 
+	// Force a specific model (used to give each city NPC a unique model).
+	public static bool TryAddActorModel(SimpleActor actor, string forcedPath)
+	{
+		if (string.IsNullOrEmpty(forcedPath))
+		{
+			return TryAddActorModel(actor);
+		}
+
+		Vector3 scale = GetActorModelScale(actor);
+		return TryAddFirstExisting(actor, new[] { forcedPath }, "ExternalModel", Vector3.Zero, new Vector3(0.0f, 180.0f, 0.0f), scale, 0);
+	}
+
+	// Distinct humanoid NPC models that exist on disk (deduped across pools).
+	public static List<string> GetDistinctNpcModels()
+	{
+		var seen = new HashSet<string>();
+		var result = new List<string>();
+		foreach (string path in NpcMelee)
+		{
+			AddIfNew(path);
+		}
+		foreach (string path in NpcRanged)
+		{
+			AddIfNew(path);
+		}
+		foreach (string path in NpcSupport)
+		{
+			AddIfNew(path);
+		}
+
+		return result;
+
+		void AddIfNew(string path)
+		{
+			if (seen.Add(path) && ResourceLoader.Exists(path) && !HasInvalidImportRemap(path))
+			{
+				result.Add(path);
+			}
+		}
+	}
+
 	private static string[] GetMonsterModelPool(SimpleActor actor)
 	{
 		string displayName = actor.DisplayName ?? string.Empty;

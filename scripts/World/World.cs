@@ -1798,33 +1798,43 @@ public partial class World : Node3D
 			new("name.npc.pet_trainer", RingFrontOffset(234.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(234.0f, shopRadius)), 0.7f, "Support"),
 			new("name.npc.mercenary_broker", RingFrontOffset(126.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(126.0f, shopRadius)), 0.7f, "DPS"),
 			new("name.npc.warehouse_keeper", RingFrontOffset(0.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(0.0f, shopRadius)), 0.8f, "Support"),
-			new("name.npc.gatherer", RingFrontOffset(180.0f, 24.0f, 1.8f), YawFacingCenter(RingOffset(180.0f, 24.0f)), 1.1f, "Gatherer"),
-			new("name.npc.guard", new Vector3(-36.0f, 0.0f, -35.0f), 135.0f, 0.0f, "Tank"),
-			new("name.npc.guard", new Vector3(36.0f, 0.0f, -35.0f), -135.0f, 0.0f, "Tank"),
-			new("name.npc.hunter", RingFrontOffset(270.0f, 24.0f, 1.8f), YawFacingCenter(RingOffset(270.0f, 24.0f)), 1.2f, "Ranged"),
-			new("name.npc.apprentice", RingFrontOffset(90.0f, 24.0f, 1.8f), YawFacingCenter(RingOffset(90.0f, 24.0f)), 0.9f, "DPS"),
-			new("name.npc.gatherer", RingFrontOffset(0.0f, 24.0f, 1.8f), YawFacingCenter(RingOffset(0.0f, 24.0f)), 1.0f, "Gatherer"),
-			new("name.npc.guard", new Vector3(-36.0f, 0.0f, 35.0f), 45.0f, 0.0f, "Tank"),
-			new("name.npc.guard", new Vector3(36.0f, 0.0f, 35.0f), -45.0f, 0.0f, "Tank"),
 		};
 
-		int npcCount = Mathf.Max(CityNpcCount, 0);
-		for (int index = 0; index < npcCount; index++)
+		// Functional shop NPCs (always present).
+		foreach (CityNpcStation station in stations)
 		{
-			CityNpcStation station = index < stations.Length
-				? stations[index]
-				: CreateAmbientCityNpcStation(index);
-			SimpleActor actor = CreateActor(false, "city", station.NameKey, station.Role);
-			Vector3 offset = station.Offset;
-
-			Vector3 spawnPosition = _mainCityCenter + offset;
-			actor.RotationDegrees = new Vector3(0.0f, station.YawDegrees, 0.0f);
-			actor.Position = spawnPosition;
-			actor.HomePosition = spawnPosition;
-			actor.WanderRadius = station.WanderRadius;
-			actor.MoveSpeed = (float)_rng.RandfRange(0.55f, 0.9f);
-			_actorsRoot.AddChild(actor);
+			SpawnCityNpc(station, string.Empty);
 		}
+
+		// Quest / recruit NPCs: exactly ONE per distinct NPC model, so no model
+		// is repeated (keeps the city from feeling crowded with clones).
+		List<string> npcModels = ExternalModelLibrary.GetDistinctNpcModels();
+		string[] recruitNames = { "name.npc.gatherer", "name.npc.hunter", "name.npc.apprentice", "name.npc.guard" };
+		string[] recruitRoles = { "Gatherer", "Ranged", "DPS", "Tank" };
+		for (int index = 0; index < npcModels.Count; index++)
+		{
+			float angleDeg = index / (float)Mathf.Max(npcModels.Count, 1) * 360.0f;
+			Vector3 offset = RingFrontOffset(angleDeg, 20.0f, 1.8f);
+			var recruit = new CityNpcStation(
+				recruitNames[index % recruitNames.Length],
+				offset,
+				YawFacingCenter(RingOffset(angleDeg, 20.0f)),
+				1.1f,
+				recruitRoles[index % recruitRoles.Length]);
+			SpawnCityNpc(recruit, npcModels[index]);
+		}
+	}
+
+	private void SpawnCityNpc(CityNpcStation station, string forcedModelPath)
+	{
+		SimpleActor actor = CreateActor(false, "city", station.NameKey, station.Role, 0, 0, forcedModelPath);
+		Vector3 spawnPosition = _mainCityCenter + station.Offset;
+		actor.RotationDegrees = new Vector3(0.0f, station.YawDegrees, 0.0f);
+		actor.Position = spawnPosition;
+		actor.HomePosition = spawnPosition;
+		actor.WanderRadius = station.WanderRadius;
+		actor.MoveSpeed = (float)_rng.RandfRange(0.55f, 0.9f);
+		_actorsRoot.AddChild(actor);
 	}
 
 	private CityNpcStation CreateAmbientCityNpcStation(int index)
@@ -1878,7 +1888,7 @@ public partial class World : Node3D
 		return actor;
 	}
 
-	private SimpleActor CreateActor(bool isMonster, string mapId = "wild_forest", string forcedDisplayName = "", string forcedCombatRole = "", int forcedLevel = 0, int forcedTier = 0)
+	private SimpleActor CreateActor(bool isMonster, string mapId = "wild_forest", string forcedDisplayName = "", string forcedCombatRole = "", int forcedLevel = 0, int forcedTier = 0, string forcedModelPath = "")
 	{
 		var actor = new SimpleActor
 		{
@@ -1908,7 +1918,7 @@ public partial class World : Node3D
 		}
 		else
 		{
-			BuildNpcVisual(actor);
+			BuildNpcVisual(actor, forcedModelPath);
 		}
 
 		ScaleActorVisualChildren(actor, isMonster ? 0.88f : 0.86f);
@@ -1932,9 +1942,9 @@ public partial class World : Node3D
 		}
 	}
 
-	private void BuildNpcVisual(Node3D actor)
+	private void BuildNpcVisual(Node3D actor, string forcedModelPath = "")
 	{
-		if (actor is SimpleActor npcActor && ExternalModelLibrary.TryAddActorModel(npcActor))
+		if (actor is SimpleActor npcActor && ExternalModelLibrary.TryAddActorModel(npcActor, forcedModelPath))
 		{
 			return;
 		}
