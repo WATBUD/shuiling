@@ -321,7 +321,7 @@
 	"mercenary.shop.title": "Mercenary Guild",
 	"mercenary.shop.hint": "Spend gold to hire trusted mercenaries. Hired companions join the party or collection and can be arranged from the party panel.",
 	"mercenary.offer.name": "{0}  Lv.{1}  {2}",
-	"mercenary.offer.stats": "ATK {0} / DEF {1} / HP {2}",
+	"mercenary.offer.stats": "HP {0} / ATK {1} / DEF {2} / {3}",
 	"mercenary.button.hire": "Hire {0}G",
 	"mercenary.button.refresh": "Refresh {0}G",
 	"mercenary.refresh.countdown": "Next auto refresh: {0:00}:{1:00}:{2:00}",

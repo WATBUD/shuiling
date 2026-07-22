@@ -60,7 +60,10 @@ public partial class PlayerController
 
 	private void EnsureMercenaryOffers()
 	{
-		if (_contractCompanionOffers.Count == 0 || _mercenaryNextRefreshUnix <= 0.0 || Time.GetUnixTimeFromSystem() >= _mercenaryNextRefreshUnix)
+		// Only generate on first init or when the refresh time is due — do NOT
+		// refill just because the list was emptied by hiring. Bought-out slots
+		// stay empty until the timer elapses or the player pays to refresh.
+		if (_mercenaryNextRefreshUnix <= 0.0 || Time.GetUnixTimeFromSystem() >= _mercenaryNextRefreshUnix)
 		{
 			GenerateMercenaryOffers();
 		}
