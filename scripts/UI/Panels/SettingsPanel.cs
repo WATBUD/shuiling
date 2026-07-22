@@ -28,6 +28,8 @@ public partial class SettingsPanel : PanelContainer
 	private Button _godViewCameraButton = null!;
 	private HSlider _damageTextScaleSlider = null!;
 	private Label _damageTextScaleValueLabel = null!;
+	private HSlider _nameplateScaleSlider = null!;
+	private Label _nameplateScaleValueLabel = null!;
 	private CheckButton _bossAnnouncementToggle = null!;
 	private HSlider _bossAnnouncementOpacitySlider = null!;
 	private Label _bossAnnouncementOpacityValueLabel = null!;
@@ -162,6 +164,8 @@ public partial class SettingsPanel : PanelContainer
 		_godViewCameraButton = null!;
 		_damageTextScaleSlider = null!;
 		_damageTextScaleValueLabel = null!;
+		_nameplateScaleSlider = null!;
+		_nameplateScaleValueLabel = null!;
 		_bossAnnouncementToggle = null!;
 		_bossAnnouncementOpacitySlider = null!;
 		_bossAnnouncementOpacityValueLabel = null!;
@@ -253,6 +257,24 @@ public partial class SettingsPanel : PanelContainer
 		_damageTextScaleValueLabel.HorizontalAlignment = HorizontalAlignment.Right;
 		damageTextControl.AddChild(_damageTextScaleValueLabel);
 		AddSettingRow(section, "ui.damage_text_size", damageTextControl);
+
+		var nameplateControl = new HBoxContainer();
+		nameplateControl.AddThemeConstantOverride("separation", 12);
+		_nameplateScaleSlider = new HSlider
+		{
+			MinValue = SimpleActor.MinNameplateScale,
+			MaxValue = SimpleActor.MaxNameplateScale,
+			Step = 0.25,
+			CustomMinimumSize = new Vector2(230.0f, 36.0f),
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		_nameplateScaleSlider.ValueChanged += OnNameplateScaleChanged;
+		nameplateControl.AddChild(_nameplateScaleSlider);
+		_nameplateScaleValueLabel = MakeLabel(string.Empty, 15, new Color(1.0f, 0.92f, 0.66f));
+		_nameplateScaleValueLabel.CustomMinimumSize = new Vector2(64.0f, 36.0f);
+		_nameplateScaleValueLabel.HorizontalAlignment = HorizontalAlignment.Right;
+		nameplateControl.AddChild(_nameplateScaleValueLabel);
+		AddSettingRow(section, "ui.nameplate_size", nameplateControl);
 
 		_bossAnnouncementToggle = new CheckButton
 		{
@@ -354,6 +376,11 @@ public partial class SettingsPanel : PanelContainer
 			SyncDamageTextScale();
 		}
 
+		if (_nameplateScaleSlider != null)
+		{
+			SyncNameplateScale();
+		}
+
 		if (_bossAnnouncementToggle != null && _bossAnnouncementOpacitySlider != null)
 		{
 			SyncBossAnnouncementSettings();
@@ -420,6 +447,36 @@ public partial class SettingsPanel : PanelContainer
 		if (_damageTextScaleValueLabel != null)
 		{
 			_damageTextScaleValueLabel.Text = LocaleText.F("ui.damage_text_size_value", Mathf.RoundToInt(scale * 100.0f));
+		}
+	}
+
+	private void SyncNameplateScale()
+	{
+		float scale = _player?.NameplateScale ?? SimpleActor.NameplateScale;
+		_nameplateScaleSlider.SetValueNoSignal(scale);
+		UpdateNameplateScaleLabel(scale);
+	}
+
+	private void OnNameplateScaleChanged(double value)
+	{
+		var scale = (float)value;
+		if (_player != null)
+		{
+			_player.SetNameplateScale(scale);
+		}
+		else
+		{
+			SimpleActor.SetNameplateScale(scale);
+		}
+
+		UpdateNameplateScaleLabel(scale);
+	}
+
+	private void UpdateNameplateScaleLabel(float scale)
+	{
+		if (_nameplateScaleValueLabel != null)
+		{
+			_nameplateScaleValueLabel.Text = LocaleText.F("ui.damage_text_size_value", Mathf.RoundToInt(scale * 100.0f));
 		}
 	}
 

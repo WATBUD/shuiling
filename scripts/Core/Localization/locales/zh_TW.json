@@ -17,6 +17,7 @@
 	"ui.camera_third_person": "第三人稱",
 	"ui.camera_god_view": "上帝視角",
 	"ui.damage_text_size": "傷害數字大小",
+	"ui.nameplate_size": "頭頂名牌大小",
 	"ui.damage_text_size_value": "{0}%",
 	"ui.boss_announcement": "Boss 公告",
 	"ui.boss_announcement_show": "顯示全地圖 Boss 公告",

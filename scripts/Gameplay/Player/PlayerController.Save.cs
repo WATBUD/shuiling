@@ -19,6 +19,7 @@ public partial class PlayerController
 			Gold = Gold,
 			CameraMode = CameraModeToSaveId(_cameraMode),
 			DamageTextScale = DamageTextScale,
+			NameplateScale = NameplateScale,
 			BossAnnouncementsEnabled = BossAnnouncementsEnabled,
 			BossAnnouncementOpacity = BossAnnouncementOpacity,
 			InventoryItems = new Dictionary<string, int>(_inventoryItems),
@@ -105,6 +106,7 @@ public partial class PlayerController
 		Defense = Mathf.Max(data.Defense, 0);
 		Gold = Mathf.Max(data.Gold, 0);
 		SetDamageTextScale(data.DamageTextScale);
+		SetNameplateScale(data.NameplateScale);
 		SetBossAnnouncementsEnabled(data.BossAnnouncementsEnabled);
 		SetBossAnnouncementOpacity(data.BossAnnouncementOpacity);
 		SetCameraMode(CameraModeFromSaveId(data.CameraMode));
@@ -169,6 +171,26 @@ public partial class PlayerController
 	public void SetDamageTextScale(float scale)
 	{
 		CombatEffect.SetDamageTextScale(scale);
+	}
+
+	// Adjust the overhead Lv+name nameplate size and re-apply to every live
+	// monster/companion/NPC in the world.
+	public void SetNameplateScale(float scale)
+	{
+		SimpleActor.SetNameplateScale(scale);
+		foreach (string group in new[] { "monsters", "npcs" })
+		{
+			foreach (Node node in GetTree().GetNodesInGroup(group))
+			{
+				if (node is SimpleActor actor && IsInstanceValid(actor))
+				{
+					actor.RefreshNameplateDisplay();
+				}
+			}
+		}
+
+		// The player's own overhead nickname scales with the same setting.
+		RefreshPlayerNameplate();
 	}
 
 	private void SaveCurrentGame()

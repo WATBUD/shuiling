@@ -249,7 +249,7 @@ public partial class PlayerController
 			Text = LocalizedPlayerName,
 			Position = new Vector3(0.0f, 2.35f, 0.0f),
 			Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-			FontSize = 44,
+			FontSize = Mathf.RoundToInt(PlayerNameplateBaseFont * SimpleActor.NameplateScale),
 			OutlineSize = 10,
 			PixelSize = 0.0075f,
 			Modulate = new Color(0.6f, 1.0f, 0.78f),
@@ -260,11 +260,16 @@ public partial class PlayerController
 		AddChild(_playerNameLabel);
 	}
 
+	private const int PlayerNameplateBaseFont = 20;
+
+	// Updates the player's overhead nickname text + size (nickname changes and
+	// the shared nameplate scale setting both route here).
 	public void RefreshPlayerNameplate()
 	{
 		if (_playerNameLabel != null && IsInstanceValid(_playerNameLabel))
 		{
 			_playerNameLabel.Text = LocalizedPlayerName;
+			_playerNameLabel.FontSize = Mathf.RoundToInt(PlayerNameplateBaseFont * SimpleActor.NameplateScale);
 		}
 	}
 
