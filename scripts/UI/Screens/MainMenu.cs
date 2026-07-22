@@ -537,9 +537,9 @@ public partial class MainMenu : Control
 
 	private void StartNewGame()
 	{
+		// New game goes through character creation (model + name) first.
 		NetworkManager.Instance?.ResetSession();
-		GameLaunchOptions.StartNewGame();
-		GetTree().ChangeSceneToFile("res://node_3d.tscn");
+		GetTree().ChangeSceneToFile("res://character_select.tscn");
 	}
 
 	private void LoadGame()

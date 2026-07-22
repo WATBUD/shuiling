@@ -23,6 +23,8 @@ public partial class WarehousePanel : PanelContainer
 	private HBoxContainer _categoryTabs = null!;
 	private readonly Dictionary<ItemCategory, Button> _categoryButtons = new();
 	private ItemCategory _selectedCategory = ItemCategory.All;
+	private const ulong TransferDebounceMsec = 250;
+	private ulong _lastTransferMsec;
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -263,13 +265,24 @@ public partial class WarehousePanel : PanelContainer
 			return;
 		}
 
+		// Debounce: rapid clicks rebuild+re-sort the grids, so a fast second
+		// click would land on a different item. Ignore clicks that arrive too
+		// soon after the last transfer.
+		ulong now = Time.GetTicksMsec();
+		if (now - _lastTransferMsec < TransferDebounceMsec)
+		{
+			return;
+		}
+		_lastTransferMsec = now;
+
+		// Move the whole stack in one action (deterministic; no need to spam).
 		if (fromBag)
 		{
-			_player.WarehouseDeposit(itemId);
+			_player.WarehouseDeposit(itemId, int.MaxValue);
 		}
 		else
 		{
-			_player.WarehouseWithdraw(itemId);
+			_player.WarehouseWithdraw(itemId, int.MaxValue);
 		}
 
 		RefreshAll();

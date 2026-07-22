@@ -193,6 +193,25 @@ public partial class PlayerController
 		}
 	}
 
+	// Fallen companions that can be revived right now (excludes those still
+	// awaiting field recovery). Used by the pet merchant's revive option.
+	public int RevivableCompanionCount
+	{
+		get
+		{
+			int count = 0;
+			foreach (SimpleActor actor in _capturedCollection)
+			{
+				if (IsInstanceValid(actor) && actor.IsDefeated && !actor.IsAwaitingRecovery)
+				{
+					count++;
+				}
+			}
+
+			return count;
+		}
+	}
+
 	public int ReviveDefeatedCompanions()
 	{
 		int fallenCount = 0;

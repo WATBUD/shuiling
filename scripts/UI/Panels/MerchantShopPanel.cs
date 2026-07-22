@@ -20,6 +20,7 @@ public partial class MerchantShopPanel : PanelContainer
 	private Label _titleLabel = null!;
 	private Label _goldLabel = null!;
 	private Label _noticeLabel = null!;
+	private Button _reviveButton = null!;
 	private HBoxContainer _categoryTabs = null!;
 	private HBoxContainer _tradeModeTabs = null!;
 	private HBoxContainer _refreshRow = null!;
@@ -114,6 +115,16 @@ public partial class MerchantShopPanel : PanelContainer
 		_goldLabel.Text = LocaleText.F("inventory.gold", _player?.Gold ?? 0);
 		_noticeLabel.Visible = _shopKind == PlayerController.MerchantShopKind.PetShop;
 		_noticeLabel.Text = _noticeLabel.Visible ? LocaleText.T("shop.pet.notice") : string.Empty;
+		_reviveButton.Visible = _shopKind == PlayerController.MerchantShopKind.PetShop;
+		if (_reviveButton.Visible)
+		{
+			int fallen = _player?.RevivableCompanionCount ?? 0;
+			int cost = fallen * (_player?.PetReviveCostPerCompanion ?? 0);
+			_reviveButton.Text = fallen > 0
+				? LocaleText.F("shop.pet.revive", fallen, cost)
+				: LocaleText.T("shop.pet.revive_none");
+			_reviveButton.Disabled = fallen <= 0 || (_player != null && _player.Gold < cost);
+		}
 		_categoryTabs.Visible = _shopKind == PlayerController.MerchantShopKind.ItemShop;
 		RefreshCategoryTabs();
 		bool canSell = _shopKind != PlayerController.MerchantShopKind.PetShop;
@@ -237,6 +248,15 @@ public partial class MerchantShopPanel : PanelContainer
 		_noticeLabel = MakeLabel(14, new Color(0.76f, 0.88f, 1.0f));
 		_noticeLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
 		root.AddChild(_noticeLabel);
+
+		// Pet merchant also handles paid companion revival.
+		_reviveButton = new Button { CustomMinimumSize = new Vector2(0.0f, 42.0f), Visible = false };
+		_reviveButton.Pressed += () =>
+		{
+			_player?.ReviveDefeatedCompanions();
+			RefreshAll();
+		};
+		root.AddChild(_reviveButton);
 
 		_categoryTabs = new HBoxContainer();
 		_categoryTabs.AddThemeConstantOverride("separation", 8);
