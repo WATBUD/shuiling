@@ -14,6 +14,59 @@ public static class ExternalModelLibrary
 		"res://assets/models/player/player_barbarian.glb",
 	};
 
+	// Player-selectable characters for the creation screen (path + name locale
+	// key). Includes the dedicated player models plus the humanoid character
+	// models. The character-select screen filters out any that don't exist.
+	public static readonly (string Path, string NameKey)[] SelectablePlayerModels =
+	{
+		("res://assets/models/player/player_rogue_hooded.glb", "character.rogue"),
+		("res://assets/models/player/player_knight.glb", "character.knight"),
+		("res://assets/models/player/player_mage.glb", "character.mage"),
+		("res://assets/models/player/player_barbarian.glb", "character.barbarian"),
+		("res://assets/models/characters/adventurer.gltf", "character.adventurer"),
+		("res://assets/models/characters/archer.glb", "character.archer"),
+		("res://assets/models/characters/knight.glb", "character.knight"),
+		("res://assets/models/characters/barbarian.glb", "character.barbarian"),
+		("res://assets/models/characters/mage.glb", "character.mage"),
+		("res://assets/models/characters/rogue.glb", "character.rogue"),
+		("res://assets/models/characters/guard.gltf", "character.guard"),
+	};
+
+	// Returns the selectable models that actually exist on disk.
+	public static List<(string Path, string NameKey)> GetAvailablePlayerModels()
+	{
+		var available = new List<(string Path, string NameKey)>();
+		foreach ((string path, string nameKey) in SelectablePlayerModels)
+		{
+			if (ResourceLoader.Exists(path) && !HasInvalidImportRemap(path))
+			{
+				available.Add((path, nameKey));
+			}
+		}
+
+		return available;
+	}
+
+	// Instantiate a model for a UI preview (character select). Applies fallback
+	// materials + idle animation; caller positions/scales it.
+	public static Node3D? InstantiatePreviewModel(string path)
+	{
+		if (string.IsNullOrEmpty(path) || !ResourceLoader.Exists(path) || HasInvalidImportRemap(path))
+		{
+			return null;
+		}
+
+		var packedScene = ResourceLoader.Load<PackedScene>(path);
+		if (packedScene == null || packedScene.Instantiate() is not Node3D model)
+		{
+			return null;
+		}
+
+		ApplyFallbackMaterials(model, path);
+		TryPlayActorAnimation(model, "idle");
+		return model;
+	}
+
 	private static readonly string[] NpcMelee =
 	{
 		"res://assets/models/characters/knight.glb",
@@ -144,44 +197,52 @@ public static class ExternalModelLibrary
 		}
 	}
 
-	public static Node3D? TryAddPlayerModel(Node3D player)
+	public static Node3D? TryAddPlayerModel(Node3D player, string preferredPath = "")
 	{
 		if (player.GetNodeOrNull<Node3D>("PlayerExternalModel") != null)
 		{
 			return player.GetNode<Node3D>("PlayerExternalModel");
 		}
 
+		// Try the player's chosen model first (from character select / save),
+		// then fall back to the default player model list.
+		if (!string.IsNullOrEmpty(preferredPath) && TryBuildPlayerModel(player, preferredPath) is Node3D chosen)
+		{
+			return chosen;
+		}
+
 		foreach (string path in PlayerModels)
 		{
-			if (!ResourceLoader.Exists(path))
+			if (TryBuildPlayerModel(player, path) is Node3D model)
 			{
-				continue;
+				return model;
 			}
-
-			var packedScene = ResourceLoader.Load<PackedScene>(path);
-			if (packedScene == null)
-			{
-				continue;
-			}
-
-			Node instance = packedScene.Instantiate();
-			if (instance is not Node3D model)
-			{
-				instance.QueueFree();
-				continue;
-			}
-
-			model.Name = "PlayerExternalModel";
-			model.Position = Vector3.Zero;
-			model.RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f);
-			model.Scale = new Vector3(0.88f, 0.88f, 0.88f);
-			player.AddChild(model);
-			ApplyFallbackMaterials(model, path);
-			TryPlayActorAnimation(model, "idle");
-			return model;
 		}
 
 		return null;
+	}
+
+	private static Node3D? TryBuildPlayerModel(Node3D player, string path)
+	{
+		if (!ResourceLoader.Exists(path) || HasInvalidImportRemap(path))
+		{
+			return null;
+		}
+
+		var packedScene = ResourceLoader.Load<PackedScene>(path);
+		if (packedScene == null || packedScene.Instantiate() is not Node3D model)
+		{
+			return null;
+		}
+
+		model.Name = "PlayerExternalModel";
+		model.Position = Vector3.Zero;
+		model.RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f);
+		model.Scale = new Vector3(0.88f, 0.88f, 0.88f);
+		player.AddChild(model);
+		ApplyFallbackMaterials(model, path);
+		TryPlayActorAnimation(model, "idle");
+		return model;
 	}
 
 	public static bool TryAddPropModel(Node3D parent, string propKind, int variantSeed, Vector3 position, Vector3 scale)

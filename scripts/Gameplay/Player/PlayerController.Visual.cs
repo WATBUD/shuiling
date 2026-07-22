@@ -233,9 +233,48 @@ public partial class PlayerController
 		Rotation = rotation;
 	}
 
+	// New game: pull the model + name chosen on the character-select screen.
+	private void ApplyNewGameCharacterChoice()
+	{
+		if (GameLaunchOptions.LoadSaveOnWorldReady)
+		{
+			return;
+		}
+
+		if (!string.IsNullOrWhiteSpace(GameLaunchOptions.NewGamePlayerName))
+		{
+			PlayerName = GameLaunchOptions.NewGamePlayerName;
+		}
+
+		if (!string.IsNullOrWhiteSpace(GameLaunchOptions.NewGamePlayerModelPath))
+		{
+			PlayerModelPath = GameLaunchOptions.NewGamePlayerModelPath;
+		}
+	}
+
+	// Swap the player's external model at runtime (used after loading a save
+	// whose character differs from the one built during _Ready).
+	public void RebuildPlayerExternalModel()
+	{
+		Node3D? existing = GetNodeOrNull<Node3D>("PlayerExternalModel");
+		if (existing != null && existing == _playerExternalModel)
+		{
+			existing.QueueFree();
+			_playerExternalModel = null;
+		}
+
+		Node3D? rebuilt = ExternalModelLibrary.TryAddPlayerModel(this, PlayerModelPath);
+		if (rebuilt != null)
+		{
+			_playerExternalModel = rebuilt;
+			_playerVisualRoot = rebuilt;
+			AddPlayerExternalEquipment();
+		}
+	}
+
 	private void CreatePlayerVisual()
 	{
-		_playerExternalModel = ExternalModelLibrary.TryAddPlayerModel(this);
+		_playerExternalModel = ExternalModelLibrary.TryAddPlayerModel(this, PlayerModelPath);
 		if (_playerExternalModel != null)
 		{
 			_playerVisualRoot = _playerExternalModel;

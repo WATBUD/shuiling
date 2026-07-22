@@ -335,6 +335,14 @@ public partial class PlayerController
 				return;
 			}
 
+			// Leaving a wild map: offer "next tier" vs "return to city" instead of
+			// going straight back to town.
+			if (targetMapId == "city" && world.IsWildMap(world.ActiveMapId))
+			{
+				ShowWildReturnDialog(world);
+				return;
+			}
+
 			world.RequestMapTravel(targetMapId);
 		}
 	}
