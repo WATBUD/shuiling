@@ -87,12 +87,16 @@ public partial class MercenaryShopPanel : PanelContainer
 	{
 		Name = "MercenaryShopPanel";
 		MouseFilter = MouseFilterEnum.Stop;
-		SetAnchorsPreset(LayoutPreset.Center);
-		OffsetLeft = -380.0f;
-		OffsetRight = 380.0f;
-		OffsetTop = -285.0f;
-		OffsetBottom = 285.0f;
-		CustomMinimumSize = new Vector2(760.0f, 570.0f);
+		// Match the pet shop window size (a large centred 80% panel).
+		AnchorLeft = 0.10f;
+		AnchorTop = 0.10f;
+		AnchorRight = 0.90f;
+		AnchorBottom = 0.90f;
+		OffsetLeft = 0.0f;
+		OffsetTop = 0.0f;
+		OffsetRight = 0.0f;
+		OffsetBottom = 0.0f;
+		CustomMinimumSize = Vector2.Zero;
 
 		var style = new StyleBoxFlat
 		{
@@ -160,7 +164,7 @@ public partial class MercenaryShopPanel : PanelContainer
 		};
 		root.AddChild(scroll);
 
-		_offerList = new VBoxContainer();
+		_offerList = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
 		_offerList.AddThemeConstantOverride("separation", 10);
 		scroll.AddChild(_offerList);
 
@@ -175,7 +179,7 @@ public partial class MercenaryShopPanel : PanelContainer
 
 	private void AddOfferRow(PlayerController.ContractCompanionOffer offer)
 	{
-		var row = new PanelContainer();
+		var row = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
 		var style = new StyleBoxFlat
 		{
 			BgColor = new Color(0.08f, 0.09f, 0.105f, 0.94f),
@@ -197,22 +201,23 @@ public partial class MercenaryShopPanel : PanelContainer
 		content.AddThemeConstantOverride("separation", 12);
 		margin.AddChild(content);
 
-		var info = new VBoxContainer();
-		info.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-		info.AddThemeConstantOverride("separation", 5);
-		content.AddChild(info);
-
-		var name = MakeLabel(19, new Color(0.96f, 0.98f, 1.0f));
-		name.Text = LocaleText.F("mercenary.offer.name", LocaleText.T(offer.NameKey), offer.Level, LocaleText.T(offer.RoleNameKey));
-		info.AddChild(name);
-
-		// Full stat detail card like the pet shop (no flavour summary text).
-		string rangeKey = offer.CombatRole is "Ranged" or "Support"
-			? "shop.pet.range.ranged"
-			: "shop.pet.range.melee";
-		var stats = MakeLabel(15, new Color(0.82f, 0.92f, 0.78f));
-		stats.Text = LocaleText.F("mercenary.offer.stats", offer.MaxHealth, offer.Attack, offer.Defense, LocaleText.T(rangeKey));
-		info.AddChild(stats);
+		// Same rich info card as the pet shop: a preview companion fed into a
+		// CompanionInfoCard, freed when the row leaves the tree.
+		SimpleActor previewActor = CreateMercenaryOfferPreview(offer);
+		var infoCard = new CompanionInfoCard
+		{
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			SizeFlagsVertical = SizeFlags.ShrinkBegin,
+		};
+		infoCard.SetActor(previewActor);
+		content.AddChild(infoCard);
+		row.TreeExiting += () =>
+		{
+			if (IsInstanceValid(previewActor))
+			{
+				previewActor.Free();
+			}
+		};
 
 		var hireButton = new Button
 		{
@@ -228,6 +233,21 @@ public partial class MercenaryShopPanel : PanelContainer
 			}
 		};
 		content.AddChild(hireButton);
+	}
+
+	// Build a throwaway companion that mirrors the mercenary offer, so the
+	// CompanionInfoCard shows the exact same rich layout as the pet shop.
+	private static SimpleActor CreateMercenaryOfferPreview(PlayerController.ContractCompanionOffer offer)
+	{
+		var actor = new SimpleActor
+		{
+			ActorKind = "npc",
+			MoveSpeed = 6.5f,
+		};
+		actor.ConfigureStats(offer.NameKey, offer.Level, offer.MaxHealth, offer.Attack, offer.Defense, offer.Level * 8, 0);
+		actor.ConfigureGrowth("ability.none", Mathf.Max(offer.Level / 2, 1));
+		actor.ConfigureCombatProfile(offer.CombatRole, "personality.brave", "ability.none", 5);
+		return actor;
 	}
 
 	private static Label MakeLabel(int fontSize, Color color)

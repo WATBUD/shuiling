@@ -95,6 +95,8 @@ public partial class PlayerController
 			RebuildPlayerExternalModel();
 		}
 
+		RefreshPlayerNameplate();
+
 		Level = Mathf.Max(data.Level, 1);
 		Experience = Mathf.Max(data.Experience, 0);
 		MaxHealth = Mathf.Max(data.MaxHealth, 1);

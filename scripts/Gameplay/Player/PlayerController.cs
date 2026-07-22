@@ -38,10 +38,10 @@ public partial class PlayerController : CharacterBody3D
 	private const int NpcRecruitAffinityRequirement = 80;
 	private const float MercenaryBrokerInteractRange = 4.6f;
 	private const float MerchantInteractRange = 4.6f;
-	private const int MercenaryRefreshCost = 50;
+	private const int MercenaryRefreshCost = 5000;
 	private const int MercenaryOfferCount = 5;
 	private const double MercenaryRefreshSeconds = 6.0 * 60.0 * 60.0;
-	private const int MerchantRefreshCost = 50;
+	private const int MerchantRefreshCost = 5000;
 	private const int BlacksmithStockCount = 6;
 	private const int PetShopStockCount = 4;
 	private const int PetReviveGoldCost = 40;
@@ -53,12 +53,12 @@ public partial class PlayerController : CharacterBody3D
 
 	private static readonly PetShopOffer[] PetShopOffers =
 	{
-		new("name.monster.rat", 2, 120, 145, 22, 12),
-		new("name.monster.bunny", 2, 130, 138, 21, 11),
-		new("name.monster.fox", 3, 210, 172, 31, 15),
-		new("name.monster.crab", 3, 240, 210, 24, 23),
-		new("name.monster.bee", 3, 260, 158, 29, 14),
-		new("name.monster.lion", 5, 420, 260, 44, 25),
+		new("name.monster.rat", 1, 120, 120, 16, 9),
+		new("name.monster.bunny", 1, 130, 118, 15, 9),
+		new("name.monster.fox", 1, 210, 130, 18, 10),
+		new("name.monster.crab", 1, 240, 150, 15, 16),
+		new("name.monster.bee", 1, 260, 124, 17, 10),
+		new("name.monster.lion", 1, 420, 150, 20, 12),
 	};
 
 	[Export] public float WalkSpeed { get; set; } = 7.8f;
@@ -195,6 +195,7 @@ public partial class PlayerController : CharacterBody3D
 	private string _playerExternalAnimationState = string.Empty;
 	private readonly Dictionary<string, Node3D?> _playerVisualNodeCache = new();
 	private Node3D? _playerVisualRoot;
+	private Label3D? _playerNameLabel;
 	private float _damageFlashRemaining;
 	private float _footstepEffectRemaining;
 	private float _movementAnimationPhase;
@@ -249,6 +250,7 @@ public partial class PlayerController : CharacterBody3D
 		ConfigureThirdPersonCamera();
 		ApplyNewGameCharacterChoice();
 		CreatePlayerVisual();
+		CreatePlayerNameplate();
 		CreateTargetInfoPanel();
 		CreateMinimapPanel();
 		CreateCaptureRhythmPanel();
