@@ -100,7 +100,8 @@ public partial class PlayerController
 
 	private ContractCompanionOffer CreateRandomMercenaryOffer(ContractCompanionOffer template, int index)
 	{
-		int level = _mercenaryRng.RandiRange(2, 8);
+		// Hired mercenaries start at level 1 (they grow with the player).
+		int level = 1;
 		float quality = (float)_mercenaryRng.RandfRange(0.88f, 1.22f);
 		int maxHealth = Mathf.RoundToInt((template.MaxHealth + level * 17) * quality);
 		int attack = Mathf.RoundToInt((template.Attack + level * 3) * quality);

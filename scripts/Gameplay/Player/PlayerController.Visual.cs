@@ -233,6 +233,41 @@ public partial class PlayerController
 		Rotation = rotation;
 	}
 
+	// Floating nickname above the local player's head (the name chosen at
+	// character creation / loaded from the save).
+	private void CreatePlayerNameplate()
+	{
+		if (_playerNameLabel != null && IsInstanceValid(_playerNameLabel))
+		{
+			RefreshPlayerNameplate();
+			return;
+		}
+
+		_playerNameLabel = new Label3D
+		{
+			Name = "PlayerNameplate",
+			Text = LocalizedPlayerName,
+			Position = new Vector3(0.0f, 2.35f, 0.0f),
+			Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+			FontSize = 44,
+			OutlineSize = 10,
+			PixelSize = 0.0075f,
+			Modulate = new Color(0.6f, 1.0f, 0.78f),
+			NoDepthTest = true,
+			HorizontalAlignment = HorizontalAlignment.Center,
+		};
+		_playerNameLabel.OutlineModulate = new Color(0.02f, 0.03f, 0.03f, 0.95f);
+		AddChild(_playerNameLabel);
+	}
+
+	public void RefreshPlayerNameplate()
+	{
+		if (_playerNameLabel != null && IsInstanceValid(_playerNameLabel))
+		{
+			_playerNameLabel.Text = LocalizedPlayerName;
+		}
+	}
+
 	// New game: pull the model + name chosen on the character-select screen.
 	private void ApplyNewGameCharacterChoice()
 	{
