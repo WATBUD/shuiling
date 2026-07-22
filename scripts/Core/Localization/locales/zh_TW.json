@@ -153,7 +153,6 @@
 	"map.tier.option": "第 {0} 階",
 	"map.tier.progress": "已解鎖階級：{0} / {1}",
 	"map.tier.button": "第{0}階\n等級 {1}-{2}",
-	"map.tier.need_level": "需要等級 {0}",
 	"map.tier.locked_boss": "尚未擊敗前一階首領",
 	"map.guide.here": "{0}（目前所在）",
 	"map.guide.boss_alive": "首領：{0}（現身中）",

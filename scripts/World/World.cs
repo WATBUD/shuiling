@@ -2932,11 +2932,13 @@ public partial class World : Node3D
 	}
 
 	// One row per tier (1..Max) for a map, given a player level. Shared by the
-	// portal travel dialog and the M-key world map so the lock/level rules live
-	// in one place. Available = progression-unlocked AND level requirement met.
+	// portal travel dialog and the M-key world map. Unlock is purely
+	// progression-based: a tier is available only after the previous tier's boss
+	// has been defeated — NOT gated by player or monster level. The level range
+	// is shown for information only. playerLevel is unused (kept for callers).
 	public readonly record struct TierMenuEntry(
-		int Tier, int LevelMin, int LevelMax, int RequiredLevel,
-		bool Unlocked, bool LevelMet, bool Available, bool IsSelected);
+		int Tier, int LevelMin, int LevelMax,
+		bool Unlocked, bool Available, bool IsSelected);
 
 	public IReadOnlyList<TierMenuEntry> GetTierMenu(string mapId, int playerLevel)
 	{
@@ -2947,10 +2949,8 @@ public partial class World : Node3D
 		for (int tier = WorldTierCatalog.MinTier; tier <= WorldTierCatalog.MaxTier; tier++)
 		{
 			(int min, int max) = WorldTierCatalog.GetMonsterLevelRange(tier);
-			int required = WorldTierCatalog.GetRequiredPlayerLevel(tier);
 			bool unlocked = tier <= unlockedTier;
-			bool levelMet = playerLevel >= required;
-			entries.Add(new TierMenuEntry(tier, min, max, required, unlocked, levelMet, unlocked && levelMet, tier == selectedTier));
+			entries.Add(new TierMenuEntry(tier, min, max, unlocked, unlocked, tier == selectedTier));
 		}
 
 		return entries;
@@ -3027,16 +3027,9 @@ public partial class World : Node3D
 			return false;
 		}
 
+		// Only progression matters: clamp to the highest tier unlocked by
+		// defeating bosses. No player/monster level gate.
 		int tier = Mathf.Clamp(requestedTier, WorldTierCatalog.MinTier, GetUnlockedTier(mapId));
-		// Level gate: never enter a tier whose required level the player hasn't
-		// reached (the UI locks these, this is the safety net).
-		if (_player != null && IsInstanceValid(_player))
-		{
-			while (tier > WorldTierCatalog.MinTier && _player.Level < WorldTierCatalog.GetRequiredPlayerLevel(tier))
-			{
-				tier--;
-			}
-		}
 		int previousTier = GetSelectedTier(mapId);
 		_wildMapSelectedTiersById[mapId] = tier;
 		if (tier == previousTier)

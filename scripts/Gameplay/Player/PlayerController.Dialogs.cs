@@ -332,10 +332,9 @@ public partial class PlayerController
 
 		if (!entry.Available)
 		{
+			// Locked only because the previous tier's boss hasn't been beaten.
 			button.Modulate = new Color(0.62f, 0.64f, 0.68f);
-			button.TooltipText = entry.Unlocked
-				? LocaleText.F("map.tier.need_level", entry.RequiredLevel)
-				: LocaleText.T("map.tier.locked_boss");
+			button.TooltipText = LocaleText.T("map.tier.locked_boss");
 			button.AddChild(MakeLockBadge());
 		}
 		else

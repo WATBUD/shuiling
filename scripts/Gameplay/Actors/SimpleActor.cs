@@ -266,6 +266,9 @@ public partial class SimpleActor : CharacterBody3D
 
 	public bool CanBeCaptured => ActorKind == "monster" && !IsBoss && !_isCaptured && !_isDefeated && !_isNetworkPuppet;
 	public bool IsNetworkPuppet => _isNetworkPuppet;
+	// Host & client both tag their wild monsters with the shared network id so
+	// death can be broadcast/looked up without scanning (multiplayer).
+	public int NetworkMonsterId { get; set; } = -1;
 	public bool IsNpcRecruitCandidate => ActorKind == "npc" && !_isCaptured && !_isDefeated;
 	public bool CanJoinByAffinity => IsNpcRecruitCandidate && Affinity >= 80;
 	public bool IsCaptured => _isCaptured;
@@ -937,6 +940,7 @@ public partial class SimpleActor : CharacterBody3D
 	{
 		_isNetworkPuppet = true;
 		_networkId = networkId;
+		NetworkMonsterId = networkId;
 		_netTargetPosition = GlobalPosition;
 		_netTargetYaw = Rotation.Y;
 	}
@@ -2733,6 +2737,14 @@ public partial class SimpleActor : CharacterBody3D
 			&& FindOwningWorld() is World bossWorld)
 		{
 			bossWorld.OnWildBossDefeated(this);
+		}
+
+		// Multiplayer: tell the host to broadcast this monster's removal now,
+		// instead of waiting for the next periodic state sweep (removes the
+		// death lag/pop clients would otherwise see).
+		if (ActorKind == "monster" && NetworkMonsterId >= 0)
+		{
+			FindOwningWorld()?.OnNetworkMonsterDefeated(this);
 		}
 	}
 

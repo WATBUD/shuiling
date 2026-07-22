@@ -36,20 +36,8 @@ public static class WorldTierCatalog
 		return (2 + (tier - 1) * 8, 10 + (tier - 1) * 8);
 	}
 
-	// Player level required to enter a tier. T1 is always open (1); higher tiers
-	// gate a little below the band's floor so you can enter once you're roughly
-	// on par with its monsters. Shown with a lock icon when unmet.
-	public static int GetRequiredPlayerLevel(int tier)
-	{
-		tier = ClampTier(tier);
-		if (tier <= MinTier)
-		{
-			return 1;
-		}
-
-		(int min, _) = GetMonsterLevelRange(tier);
-		return Mathf.Max(min - 2, 1);
-	}
+	// Tier unlock is progression-only (defeat the previous tier's boss); there is
+	// no player/monster level requirement to enter a tier.
 
 	// Multiplier applied on top of the level-based stat curve so higher tiers
 	// feel meaningfully tougher, not just higher-leveled.
