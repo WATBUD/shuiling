@@ -210,14 +210,14 @@ public partial class PlayerController
 		root.AddThemeConstantOverride("separation", 10);
 		margin.AddChild(root);
 
-		var title = new Label
+		_mapTravelTitleLabel = new Label
 		{
 			Text = LocaleText.T("map.travel.title"),
 			HorizontalAlignment = HorizontalAlignment.Center,
 		};
-		title.AddThemeFontSizeOverride("font_size", 24);
-		title.AddThemeColorOverride("font_color", new Color(1.0f, 0.94f, 0.78f));
-		root.AddChild(title);
+		_mapTravelTitleLabel.AddThemeFontSizeOverride("font_size", 24);
+		_mapTravelTitleLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.94f, 0.78f));
+		root.AddChild(_mapTravelTitleLabel);
 
 		var scroll = new ScrollContainer
 		{
@@ -235,8 +235,9 @@ public partial class PlayerController
 		root.AddChild(cancelButton);
 	}
 
-	// Toggle the world map guide (M key). Reuses the map travel dialog so the
-	// overview and quick-travel share one screen.
+	// Toggle the world map guide (M key). This is an OVERVIEW only — it shows
+	// maps, tiers, level ranges and boss status but does NOT let you travel.
+	// Actual travel is done through portals (city gate / wild return portal).
 	private void ToggleWorldMapGuide()
 	{
 		if (_mapTravelDialog != null && _mapTravelDialog.Visible)
@@ -247,16 +248,18 @@ public partial class PlayerController
 
 		if (GetParent() is World world)
 		{
-			ShowMapTravelDialog(world);
+			ShowMapTravelDialog(world, guideOnly: true);
 		}
 	}
 
-	private void ShowMapTravelDialog(World world)
+	private void ShowMapTravelDialog(World world, bool guideOnly = false)
 	{
+		_mapTravelGuideOnly = guideOnly;
+		_mapTravelTitleLabel.Text = LocaleText.T(guideOnly ? "map.guide.title" : "map.travel.title");
 		ClearChildren(_mapTravelButtonList);
-		// Per biome, show all tiers 1..10 with their monster level range. Tiers
-		// the player can't enter yet (not progression-unlocked, or player level
-		// below the tier's requirement) are shown with a lock badge and disabled.
+		// Per biome, show all tiers 1..10 with their monster level range + boss
+		// status. In guide mode the tier buttons are read-only; from the city
+		// gate portal they act as travel buttons.
 		foreach ((string id, string label) in world.GetWildMapList())
 		{
 			_mapTravelButtonList.AddChild(BuildMapTierSection(world, id, label));
@@ -321,11 +324,12 @@ public partial class PlayerController
 			Text = LocaleText.F("map.tier.button", entry.Tier, entry.LevelMin, entry.LevelMax),
 			CustomMinimumSize = new Vector2(116.0f, 46.0f),
 			ClipText = true,
-			Disabled = !entry.Available,
+			// Guide mode is read-only; travel mode enables the unlocked tiers.
+			Disabled = _mapTravelGuideOnly || !entry.Available,
 		};
 		button.AddThemeFontSizeOverride("font_size", 13);
 
-		if (entry.IsSelected && entry.Available)
+		if (entry.IsSelected)
 		{
 			button.AddThemeColorOverride("font_color", new Color(0.4f, 1.0f, 0.6f));
 		}
@@ -337,7 +341,7 @@ public partial class PlayerController
 			button.TooltipText = LocaleText.T("map.tier.locked_boss");
 			button.AddChild(MakeLockBadge());
 		}
-		else
+		else if (!_mapTravelGuideOnly)
 		{
 			button.Pressed += () =>
 			{
@@ -395,6 +399,116 @@ public partial class PlayerController
 		if (_mapTravelDialog != null)
 		{
 			_mapTravelDialog.Visible = false;
+		}
+
+		UpdateMouseModeForPanels();
+	}
+
+	// ----------------------------------------------------- wild return portal
+
+	private void CreateWildReturnDialog()
+	{
+		var layer = new CanvasLayer { Name = "WildReturnDialogLayer" };
+		AddChild(layer);
+
+		_wildReturnDialog = new PanelContainer
+		{
+			Name = "WildReturnDialog",
+			Visible = false,
+			AnchorLeft = 0.5f,
+			AnchorRight = 0.5f,
+			AnchorTop = 0.5f,
+			AnchorBottom = 0.5f,
+			OffsetLeft = -190.0f,
+			OffsetRight = 190.0f,
+			OffsetTop = -130.0f,
+			OffsetBottom = 130.0f,
+		};
+		_wildReturnDialog.AddThemeStyleboxOverride("panel", MakeDialogStyle(new Color(0.05f, 0.07f, 0.09f, 0.94f), new Color(0.35f, 0.82f, 1.0f, 0.72f)));
+		layer.AddChild(_wildReturnDialog);
+
+		var margin = new MarginContainer();
+		margin.AddThemeConstantOverride("margin_left", 18);
+		margin.AddThemeConstantOverride("margin_right", 18);
+		margin.AddThemeConstantOverride("margin_top", 16);
+		margin.AddThemeConstantOverride("margin_bottom", 16);
+		_wildReturnDialog.AddChild(margin);
+
+		var root = new VBoxContainer();
+		root.AddThemeConstantOverride("separation", 10);
+		margin.AddChild(root);
+
+		var title = new Label { Text = LocaleText.T("portal.return.title"), HorizontalAlignment = HorizontalAlignment.Center };
+		title.AddThemeFontSizeOverride("font_size", 22);
+		title.AddThemeColorOverride("font_color", new Color(1.0f, 0.94f, 0.78f));
+		root.AddChild(title);
+
+		_wildReturnButtonList = new VBoxContainer();
+		_wildReturnButtonList.AddThemeConstantOverride("separation", 8);
+		root.AddChild(_wildReturnButtonList);
+
+		var cancelButton = MakeQuestDialogButton("dialog.button.cancel");
+		cancelButton.Pressed += CloseWildReturnDialog;
+		root.AddChild(cancelButton);
+	}
+
+	// Shown when using a wild map's return portal: choose to advance to the next
+	// (higher) unlocked tier of this biome, or head back to the city.
+	private void ShowWildReturnDialog(World world)
+	{
+		ClearChildren(_wildReturnButtonList);
+		string mapId = world.ActiveMapId;
+		int currentTier = world.GetSelectedTier(mapId);
+		int unlockedTier = world.GetUnlockedTier(mapId);
+		int nextTier = currentTier + 1;
+
+		if (nextTier <= WorldTierCatalog.MaxTier)
+		{
+			bool nextUnlocked = nextTier <= unlockedTier;
+			var nextButton = new Button
+			{
+				Text = LocaleText.F("portal.return.next_tier", nextTier),
+				CustomMinimumSize = new Vector2(0.0f, 46.0f),
+				Disabled = !nextUnlocked,
+			};
+			if (nextUnlocked)
+			{
+				nextButton.Pressed += () =>
+				{
+					CloseWildReturnDialog();
+					world.RequestMapTravel(mapId, nextTier);
+				};
+			}
+			else
+			{
+				nextButton.TooltipText = LocaleText.T("map.tier.locked_boss");
+				nextButton.Modulate = new Color(0.62f, 0.64f, 0.68f);
+			}
+			_wildReturnButtonList.AddChild(nextButton);
+		}
+
+		var cityButton = new Button
+		{
+			Text = LocaleText.T("portal.return.city"),
+			CustomMinimumSize = new Vector2(0.0f, 46.0f),
+		};
+		cityButton.Pressed += () =>
+		{
+			CloseWildReturnDialog();
+			world.RequestMapTravel("city");
+		};
+		_wildReturnButtonList.AddChild(cityButton);
+
+		_wildReturnDialog.Visible = true;
+		_interactionPromptLabel.Visible = false;
+		UpdateMouseModeForPanels();
+	}
+
+	private void CloseWildReturnDialog()
+	{
+		if (_wildReturnDialog != null)
+		{
+			_wildReturnDialog.Visible = false;
 		}
 
 		UpdateMouseModeForPanels();

@@ -14,6 +14,8 @@ public sealed class SaveGameData
 
 public sealed class PlayerSaveData
 {
+	public string PlayerName { get; set; } = "player.default_name";
+	public string PlayerModelPath { get; set; } = string.Empty;
 	public int Level { get; set; } = 1;
 	public int Experience { get; set; }
 	public int MaxHealth { get; set; } = 150;

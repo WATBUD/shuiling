@@ -8,6 +8,8 @@ public partial class PlayerController
 	{
 		var data = new PlayerSaveData
 		{
+			PlayerName = PlayerName,
+			PlayerModelPath = PlayerModelPath,
 			Level = Level,
 			Experience = Experience,
 			MaxHealth = MaxHealth,
@@ -80,6 +82,19 @@ public partial class PlayerController
 
 	public void ApplySaveData(PlayerSaveData data, IReadOnlyList<SimpleActor> loadedCompanions)
 	{
+		// Restore chosen character name + model; rebuild the model if it differs
+		// from the one built at startup.
+		if (!string.IsNullOrWhiteSpace(data.PlayerName))
+		{
+			PlayerName = data.PlayerName;
+		}
+
+		if (PlayerModelPath != data.PlayerModelPath)
+		{
+			PlayerModelPath = data.PlayerModelPath;
+			RebuildPlayerExternalModel();
+		}
+
 		Level = Mathf.Max(data.Level, 1);
 		Experience = Mathf.Max(data.Experience, 0);
 		MaxHealth = Mathf.Max(data.MaxHealth, 1);

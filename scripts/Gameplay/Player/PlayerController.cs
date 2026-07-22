@@ -86,6 +86,7 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float NpcRecruitInteractRange { get; set; } = 4.8f;
 	[Export] public float MapPortalInteractRange { get; set; } = 5.2f;
 	[Export] public string PlayerName { get; set; } = "player.default_name";
+	[Export] public string PlayerModelPath { get; set; } = string.Empty;
 	[Export] public int Level { get; set; } = 1;
 	[Export] public int Experience { get; set; }
 	[Export] public int MaxHealth { get; set; } = 150;
@@ -159,6 +160,10 @@ public partial class PlayerController : CharacterBody3D
 	private PanelContainer _npcQuestDialog = null!;
 	private PanelContainer _mapTravelDialog = null!;
 	private VBoxContainer _mapTravelButtonList = null!;
+	private Label _mapTravelTitleLabel = null!;
+	private bool _mapTravelGuideOnly;
+	private PanelContainer _wildReturnDialog = null!;
+	private VBoxContainer _wildReturnButtonList = null!;
 	private Label _captureAmmoCaptionLabel = null!;
 	private Label _captureAmmoCountLabel = null!;
 	private ProgressBar _captureAmmoRechargeBar = null!;
@@ -242,6 +247,7 @@ public partial class PlayerController : CharacterBody3D
 		EnsureMercenaryOffers();
 		EnsureMerchantStock();
 		ConfigureThirdPersonCamera();
+		ApplyNewGameCharacterChoice();
 		CreatePlayerVisual();
 		CreateTargetInfoPanel();
 		CreateMinimapPanel();
@@ -268,6 +274,7 @@ public partial class PlayerController : CharacterBody3D
 		CreateBossHud();
 		CreateNpcQuestDialog();
 		CreateMapTravelDialog();
+		CreateWildReturnDialog();
 
 		AddToGroup("player");
 		CallDeferred(nameof(PrewarmTownPortalCastEffect));

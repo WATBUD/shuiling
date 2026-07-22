@@ -3004,6 +3004,12 @@ public partial class World : Node3D
 		return false;
 	}
 
+	// Public wrapper for UI (e.g. the wild return-portal choice dialog).
+	public bool IsWildMap(string mapId)
+	{
+		return IsWildMapId(mapId);
+	}
+
 	private static string WildInstanceKey(string mapId, int tier)
 	{
 		return $"{mapId}#t{tier}";
