@@ -42,7 +42,9 @@ public partial class PlayerController
 
 	private void EnsureMerchantStock()
 	{
-		if (_blacksmithStockItemIds.Count == 0 || _petShopStockNameKeys.Count == 0 || _merchantNextRefreshUnix <= 0.0 || Time.GetUnixTimeFromSystem() >= _merchantNextRefreshUnix)
+		// Only on first init or when due — bought-out pet slots stay empty until
+		// the timer elapses or the player pays to refresh (no instant refill).
+		if (_merchantNextRefreshUnix <= 0.0 || Time.GetUnixTimeFromSystem() >= _merchantNextRefreshUnix)
 		{
 			GenerateMerchantStock();
 		}

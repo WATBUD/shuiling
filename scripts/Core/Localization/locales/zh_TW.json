@@ -321,7 +321,7 @@
 	"mercenary.shop.title": "傭兵公會",
 	"mercenary.shop.hint": "使用金幣雇用可信任的傭兵。雇用後會加入隊伍或收藏，可在隊伍面板調整出戰。",
 	"mercenary.offer.name": "{0}  Lv.{1}  {2}",
-	"mercenary.offer.stats": "攻擊 {0} / 防禦 {1} / 生命 {2}",
+	"mercenary.offer.stats": "生命 {0} / 攻擊 {1} / 防禦 {2} / {3}",
 	"mercenary.button.hire": "雇用 {0}G",
 	"mercenary.button.refresh": "刷新 {0}G",
 	"mercenary.refresh.countdown": "下次自動刷新：{0:00}:{1:00}:{2:00}",

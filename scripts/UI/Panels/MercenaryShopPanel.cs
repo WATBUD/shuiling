@@ -206,9 +206,12 @@ public partial class MercenaryShopPanel : PanelContainer
 		name.Text = LocaleText.F("mercenary.offer.name", LocaleText.T(offer.NameKey), offer.Level, LocaleText.T(offer.RoleNameKey));
 		info.AddChild(name);
 
-		// Show the stat detail directly (like the pet shop) — no flavour summary.
-		var stats = MakeLabel(14, new Color(0.82f, 0.92f, 0.78f));
-		stats.Text = LocaleText.F("mercenary.offer.stats", offer.Attack, offer.Defense, offer.MaxHealth);
+		// Full stat detail card like the pet shop (no flavour summary text).
+		string rangeKey = offer.CombatRole is "Ranged" or "Support"
+			? "shop.pet.range.ranged"
+			: "shop.pet.range.melee";
+		var stats = MakeLabel(15, new Color(0.82f, 0.92f, 0.78f));
+		stats.Text = LocaleText.F("mercenary.offer.stats", offer.MaxHealth, offer.Attack, offer.Defense, LocaleText.T(rangeKey));
 		info.AddChild(stats);
 
 		var hireButton = new Button
