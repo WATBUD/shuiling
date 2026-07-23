@@ -61,6 +61,7 @@ public sealed class ActorSaveData
 	public string DisplayName { get; set; } = "name.actor.traveler";
 	public int Level { get; set; } = 1;
 	public int WorldTier { get; set; } = 1;
+	public int Rarity { get; set; }
 	public int MaxHealth { get; set; } = 100;
 	public int CurrentHealth { get; set; } = 100;
 	public bool IsDefeated { get; set; }

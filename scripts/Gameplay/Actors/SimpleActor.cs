@@ -286,6 +286,31 @@ public partial class SimpleActor : CharacterBody3D
 	// Host & client both tag their wild monsters with the shared network id so
 	// death can be broadcast/looked up without scanning (multiplayer).
 	public int NetworkMonsterId { get; set; } = -1;
+
+	// Wild-monster rarity (MonsterRarity.*). 0 = common. Kept after capture.
+	[Export] public int Rarity { get; set; } = MonsterRarity.Common;
+
+	// Applied at spawn: scale base stats + rewards by rarity, then refresh.
+	public void ApplyRarity(int rarity)
+	{
+		Rarity = rarity;
+		if (rarity <= MonsterRarity.Common)
+		{
+			return;
+		}
+
+		float stat = MonsterRarity.StatMultiplier(rarity);
+		float reward = MonsterRarity.RewardMultiplier(rarity);
+		MaxHealth = Mathf.RoundToInt(MaxHealth * stat);
+		CurrentHealth = MaxHealth;
+		Attack = Mathf.RoundToInt(Attack * stat);
+		Defense = Mathf.RoundToInt(Defense * stat);
+		ExperienceReward = Mathf.RoundToInt(ExperienceReward * reward);
+		GoldReward = Mathf.RoundToInt(GoldReward * reward);
+		_buildConfigured = false;
+		_buildStatsDirty = true;
+		RefreshNameplate();
+	}
 	public bool IsNpcRecruitCandidate => ActorKind == "npc" && !_isCaptured && !_isDefeated;
 	public bool CanJoinByAffinity => IsNpcRecruitCandidate && Affinity >= 80;
 	public bool IsCaptured => _isCaptured;
@@ -632,6 +657,14 @@ public partial class SimpleActor : CharacterBody3D
 		RemoveFromGroup(ActorKind == "monster" ? "monsters" : "npcs");
 		AddToGroup("captured_actors");
 		RefreshNameplate();
+
+		// Celebrate a rare capture — a real power spike worth showing off.
+		if (Rarity > MonsterRarity.Common && IsInstanceValid(followTarget))
+		{
+			string rarity = LocaleText.T(MonsterRarity.NameKey(Rarity));
+			followTarget.PostSystemMessage(LocaleText.F("system.capture.rare", rarity, LocalizedDisplayName), MonsterRarity.Color(Rarity), GameMessageChannel.Party);
+			SpawnCombatEffect(LocaleText.T("system.capture.rare_pop"), MonsterRarity.Color(Rarity), GlobalPosition + new Vector3(0.0f, 1.6f, 0.0f), 1.3f, 0.9f);
+		}
 	}
 
 	public void Recruit(PlayerController followTarget)
@@ -1084,6 +1117,7 @@ public partial class SimpleActor : CharacterBody3D
 			DisplayName = DisplayName,
 			Level = Level,
 			WorldTier = WorldTier,
+			Rarity = Rarity,
 			MaxHealth = MaxHealth,
 			CurrentHealth = CurrentHealth,
 			IsDefeated = _isDefeated,
@@ -1125,6 +1159,7 @@ public partial class SimpleActor : CharacterBody3D
 		DisplayName = data.DisplayName;
 		Level = Mathf.Max(data.Level, 1);
 		WorldTier = WorldTierCatalog.ClampTier(data.WorldTier);
+		Rarity = data.Rarity;
 		MaxHealth = Mathf.Max(data.MaxHealth, 1);
 		_isDefeated = data.IsDefeated || data.CurrentHealth <= 0;
 		_isAwaitingRecovery = _isDefeated && data.IsAwaitingRecovery;
@@ -1511,9 +1546,13 @@ public partial class SimpleActor : CharacterBody3D
 			: _isCaptured
 			? _isInActiveParty ? LocaleText.T("actor.nameplate.active") : LocaleText.T("actor.nameplate.stored")
 			: string.Empty;
+		// Wild rare+ monsters get a star prefix so their rarity reads at a glance.
+		string rarityPrefix = ActorKind == "monster" && !_isCaptured && Rarity > MonsterRarity.Common
+			? MonsterRarity.StarPrefix(Rarity)
+			: string.Empty;
 		_nameplate.Text = IsBoss
 			? LocaleText.F("boss.nameplate", Level, LocalizedDisplayName, capturedText)
-			: $"{LocaleText.T("actor.level_prefix")}{Level} {LocalizedDisplayName}{capturedText}";
+			: $"{rarityPrefix}{LocaleText.T("actor.level_prefix")}{Level} {LocalizedDisplayName}{capturedText}";
 		_nameplate.FontSize = Mathf.RoundToInt((IsBoss ? 28 : 20) * NameplateScale);
 		Color markerColor = GetNameplateStatusColor();
 		_nameplate.Modulate = markerColor;
@@ -1587,6 +1626,12 @@ public partial class SimpleActor : CharacterBody3D
 			return _bossEnraged
 				? new Color(1.0f, 0.22f, 0.08f, 0.98f)
 				: new Color(1.0f, 0.76f, 0.18f, 0.98f);
+		}
+
+		// Wild rare+ monsters show their rarity colour in the field.
+		if (Rarity > MonsterRarity.Common)
+		{
+			return MonsterRarity.Color(Rarity);
 		}
 
 		return MonsterSpeciesCatalog.Current.GetMarkerColor(DisplayName);
@@ -2834,6 +2879,16 @@ public partial class SimpleActor : CharacterBody3D
 		if (_rng.Randf() < 0.22f)
 		{
 			SpawnWorldDrop(origin + RandomDropOffset(1.32f), PickGemDropId(), 1, 0);
+		}
+
+		// Rare+ monsters drop guaranteed bonus loot (their reward for hunting).
+		if (Rarity >= MonsterRarity.Rare)
+		{
+			SpawnWorldDrop(origin + RandomDropOffset(1.05f), PickEquipmentDropId(), 1, 0);
+		}
+		if (Rarity >= MonsterRarity.Elite)
+		{
+			SpawnWorldDrop(origin + RandomDropOffset(1.45f), PickGemDropId(), 1, 0);
 		}
 
 		player.PostSystemMessage(LocaleText.F("system.drop.loot", LocalizedDisplayName, LocaleText.T(MonsterLootCatalog.GetNameKey(primaryLootId))), new Color(1.0f, 0.86f, 0.48f), GameMessageChannel.Loot);
