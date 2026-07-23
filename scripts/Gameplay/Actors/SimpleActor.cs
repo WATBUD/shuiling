@@ -256,6 +256,10 @@ public partial class SimpleActor : CharacterBody3D
 	private float _formationIncomingDamageMultiplier = 1.0f;
 	private float _formationRangeBonus;
 	private string _formationBonusSummary = string.Empty;
+	// Global team buff from the monster-card album (卡片系統 collection bonus).
+	private float _cardAttackMultiplier = 1.0f;
+	private float _cardDefenseMultiplier = 1.0f;
+	private float _cardHealthMultiplier = 1.0f;
 	private bool _bossEnraged;
 	private int _bossAttackCounter;
 	private Vector3 _bossLastChasePosition;
@@ -812,6 +816,37 @@ public partial class SimpleActor : CharacterBody3D
 		}
 	}
 
+	// Applied to every deployed companion; scales with unique cards collected.
+	public void SetCardCollectionBonus(float attackMultiplier, float defenseMultiplier, float healthMultiplier)
+	{
+		_cardAttackMultiplier = attackMultiplier;
+		_cardDefenseMultiplier = defenseMultiplier;
+		_cardHealthMultiplier = healthMultiplier;
+		_buildStatsDirty = true;
+		if (_buildConfigured)
+		{
+			RecalculateBuildStats();
+		}
+	}
+
+	// Canonical card identity for this actor's model (one card per model), with a
+	// fallback to the species DisplayName key when no external model is present.
+	public string GetCardKey()
+	{
+		Node3D? model = GetNodeOrNull<Node3D>("ExternalModel");
+		string path = model?.SceneFilePath ?? string.Empty;
+		if (!string.IsNullOrEmpty(path))
+		{
+			string key = ExternalModelLibrary.CardKeyFromModelPath(path);
+			if (!string.IsNullOrWhiteSpace(key))
+			{
+				return key;
+			}
+		}
+
+		return DisplayName;
+	}
+
 	public void CycleBuildEquipment(EquipmentSlot slot)
 	{
 		BuildLoadout.CycleEquipment(slot);
@@ -1299,8 +1334,9 @@ public partial class SimpleActor : CharacterBody3D
 	{
 		EnsureBuildLoadout();
 		_buildStats = BuildCatalog.CalculateStats(this, _buildLoadout);
-		_buildStats.Attack = Mathf.Max(Mathf.RoundToInt(_buildStats.Attack * _formationAttackMultiplier), 1);
-		_buildStats.Defense = Mathf.Max(Mathf.RoundToInt(_buildStats.Defense * _formationDefenseMultiplier), 0);
+		_buildStats.Attack = Mathf.Max(Mathf.RoundToInt(_buildStats.Attack * _formationAttackMultiplier * _cardAttackMultiplier), 1);
+		_buildStats.Defense = Mathf.Max(Mathf.RoundToInt(_buildStats.Defense * _formationDefenseMultiplier * _cardDefenseMultiplier), 0);
+		_buildStats.MaxHealth = Mathf.Max(Mathf.RoundToInt(_buildStats.MaxHealth * _cardHealthMultiplier), 1);
 		_buildStats.AttackCooldownMultiplier *= _formationCooldownMultiplier;
 		_buildStats.IncomingDamageMultiplier *= _formationIncomingDamageMultiplier;
 		_buildStats.AttackRangeBonus += _formationRangeBonus;
@@ -2782,6 +2818,8 @@ public partial class SimpleActor : CharacterBody3D
 			if (ActorKind == "monster")
 			{
 				DropMonsterLoot(attacker._followTarget);
+				// Every monster yields its own exclusive name card (one per model).
+				attacker._followTarget.AwardMonsterCard(this);
 			}
 			if (IsBoss)
 			{

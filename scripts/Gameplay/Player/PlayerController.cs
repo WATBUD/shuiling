@@ -152,6 +152,9 @@ public partial class PlayerController : CharacterBody3D
 	private ComposePanel _composePanel = null!;
 	private Button _mailboxHudButton = null!;
 	private Panel _mailboxBadge = null!;
+	private CardAlbumPanel _cardAlbumPanel = null!;
+	private Button _cardAlbumHudButton = null!;
+	private Label _cardAlbumHudCountLabel = null!;
 	private SettingsPanel _settingsPanel = null!;
 	private PanelContainer _pauseMenuPanel = null!;
 	private MinimapPanel _minimapPanel = null!;
@@ -267,6 +270,7 @@ public partial class PlayerController : CharacterBody3D
 		CreateWarehousePanel();
 		CreateMailboxPanel();
 		CreateComposePanel();
+		CreateCardAlbumPanel();
 		CreateSettingsPanel();
 		CreatePauseMenuPanel();
 		InitializeStarterInventory();
@@ -278,6 +282,7 @@ public partial class PlayerController : CharacterBody3D
 		InitializeCaptureNetAmmo();
 		CreateCaptureAmmoHud();
 		CreateMailboxHud();
+		CreateCardAlbumHud();
 		CreateDamageFlashHud();
 		CreateInteractionPromptHud();
 		CreateSystemLogPanel();
@@ -377,6 +382,10 @@ public partial class PlayerController : CharacterBody3D
 			{
 				SetMailboxPanelVisible(false);
 			}
+			else if (_cardAlbumPanel.Visible)
+			{
+				SetCardAlbumPanelVisible(false);
+			}
 			else if (_partyPanel.Visible)
 			{
 				SetPartyPanelVisible(false);
@@ -394,7 +403,7 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
-		if (_pauseMenuPanel.Visible || _settingsPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _warehousePanel.Visible || _mailboxPanel.Visible || _composePanel.Visible)
+		if (_pauseMenuPanel.Visible || _settingsPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _warehousePanel.Visible || _mailboxPanel.Visible || _composePanel.Visible || _cardAlbumPanel.Visible)
 		{
 			return;
 		}

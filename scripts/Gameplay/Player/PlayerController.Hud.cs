@@ -148,6 +148,78 @@ public partial class PlayerController
 		_mailboxBadge.Visible = UnreadMailCount > 0;
 	}
 
+	private void CreateCardAlbumHud()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "CardAlbumHudLayer",
+			Layer = 25,
+		};
+		AddChild(layer);
+
+		_cardAlbumHudButton = new Button
+		{
+			Name = "CardAlbumHudButton",
+			Text = "卡",
+			TooltipText = LocaleText.T("card.title"),
+			MouseFilter = Control.MouseFilterEnum.Stop,
+			AnchorLeft = 1.0f,
+			AnchorRight = 1.0f,
+			AnchorTop = 1.0f,
+			AnchorBottom = 1.0f,
+			OffsetLeft = -86.0f,
+			OffsetRight = -30.0f,
+			OffsetTop = -244.0f,
+			OffsetBottom = -188.0f,
+		};
+		_cardAlbumHudButton.AddThemeFontSizeOverride("font_size", 24);
+		_cardAlbumHudButton.Pressed += () => SetCardAlbumPanelVisible(!_cardAlbumPanel.Visible);
+		layer.AddChild(_cardAlbumHudButton);
+
+		var countBadge = new Panel
+		{
+			Name = "CardAlbumCountBadge",
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			AnchorLeft = 1.0f,
+			AnchorRight = 1.0f,
+			AnchorTop = 1.0f,
+			AnchorBottom = 1.0f,
+			OffsetLeft = -26.0f,
+			OffsetRight = 4.0f,
+			OffsetTop = -18.0f,
+			OffsetBottom = 4.0f,
+		};
+		var badgeStyle = new StyleBoxFlat { BgColor = new Color(0.18f, 0.42f, 0.78f, 1.0f) };
+		badgeStyle.SetCornerRadiusAll(10);
+		countBadge.AddThemeStyleboxOverride("panel", badgeStyle);
+		_cardAlbumHudButton.AddChild(countBadge);
+
+		_cardAlbumHudCountLabel = new Label
+		{
+			Text = "0",
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			HorizontalAlignment = HorizontalAlignment.Center,
+			VerticalAlignment = VerticalAlignment.Center,
+			AnchorRight = 1.0f,
+			AnchorBottom = 1.0f,
+		};
+		_cardAlbumHudCountLabel.AddThemeFontSizeOverride("font_size", 12);
+		_cardAlbumHudCountLabel.AddThemeColorOverride("font_color", new Color(1.0f, 1.0f, 1.0f));
+		countBadge.AddChild(_cardAlbumHudCountLabel);
+
+		UpdateCardAlbumHud();
+	}
+
+	private void UpdateCardAlbumHud()
+	{
+		if (_cardAlbumHudCountLabel == null || !IsInstanceValid(_cardAlbumHudCountLabel))
+		{
+			return;
+		}
+
+		_cardAlbumHudCountLabel.Text = OwnedCardCount.ToString();
+	}
+
 	private void CreateDamageFlashHud()
 	{
 		var layer = new CanvasLayer
@@ -731,7 +803,7 @@ public partial class PlayerController
 
 	private void UpdateMouseModeForPanels()
 	{
-		Input.MouseMode = _pauseMenuPanel.Visible || _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _warehousePanel.Visible || _mailboxPanel.Visible || _composePanel.Visible || _settingsPanel.Visible || (_npcQuestDialog != null && _npcQuestDialog.Visible) || (_mapTravelDialog != null && _mapTravelDialog.Visible) || (_wildReturnDialog != null && _wildReturnDialog.Visible)
+		Input.MouseMode = _pauseMenuPanel.Visible || _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _warehousePanel.Visible || _mailboxPanel.Visible || _composePanel.Visible || _cardAlbumPanel.Visible || _settingsPanel.Visible || (_npcQuestDialog != null && _npcQuestDialog.Visible) || (_mapTravelDialog != null && _mapTravelDialog.Visible) || (_wildReturnDialog != null && _wildReturnDialog.Visible)
 			? Input.MouseModeEnum.Visible
 			: _cameraMode == CameraViewMode.GodView
 				? Input.MouseModeEnum.Visible

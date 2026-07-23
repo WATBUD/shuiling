@@ -62,6 +62,7 @@ public sealed class PlayerSaveData
 	public List<ActorSaveData> Companions { get; set; } = new();
 	public List<int> ActivePartyIndexes { get; set; } = new();
 	public List<MailMessageSaveData> Mailbox { get; set; } = new();
+	public List<string> OwnedCards { get; set; } = new();
 }
 
 public sealed class MercenaryOfferSaveData

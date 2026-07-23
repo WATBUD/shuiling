@@ -242,6 +242,9 @@ public partial class PlayerController
 			if (rangedBackAura) bonuses.Add(LocaleText.T("formation.bonus.backline"));
 			actor.SetFormationBonuses(attackMultiplier, defenseMultiplier, cooldownMultiplier, incomingMultiplier, rangeBonus, string.Join(" / ", bonuses));
 		}
+
+		// Party membership may have changed — re-apply the card collection buff too.
+		RefreshCardCollectionBonus();
 	}
 
 	private bool AreSlotsFilledByRole(int[] slots, string role)

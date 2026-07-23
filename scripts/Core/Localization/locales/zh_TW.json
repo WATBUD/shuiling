@@ -777,5 +777,13 @@
 	"system.mail.received": "你收到了來自 {0} 的信件！",
 	"system.mail.sent": "已寄出信件給 {0}。",
 	"system.mail.need_online": "需要連線才能寄送給其他玩家。",
-	"system.mail.need_recipient": "請先選擇收件人。"
+	"system.mail.need_recipient": "請先選擇收件人。",
+	"card.title": "卡冊",
+	"card.empty": "尚未收集任何怪物卡片，擊敗野外怪物即可獲得專屬卡片。",
+	"card.summary": "已收集 {0} 種 · 全隊加成 +{1}% 攻擊／防禦／生命",
+	"card.tag": "怪物卡片",
+	"card.unknown": "未知卡片",
+	"system.card.obtained": "獲得新卡片：{0}！",
+	"prompt.npc.deliver_card": "按 {0} 交出【{1}】卡片給 {2}",
+	"system.npc.card_accepted": "你把【{0}】卡片交給了 {1}，好感度大幅提升！"
 }

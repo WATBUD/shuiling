@@ -777,5 +777,13 @@
 	"system.mail.received": "You received a letter from {0}!",
 	"system.mail.sent": "Letter sent to {0}.",
 	"system.mail.need_online": "You must be online to send mail to other players.",
-	"system.mail.need_recipient": "Please choose a recipient first."
+	"system.mail.need_recipient": "Please choose a recipient first.",
+	"card.title": "Card Album",
+	"card.empty": "No monster cards yet. Defeat wild monsters to collect their cards.",
+	"card.summary": "Collected {0} · Team bonus +{1}% ATK / DEF / HP",
+	"card.tag": "Monster Card",
+	"card.unknown": "Unknown Card",
+	"system.card.obtained": "New card obtained: {0}!",
+	"prompt.npc.deliver_card": "Press {0} to give the {1} card to {2}",
+	"system.npc.card_accepted": "You gave the {0} card to {1} — affinity greatly increased!"
 }
