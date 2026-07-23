@@ -124,6 +124,21 @@ public partial class PlayerController
 		_composePanel.CloseRequested = () => SetComposePanelVisible(false);
 	}
 
+	private void CreateCardAlbumPanel()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "CardAlbumLayer",
+			Layer = 44,
+		};
+
+		AddChild(layer);
+		_cardAlbumPanel = new CardAlbumPanel();
+		layer.AddChild(_cardAlbumPanel);
+		_cardAlbumPanel.Bind(this);
+		_cardAlbumPanel.CloseRequested = () => SetCardAlbumPanelVisible(false);
+	}
+
 	private void CreateSettingsPanel()
 	{
 		var layer = new CanvasLayer
@@ -388,6 +403,28 @@ public partial class PlayerController
 		{
 			// Returning from compose refreshes the mailbox behind it.
 			_mailboxPanel.RefreshAll();
+		}
+
+		UpdateMouseModeForPanels();
+	}
+
+	private void SetCardAlbumPanelVisible(bool visible)
+	{
+		_cardAlbumPanel.SetPanelVisible(visible);
+		if (visible)
+		{
+			SetPauseMenuVisible(false, false);
+			_partyPanel.SetPanelVisible(false);
+			_inventoryPanel.SetPanelVisible(false);
+			_formationPanel.SetPanelVisible(false);
+			_merchantShopPanel.SetPanelVisible(false);
+			_mercenaryShopPanel.SetPanelVisible(false);
+			_warehousePanel.SetPanelVisible(false);
+			_mailboxPanel.SetPanelVisible(false);
+			_composePanel.SetPanelVisible(false);
+			_settingsPanel.SetPanelVisible(false);
+			CloseNpcQuestDialog();
+			CloseMapTravelDialog();
 		}
 
 		UpdateMouseModeForPanels();

@@ -29,6 +29,7 @@ public partial class PlayerController
 			BlacksmithStockItemIds = new List<string>(_blacksmithStockItemIds),
 			PetShopStockNameKeys = new List<string>(_petShopStockNameKeys),
 			Mailbox = ExportMailbox(),
+			OwnedCards = ExportCards(),
 		};
 
 		foreach (ContractCompanionOffer offer in _contractCompanionOffers)
@@ -159,6 +160,7 @@ public partial class PlayerController
 
 		RestoreNpcQuestSets(data);
 		RestoreMailbox(data);
+		RestoreCards(data);
 		if (GetParent() is World world)
 		{
 			RefreshFallenCompanionMapVisibility(world.ActiveMapId);

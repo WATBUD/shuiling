@@ -162,6 +162,43 @@ public static class ExternalModelLibrary
 			: PrettifyModelName(path);
 	}
 
+	// --- monster card identity (卡片系統) ------------------------------------
+	// One card per visually-distinct model: the canonical key collapses cosmetic
+	// variants so the same creature never yields two different cards.
+	public static string CardKeyFromModelPath(string path)
+	{
+		return string.IsNullOrWhiteSpace(path) ? string.Empty : CanonicalModelKey(path);
+	}
+
+	// Fixed, stable list of the named monster-card keys (used to assign each NPC a
+	// specific card it will accept for its quest). Ordered for determinism.
+	public static IReadOnlyList<string> KnownCardKeys
+	{
+		get
+		{
+			var keys = new List<string>(MonsterModelNameKeys.Keys);
+			keys.Sort(System.StringComparer.Ordinal);
+			return keys;
+		}
+	}
+
+	// Localized card name. Accepts a canonical model key; falls back to a raw
+	// locale key (species DisplayName) or a prettified token.
+	public static string LocalizedCardName(string cardKey)
+	{
+		if (string.IsNullOrWhiteSpace(cardKey))
+		{
+			return LocaleText.T("card.unknown");
+		}
+
+		if (MonsterModelNameKeys.TryGetValue(cardKey, out string? nameKey))
+		{
+			return LocaleText.T(nameKey);
+		}
+
+		return cardKey.Contains('.') ? LocaleText.T(cardKey) : PrettifyModelName(cardKey);
+	}
+
 	// Canonical identity of a model, ignoring folder, extension, the "player_"
 	// prefix and cosmetic/size tokens — so visually-identical models collapse.
 	private static string CanonicalModelKey(string path)
