@@ -74,6 +74,80 @@ public partial class PlayerController
 		UpdateCaptureAmmoHud();
 	}
 
+	private void CreateMailboxHud()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "MailboxHudLayer",
+			Layer = 25,
+		};
+		AddChild(layer);
+
+		_mailboxHudButton = new Button
+		{
+			Name = "MailboxHudButton",
+			Text = "✉",
+			TooltipText = LocaleText.T("mail.title"),
+			MouseFilter = Control.MouseFilterEnum.Stop,
+			AnchorLeft = 1.0f,
+			AnchorRight = 1.0f,
+			AnchorTop = 1.0f,
+			AnchorBottom = 1.0f,
+			OffsetLeft = -86.0f,
+			OffsetRight = -30.0f,
+			OffsetTop = -178.0f,
+			OffsetBottom = -122.0f,
+		};
+		_mailboxHudButton.AddThemeFontSizeOverride("font_size", 26);
+		_mailboxHudButton.Pressed += () => SetMailboxPanelVisible(!_mailboxPanel.Visible);
+		layer.AddChild(_mailboxHudButton);
+
+		// Unread "!" badge pinned to the button's top-right corner.
+		_mailboxBadge = new Panel
+		{
+			Name = "MailboxBadge",
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			Visible = false,
+			AnchorLeft = 1.0f,
+			AnchorRight = 1.0f,
+			AnchorTop = 0.0f,
+			AnchorBottom = 0.0f,
+			OffsetLeft = -18.0f,
+			OffsetRight = 4.0f,
+			OffsetTop = -6.0f,
+			OffsetBottom = 16.0f,
+		};
+		var badgeStyle = new StyleBoxFlat { BgColor = new Color(0.90f, 0.22f, 0.20f, 1.0f) };
+		badgeStyle.SetCornerRadiusAll(11);
+		_mailboxBadge.AddThemeStyleboxOverride("panel", badgeStyle);
+		_mailboxHudButton.AddChild(_mailboxBadge);
+
+		var badgeLabel = new Label
+		{
+			Text = "!",
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			HorizontalAlignment = HorizontalAlignment.Center,
+			VerticalAlignment = VerticalAlignment.Center,
+			AnchorRight = 1.0f,
+			AnchorBottom = 1.0f,
+		};
+		badgeLabel.AddThemeFontSizeOverride("font_size", 15);
+		badgeLabel.AddThemeColorOverride("font_color", new Color(1.0f, 1.0f, 1.0f));
+		_mailboxBadge.AddChild(badgeLabel);
+
+		UpdateMailboxHud();
+	}
+
+	private void UpdateMailboxHud()
+	{
+		if (_mailboxBadge == null || !IsInstanceValid(_mailboxBadge))
+		{
+			return;
+		}
+
+		_mailboxBadge.Visible = UnreadMailCount > 0;
+	}
+
 	private void CreateDamageFlashHud()
 	{
 		var layer = new CanvasLayer
@@ -657,7 +731,7 @@ public partial class PlayerController
 
 	private void UpdateMouseModeForPanels()
 	{
-		Input.MouseMode = _pauseMenuPanel.Visible || _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _warehousePanel.Visible || _settingsPanel.Visible || (_npcQuestDialog != null && _npcQuestDialog.Visible) || (_mapTravelDialog != null && _mapTravelDialog.Visible) || (_wildReturnDialog != null && _wildReturnDialog.Visible)
+		Input.MouseMode = _pauseMenuPanel.Visible || _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _warehousePanel.Visible || _mailboxPanel.Visible || _composePanel.Visible || _settingsPanel.Visible || (_npcQuestDialog != null && _npcQuestDialog.Visible) || (_mapTravelDialog != null && _mapTravelDialog.Visible) || (_wildReturnDialog != null && _wildReturnDialog.Visible)
 			? Input.MouseModeEnum.Visible
 			: _cameraMode == CameraViewMode.GodView
 				? Input.MouseModeEnum.Visible

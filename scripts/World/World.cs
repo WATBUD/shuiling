@@ -2550,6 +2550,7 @@ public partial class World : Node3D
 			Player = _player.ExportSaveData(),
 			UnlockedMapTiers = new Dictionary<string, int>(_wildMapUnlockedTiersById),
 			SelectedMapTiers = new Dictionary<string, int>(_wildMapSelectedTiersById),
+			PendingMail = NetworkManager.Instance?.ExportPendingMail() ?? new List<PendingMailSaveData>(),
 		};
 	}
 
@@ -2618,6 +2619,7 @@ public partial class World : Node3D
 
 		_player.ApplySaveData(data.Player, loadedCompanions);
 		_player.TeleportPartyTo(FromSaveVector(data.PlayerPosition));
+		NetworkManager.Instance?.ImportPendingMail(data.PendingMail);
 		UpdateActorMapActivity();
 	}
 

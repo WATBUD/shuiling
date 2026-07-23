@@ -10,6 +10,28 @@ public sealed class SaveGameData
 	// World Tier progression per wild map id (docs/world_progression.md).
 	public Dictionary<string, int> UnlockedMapTiers { get; set; } = new();
 	public Dictionary<string, int> SelectedMapTiers { get; set; } = new();
+	// Host-only: gift mail addressed to players who were not connected when it was
+	// sent. Delivered when that player next joins this host (keyed by name).
+	public List<PendingMailSaveData> PendingMail { get; set; } = new();
+}
+
+// A single gift-mail letter kept in a player's mailbox.
+public sealed class MailMessageSaveData
+{
+	public string Id { get; set; } = string.Empty;
+	public string SenderName { get; set; } = string.Empty;
+	public double SentUnix { get; set; }
+	public string Body { get; set; } = string.Empty;
+	public Dictionary<string, int> AttachedItems { get; set; } = new();
+	public bool IsRead { get; set; }
+	public bool IsClaimed { get; set; }
+}
+
+// Host outbox entry: a letter waiting for an offline recipient (matched by name).
+public sealed class PendingMailSaveData
+{
+	public string RecipientName { get; set; } = string.Empty;
+	public MailMessageSaveData Mail { get; set; } = new();
 }
 
 public sealed class PlayerSaveData
@@ -39,6 +61,7 @@ public sealed class PlayerSaveData
 	public List<MercenaryOfferSaveData> MercenaryOffers { get; set; } = new();
 	public List<ActorSaveData> Companions { get; set; } = new();
 	public List<int> ActivePartyIndexes { get; set; } = new();
+	public List<MailMessageSaveData> Mailbox { get; set; } = new();
 }
 
 public sealed class MercenaryOfferSaveData
