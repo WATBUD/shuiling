@@ -170,6 +170,33 @@ public static class ExternalModelLibrary
 		return string.IsNullOrWhiteSpace(path) ? string.Empty : CanonicalModelKey(path);
 	}
 
+	private static Dictionary<string, string>? _cardKeyToModelPath;
+
+	// Reverse lookup: canonical card key → a concrete model path, so the album can
+	// instantiate a 3D preview from a stored card key. Cached after first build.
+	public static string GetModelPathForCardKey(string cardKey)
+	{
+		if (string.IsNullOrWhiteSpace(cardKey))
+		{
+			return string.Empty;
+		}
+
+		if (_cardKeyToModelPath == null)
+		{
+			_cardKeyToModelPath = new Dictionary<string, string>();
+			foreach ((string path, string _) in GetAvailableCharacterModels())
+			{
+				string key = CanonicalModelKey(path);
+				if (!_cardKeyToModelPath.ContainsKey(key))
+				{
+					_cardKeyToModelPath[key] = path;
+				}
+			}
+		}
+
+		return _cardKeyToModelPath.TryGetValue(cardKey, out string? modelPath) ? modelPath : string.Empty;
+	}
+
 	// Fixed, stable list of the named monster-card keys (used to assign each NPC a
 	// specific card it will accept for its quest). Ordered for determinism.
 	public static IReadOnlyList<string> KnownCardKeys
