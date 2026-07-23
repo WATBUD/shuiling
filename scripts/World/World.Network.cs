@@ -86,7 +86,7 @@ public partial class World
 		int netId = ++_nextNetMonsterId;
 		actor.NetworkMonsterId = netId;
 		_netMonstersById[netId] = new NetMonsterInfo(actor, visualScale, auraColor);
-		Net!.BroadcastMonsterSpawn(netId, actor.MapId, actor.DisplayName, actor.Level, actor.WorldTier,
+		Net!.BroadcastMonsterSpawn(netId, actor.MapId, actor.DisplayName, actor.Level, actor.WorldTier, actor.Rarity,
 			actor.MaxHealth, actor.CurrentHealth, actor.IsBoss, actor.BossNameKey, visualScale, auraColor, actor.Position);
 	}
 
@@ -105,7 +105,7 @@ public partial class World
 				continue;
 			}
 
-			Net!.SendMonsterSpawnTo(peerId, entry.Key, actor.MapId, actor.DisplayName, actor.Level, actor.WorldTier,
+			Net!.SendMonsterSpawnTo(peerId, entry.Key, actor.MapId, actor.DisplayName, actor.Level, actor.WorldTier, actor.Rarity,
 				actor.MaxHealth, actor.CurrentHealth, actor.IsBoss, actor.BossNameKey,
 				entry.Value.VisualScale, entry.Value.AuraColor, actor.Position);
 		}
@@ -224,7 +224,7 @@ public partial class World
 
 	// ---------------------------------------------------------------- client side
 
-	public void HandleNetworkMonsterSpawn(int netId, string mapId, string nameKey, int level, int tier,
+	public void HandleNetworkMonsterSpawn(int netId, string mapId, string nameKey, int level, int tier, int rarity,
 		int maxHealth, int health, bool isBoss, string bossNameKey, float visualScale, Color auraColor, Vector3 position)
 	{
 		if (!IsNetworkClientWorld)
@@ -258,9 +258,29 @@ public partial class World
 			AddBossAura(actor, auraColor, visualScale);
 			_wildBossesByInstance[WildInstanceKey(mapId, tier)] = actor;
 		}
-		else if (visualScale > 1.001f)
+		else
 		{
-			ScaleActorVisualChildren(actor, visualScale);
+			if (visualScale > 1.001f)
+			{
+				ScaleActorVisualChildren(actor, visualScale);
+			}
+
+			// Rarity is host-rolled; the client only mirrors the display (nameplate
+			// colour + star, aura and bigger body). Stats already arrive via health.
+			if (rarity > MonsterRarity.Common)
+			{
+				actor.Rarity = rarity;
+				float rarityScale = MonsterRarity.VisualScale(rarity);
+				if (rarityScale > 1.001f)
+				{
+					ScaleActorVisualChildren(actor, rarityScale);
+				}
+				if (MonsterRarity.HasAura(rarity))
+				{
+					AddBossAura(actor, MonsterRarity.Color(rarity), rarityScale);
+				}
+				actor.RefreshNameplateDisplay();
+			}
 		}
 
 		actor.Position = position;

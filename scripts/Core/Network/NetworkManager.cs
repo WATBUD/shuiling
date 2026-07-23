@@ -355,31 +355,31 @@ public partial class NetworkManager : Node
 	// ---------------------------------------------------------------- monsters
 
 	// Host → clients: a monster now exists (also used for join snapshots).
-	public void BroadcastMonsterSpawn(int netId, string mapId, string nameKey, int level, int tier,
+	public void BroadcastMonsterSpawn(int netId, string mapId, string nameKey, int level, int tier, int rarity,
 		int maxHealth, int health, bool isBoss, string bossNameKey, float visualScale, Color auraColor, Vector3 position)
 	{
 		if (IsHost)
 		{
-			Rpc(MethodName.ClientMonsterSpawn, netId, mapId, nameKey, level, tier, maxHealth, health, isBoss, bossNameKey, visualScale, auraColor, position);
+			Rpc(MethodName.ClientMonsterSpawn, netId, mapId, nameKey, level, tier, rarity, maxHealth, health, isBoss, bossNameKey, visualScale, auraColor, position);
 		}
 	}
 
-	public void SendMonsterSpawnTo(long peerId, int netId, string mapId, string nameKey, int level, int tier,
+	public void SendMonsterSpawnTo(long peerId, int netId, string mapId, string nameKey, int level, int tier, int rarity,
 		int maxHealth, int health, bool isBoss, string bossNameKey, float visualScale, Color auraColor, Vector3 position)
 	{
 		if (IsHost)
 		{
-			RpcId(peerId, MethodName.ClientMonsterSpawn, netId, mapId, nameKey, level, tier, maxHealth, health, isBoss, bossNameKey, visualScale, auraColor, position);
+			RpcId(peerId, MethodName.ClientMonsterSpawn, netId, mapId, nameKey, level, tier, rarity, maxHealth, health, isBoss, bossNameKey, visualScale, auraColor, position);
 		}
 	}
 
 	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-	private void ClientMonsterSpawn(int netId, string mapId, string nameKey, int level, int tier,
+	private void ClientMonsterSpawn(int netId, string mapId, string nameKey, int level, int tier, int rarity,
 		int maxHealth, int health, bool isBoss, string bossNameKey, float visualScale, Color auraColor, Vector3 position)
 	{
 		if (ActiveWorld != null && IsInstanceValid(ActiveWorld))
 		{
-			ActiveWorld.HandleNetworkMonsterSpawn(netId, mapId, nameKey, level, tier, maxHealth, health, isBoss, bossNameKey, visualScale, auraColor, position);
+			ActiveWorld.HandleNetworkMonsterSpawn(netId, mapId, nameKey, level, tier, rarity, maxHealth, health, isBoss, bossNameKey, visualScale, auraColor, position);
 		}
 	}
 

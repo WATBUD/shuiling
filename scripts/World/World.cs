@@ -1612,6 +1612,23 @@ public partial class World : Node3D
 			actor.AttackCooldown *= WorldTierCatalog.GetAttackCooldownFactor(tier);
 		}
 
+		// Roll rarity: boosts stats/drops and marks the monster in the field
+		// (nameplate colour + star, and an aura/bigger body for elite/alpha).
+		int rarity = MonsterRarity.Roll(_rng);
+		if (rarity > MonsterRarity.Common)
+		{
+			actor.ApplyRarity(rarity);
+			float rarityScale = MonsterRarity.VisualScale(rarity);
+			if (rarityScale > 1.001f)
+			{
+				ScaleActorVisualChildren(actor, rarityScale);
+			}
+			if (MonsterRarity.HasAura(rarity))
+			{
+				AddBossAura(actor, MonsterRarity.Color(rarity), rarityScale);
+			}
+		}
+
 		Vector3 spawnPosition = FindOpenMonsterSpawnPosition();
 		actor.Position = spawnPosition;
 		actor.HomePosition = spawnPosition;
