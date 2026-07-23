@@ -93,6 +93,37 @@ public partial class PlayerController
 		_warehousePanel.CloseRequested = () => SetWarehousePanelVisible(false);
 	}
 
+	private void CreateMailboxPanel()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "MailboxLayer",
+			Layer = 42,
+		};
+
+		AddChild(layer);
+		_mailboxPanel = new MailboxPanel();
+		layer.AddChild(_mailboxPanel);
+		_mailboxPanel.Bind(this);
+		_mailboxPanel.CloseRequested = () => SetMailboxPanelVisible(false);
+		_mailboxPanel.ComposeRequested = () => SetComposePanelVisible(true);
+	}
+
+	private void CreateComposePanel()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "ComposeLayer",
+			Layer = 43,
+		};
+
+		AddChild(layer);
+		_composePanel = new ComposePanel();
+		layer.AddChild(_composePanel);
+		_composePanel.Bind(this);
+		_composePanel.CloseRequested = () => SetComposePanelVisible(false);
+	}
+
 	private void CreateSettingsPanel()
 	{
 		var layer = new CanvasLayer
@@ -311,6 +342,52 @@ public partial class PlayerController
 			_settingsPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
+		}
+
+		UpdateMouseModeForPanels();
+	}
+
+	private void SetMailboxPanelVisible(bool visible)
+	{
+		_mailboxPanel.SetPanelVisible(visible);
+		if (visible)
+		{
+			SetPauseMenuVisible(false, false);
+			_partyPanel.SetPanelVisible(false);
+			_inventoryPanel.SetPanelVisible(false);
+			_formationPanel.SetPanelVisible(false);
+			_merchantShopPanel.SetPanelVisible(false);
+			_mercenaryShopPanel.SetPanelVisible(false);
+			_warehousePanel.SetPanelVisible(false);
+			_composePanel.SetPanelVisible(false);
+			_settingsPanel.SetPanelVisible(false);
+			CloseNpcQuestDialog();
+			CloseMapTravelDialog();
+		}
+
+		UpdateMouseModeForPanels();
+	}
+
+	private void SetComposePanelVisible(bool visible)
+	{
+		_composePanel.SetPanelVisible(visible);
+		if (visible)
+		{
+			SetPauseMenuVisible(false, false);
+			_partyPanel.SetPanelVisible(false);
+			_inventoryPanel.SetPanelVisible(false);
+			_formationPanel.SetPanelVisible(false);
+			_merchantShopPanel.SetPanelVisible(false);
+			_mercenaryShopPanel.SetPanelVisible(false);
+			_warehousePanel.SetPanelVisible(false);
+			_settingsPanel.SetPanelVisible(false);
+			CloseNpcQuestDialog();
+			CloseMapTravelDialog();
+		}
+		else if (_mailboxPanel != null && IsInstanceValid(_mailboxPanel) && _mailboxPanel.Visible)
+		{
+			// Returning from compose refreshes the mailbox behind it.
+			_mailboxPanel.RefreshAll();
 		}
 
 		UpdateMouseModeForPanels();
