@@ -10,7 +10,6 @@ public partial class CompanionInfoCard : PanelContainer
 	private Label _meta = null!;
 	private Label _mode = null!;
 	private Label _mood = null!;
-	private Label _ability = null!;
 	private Label _traitsTitle = null!;
 	private Label _equipmentTitle = null!;
 	private Label _skillGemsTitle = null!;
@@ -68,7 +67,6 @@ public partial class CompanionInfoCard : PanelContainer
 		metaRows.AddChild(_mood);
 		_meta = MakeLabel(12, new Color(0.74f, 0.88f, 0.80f));
 		metaRows.AddChild(_meta);
-		_ability = AddInteractiveLabel(metaRows);
 		_traitsTitle = MakeLabel(12, new Color(0.74f, 0.88f, 0.80f), "build.traits");
 		metaRows.AddChild(_traitsTitle);
 		_traitFlow = AddFlow(metaRows);
@@ -89,7 +87,6 @@ public partial class CompanionInfoCard : PanelContainer
 			MaxHeightRatio = 0.72f,
 		};
 		AddChild(_tooltip);
-		BindTooltip(_ability, BuildAbilityTooltip);
 		SetActor(_actor);
 	}
 
@@ -139,7 +136,7 @@ public partial class CompanionInfoCard : PanelContainer
 			_title.Text = LocaleText.T("inventory.companion_info");
 			_experienceBar.Value = 0.0;
 			_experience.Text = LocaleText.T("inventory.no_companions");
-			_stats.Text = _meta.Text = _mood.Text = _ability.Text = string.Empty;
+			_stats.Text = _meta.Text = _mood.Text = string.Empty;
 			ClearFlow(_traitFlow);
 			ClearFlow(_equipmentFlow);
 			ClearFlow(_skillGemFlow);
@@ -161,10 +158,11 @@ public partial class CompanionInfoCard : PanelContainer
 		_experienceBar.MaxValue = Mathf.Max(_actor.ExperienceToNextLevel, 1);
 		_experienceBar.Value = Mathf.Clamp(_actor.Experience, 0, _actor.ExperienceToNextLevel);
 		_experience.Text = $"{LocaleText.T("stat.experience")} {_actor.Experience}/{_actor.ExperienceToNextLevel}";
+		int rebirthBonus = _actor.RebirthTotalStatBonus;
 		_stats.Text = string.Join("\n",
-			$"HP {(_actor.IsDefeated ? 0 : _actor.CurrentHealth)} / {_actor.EffectiveMaxHealth}",
-			$"{LocaleText.T("stat.attack")} {LocaleText.F("build.effective_stat", _actor.EffectiveAttack, _actor.Attack)}",
-			$"{LocaleText.T("stat.defense")} {LocaleText.F("build.effective_stat", _actor.EffectiveDefense, _actor.Defense)}",
+			BuildHealthStatText(_actor, rebirthBonus),
+			BuildRebirthStatText("stat.attack", _actor.EffectiveAttack, _actor.Attack, _actor.OriginalAttackWithoutRebirth, rebirthBonus),
+			BuildRebirthStatText("stat.defense", _actor.EffectiveDefense, _actor.Defense, _actor.OriginalDefenseWithoutRebirth, rebirthBonus),
 			$"{LocaleText.T("stat.move_speed")} {_actor.EffectiveMoveSpeed:0.0}",
 			LocaleText.F("stat.attack_speed_value", GetAttackSpeed(_actor.EffectiveAttackCooldown).ToString("0.00")),
 			$"{LocaleText.T("tooltip.attack_range")} {_actor.EffectiveAttackRange:0.0}",
@@ -172,13 +170,19 @@ public partial class CompanionInfoCard : PanelContainer
 			$"{LocaleText.T("tooltip.crit_chance")} {stats.CritChance * 100.0f:0.#}%",
 			$"{LocaleText.T("stat.growth")} {_actor.GrowthName}",
 			$"{LocaleText.T("stat.state")} {_actor.StateName}");
-		_meta.Text = string.Join("\n",
+		var metaLines = new List<string>
+		{
 			$"{_actor.TypeName} / {_actor.CombatRangeName}",
 			$"{LocaleText.T("stat.role")} {_actor.CombatRoleName}",
-			$"{LocaleText.T("stat.affinity")} {_actor.Affinity} / 100");
+			$"{LocaleText.T("stat.affinity")} {_actor.Affinity} / 100",
+		};
+		if (rebirthBonus > 0)
+		{
+			metaLines.Add(BuildRebirthSummary(_actor, rebirthBonus));
+		}
+		_meta.Text = string.Join("\n", metaLines);
 		_mood.Text = $"{LocaleText.T("stat.mood")}：{_actor.MoodName}";
 		_mood.Visible = true;
-		_ability.Text = $"{LocaleText.T("stat.ability")} {_actor.LocalizedSpecialAbility} {LocaleText.T("actor.level_prefix")}{_actor.AbilityRank}";
 		string detailSignature = BuildDetailSignature(_actor);
 		if (_detailSignature != detailSignature)
 		{
@@ -220,14 +224,12 @@ public partial class CompanionInfoCard : PanelContainer
 			$"{LocaleText.T("stat.role")} {LocaleText.T("role.dps")} / {LocaleText.T("personality.brave")}",
 			LocaleText.F("inventory.gold", _player.Gold),
 			LocaleText.F("party.title", _player.ActiveParty.Count, _player.ActivePartyLimit, _player.AvailableCompanionCount));
-		_ability.Text = string.Empty;
 		_mode.Visible = false;
 		_mood.Visible = false;
 		SetPetSectionsVisible(true);
-		_ability.Visible = false;
 		_traitsTitle.Text = LocaleText.T("build.traits");
 		_equipmentTitle.Text = LocaleText.T("build.equipment");
-		_skillGemsTitle.Text = LocaleText.T("stat.ability");
+		_skillGemsTitle.Text = LocaleText.T("build.skill_gems");
 		string playerSignature = $"player|{_player.Level}|{_player.Attack}|{_player.Defense}|{_player.WalkSpeed}|{_player.SprintSpeed}|{_player.AttackCooldown}|{_player.CaptureNetCapacity}|{_player.CaptureNetRechargeSeconds}";
 		if (_detailSignature != playerSignature)
 		{
@@ -259,13 +261,44 @@ public partial class CompanionInfoCard : PanelContainer
 
 	private void SetPetSectionsVisible(bool visible)
 	{
-		_ability.Visible = visible;
 		_traitsTitle.Visible = visible;
 		_traitFlow.Visible = visible;
 		_equipmentTitle.Visible = visible;
 		_equipmentFlow.Visible = visible;
 		_skillGemsTitle.Visible = visible;
 		_skillGemFlow.Visible = visible;
+	}
+
+	private static string BuildHealthStatText(SimpleActor actor, int rebirthBonus)
+	{
+		int currentHealth = actor.IsDefeated ? 0 : actor.CurrentHealth;
+		if (rebirthBonus <= 0)
+		{
+			return $"HP {currentHealth} / {actor.EffectiveMaxHealth}";
+		}
+
+		return LocaleText.F(
+			"build.rebirth_health_stat",
+			currentHealth,
+			actor.EffectiveMaxHealth,
+			actor.OriginalMaxHealthWithoutRebirth,
+			rebirthBonus);
+	}
+
+	private static string BuildRebirthStatText(string labelKey, int effectiveValue, int baseValue, int originalValue, int rebirthBonus)
+	{
+		string label = LocaleText.T(labelKey);
+		if (rebirthBonus <= 0)
+		{
+			return $"{label} {LocaleText.F("build.effective_stat", effectiveValue, baseValue)}";
+		}
+
+		return $"{label} {LocaleText.F("build.rebirth_effective_stat", effectiveValue, originalValue, rebirthBonus)}";
+	}
+
+	private static string BuildRebirthSummary(SimpleActor actor, int rebirthBonus)
+	{
+		return LocaleText.F("stat.rebirth_summary", actor.RebirthCount, rebirthBonus, rebirthBonus, rebirthBonus);
 	}
 
 	private void CycleMode()
@@ -329,8 +362,10 @@ public partial class CompanionInfoCard : PanelContainer
 		CompanionBuildLoadout loadout = actor.BuildLoadout;
 		return string.Join("|",
 			actor.GetInstanceId(),
-			actor.SpecialAbility,
-			actor.AbilityRank,
+			actor.RebirthCount,
+			actor.MaxHealth,
+			actor.Attack,
+			actor.Defense,
 			string.Join(",", actor.TraitKeys),
 			loadout.HelmetId,
 			loadout.WeaponId,
@@ -421,28 +456,6 @@ public partial class CompanionInfoCard : PanelContainer
 			_tooltip.ShowTooltip(title, body, this);
 		};
 		control.MouseExited += () => _tooltip.HideTooltip();
-	}
-
-	private (string, string) BuildAbilityTooltip()
-	{
-		if (_actor == null) return (string.Empty, string.Empty);
-		BuildStats stats = _actor.CurrentBuildStats;
-		ProjectileBehaviorProfile behavior = stats.Behavior;
-		var lines = new List<string>
-		{
-			$"{_actor.LocalizedSpecialAbility} {LocaleText.T("actor.level_prefix")}{_actor.AbilityRank}",
-			$"{LocaleText.T("stat.attack")} {_actor.EffectiveAttack}",
-			$"{LocaleText.T("tooltip.attack_range")} {_actor.EffectiveAttackRange:0.0}",
-			$"{LocaleText.T("tooltip.attack_cooldown")} {_actor.EffectiveAttackCooldown:0.00}s",
-		};
-		if (stats.HasHealSkill) lines.Add(LocaleText.T("tooltip.enable_heal"));
-		if (stats.HasShieldSkill) lines.Add(LocaleText.T("tooltip.enable_shield"));
-		if (behavior.ExtraProjectiles > 0) lines.Add($"Multi +{behavior.ExtraProjectiles}");
-		if (behavior.SplitCount > 0) lines.Add($"Split {behavior.SplitCount}");
-		if (behavior.ChainBounces > 0) lines.Add($"Chain {behavior.ChainBounces}");
-		if (behavior.PierceCount > 0) lines.Add($"Pierce {behavior.PierceCount}");
-		if (behavior.ExplosionRadius > 0.0f) lines.Add($"Explosion {behavior.ExplosionRadius:0.0}m");
-		return (LocaleText.T("stat.ability"), string.Join("\n", lines));
 	}
 
 	private (string, string) BuildTraitsTooltip()

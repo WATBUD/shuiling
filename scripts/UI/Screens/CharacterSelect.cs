@@ -126,7 +126,7 @@ public partial class CharacterSelect : Control
 		{
 			Text = LocaleText.T("world.default_name"),
 			CustomMinimumSize = new Vector2(180.0f, 30.0f),
-			MaxLength = 24,
+			MaxLength = GameLaunchOptions.MaxWorldNameLength,
 			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 		};
 		_worldNameEdit.TextChanged += _ => UpdateStartEnabled();

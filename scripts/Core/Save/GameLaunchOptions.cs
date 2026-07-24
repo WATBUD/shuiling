@@ -1,5 +1,7 @@
 public static class GameLaunchOptions
 {
+	public const int MaxWorldNameLength = 20;
+
 	public static bool LoadSaveOnWorldReady { get; set; }
 
 	// The world slot the running game saves to / loads from.
@@ -30,7 +32,10 @@ public static class GameLaunchOptions
 	public static void StartNewWorld(string worldId, string worldName, int seed, string modelPath, string playerName)
 	{
 		ActiveWorldId = worldId;
-		NewWorldName = worldName;
+		string normalizedWorldName = worldName.Trim();
+		NewWorldName = normalizedWorldName.Length > MaxWorldNameLength
+			? normalizedWorldName[..MaxWorldNameLength]
+			: normalizedWorldName;
 		ActiveSeed = seed;
 		NewGamePlayerModelPath = modelPath;
 		NewGamePlayerName = playerName;
