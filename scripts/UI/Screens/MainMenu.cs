@@ -1,23 +1,29 @@
 using Godot;
+using System.Collections.Generic;
 
 public partial class MainMenu : Control
 {
-	private Label _saveInfoLabel = null!;
-	private Button _loadButton = null!;
-
 	// Multiplayer dialogs (host-authoritative co-op, see NetworkManager.cs).
+	private PanelContainer? _worldListDialog;
+	private PanelContainer? _newWorldModeDialog;
+	private VBoxContainer _worldListContainer = null!;
+	private Label _worldListEmptyLabel = null!;
 	private PanelContainer? _hostDialog;
 	private PanelContainer? _joinDialog;
 	private LineEdit _hostPortEdit = null!;
 	private LineEdit _joinAddressEdit = null!;
 	private LineEdit _joinPortEdit = null!;
 	private Label _hostStatusLabel = null!;
+	private Label _hostWorldLabel = null!;
 	private Label _joinStatusLabel = null!;
-	private Button _hostNewButton = null!;
-	private Button _hostLoadButton = null!;
+	private Button _hostStartButton = null!;
 	private Button _hostTestButton = null!;
 	private Label _hostDiagLabel = null!;
 	private Button _joinConfirmButton = null!;
+
+	// The world chosen from the list to host.
+	private string _hostWorldId = string.Empty;
+	private int _hostWorldSeed;
 
 	public override void _Ready()
 	{
@@ -35,6 +41,18 @@ public partial class MainMenu : Control
 		{
 			NetworkManager.Instance.JoinWelcomed += OnJoinWelcomed;
 			NetworkManager.Instance.JoinFailed += OnJoinFailed;
+		}
+
+		// Coming back from character-select's Cancel: reopen only the previous
+		// screen (the single/multiplayer window), matching the forward flow where
+		// the world list is hidden while that window is shown.
+		if (GameLaunchOptions.ReturnToNewWorldMode)
+		{
+			GameLaunchOptions.ReturnToNewWorldMode = false;
+			if (_newWorldModeDialog != null)
+			{
+				_newWorldModeDialog.Visible = true;
+			}
 		}
 	}
 
@@ -59,10 +77,6 @@ public partial class MainMenu : Control
 			AnchorRight = 1.0f,
 			AnchorTop = 0.0f,
 			AnchorBottom = 1.0f,
-			OffsetLeft = 0.0f,
-			OffsetRight = 0.0f,
-			OffsetTop = 0.0f,
-			OffsetBottom = 0.0f,
 		};
 		AddChild(background);
 
@@ -74,8 +88,8 @@ public partial class MainMenu : Control
 			AnchorBottom = 0.5f,
 			OffsetLeft = -220.0f,
 			OffsetRight = 220.0f,
-			OffsetTop = -235.0f,
-			OffsetBottom = 235.0f,
+			OffsetTop = -200.0f,
+			OffsetBottom = 200.0f,
 		};
 		root.AddThemeConstantOverride("separation", 16);
 		AddChild(root);
@@ -90,27 +104,9 @@ public partial class MainMenu : Control
 		title.AddThemeColorOverride("font_color", new Color(1.0f, 0.94f, 0.76f));
 		root.AddChild(title);
 
-		_saveInfoLabel = new Label
-		{
-			HorizontalAlignment = HorizontalAlignment.Center,
-			AutowrapMode = TextServer.AutowrapMode.WordSmart,
-			SizeFlagsHorizontal = SizeFlags.ExpandFill,
-		};
-		_saveInfoLabel.AddThemeFontSizeOverride("font_size", 16);
-		_saveInfoLabel.AddThemeColorOverride("font_color", new Color(0.78f, 0.88f, 1.0f));
-		root.AddChild(_saveInfoLabel);
-
-		Button newGameButton = MakeMenuButton(LocaleText.T("main_menu.singleplayer"));
-		newGameButton.Pressed += StartNewGame;
-		root.AddChild(newGameButton);
-
-		_loadButton = MakeMenuButton(LocaleText.T("main_menu.load_game"));
-		_loadButton.Pressed += LoadGame;
-		root.AddChild(_loadButton);
-
-		Button hostButton = MakeMenuButton(LocaleText.T("main_menu.host_server"));
-		hostButton.Pressed += ShowHostDialog;
-		root.AddChild(hostButton);
+		Button playButton = MakeMenuButton(LocaleText.T("main_menu.play"));
+		playButton.Pressed += ShowWorldList;
+		root.AddChild(playButton);
 
 		Button joinButton = MakeMenuButton(LocaleText.T("main_menu.join_server"));
 		joinButton.Pressed += ShowJoinDialog;
@@ -120,14 +116,213 @@ public partial class MainMenu : Control
 		quitButton.Pressed += () => GetTree().Quit();
 		root.AddChild(quitButton);
 
+		BuildWorldListDialog();
+		BuildNewWorldModeDialog();
 		BuildHostDialog();
 		BuildJoinDialog();
-		RefreshSaveInfo();
 	}
 
-	// ---------------------------------------------------------------- multiplayer dialogs
+	// Shared "new world" window: pick single-player or multiplayer BEFORE going to
+	// character creation.
+	private void BuildNewWorldModeDialog()
+	{
+		_newWorldModeDialog = MakeDialogPanel("world.mode_title", out VBoxContainer content);
 
-	private PanelContainer MakeDialogPanel(string titleKey, out VBoxContainer content)
+		var hint = new Label
+		{
+			Text = LocaleText.T("world.mode_hint"),
+			HorizontalAlignment = HorizontalAlignment.Center,
+			AutowrapMode = TextServer.AutowrapMode.WordSmart,
+		};
+		hint.AddThemeFontSizeOverride("font_size", 14);
+		hint.AddThemeColorOverride("font_color", new Color(0.72f, 0.82f, 0.92f));
+		content.AddChild(hint);
+
+		Button single = MakeMenuButton(LocaleText.T("world.mode.single_play"));
+		single.Pressed += () => ChooseNewWorldMode(false);
+		content.AddChild(single);
+
+		Button multi = MakeMenuButton(LocaleText.T("world.mode.multi_play"));
+		multi.Pressed += () => ChooseNewWorldMode(true);
+		content.AddChild(multi);
+
+		Button cancel = MakeMenuButton(LocaleText.T("dialog.button.cancel"));
+		cancel.Pressed += () =>
+		{
+			_newWorldModeDialog!.Visible = false;
+			ShowWorldList();
+		};
+		content.AddChild(cancel);
+	}
+
+	private void ChooseNewWorldMode(bool multiplayer)
+	{
+		NetworkManager.Instance?.ResetSession();
+		GameLaunchOptions.NewWorldIsMultiplayer = multiplayer;
+		GetTree().ChangeSceneToFile("res://character_select.tscn");
+	}
+
+	// ---------------------------------------------------------------- world list
+
+	private void BuildWorldListDialog()
+	{
+		_worldListDialog = MakeDialogPanel("world.list_title", out VBoxContainer content, 300.0f, 300.0f);
+
+		var hint = new Label
+		{
+			Text = LocaleText.T("world.list_hint"),
+			HorizontalAlignment = HorizontalAlignment.Center,
+			AutowrapMode = TextServer.AutowrapMode.WordSmart,
+		};
+		hint.AddThemeFontSizeOverride("font_size", 13);
+		hint.AddThemeColorOverride("font_color", new Color(0.66f, 0.78f, 0.9f));
+		content.AddChild(hint);
+
+		var scroll = new ScrollContainer
+		{
+			SizeFlagsVertical = SizeFlags.ExpandFill,
+			CustomMinimumSize = new Vector2(560.0f, 330.0f),
+		};
+		content.AddChild(scroll);
+
+		_worldListContainer = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		_worldListContainer.AddThemeConstantOverride("separation", 8);
+		scroll.AddChild(_worldListContainer);
+
+		_worldListEmptyLabel = new Label
+		{
+			Text = LocaleText.T("world.list_empty"),
+			HorizontalAlignment = HorizontalAlignment.Center,
+			AutowrapMode = TextServer.AutowrapMode.WordSmart,
+		};
+		_worldListEmptyLabel.AddThemeFontSizeOverride("font_size", 15);
+		_worldListEmptyLabel.AddThemeColorOverride("font_color", new Color(0.7f, 0.8f, 0.92f));
+		content.AddChild(_worldListEmptyLabel);
+
+		Button newWorld = MakeMenuButton(LocaleText.T("world.new"));
+		newWorld.Pressed += NewWorld;
+		content.AddChild(newWorld);
+
+		Button back = MakeMenuButton(LocaleText.T("dialog.button.cancel"));
+		back.Pressed += () => _worldListDialog!.Visible = false;
+		content.AddChild(back);
+	}
+
+	private void ShowWorldList()
+	{
+		if (_hostDialog != null) _hostDialog.Visible = false;
+		if (_joinDialog != null) _joinDialog.Visible = false;
+		RefreshWorldList();
+		if (_worldListDialog != null) _worldListDialog.Visible = true;
+	}
+
+	private void RefreshWorldList()
+	{
+		foreach (Node child in _worldListContainer.GetChildren())
+		{
+			_worldListContainer.RemoveChild(child);
+			child.QueueFree();
+		}
+
+		List<SaveGameManager.WorldSaveInfo> worlds = SaveGameManager.ListWorlds();
+		_worldListEmptyLabel.Visible = worlds.Count == 0;
+		foreach (SaveGameManager.WorldSaveInfo world in worlds)
+		{
+			_worldListContainer.AddChild(BuildWorldRow(world));
+		}
+	}
+
+	private Control BuildWorldRow(SaveGameManager.WorldSaveInfo world)
+	{
+		var row = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		var style = new StyleBoxFlat
+		{
+			BgColor = new Color(0.09f, 0.12f, 0.16f, 0.95f),
+			BorderColor = new Color(0.4f, 0.6f, 0.82f, 0.6f),
+		};
+		style.SetBorderWidthAll(1);
+		style.SetCornerRadiusAll(6);
+		row.AddThemeStyleboxOverride("panel", style);
+
+		var margin = new MarginContainer();
+		margin.AddThemeConstantOverride("margin_left", 10);
+		margin.AddThemeConstantOverride("margin_right", 10);
+		margin.AddThemeConstantOverride("margin_top", 8);
+		margin.AddThemeConstantOverride("margin_bottom", 8);
+		row.AddChild(margin);
+
+		var line = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		line.AddThemeConstantOverride("separation", 8);
+		margin.AddChild(line);
+
+		var info = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		line.AddChild(info);
+
+		var nameLabel = new Label { Text = world.Name };
+		nameLabel.AddThemeFontSizeOverride("font_size", 18);
+		nameLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.94f, 0.78f));
+		info.AddChild(nameLabel);
+
+		string modeText = LocaleText.T(world.LastMode == "multiplayer" ? "world.mode.multiplayer" : "world.mode.single");
+		var meta = new Label { Text = LocaleText.F("world.row_meta", modeText, world.Level, FormatSavedAt(world.SavedAt)) };
+		meta.AddThemeFontSizeOverride("font_size", 12);
+		meta.AddThemeColorOverride("font_color", new Color(0.66f, 0.76f, 0.88f));
+		info.AddChild(meta);
+
+		var play = new Button { Text = LocaleText.T("world.play_single"), CustomMinimumSize = new Vector2(0.0f, 40.0f) };
+		play.Pressed += () => PlaySingle(world);
+		line.AddChild(play);
+
+		var host = new Button { Text = LocaleText.T("world.host"), CustomMinimumSize = new Vector2(0.0f, 40.0f) };
+		host.Pressed += () => ShowHostDialog(world);
+		line.AddChild(host);
+
+		var delete = new Button { Text = LocaleText.T("world.delete"), CustomMinimumSize = new Vector2(0.0f, 40.0f) };
+		delete.Pressed += () =>
+		{
+			if (delete.HasMeta("armed"))
+			{
+				SaveGameManager.DeleteWorld(world.Id);
+				RefreshWorldList();
+			}
+			else
+			{
+				// Two-click guard so a stray click never nukes a world.
+				delete.SetMeta("armed", true);
+				delete.Text = LocaleText.T("world.delete_confirm");
+			}
+		};
+		line.AddChild(delete);
+
+		return row;
+	}
+
+	private void PlaySingle(SaveGameManager.WorldSaveInfo world)
+	{
+		NetworkManager.Instance?.ResetSession();
+		GameLaunchOptions.LoadWorld(world.Id, world.Seed);
+		GetTree().ChangeSceneToFile("res://node_3d.tscn");
+	}
+
+	private void NewWorld()
+	{
+		if (_worldListDialog != null) _worldListDialog.Visible = false;
+		if (_newWorldModeDialog != null) _newWorldModeDialog.Visible = true;
+	}
+
+	private static string FormatSavedAt(string savedAt)
+	{
+		if (System.DateTimeOffset.TryParse(savedAt, out System.DateTimeOffset when))
+		{
+			return when.LocalDateTime.ToString("yyyy-MM-dd HH:mm");
+		}
+
+		return savedAt;
+	}
+
+	// ---------------------------------------------------------------- dialogs
+
+	private PanelContainer MakeDialogPanel(string titleKey, out VBoxContainer content, float halfWidth = 230.0f, float halfHeight = 235.0f)
 	{
 		var panel = new PanelContainer
 		{
@@ -136,10 +331,10 @@ public partial class MainMenu : Control
 			AnchorRight = 0.5f,
 			AnchorTop = 0.5f,
 			AnchorBottom = 0.5f,
-			OffsetLeft = -230.0f,
-			OffsetRight = 230.0f,
-			OffsetTop = -235.0f,
-			OffsetBottom = 235.0f,
+			OffsetLeft = -halfWidth,
+			OffsetRight = halfWidth,
+			OffsetTop = -halfHeight,
+			OffsetBottom = halfHeight,
 		};
 		var style = new StyleBoxFlat
 		{
@@ -186,6 +381,11 @@ public partial class MainMenu : Control
 	{
 		_hostDialog = MakeDialogPanel("net.dialog.host_title", out VBoxContainer content);
 
+		_hostWorldLabel = new Label { HorizontalAlignment = HorizontalAlignment.Center };
+		_hostWorldLabel.AddThemeFontSizeOverride("font_size", 15);
+		_hostWorldLabel.AddThemeColorOverride("font_color", new Color(0.82f, 0.94f, 1.0f));
+		content.AddChild(_hostWorldLabel);
+
 		content.AddChild(MakeFieldLabel("net.dialog.port"));
 		_hostPortEdit = new LineEdit { Text = NetworkManager.DefaultPort.ToString(), CustomMinimumSize = new Vector2(0.0f, 38.0f) };
 		content.AddChild(_hostPortEdit);
@@ -221,13 +421,9 @@ public partial class MainMenu : Control
 		_hostDiagLabel.AddThemeColorOverride("font_color", new Color(0.82f, 0.9f, 1.0f));
 		content.AddChild(_hostDiagLabel);
 
-		_hostNewButton = MakeMenuButton(LocaleText.T("net.dialog.host_new"));
-		_hostNewButton.Pressed += () => StartHosting(false);
-		content.AddChild(_hostNewButton);
-
-		_hostLoadButton = MakeMenuButton(LocaleText.T("net.dialog.host_load"));
-		_hostLoadButton.Pressed += () => StartHosting(true);
-		content.AddChild(_hostLoadButton);
+		_hostStartButton = MakeMenuButton(LocaleText.T("world.host_start"));
+		_hostStartButton.Pressed += StartHosting;
+		content.AddChild(_hostStartButton);
 
 		Button cancel = MakeMenuButton(LocaleText.T("dialog.button.cancel"));
 		cancel.Pressed += () => _hostDialog!.Visible = false;
@@ -264,28 +460,26 @@ public partial class MainMenu : Control
 		content.AddChild(cancel);
 	}
 
-	private void ShowHostDialog()
+	private void ShowHostDialog(SaveGameManager.WorldSaveInfo world)
 	{
-		if (_joinDialog != null)
-		{
-			_joinDialog.Visible = false;
-		}
+		_hostWorldId = world.Id;
+		_hostWorldSeed = world.Seed;
+		if (_worldListDialog != null) _worldListDialog.Visible = false;
+		if (_joinDialog != null) _joinDialog.Visible = false;
 		if (_hostDialog != null)
 		{
+			_hostWorldLabel.Text = LocaleText.F("world.host_world", world.Name);
 			_hostStatusLabel.Text = string.Empty;
 			_hostDiagLabel.Text = string.Empty;
 			_hostTestButton.Disabled = false;
-			_hostLoadButton.Disabled = !SaveGameManager.HasSave();
 			_hostDialog.Visible = true;
 		}
 	}
 
 	private void ShowJoinDialog()
 	{
-		if (_hostDialog != null)
-		{
-			_hostDialog.Visible = false;
-		}
+		if (_worldListDialog != null) _worldListDialog.Visible = false;
+		if (_hostDialog != null) _hostDialog.Visible = false;
 		if (_joinDialog != null)
 		{
 			_joinStatusLabel.Text = string.Empty;
@@ -316,14 +510,14 @@ public partial class MainMenu : Control
 		NetworkDiagnostics.Line bindLine = NetworkDiagnostics.TestPortBind(port);
 		System.Threading.Tasks.Task.Run(() =>
 		{
-			var lines = new System.Collections.Generic.List<NetworkDiagnostics.Line> { bindLine };
+			var lines = new List<NetworkDiagnostics.Line> { bindLine };
 			lines.AddRange(NetworkDiagnostics.RunNat(port));
 			lines.Add(NetworkDiagnostics.EnsureFirewallRule(port));
 			Callable.From(() => ShowDiagnostics(lines)).CallDeferred();
 		});
 	}
 
-	private void ShowDiagnostics(System.Collections.Generic.List<NetworkDiagnostics.Line> lines)
+	private void ShowDiagnostics(List<NetworkDiagnostics.Line> lines)
 	{
 		var builder = new System.Text.StringBuilder();
 		bool anyFail = false;
@@ -351,9 +545,9 @@ public partial class MainMenu : Control
 		_hostTestButton.Disabled = false;
 	}
 
-	private void StartHosting(bool loadSave)
+	private void StartHosting()
 	{
-		if (NetworkManager.Instance == null)
+		if (NetworkManager.Instance == null || string.IsNullOrEmpty(_hostWorldId))
 		{
 			return;
 		}
@@ -371,14 +565,9 @@ public partial class MainMenu : Control
 			return;
 		}
 
-		if (loadSave && SaveGameManager.HasSave())
-		{
-			GameLaunchOptions.LoadSavedGame();
-		}
-		else
-		{
-			GameLaunchOptions.StartNewGame();
-		}
+		// Host the chosen world with its saved seed + progress.
+		NetworkManager.Instance.OverrideWorldSeed(_hostWorldSeed);
+		GameLaunchOptions.LoadWorld(_hostWorldId, _hostWorldSeed);
 		GetTree().ChangeSceneToFile("res://node_3d.tscn");
 	}
 
@@ -424,9 +613,10 @@ public partial class MainMenu : Control
 
 	private void OnJoinWelcomed()
 	{
-		// Seed received from the host — enter the shared world. The local save
-		// (if any) still provides this player's own character/progress.
-		if (SaveGameManager.HasSave())
+		// Seed received from the host — enter the shared world. A dedicated "guest"
+		// slot carries this player's own character/progress across servers.
+		GameLaunchOptions.ActiveWorldId = "guest";
+		if (SaveGameManager.HasWorld("guest"))
 		{
 			GameLaunchOptions.LoadSavedGame();
 		}
@@ -434,6 +624,7 @@ public partial class MainMenu : Control
 		{
 			GameLaunchOptions.StartNewGame();
 		}
+
 		GetTree().ChangeSceneToFile("res://node_3d.tscn");
 	}
 
@@ -446,7 +637,7 @@ public partial class MainMenu : Control
 		}
 	}
 
-	// ---------------------------------------------------------------- original flows
+	// ---------------------------------------------------------------- fallback
 
 	private void BuildFallbackMenu(string errorMessage)
 	{
@@ -496,8 +687,8 @@ public partial class MainMenu : Control
 		message.AddThemeColorOverride("font_color", new Color(1.0f, 0.72f, 0.68f));
 		root.AddChild(message);
 
-		Button newGameButton = MakeMenuButton("New Game");
-		newGameButton.Pressed += StartNewGame;
+		Button newGameButton = MakeMenuButton("New World");
+		newGameButton.Pressed += NewWorld;
 		root.AddChild(newGameButton);
 
 		Button quitButton = MakeMenuButton("Quit");
@@ -524,34 +715,5 @@ public partial class MainMenu : Control
 			RemoveChild(child);
 			child.QueueFree();
 		}
-	}
-
-	private void RefreshSaveInfo()
-	{
-		bool hasSave = SaveGameManager.HasSave();
-		_loadButton.Disabled = !hasSave;
-		_saveInfoLabel.Text = hasSave
-			? LocaleText.F("main_menu.save_found", SaveGameManager.GetSavePath())
-			: LocaleText.T("main_menu.no_save");
-	}
-
-	private void StartNewGame()
-	{
-		// New game goes through character creation (model + name) first.
-		NetworkManager.Instance?.ResetSession();
-		GetTree().ChangeSceneToFile("res://character_select.tscn");
-	}
-
-	private void LoadGame()
-	{
-		if (!SaveGameManager.HasSave())
-		{
-			RefreshSaveInfo();
-			return;
-		}
-
-		NetworkManager.Instance?.ResetSession();
-		GameLaunchOptions.LoadSavedGame();
-		GetTree().ChangeSceneToFile("res://node_3d.tscn");
 	}
 }

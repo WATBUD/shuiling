@@ -4,6 +4,11 @@ public sealed class SaveGameData
 {
 	public int Version { get; set; } = 1;
 	public string SavedAt { get; set; } = string.Empty;
+	// World-slot metadata (Minecraft-style multi-world saves).
+	public string WorldId { get; set; } = string.Empty;
+	public string WorldName { get; set; } = string.Empty;
+	public int WorldSeed { get; set; }
+	public string LastMode { get; set; } = "single"; // "single" | "multiplayer"
 	public string ActiveMapId { get; set; } = "city";
 	public SaveVector3 PlayerPosition { get; set; } = new();
 	public PlayerSaveData Player { get; set; } = new();

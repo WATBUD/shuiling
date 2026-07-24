@@ -11,25 +11,20 @@ public partial class CharacterSelect : Control
 	private readonly List<Button> _cellButtons = new();
 	private List<(string Path, string Display)> _models = new();
 	private LineEdit _nameEdit = null!;
+	private LineEdit _worldNameEdit = null!;
+	private LineEdit _portEdit = null!;
+	private Label _statusLabel = null!;
 	private Button _startButton = null!;
 	private int _selectedIndex;
+	private bool _isMultiplayer;
+	private float _cellWidth = 190.0f;
 
 	public override void _Ready()
 	{
+		// Mode was chosen on the "new world" window before this screen.
+		_isMultiplayer = GameLaunchOptions.NewWorldIsMultiplayer;
 		_models = ExternalModelLibrary.GetAvailableCharacterModels();
 		BuildUi();
-	}
-
-	public override void _Process(double delta)
-	{
-		// Turntable spin for every preview.
-		foreach (Node3D pivot in _previewPivots)
-		{
-			if (IsInstanceValid(pivot))
-			{
-				pivot.RotationDegrees += new Vector3(0.0f, (float)delta * 45.0f, 0.0f);
-			}
-		}
 	}
 
 	private void BuildUi()
@@ -44,18 +39,18 @@ public partial class CharacterSelect : Control
 		};
 		AddChild(background);
 
+		// Fill the window with margins so the layout adapts to any height and the
+		// bottom buttons are never clipped (the model grid scrolls to absorb slack).
 		var root = new VBoxContainer
 		{
-			AnchorLeft = 0.5f,
-			AnchorRight = 0.5f,
-			AnchorTop = 0.5f,
-			AnchorBottom = 0.5f,
-			OffsetLeft = -430.0f,
-			OffsetRight = 430.0f,
-			OffsetTop = -320.0f,
-			OffsetBottom = 320.0f,
+			AnchorRight = 1.0f,
+			AnchorBottom = 1.0f,
+			OffsetLeft = 60.0f,
+			OffsetTop = 28.0f,
+			OffsetRight = -60.0f,
+			OffsetBottom = -28.0f,
 		};
-		root.AddThemeConstantOverride("separation", 14);
+		root.AddThemeConstantOverride("separation", 12);
 		AddChild(root);
 
 		var title = new Label
@@ -64,19 +59,27 @@ public partial class CharacterSelect : Control
 			HorizontalAlignment = HorizontalAlignment.Center,
 			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 		};
-		title.AddThemeFontSizeOverride("font_size", 32);
+		title.AddThemeFontSizeOverride("font_size", 22);
 		title.AddThemeColorOverride("font_color", new Color(1.0f, 0.94f, 0.76f));
 		root.AddChild(title);
 
 		var scroll = new ScrollContainer
 		{
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 			SizeFlagsVertical = SizeFlags.ExpandFill,
-			CustomMinimumSize = new Vector2(860.0f, 420.0f),
+			CustomMinimumSize = new Vector2(0.0f, 200.0f),
 		};
 		root.AddChild(scroll);
 
-		var grid = new GridContainer { Columns = 5, SizeFlagsHorizontal = SizeFlags.ExpandFill };
-		grid.AddThemeConstantOverride("h_separation", 10);
+		// Always 6 characters per row: size each cell to the window width so the
+		// row is filled edge-to-edge with no right-hand gap.
+		const int columns = 6;
+		const float cellSeparation = 10.0f;
+		float available = GetViewportRect().Size.X - 120.0f - 24.0f; // root margins + scrollbar
+		_cellWidth = Mathf.Max(Mathf.Floor((available - (columns - 1) * cellSeparation) / columns), 120.0f);
+
+		var grid = new GridContainer { Columns = columns, SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		grid.AddThemeConstantOverride("h_separation", (int)cellSeparation);
 		grid.AddThemeConstantOverride("v_separation", 10);
 		scroll.AddChild(grid);
 
@@ -97,30 +100,83 @@ public partial class CharacterSelect : Control
 		root.AddChild(nameRow);
 
 		var nameLabel = new Label { Text = LocaleText.T("character.select.name") };
-		nameLabel.AddThemeFontSizeOverride("font_size", 18);
+		nameLabel.AddThemeFontSizeOverride("font_size", 13);
 		nameLabel.AddThemeColorOverride("font_color", new Color(0.82f, 0.9f, 1.0f));
 		nameRow.AddChild(nameLabel);
 
 		_nameEdit = new LineEdit
 		{
 			Text = LocaleText.T("player.default_name"),
-			CustomMinimumSize = new Vector2(280.0f, 40.0f),
+			CustomMinimumSize = new Vector2(180.0f, 30.0f),
 			MaxLength = 24,
 			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 		};
 		_nameEdit.TextChanged += _ => UpdateStartEnabled();
 		nameRow.AddChild(_nameEdit);
 
+		var worldRow = new HBoxContainer();
+		worldRow.AddThemeConstantOverride("separation", 10);
+		root.AddChild(worldRow);
+
+		var worldLabel = new Label { Text = LocaleText.T("world.name_label") };
+		worldLabel.AddThemeFontSizeOverride("font_size", 13);
+		worldLabel.AddThemeColorOverride("font_color", new Color(0.82f, 0.9f, 1.0f));
+		worldRow.AddChild(worldLabel);
+
+		_worldNameEdit = new LineEdit
+		{
+			Text = LocaleText.T("world.default_name"),
+			CustomMinimumSize = new Vector2(180.0f, 30.0f),
+			MaxLength = 24,
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		_worldNameEdit.TextChanged += _ => UpdateStartEnabled();
+		worldRow.AddChild(_worldNameEdit);
+
+		// Port entry only matters when hosting a multiplayer world.
+		var portRow = new HBoxContainer { Visible = _isMultiplayer };
+		portRow.AddThemeConstantOverride("separation", 10);
+		root.AddChild(portRow);
+
+		var portLabel = new Label { Text = LocaleText.T("net.dialog.port") };
+		portLabel.AddThemeFontSizeOverride("font_size", 13);
+		portLabel.AddThemeColorOverride("font_color", new Color(0.82f, 0.9f, 1.0f));
+		portRow.AddChild(portLabel);
+
+		_portEdit = new LineEdit
+		{
+			Text = NetworkManager.DefaultPort.ToString(),
+			CustomMinimumSize = new Vector2(180.0f, 30.0f),
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		portRow.AddChild(_portEdit);
+
+		_statusLabel = new Label
+		{
+			Visible = _isMultiplayer,
+			HorizontalAlignment = HorizontalAlignment.Center,
+			AutowrapMode = TextServer.AutowrapMode.WordSmart,
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		_statusLabel.AddThemeFontSizeOverride("font_size", 14);
+		_statusLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.72f, 0.68f));
+		root.AddChild(_statusLabel);
+
 		var buttons = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
 		buttons.AddThemeConstantOverride("separation", 12);
 		root.AddChild(buttons);
 
 		var backButton = MakeButton(LocaleText.T("dialog.button.cancel"));
-		backButton.Pressed += () => GetTree().ChangeSceneToFile("res://main_menu.tscn");
+		backButton.Pressed += () =>
+		{
+			// Return to the previous screen (world list + single/multiplayer choice).
+			GameLaunchOptions.ReturnToNewWorldMode = true;
+			GetTree().ChangeSceneToFile("res://main_menu.tscn");
+		};
 		buttons.AddChild(backButton);
 
-		_startButton = MakeButton(LocaleText.T("character.select.start"));
-		_startButton.Pressed += StartGame;
+		_startButton = MakeButton(LocaleText.T(_isMultiplayer ? "character.select.start_host" : "character.select.start_single"));
+		_startButton.Pressed += () => StartGame(_isMultiplayer);
 		buttons.AddChild(_startButton);
 
 		SelectModel(0);
@@ -131,7 +187,7 @@ public partial class CharacterSelect : Control
 	{
 		var button = new Button
 		{
-			CustomMinimumSize = new Vector2(158.0f, 214.0f),
+			CustomMinimumSize = new Vector2(_cellWidth, 250.0f),
 			Flat = false,
 			ToggleMode = true,
 		};
@@ -144,27 +200,30 @@ public partial class CharacterSelect : Control
 			AnchorRight = 1.0f,
 			AnchorBottom = 1.0f,
 		};
-		column.AddThemeConstantOverride("separation", 4);
+		column.AddThemeConstantOverride("separation", 2);
 		button.AddChild(column);
 
+		int viewportWidth = Mathf.Max((int)(_cellWidth - 8.0f), 100);
 		var viewportContainer = new SubViewportContainer
 		{
 			Stretch = true,
-			CustomMinimumSize = new Vector2(150.0f, 176.0f),
+			CustomMinimumSize = new Vector2(viewportWidth, 216.0f),
 			MouseFilter = MouseFilterEnum.Ignore,
 		};
 		column.AddChild(viewportContainer);
 
 		var viewport = new SubViewport
 		{
-			Size = new Vector2I(150, 176),
+			Size = new Vector2I(viewportWidth, 216),
 			OwnWorld3D = true,
 			TransparentBg = true,
 			RenderTargetUpdateMode = SubViewport.UpdateMode.Always,
 		};
 		viewportContainer.AddChild(viewport);
 
-		var pivot = new Node3D();
+		// Flattering 3/4 view with a little per-card variation so the row feels
+		// alive rather than a set of identical mugshots.
+		var pivot = new Node3D { RotationDegrees = new Vector3(0.0f, -30.0f + GD.Randf() * 24.0f, 0.0f) };
 		viewport.AddChild(pivot);
 		_previewPivots.Add(pivot);
 
@@ -173,9 +232,16 @@ public partial class CharacterSelect : Control
 		{
 			model.Position = Vector3.Zero;
 			pivot.AddChild(model);
+			// Animal-type models (cube_pets/animal-*) read slightly oversized next
+			// to humanoids, so shrink them to 0.75 of the unified height.
+			float extraScale = _models[index].Path.Contains("animal") ? 0.75f : 1.0f;
 			// Auto-fit so every model (tiny rats, huge dragons, off-origin
 			// meshes) is centered and framed the same in the preview.
-			CallDeferred(nameof(FitPreviewModel), model);
+			CallDeferred(nameof(FitPreviewModel), model, extraScale);
+
+			// Each character performs its own looping action for variety.
+			string[] actions = { "idle", "idle", "walk", "run" };
+			CallDeferred(nameof(PlayPreviewAnimation), model, actions[(int)(GD.Randi() % (uint)actions.Length)]);
 		}
 
 		var light = new DirectionalLight3D
@@ -185,7 +251,7 @@ public partial class CharacterSelect : Control
 		};
 		viewport.AddChild(light);
 
-		var camera = new Camera3D { Position = new Vector3(0.0f, 1.05f, 3.1f) };
+		var camera = new Camera3D { Position = new Vector3(0.0f, 1.0f, 2.5f) };
 		viewport.AddChild(camera);
 		camera.LookAt(new Vector3(0.0f, 0.95f, 0.0f), Vector3.Up);
 
@@ -215,10 +281,11 @@ public partial class CharacterSelect : Control
 
 	private void UpdateStartEnabled()
 	{
-		_startButton.Disabled = _models.Count == 0 || _nameEdit.Text.Trim().Length == 0;
+		bool ready = _models.Count > 0 && _nameEdit.Text.Trim().Length > 0;
+		_startButton.Disabled = !ready;
 	}
 
-	private void StartGame()
+	private void StartGame(bool host)
 	{
 		if (_models.Count == 0)
 		{
@@ -231,15 +298,62 @@ public partial class CharacterSelect : Control
 			name = LocaleText.T("player.default_name");
 		}
 
-		GameLaunchOptions.NewGamePlayerModelPath = _models[_selectedIndex].Path;
-		GameLaunchOptions.NewGamePlayerName = name;
-		GameLaunchOptions.StartNewGame();
+		string worldName = _worldNameEdit.Text.Trim();
+		if (worldName.Length == 0)
+		{
+			worldName = LocaleText.T("world.default_name");
+		}
+
+		int seed = unchecked((int)GD.Randi());
+		if (seed == 0)
+		{
+			seed = 1;
+		}
+
+		// Hosting: stand up the server before entering so the world generates in
+		// online mode with the new world's seed.
+		if (host)
+		{
+			if (NetworkManager.Instance == null)
+			{
+				return;
+			}
+
+			if (!int.TryParse(_portEdit.Text.Trim(), out int port) || port < 1024 || port > 65535)
+			{
+				_statusLabel.Text = LocaleText.T("net.error.invalid_port");
+				return;
+			}
+
+			string error = NetworkManager.Instance.CreateServer(port);
+			if (error.Length > 0)
+			{
+				_statusLabel.Text = LocaleText.F("net.error.create_failed", error);
+				return;
+			}
+
+			NetworkManager.Instance.OverrideWorldSeed(seed);
+		}
+		else
+		{
+			NetworkManager.Instance?.ResetSession();
+		}
+
+		GameLaunchOptions.StartNewWorld(SaveGameManager.NewWorldId(), worldName, seed, _models[_selectedIndex].Path, name);
 		GetTree().ChangeSceneToFile("res://node_3d.tscn");
 	}
 
 	// Center + uniformly scale a preview model to a consistent frame, using its
 	// combined mesh bounds. Deferred so global transforms are valid.
-	private void FitPreviewModel(Node3D model)
+	private void PlayPreviewAnimation(Node3D model, string state)
+	{
+		if (IsInstanceValid(model))
+		{
+			ExternalModelLibrary.TryPlayActorAnimation(model, state);
+		}
+	}
+
+	private void FitPreviewModel(Node3D model, float extraScale)
 	{
 		if (!IsInstanceValid(model) || !TryGetModelBounds(model, out Aabb bounds))
 		{
@@ -247,13 +361,29 @@ public partial class CharacterSelect : Control
 		}
 
 		Vector3 size = bounds.Size;
-		float maxDim = Mathf.Max(size.X, Mathf.Max(size.Y, size.Z));
-		if (maxDim <= 0.0001f)
+		if (Mathf.Max(size.X, Mathf.Max(size.Y, size.Z)) <= 0.0001f)
 		{
 			return;
 		}
 
-		float scale = 1.7f / maxDim;
+		// Uniform (proportional) scale, but normalize by HEIGHT so every character
+		// stands the same height on screen — humanoids, quadrupeds and tall bosses
+		// all line up. Very wide/deep models are scaled down just enough to stay in
+		// frame so they never overflow their card.
+		const float targetHeight = 1.9f;
+		const float maxWidth = 2.3f;
+		const float maxDepth = 2.3f;
+		float scale = targetHeight / Mathf.Max(size.Y, 0.001f);
+		if (size.X * scale > maxWidth)
+		{
+			scale = maxWidth / Mathf.Max(size.X, 0.001f);
+		}
+		if (size.Z * scale > maxDepth)
+		{
+			scale = maxDepth / Mathf.Max(size.Z, 0.001f);
+		}
+
+		scale *= extraScale;
 		model.Scale = new Vector3(scale, scale, scale);
 		Vector3 center = bounds.Position + size * 0.5f;
 		// Put the scaled centre on the camera focus (0, 0.95, 0) and keep it on
@@ -309,10 +439,10 @@ public partial class CharacterSelect : Control
 		var button = new Button
 		{
 			Text = text,
-			CustomMinimumSize = new Vector2(220.0f, 46.0f),
+			CustomMinimumSize = new Vector2(170.0f, 34.0f),
 			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 		};
-		button.AddThemeFontSizeOverride("font_size", 20);
+		button.AddThemeFontSizeOverride("font_size", 15);
 		return button;
 	}
 }
