@@ -267,9 +267,60 @@ public partial class SimpleActor : CharacterBody3D
 	private float _bossStuckTime;
 	private float _bossAvoidRemaining;
 	private float _bossAvoidSide = 1.0f;
+	// Capture readiness (削弱→硬直→捕捉). Stagger builds from hits (combo finisher)
+	// and breaks the monster's guard; low HP also opens the capture window.
+	private float _staggerValue;
+	private float _staggerRemaining;
+	private const float StaggerDuration = 4.0f;
 
 	public bool CanBeCaptured => ActorKind == "monster" && !IsBoss && !_isCaptured && !_isDefeated && !_isNetworkPuppet;
 	public bool IsNetworkPuppet => _isNetworkPuppet;
+
+	// HP fraction at/under which the monster can be netted; rarer = must be weaker.
+	public float CaptureHealthThreshold => Mathf.Clamp(0.45f - Rarity * 0.06f, 0.18f, 0.45f);
+	public float MaxStagger => Mathf.Max(EffectiveMaxHealth * 0.65f, 1.0f);
+	public float StaggerRatio => Mathf.Clamp(_staggerValue / MaxStagger, 0.0f, 1.0f);
+	public bool IsStaggered => _staggerRemaining > 0.0f;
+	// The net only opens the capture challenge when the monster is weakened or
+	// staggered — throwing at a healthy monster just chips its guard.
+	public bool CaptureReady => CanBeCaptured && (IsStaggered || HealthRatio <= CaptureHealthThreshold);
+
+	// Combo finisher: landing hits fills the stagger meter; a full meter breaks the
+	// monster (力竭) into a capture window for a few seconds.
+	public void AddCaptureStagger(float amount)
+	{
+		if (!CanBeCaptured || IsStaggered || amount <= 0.0f)
+		{
+			return;
+		}
+
+		_staggerValue += amount;
+		if (_staggerValue >= MaxStagger)
+		{
+			_staggerValue = 0.0f;
+			_staggerRemaining = StaggerDuration;
+			SpawnCombatEffect(LocaleText.T("system.capture.stagger"), new Color(1.0f, 0.86f, 0.35f, 0.95f), GlobalPosition + new Vector3(0.0f, 1.7f, 0.0f), 1.0f, 0.7f);
+			RefreshNameplate();
+		}
+	}
+
+	private void UpdateCaptureState(float step)
+	{
+		if (_staggerRemaining > 0.0f)
+		{
+			_staggerRemaining -= step;
+			if (_staggerRemaining <= 0.0f)
+			{
+				_staggerRemaining = 0.0f;
+				RefreshNameplate();
+			}
+		}
+		else if (_staggerValue > 0.0f)
+		{
+			// Guard recovers if you stop comboing (~5s to fully drain).
+			_staggerValue = Mathf.Max(0.0f, _staggerValue - MaxStagger * 0.2f * step);
+		}
+	}
 
 	// Overhead nameplate (Lv + name) font multiplier — 3x by default, adjustable
 	// in settings. Base font is 20 (28 for bosses).
@@ -532,6 +583,10 @@ public partial class SimpleActor : CharacterBody3D
 			return;
 		}
 		UpdateStatusEffects(step);
+		if (ActorKind == "monster" && !_isCaptured)
+		{
+			UpdateCaptureState(step);
+		}
 		_attackCooldownRemaining = Mathf.Max(_attackCooldownRemaining - step, 0.0f);
 		_retaliationTargetRemaining = Mathf.Max(_retaliationTargetRemaining - step, 0.0f);
 		_specialControlCooldownRemaining = Mathf.Max(_specialControlCooldownRemaining - step, 0.0f);
@@ -834,6 +889,15 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			RecalculateBuildStats();
 		}
+	}
+
+	// The res:// path of the currently-instantiated external model, so the network
+	// layer can tell peers which model to render for this companion (empty if the
+	// actor is using the primitive fallback body).
+	public string GetExternalModelPath()
+	{
+		Node3D? model = GetNodeOrNull<Node3D>("ExternalModel");
+		return model?.SceneFilePath ?? string.Empty;
 	}
 
 	// Canonical card identity for this actor's model (one card per model), with a
@@ -1479,6 +1543,8 @@ public partial class SimpleActor : CharacterBody3D
 		RememberAttacker(attacker);
 		CurrentHealth = Mathf.Max(CurrentHealth - mitigatedDamage, 0);
 		SpawnCombatEffect(mitigatedDamage, attacker?.GetAttackColor() ?? new Color(1.0f, 0.5f, 0.22f, 0.92f));
+		// Hits build the capture stagger meter (combo finisher path).
+		AddCaptureStagger(mitigatedDamage);
 		if (IsBoss && attacker?._followTarget != null && IsInstanceValid(attacker._followTarget))
 		{
 			attacker._followTarget.NotifyBossCombat(this);
@@ -1631,9 +1697,11 @@ public partial class SimpleActor : CharacterBody3D
 			: string.Empty;
 		// Rebirth count (轉生) shown as ✦xN next to a companion's level.
 		string rebirthSuffix = _isCaptured && RebirthCount > 0 ? $" ✦x{RebirthCount}" : string.Empty;
+		// Wild monster ready to be netted (weakened or staggered) gets a tag.
+		string captureTag = CaptureReady ? " " + LocaleText.T(IsStaggered ? "mob.capture_stagger" : "mob.capture_ready") : string.Empty;
 		_nameplate.Text = IsBoss
 			? LocaleText.F("boss.nameplate", Level, LocalizedDisplayName, capturedText)
-			: $"{rarityPrefix}{LocaleText.T("actor.level_prefix")}{Level} {LocalizedDisplayName}{rebirthSuffix}{capturedText}";
+			: $"{rarityPrefix}{LocaleText.T("actor.level_prefix")}{Level} {LocalizedDisplayName}{rebirthSuffix}{captureTag}{capturedText}";
 		_nameplate.FontSize = Mathf.RoundToInt((IsBoss ? 28 : 20) * NameplateScale);
 		Color markerColor = GetNameplateStatusColor();
 		_nameplate.Modulate = markerColor;

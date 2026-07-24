@@ -245,6 +245,9 @@ public partial class PlayerController
 
 		// Party membership may have changed — re-apply the card collection buff too.
 		RefreshCardCollectionBonus();
+
+		// Tell peers to refresh which companions to render for this player.
+		NetworkManager.Instance?.MarkCompanionRosterDirty();
 	}
 
 	private bool AreSlotsFilledByRole(int[] slots, string role)
