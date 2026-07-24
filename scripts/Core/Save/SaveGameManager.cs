@@ -29,6 +29,7 @@ public static class SaveGameManager
 		public string SavedAt = string.Empty;
 		public int Level = 1;
 		public string PlayerName = string.Empty;
+		public bool AutoSaveOnExit = true;
 	}
 
 	private static string PathForId(string worldId)
@@ -109,6 +110,31 @@ public static class SaveGameManager
 		}
 	}
 
+	public static bool TrySetWorldAutoSave(string worldId, bool enabled, out string error)
+	{
+		error = string.Empty;
+		if (!TryLoad(worldId, out SaveGameData data, out error))
+		{
+			return false;
+		}
+
+		try
+		{
+			data.AutoSaveOnExit = enabled;
+			// This is a world preference change, not a gameplay save. Preserve
+			// SavedAt so toggling the switch does not reorder the world list.
+			string path = ProjectSettings.GlobalizePath(PathForId(worldId));
+			Directory.CreateDirectory(Path.GetDirectoryName(path) ?? string.Empty);
+			File.WriteAllText(path, JsonSerializer.Serialize(data, SerializerOptions));
+			return true;
+		}
+		catch (Exception exception)
+		{
+			error = exception.Message;
+			return false;
+		}
+	}
+
 	public static void DeleteWorld(string worldId)
 	{
 		try
@@ -156,6 +182,7 @@ public static class SaveGameManager
 					SavedAt = data.SavedAt,
 					Level = data.Player?.Level ?? 1,
 					PlayerName = data.Player?.PlayerName ?? string.Empty,
+					AutoSaveOnExit = data.AutoSaveOnExit,
 				});
 			}
 			catch (Exception exception)

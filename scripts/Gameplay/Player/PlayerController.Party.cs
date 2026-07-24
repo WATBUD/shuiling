@@ -309,9 +309,11 @@ public partial class PlayerController
 			return;
 		}
 
-		// Starter showcase pet — tentatively max level (100) with matching stats so
-		// every core slot is unlocked and the full core chain can be shown off.
-		SimpleActor bunny = world.SpawnPurchasedPet("name.monster.bunny", 100, 2600, 260, 150);
+		// The starter bunny has completed one rebirth and begins its new journey
+		// at level 1. Current stats are its level-1 baseline plus the +5 bonus.
+		SimpleActor bunny = world.SpawnPurchasedPet("name.monster.bunny", 1, 129, 23, 14);
+		bunny.ConfigureLevelOneStats(124, 18, 9);
+		bunny.RebirthCount = 1;
 		CaptureActor(bunny);
 		EquipFullCoreShowcase(bunny);
 	}

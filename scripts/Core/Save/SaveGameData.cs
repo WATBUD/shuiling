@@ -93,6 +93,9 @@ public sealed class ActorSaveData
 	public int WorldTier { get; set; } = 1;
 	public int Rarity { get; set; }
 	public int RebirthCount { get; set; }
+	public int LevelOneMaxHealth { get; set; }
+	public int LevelOneAttack { get; set; }
+	public int LevelOneDefense { get; set; }
 	public int MaxHealth { get; set; } = 100;
 	public int CurrentHealth { get; set; } = 100;
 	public bool IsDefeated { get; set; }

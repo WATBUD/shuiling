@@ -525,7 +525,14 @@ public partial class SimpleActor : CharacterBody3D
 	public const int MaxCompanionLevel = 100;
 	public const int RebirthStatBonus = 5;
 	[Export] public int RebirthCount { get; set; }
+	[Export] public int LevelOneMaxHealth { get; set; }
+	[Export] public int LevelOneAttack { get; set; }
+	[Export] public int LevelOneDefense { get; set; }
 	public bool CanRebirth => _isCaptured && Level >= MaxCompanionLevel;
+	public int RebirthTotalStatBonus => Mathf.Max(RebirthCount, 0) * RebirthStatBonus;
+	public int OriginalMaxHealthWithoutRebirth => Mathf.Max(MaxHealth - RebirthTotalStatBonus, 1);
+	public int OriginalAttackWithoutRebirth => Mathf.Max(Attack - RebirthTotalStatBonus, 1);
+	public int OriginalDefenseWithoutRebirth => Mathf.Max(Defense - RebirthTotalStatBonus, 0);
 	public string EvolutionMaterialId => EvolutionStage switch
 	{
 		0 => "loot.cracked_core",
@@ -708,6 +715,7 @@ public partial class SimpleActor : CharacterBody3D
 
 	public void Capture(PlayerController followTarget)
 	{
+		EnsureLevelOneStats();
 		_isCaptured = true;
 		_isDefeated = false;
 		_isAwaitingRecovery = false;
@@ -1225,6 +1233,9 @@ public partial class SimpleActor : CharacterBody3D
 			WorldTier = WorldTier,
 			Rarity = Rarity,
 			RebirthCount = RebirthCount,
+			LevelOneMaxHealth = LevelOneMaxHealth,
+			LevelOneAttack = LevelOneAttack,
+			LevelOneDefense = LevelOneDefense,
 			MaxHealth = MaxHealth,
 			CurrentHealth = CurrentHealth,
 			IsDefeated = _isDefeated,
@@ -1268,6 +1279,9 @@ public partial class SimpleActor : CharacterBody3D
 		WorldTier = WorldTierCatalog.ClampTier(data.WorldTier);
 		Rarity = data.Rarity;
 		RebirthCount = Mathf.Max(data.RebirthCount, 0);
+		LevelOneMaxHealth = Mathf.Max(data.LevelOneMaxHealth, 0);
+		LevelOneAttack = Mathf.Max(data.LevelOneAttack, 0);
+		LevelOneDefense = Mathf.Max(data.LevelOneDefense, 0);
 		MaxHealth = Mathf.Max(data.MaxHealth, 1);
 		_isDefeated = data.IsDefeated || data.CurrentHealth <= 0;
 		_isAwaitingRecovery = _isDefeated && data.IsAwaitingRecovery;
@@ -1290,6 +1304,26 @@ public partial class SimpleActor : CharacterBody3D
 		AttackModeId = string.IsNullOrWhiteSpace(data.AttackModeId)
 			? BuildCatalog.GetDefaultAttackModeId(this)
 			: BuildCatalog.GetAttackMode(data.AttackModeId).Id;
+		bool isLegacyStarterShowcase = DisplayName == "name.monster.bunny"
+			&& Level >= MaxCompanionLevel
+			&& RebirthCount == 0
+			&& MaxHealth == 2600
+			&& Attack == 260
+			&& Defense == 150;
+		if (isLegacyStarterShowcase)
+		{
+			// Only the old hand-authored starter has this exact stat signature.
+			// Convert it to the new level-1, one-rebirth starter format.
+			ConfigureLevelOneStats(124, 18, 9);
+			RebirthCount = 1;
+			Level = 1;
+			Experience = 0;
+			MaxHealth = LevelOneMaxHealth + RebirthStatBonus;
+			Attack = LevelOneAttack + RebirthStatBonus;
+			Defense = LevelOneDefense + RebirthStatBonus;
+			CurrentHealth = MaxHealth;
+		}
+		EnsureLevelOneStats();
 		_buildLoadout = new CompanionBuildLoadout
 		{
 			HelmetId = data.BuildLoadout.HelmetId,
@@ -1434,6 +1468,40 @@ public partial class SimpleActor : CharacterBody3D
 		}
 	}
 
+	private bool HasLevelOneStats()
+	{
+		return LevelOneMaxHealth > 0 && LevelOneAttack > 0 && LevelOneDefense >= 0;
+	}
+
+	public void ConfigureLevelOneStats(int maxHealth, int attack, int defense)
+	{
+		LevelOneMaxHealth = Mathf.Max(maxHealth, 1);
+		LevelOneAttack = Mathf.Max(attack, 1);
+		LevelOneDefense = Mathf.Max(defense, 0);
+	}
+
+	private void EnsureLevelOneStats()
+	{
+		if (HasLevelOneStats())
+		{
+			return;
+		}
+
+		// Legacy saves did not preserve the level-1 baseline. Every completed
+		// rebirth in those saves incorrectly retained a full level-100 growth
+		// cycle, so remove 99 level gains for each historic rebirth, plus the
+		// gains made in the current cycle. New companions take this snapshot
+		// once when captured and never need this migration path again.
+		int historicLevelGains = Mathf.Max(Level - 1, 0) + Mathf.Max(RebirthCount, 0) * (MaxCompanionLevel - 1);
+		int rebirthBonus = RebirthTotalStatBonus;
+		int healthPerLevel = 14 + EvolutionStage * 4;
+		int attackPerLevel = 3 + EvolutionStage;
+		int defensePerLevel = 2 + EvolutionStage;
+		LevelOneMaxHealth = Mathf.Max(MaxHealth - rebirthBonus - historicLevelGains * healthPerLevel, 40);
+		LevelOneAttack = Mathf.Max(Attack - rebirthBonus - historicLevelGains * attackPerLevel, 3);
+		LevelOneDefense = Mathf.Max(Defense - rebirthBonus - historicLevelGains * defensePerLevel, 1);
+	}
+
 	public void GrantTraining(int amount)
 	{
 		// Companions stop gaining levels at the cap; excess XP is discarded until
@@ -1468,12 +1536,14 @@ public partial class SimpleActor : CharacterBody3D
 			return false;
 		}
 
+		EnsureLevelOneStats();
 		RebirthCount++;
 		Level = 1;
 		Experience = 0;
-		MaxHealth += RebirthStatBonus;
-		Attack += RebirthStatBonus;
-		Defense += RebirthStatBonus;
+		int totalRebirthBonus = RebirthTotalStatBonus;
+		MaxHealth = Mathf.Max(LevelOneMaxHealth + totalRebirthBonus, 1);
+		Attack = Mathf.Max(LevelOneAttack + totalRebirthBonus, 1);
+		Defense = Mathf.Max(LevelOneDefense + totalRebirthBonus, 0);
 		MarkBaseStatsChanged();
 		CurrentHealth = EffectiveMaxHealth;
 		RefreshNameplate();
@@ -1488,10 +1558,19 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		EvolutionStage++;
-		MaxHealth += 36 + EvolutionStage * 14;
+		int healthIncrease = 36 + EvolutionStage * 14;
+		int attackIncrease = 8 + EvolutionStage * 2;
+		int defenseIncrease = 6 + EvolutionStage * 2;
+		MaxHealth += healthIncrease;
 		CurrentHealth = MaxHealth;
-		Attack += 8 + EvolutionStage * 2;
-		Defense += 6 + EvolutionStage * 2;
+		Attack += attackIncrease;
+		Defense += defenseIncrease;
+		if (HasLevelOneStats())
+		{
+			LevelOneMaxHealth += healthIncrease;
+			LevelOneAttack += attackIncrease;
+			LevelOneDefense += defenseIncrease;
+		}
 		AbilityRank++;
 		MarkBaseStatsChanged();
 		ApplyEvolutionAppearance();
@@ -1508,8 +1587,15 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		AbilityRank++;
-		Attack += ActorKind == "monster" ? 2 : 1;
-		Defense += ActorKind == "monster" ? 1 : 2;
+		int attackIncrease = ActorKind == "monster" ? 2 : 1;
+		int defenseIncrease = ActorKind == "monster" ? 1 : 2;
+		Attack += attackIncrease;
+		Defense += defenseIncrease;
+		if (HasLevelOneStats())
+		{
+			LevelOneAttack += attackIncrease;
+			LevelOneDefense += defenseIncrease;
+		}
 		MarkBaseStatsChanged();
 		RefreshNameplate();
 	}

@@ -244,7 +244,7 @@ public partial class MainMenu : Control
 
 	private void BuildWorldListDialog()
 	{
-		_worldListDialog = MakeDialogPanel("world.list_title", out VBoxContainer content, 300.0f, 300.0f);
+		_worldListDialog = MakeDialogPanel("world.list_title", out VBoxContainer content, 390.0f, 320.0f);
 
 		var hint = new Label
 		{
@@ -329,33 +329,102 @@ public partial class MainMenu : Control
 		margin.AddThemeConstantOverride("margin_bottom", 8);
 		row.AddChild(margin);
 
-		var line = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-		line.AddThemeConstantOverride("separation", 8);
-		margin.AddChild(line);
+		var cardContent = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		cardContent.AddThemeConstantOverride("separation", 10);
+		margin.AddChild(cardContent);
 
-		var info = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-		line.AddChild(info);
+		var info = new VBoxContainer
+		{
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		info.AddThemeConstantOverride("separation", 4);
+		cardContent.AddChild(info);
 
-		var nameLabel = new Label { Text = world.Name };
+		var nameLabel = new Label
+		{
+			Text = world.Name,
+			VerticalAlignment = VerticalAlignment.Center,
+			TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis,
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
 		nameLabel.AddThemeFontSizeOverride("font_size", 18);
 		nameLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.94f, 0.78f));
 		info.AddChild(nameLabel);
 
+		var autoSave = new CheckButton
+		{
+			Text = LocaleText.T("world.auto_save"),
+			ButtonPressed = world.AutoSaveOnExit,
+			TooltipText = LocaleText.T("world.auto_save_select_hint"),
+			CustomMinimumSize = new Vector2(156.0f, 38.0f),
+			SizeFlagsVertical = SizeFlags.ShrinkBegin,
+			Alignment = HorizontalAlignment.Left,
+		};
+		autoSave.AddThemeFontSizeOverride("font_size", 14);
+		var autoSaveStyle = new StyleBoxEmpty
+		{
+			ContentMarginLeft = 0.0f,
+			ContentMarginRight = 0.0f,
+			ContentMarginTop = 0.0f,
+			ContentMarginBottom = 0.0f,
+		};
+		autoSave.AddThemeStyleboxOverride("normal", autoSaveStyle);
+		autoSave.AddThemeStyleboxOverride("hover", autoSaveStyle);
+		autoSave.AddThemeStyleboxOverride("pressed", autoSaveStyle);
+		autoSave.AddThemeStyleboxOverride("hover_pressed", autoSaveStyle);
+		autoSave.AddThemeStyleboxOverride("focus", autoSaveStyle);
+		autoSave.AddThemeStyleboxOverride("disabled", autoSaveStyle);
+		bool updatingAutoSave = false;
+		autoSave.Toggled += enabled =>
+		{
+			if (updatingAutoSave)
+			{
+				return;
+			}
+
+			if (SaveGameManager.TrySetWorldAutoSave(world.Id, enabled, out string error))
+			{
+				world.AutoSaveOnExit = enabled;
+				return;
+			}
+
+			GD.PushWarning($"Failed to update auto-save for world {world.Id}: {error}");
+			updatingAutoSave = true;
+			autoSave.SetPressedNoSignal(world.AutoSaveOnExit);
+			updatingAutoSave = false;
+		};
 		string modeText = LocaleText.T(world.LastMode == "multiplayer" ? "world.mode.multiplayer" : "world.mode.single");
-		var meta = new Label { Text = LocaleText.F("world.row_meta", modeText, world.Level, FormatSavedAt(world.SavedAt)) };
-		meta.AddThemeFontSizeOverride("font_size", 12);
+		var meta = new Label
+		{
+			Text = LocaleText.F("world.row_meta", modeText, world.Level, FormatSavedAt(world.SavedAt)),
+			VerticalAlignment = VerticalAlignment.Center,
+			TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis,
+		};
+		meta.AddThemeFontSizeOverride("font_size", 13);
 		meta.AddThemeColorOverride("font_color", new Color(0.66f, 0.76f, 0.88f));
 		info.AddChild(meta);
 
-		var play = new Button { Text = LocaleText.T("world.play_single"), CustomMinimumSize = new Vector2(0.0f, 40.0f) };
+		var actions = new HBoxContainer
+		{
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			Alignment = BoxContainer.AlignmentMode.Begin,
+		};
+		actions.AddThemeConstantOverride("separation", 8);
+		cardContent.AddChild(actions);
+		actions.AddChild(autoSave);
+
+		var play = new Button { Text = LocaleText.T("world.play_single"), CustomMinimumSize = new Vector2(150.0f, 38.0f) };
+		play.AddThemeFontSizeOverride("font_size", 14);
 		play.Pressed += () => PlaySingle(world);
-		line.AddChild(play);
+		actions.AddChild(play);
 
-		var host = new Button { Text = LocaleText.T("world.host"), CustomMinimumSize = new Vector2(0.0f, 40.0f) };
+		var host = new Button { Text = LocaleText.T("world.host"), CustomMinimumSize = new Vector2(150.0f, 38.0f) };
+		host.AddThemeFontSizeOverride("font_size", 14);
 		host.Pressed += () => ShowHostDialog(world);
-		line.AddChild(host);
+		actions.AddChild(host);
 
-		var delete = new Button { Text = LocaleText.T("world.delete"), CustomMinimumSize = new Vector2(0.0f, 40.0f) };
+		var delete = new Button { Text = LocaleText.T("world.delete"), CustomMinimumSize = new Vector2(116.0f, 38.0f) };
+		delete.AddThemeFontSizeOverride("font_size", 14);
 		delete.Pressed += () =>
 		{
 			if (delete.HasMeta("armed"))
@@ -370,7 +439,7 @@ public partial class MainMenu : Control
 				delete.Text = LocaleText.T("world.delete_confirm");
 			}
 		};
-		line.AddChild(delete);
+		actions.AddChild(delete);
 
 		return row;
 	}
