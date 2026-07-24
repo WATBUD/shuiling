@@ -32,6 +32,8 @@ public partial class NetworkManager : Node
 	// Fired on the joining client once the server sent the world seed.
 	public event System.Action? JoinWelcomed;
 	public event System.Action<string>? JoinFailed;
+	// Fired on a client already in the world when the host closes / the link drops.
+	public event System.Action? ServerConnectionLost;
 
 	private readonly Dictionary<long, string> _playerNames = new();
 	private readonly Dictionary<long, RemotePlayerPuppet> _playerPuppets = new();
@@ -51,7 +53,10 @@ public partial class NetworkManager : Node
 	// party's leader peer. Every client mirrors its own party's member list.
 	private readonly Dictionary<long, long> _leaderOf = new();
 	private readonly List<string> _localPartyNames = new();
+	private readonly List<long> _localPartyPeers = new();
 	public IReadOnlyList<string> LocalPartyNames => _localPartyNames;
+	public IReadOnlyList<long> LocalPartyPeers => _localPartyPeers;
+	public long LocalPeerId => IsOnline ? Multiplayer.GetUniqueId() : 0;
 	public bool LocalIsPartyLeader { get; private set; }
 	public bool LocalInParty => _localPartyNames.Count > 0;
 	// Only a leader (or a solo player about to become one) may send invites.
@@ -151,7 +156,7 @@ public partial class NetworkManager : Node
 		WorldSeed = 0;
 		_playerNames.Clear();
 		_leaderOf.Clear();
-		SetLocalPartyMirror(System.Array.Empty<string>(), -1);
+		SetLocalPartyMirror(System.Array.Empty<long>(), System.Array.Empty<string>(), -1);
 		ClearPlayerPuppets();
 	}
 
@@ -289,9 +294,16 @@ public partial class NetworkManager : Node
 		ResetSession();
 		if (wasInWorld)
 		{
-			// Host closed the room — kick the client back to the main menu.
 			Input.MouseMode = Input.MouseModeEnum.Visible;
-			CallDeferred(MethodName.ReturnClientToMainMenu);
+			if (ServerConnectionLost != null)
+			{
+				// In-world UI shows a notice, then returns to the menu on confirm.
+				ServerConnectionLost.Invoke();
+			}
+			else
+			{
+				CallDeferred(MethodName.ReturnClientToMainMenu);
+			}
 		}
 		else
 		{
@@ -1148,7 +1160,7 @@ public partial class NetworkManager : Node
 		{
 			if (member == 1)
 			{
-				SetLocalPartyMirror(names, leader);
+				SetLocalPartyMirror(peers, names, leader);
 			}
 			else
 			{
@@ -1197,7 +1209,7 @@ public partial class NetworkManager : Node
 	{
 		if (peer == 1)
 		{
-			SetLocalPartyMirror(System.Array.Empty<string>(), -1);
+			SetLocalPartyMirror(System.Array.Empty<long>(), System.Array.Empty<string>(), -1);
 		}
 		else
 		{
@@ -1226,7 +1238,7 @@ public partial class NetworkManager : Node
 	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
 	private void ClientPartyMembers(long[] peers, string[] names, long leaderPeer)
 	{
-		SetLocalPartyMirror(names, leaderPeer);
+		SetLocalPartyMirror(peers, names, leaderPeer);
 	}
 
 	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
@@ -1241,12 +1253,18 @@ public partial class NetworkManager : Node
 		PostWorldMessage(LocaleText.T(messageKey), new Color(1.0f, 0.82f, 0.55f));
 	}
 
-	private void SetLocalPartyMirror(string[] names, long leaderPeer)
+	private void SetLocalPartyMirror(long[] peers, string[] names, long leaderPeer)
 	{
 		_localPartyNames.Clear();
 		if (names != null)
 		{
 			_localPartyNames.AddRange(names);
+		}
+
+		_localPartyPeers.Clear();
+		if (peers != null)
+		{
+			_localPartyPeers.AddRange(peers);
 		}
 
 		LocalIsPartyLeader = leaderPeer == Multiplayer.GetUniqueId();
