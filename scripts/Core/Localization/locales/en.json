@@ -544,6 +544,8 @@
 	"character.select.start": "Start Adventure",
 	"character.select.start_single": "Create & Play Solo",
 	"character.select.start_host": "Create & Host Multiplayer",
+	"character.select.title_join": "Choose Your Character (Joining Server)",
+	"character.select.start_join": "Join Game",
 	"character.select.none": "No usable character models found.",
 	"character.rogue": "Rogue",
 	"character.knight": "Knight",

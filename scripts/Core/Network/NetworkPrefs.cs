@@ -34,6 +34,38 @@ public static class NetworkPrefs
 		return result;
 	}
 
+	// The character a player last used when joining someone else's server. Once
+	// set, joining skips character-select and reuses this "record"; empty model
+	// path means no record yet (first-time join → show character-select).
+	public readonly record struct GuestProfile(string ModelPath, string Name);
+
+	public static GuestProfile GetGuestProfile()
+	{
+		var config = new ConfigFile();
+		if (config.Load(ConfigPath) != Error.Ok)
+		{
+			return new GuestProfile(string.Empty, string.Empty);
+		}
+
+		string modelPath = config.GetValue("guest", "model_path", string.Empty).AsString();
+		string name = config.GetValue("guest", "name", string.Empty).AsString();
+		return new GuestProfile(modelPath, name);
+	}
+
+	public static bool HasGuestProfile()
+	{
+		return !string.IsNullOrWhiteSpace(GetGuestProfile().ModelPath);
+	}
+
+	public static void SaveGuestProfile(string modelPath, string name)
+	{
+		var config = new ConfigFile();
+		config.Load(ConfigPath); // Preserve existing sections (recent servers).
+		config.SetValue("guest", "model_path", modelPath ?? string.Empty);
+		config.SetValue("guest", "name", name ?? string.Empty);
+		config.Save(ConfigPath);
+	}
+
 	public static void AddRecentServer(string address, int port)
 	{
 		if (string.IsNullOrWhiteSpace(address))

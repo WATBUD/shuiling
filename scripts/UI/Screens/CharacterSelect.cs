@@ -11,16 +11,19 @@ public partial class CharacterSelect : Control
 	private readonly List<Button> _cellButtons = new();
 	private List<(string Path, string Display)> _models = new();
 	private LineEdit _nameEdit = null!;
-	private LineEdit _worldNameEdit = null!;
-	private CheckBox _autoSaveCheck = null!;
+	private LineEdit? _worldNameEdit;
+	private CheckBox? _autoSaveCheck;
 	private Button _startButton = null!;
 	private int _selectedIndex;
 	private bool _isMultiplayer;
+	private bool _isJoiningGuest;
 	private float _cellWidth = 190.0f;
 
 	public override void _Ready()
 	{
-		// Mode was chosen on the "new world" window before this screen.
+		// Joining someone else's server: pick a character for the guest, no world
+		// creation. Otherwise the mode was chosen on the "new world" window.
+		_isJoiningGuest = GameLaunchOptions.IsJoiningGuest;
 		_isMultiplayer = GameLaunchOptions.NewWorldIsMultiplayer;
 		_models = ExternalModelLibrary.GetAvailableCharacterModels();
 		BuildUi();
@@ -54,7 +57,7 @@ public partial class CharacterSelect : Control
 
 		var title = new Label
 		{
-			Text = LocaleText.T("character.select.title"),
+			Text = LocaleText.T(_isJoiningGuest ? "character.select.title_join" : "character.select.title"),
 			HorizontalAlignment = HorizontalAlignment.Center,
 			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 		};
@@ -113,33 +116,38 @@ public partial class CharacterSelect : Control
 		_nameEdit.TextChanged += _ => UpdateStartEnabled();
 		nameRow.AddChild(_nameEdit);
 
-		var worldRow = new HBoxContainer();
-		worldRow.AddThemeConstantOverride("separation", 10);
-		root.AddChild(worldRow);
-
-		var worldLabel = new Label { Text = LocaleText.T("world.name_label") };
-		worldLabel.AddThemeFontSizeOverride("font_size", 13);
-		worldLabel.AddThemeColorOverride("font_color", new Color(0.82f, 0.9f, 1.0f));
-		worldRow.AddChild(worldLabel);
-
-		_worldNameEdit = new LineEdit
+		// A joining guest picks only a character + name — no world is created, so
+		// the world-name and auto-save controls are omitted.
+		if (!_isJoiningGuest)
 		{
-			Text = LocaleText.T("world.default_name"),
-			CustomMinimumSize = new Vector2(180.0f, 30.0f),
-			MaxLength = GameLaunchOptions.MaxWorldNameLength,
-			SizeFlagsHorizontal = SizeFlags.ExpandFill,
-		};
-		_worldNameEdit.TextChanged += _ => UpdateStartEnabled();
-		worldRow.AddChild(_worldNameEdit);
+			var worldRow = new HBoxContainer();
+			worldRow.AddThemeConstantOverride("separation", 10);
+			root.AddChild(worldRow);
 
-		_autoSaveCheck = new CheckBox
-		{
-			Text = LocaleText.T("world.auto_save"),
-			ButtonPressed = true,
-			SizeFlagsHorizontal = SizeFlags.ShrinkCenter,
-		};
-		_autoSaveCheck.AddThemeFontSizeOverride("font_size", 14);
-		root.AddChild(_autoSaveCheck);
+			var worldLabel = new Label { Text = LocaleText.T("world.name_label") };
+			worldLabel.AddThemeFontSizeOverride("font_size", 13);
+			worldLabel.AddThemeColorOverride("font_color", new Color(0.82f, 0.9f, 1.0f));
+			worldRow.AddChild(worldLabel);
+
+			_worldNameEdit = new LineEdit
+			{
+				Text = LocaleText.T("world.default_name"),
+				CustomMinimumSize = new Vector2(180.0f, 30.0f),
+				MaxLength = GameLaunchOptions.MaxWorldNameLength,
+				SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			};
+			_worldNameEdit.TextChanged += _ => UpdateStartEnabled();
+			worldRow.AddChild(_worldNameEdit);
+
+			_autoSaveCheck = new CheckBox
+			{
+				Text = LocaleText.T("world.auto_save"),
+				ButtonPressed = true,
+				SizeFlagsHorizontal = SizeFlags.ShrinkCenter,
+			};
+			_autoSaveCheck.AddThemeFontSizeOverride("font_size", 14);
+			root.AddChild(_autoSaveCheck);
+		}
 
 		var buttons = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
 		buttons.AddThemeConstantOverride("separation", 12);
@@ -148,21 +156,36 @@ public partial class CharacterSelect : Control
 		var backButton = MakeButton(LocaleText.T("dialog.button.cancel"));
 		backButton.Pressed += () =>
 		{
-			// Multiplayer: a server was created on the host screen before this step;
-			// tear it down when backing out.
-			if (_isMultiplayer)
+			// Joining a server (guest) or hosting: a live session exists here, so tear
+			// it down when backing out (guest disconnects, host stops the server).
+			if (_isJoiningGuest || _isMultiplayer)
 			{
 				NetworkManager.Instance?.ResetSession();
 			}
 
-			// Return to the previous screen (world list + single/multiplayer choice).
-			GameLaunchOptions.ReturnToNewWorldMode = true;
+			GameLaunchOptions.IsJoiningGuest = false;
+			// Guests just go back to the main menu; new-world flows reopen the world
+			// list + single/multiplayer choice.
+			GameLaunchOptions.ReturnToNewWorldMode = !_isJoiningGuest;
 			GetTree().ChangeSceneToFile("res://main_menu.tscn");
 		};
 		buttons.AddChild(backButton);
 
-		_startButton = MakeButton(LocaleText.T(_isMultiplayer ? "character.select.start_host" : "character.select.start_single"));
-		_startButton.Pressed += () => StartGame(_isMultiplayer);
+		string startKey = _isJoiningGuest
+			? "character.select.start_join"
+			: (_isMultiplayer ? "character.select.start_host" : "character.select.start_single");
+		_startButton = MakeButton(LocaleText.T(startKey));
+		_startButton.Pressed += () =>
+		{
+			if (_isJoiningGuest)
+			{
+				StartJoinGuest();
+			}
+			else
+			{
+				StartGame(_isMultiplayer);
+			}
+		};
 		buttons.AddChild(_startButton);
 
 		SelectModel(0);
@@ -271,6 +294,29 @@ public partial class CharacterSelect : Control
 		_startButton.Disabled = !ready;
 	}
 
+	// Enter a host's world as a transient guest with the chosen character. The
+	// connection is already open (opened on the join dialog); we just save the
+	// character "record" so future joins skip this screen, then enter the world.
+	private void StartJoinGuest()
+	{
+		if (_models.Count == 0)
+		{
+			return;
+		}
+
+		string name = _nameEdit.Text.Trim();
+		if (name.Length == 0)
+		{
+			name = LocaleText.T("player.default_name");
+		}
+
+		string modelPath = _models[_selectedIndex].Path;
+		NetworkPrefs.SaveGuestProfile(modelPath, name);
+		GameLaunchOptions.IsJoiningGuest = false;
+		GameLaunchOptions.StartJoinGuest(modelPath, name);
+		GetTree().ChangeSceneToFile("res://node_3d.tscn");
+	}
+
 	private void StartGame(bool host)
 	{
 		if (_models.Count == 0)
@@ -284,7 +330,7 @@ public partial class CharacterSelect : Control
 			name = LocaleText.T("player.default_name");
 		}
 
-		string worldName = _worldNameEdit.Text.Trim();
+		string worldName = _worldNameEdit?.Text.Trim() ?? string.Empty;
 		if (worldName.Length == 0)
 		{
 			worldName = LocaleText.T("world.default_name");
@@ -306,7 +352,7 @@ public partial class CharacterSelect : Control
 			}
 		}
 
-		GameLaunchOptions.NewWorldAutoSave = _autoSaveCheck.ButtonPressed;
+		GameLaunchOptions.NewWorldAutoSave = _autoSaveCheck?.ButtonPressed ?? true;
 		GameLaunchOptions.StartNewWorld(SaveGameManager.NewWorldId(), worldName, seed, _models[_selectedIndex].Path, name);
 
 		if (host)

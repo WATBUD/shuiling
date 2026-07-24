@@ -544,6 +544,8 @@
 	"character.select.start": "開始冒險",
 	"character.select.start_single": "建立並單機遊玩",
 	"character.select.start_host": "建立並主持多人",
+	"character.select.title_join": "選擇你的角色（加入伺服器）",
+	"character.select.start_join": "加入遊戲",
 	"character.select.none": "找不到可用的角色模型。",
 	"character.rogue": "盜賊",
 	"character.knight": "騎士",
