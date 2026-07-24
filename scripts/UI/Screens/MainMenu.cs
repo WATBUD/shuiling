@@ -15,6 +15,7 @@ public partial class MainMenu : Control
 	private LineEdit _joinPortEdit = null!;
 	private OptionButton _recentServerOption = null!;
 	private System.Collections.Generic.List<NetworkPrefs.ServerEntry> _recentServers = new();
+	private bool _awaitingJoin;
 	private Label _hostStatusLabel = null!;
 	private Label _hostWorldLabel = null!;
 	private Label _hostIpLabel = null!;
@@ -881,10 +882,16 @@ public partial class MainMenu : Control
 		NetworkPrefs.AddRecentServer(address, port);
 		_joinConfirmButton.Disabled = true;
 		_joinStatusLabel.Text = LocaleText.T("net.status.connecting");
+
+		// Fail gracefully instead of hanging on "connecting" forever.
+		_awaitingJoin = true;
+		SceneTreeTimer timer = GetTree().CreateTimer(12.0);
+		timer.Timeout += OnJoinTimeout;
 	}
 
 	private void CancelJoining()
 	{
+		_awaitingJoin = false;
 		NetworkManager.Instance?.ResetSession();
 		if (_joinDialog != null)
 		{
@@ -892,8 +899,26 @@ public partial class MainMenu : Control
 		}
 	}
 
+	private void OnJoinTimeout()
+	{
+		// The MainMenu may already be freed (join succeeded and changed scene).
+		if (!GodotObject.IsInstanceValid(this) || !_awaitingJoin)
+		{
+			return;
+		}
+
+		_awaitingJoin = false;
+		NetworkManager.Instance?.ResetSession();
+		if (_joinDialog != null && _joinDialog.Visible)
+		{
+			_joinStatusLabel.Text = LocaleText.T("net.error.timeout");
+			_joinConfirmButton.Disabled = false;
+		}
+	}
+
 	private void OnJoinWelcomed()
 	{
+		_awaitingJoin = false;
 		// Seed received from the host — enter the shared world. A dedicated "guest"
 		// slot carries this player's own character/progress across servers.
 		GameLaunchOptions.ActiveWorldId = "guest";
@@ -911,6 +936,7 @@ public partial class MainMenu : Control
 
 	private void OnJoinFailed(string reason)
 	{
+		_awaitingJoin = false;
 		if (_joinDialog != null && _joinDialog.Visible)
 		{
 			_joinStatusLabel.Text = reason;

@@ -150,6 +150,7 @@ public partial class PlayerController : CharacterBody3D
 	private Camera3D _camera = null!;
 	private TargetInfoPanel _targetInfoPanel = null!;
 	private PartyPanel _partyPanel = null!;
+	private PartyInvitePanel _partyInvitePanel = null!;
 	private InventoryPanel _inventoryPanel = null!;
 	private FormationPanel _formationPanel = null!;
 	private MerchantShopPanel _merchantShopPanel = null!;
@@ -270,6 +271,7 @@ public partial class PlayerController : CharacterBody3D
 		CreateMinimapPanel();
 		CreateCaptureRhythmPanel();
 		CreatePartyPanel();
+		CreatePartyInvitePanel();
 		CreateInventoryPanel();
 		CreateFormationPanel();
 		CreateMerchantShopPanel();
@@ -290,6 +292,7 @@ public partial class PlayerController : CharacterBody3D
 		CreateCaptureAmmoHud();
 		CreateMailboxHud();
 		CreateCardAlbumHud();
+		CreateMultiplayerPartyHud();
 		CreateDamageFlashHud();
 		CreateInteractionPromptHud();
 		CreateSystemLogPanel();
@@ -393,6 +396,10 @@ public partial class PlayerController : CharacterBody3D
 			{
 				SetCardAlbumPanelVisible(false);
 			}
+			else if (_partyInvitePanel.Visible)
+			{
+				SetPartyInvitePanelVisible(false);
+			}
 			else if (_partyPanel.Visible)
 			{
 				SetPartyPanelVisible(false);
@@ -434,11 +441,19 @@ public partial class PlayerController : CharacterBody3D
 
 		if (@event.IsActionPressed("party_panel"))
 		{
+			// P now opens the multiplayer (free party) invite panel.
+			SetPartyInvitePanelVisible(!_partyInvitePanel.Visible);
+			return;
+		}
+
+		if (@event.IsActionPressed("companion_party_panel"))
+		{
+			// U opens the companion (夥伴隊伍) panel that P used to open.
 			SetPartyPanelVisible(!_partyPanel.Visible);
 			return;
 		}
 
-		if (_partyPanel.Visible)
+		if (_partyPanel.Visible || _partyInvitePanel.Visible)
 		{
 			return;
 		}
@@ -627,6 +642,7 @@ public partial class PlayerController : CharacterBody3D
 		AddKeyAction("interact", Key.E);
 		AddKeyAction("save_game", Key.F5);
 		AddKeyAction("party_panel", Key.P);
+		AddKeyAction("companion_party_panel", Key.U);
 		AddKeyAction("inventory_panel", Key.I);
 		AddKeyAction("formation_panel", Key.F);
 		AddKeyAction("town_portal", Key.T);

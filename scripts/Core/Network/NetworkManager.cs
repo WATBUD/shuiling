@@ -46,6 +46,14 @@ public partial class NetworkManager : Node
 	// Host-only outbox: gift mail for players not currently connected, keyed by
 	// name and flushed when that player next joins (persisted in the host save).
 	private readonly List<PendingMailSaveData> _pendingMail = new();
+
+	// Party (自由組隊). Host authority: _leaderOf maps each member peer to its
+	// party's leader peer. Every client mirrors its own party's member list.
+	private readonly Dictionary<long, long> _leaderOf = new();
+	private readonly List<string> _localPartyNames = new();
+	public IReadOnlyList<string> LocalPartyNames => _localPartyNames;
+	public event System.Action<long, string>? PartyInviteReceived;
+	public event System.Action? PartyChanged;
 	private float _playerStateRemaining;
 	private float _monsterStateRemaining;
 
@@ -138,6 +146,8 @@ public partial class NetworkManager : Node
 		Mode = NetMode.Offline;
 		WorldSeed = 0;
 		_playerNames.Clear();
+		_leaderOf.Clear();
+		SetLocalPartyMirror(System.Array.Empty<string>());
 		ClearPlayerPuppets();
 	}
 
@@ -188,6 +198,31 @@ public partial class NetworkManager : Node
 		return _playerNames.TryGetValue(peerId, out string? name) ? name : LocaleText.T("net.player.default_name");
 	}
 
+	public readonly record struct ConnectedPlayer(long PeerId, string Name, string MapId, int Tier, bool IsLocal);
+
+	// Everyone currently in the session (local player first), with the map/tier
+	// instance they are in — drives the HUD party list and the invite panel.
+	public List<ConnectedPlayer> GetConnectedPlayers()
+	{
+		var players = new List<ConnectedPlayer>();
+		if (!IsOnline || ActiveWorld == null || !IsInstanceValid(ActiveWorld))
+		{
+			return players;
+		}
+
+		string localMap = ActiveWorld.ActiveMapId;
+		players.Add(new ConnectedPlayer(Multiplayer.GetUniqueId(), LocalPlayerName, localMap, ActiveWorld.GetSelectedTier(localMap), true));
+		foreach (KeyValuePair<long, RemotePlayerPuppet> entry in _playerPuppets)
+		{
+			if (IsInstanceValid(entry.Value))
+			{
+				players.Add(new ConnectedPlayer(entry.Key, GetPlayerName(entry.Key), entry.Value.MapId, entry.Value.Tier, false));
+			}
+		}
+
+		return players;
+	}
+
 	// Use the player's chosen character name (not the OS user name) for multiplayer.
 	// Broadcasts the new name so every connected peer relabels this player.
 	public void SetLocalPlayerName(string name)
@@ -229,6 +264,7 @@ public partial class NetworkManager : Node
 			_playerPuppets.Remove(peerId);
 		}
 		RemoveCompanionPuppetsFor(peerId);
+		HandlePartyDisconnect(peerId);
 		PostWorldMessage(LocaleText.F("system.net.player_left", name), new Color(1.0f, 0.72f, 0.5f));
 	}
 
@@ -930,6 +966,211 @@ public partial class NetworkManager : Node
 			}
 
 			map.Remove(slot);
+		}
+	}
+
+	// ---------------------------------------------------------------- party (自由組隊)
+
+	// Local player invites another player (by peer id) to their party.
+	public void InvitePlayerToParty(long targetPeer)
+	{
+		if (!IsOnline || targetPeer == Multiplayer.GetUniqueId())
+		{
+			return;
+		}
+
+		if (IsHost)
+		{
+			HostProcessInvite(1, targetPeer);
+		}
+		else
+		{
+			RpcId(1, MethodName.ServerRequestPartyInvite, targetPeer);
+		}
+	}
+
+	// Local player answers an invite (accept/decline).
+	public void RespondToPartyInvite(long inviterPeer, bool accept)
+	{
+		if (!IsOnline)
+		{
+			return;
+		}
+
+		if (IsHost)
+		{
+			HostProcessResponse(1, inviterPeer, accept);
+		}
+		else
+		{
+			RpcId(1, MethodName.ServerRespondPartyInvite, inviterPeer, accept);
+		}
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ServerRequestPartyInvite(long targetPeer)
+	{
+		if (Multiplayer.IsServer())
+		{
+			HostProcessInvite(Multiplayer.GetRemoteSenderId(), targetPeer);
+		}
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ServerRespondPartyInvite(long inviterPeer, bool accept)
+	{
+		if (Multiplayer.IsServer())
+		{
+			HostProcessResponse(Multiplayer.GetRemoteSenderId(), inviterPeer, accept);
+		}
+	}
+
+	// Host: route an invite to the target (locally if the host is the target).
+	private void HostProcessInvite(long inviter, long target)
+	{
+		if (inviter == target || !_playerNames.ContainsKey(target))
+		{
+			return;
+		}
+
+		string inviterName = GetPlayerName(inviter);
+		if (target == 1)
+		{
+			PartyInviteReceived?.Invoke(inviter, inviterName);
+		}
+		else
+		{
+			RpcId(target, MethodName.ClientReceivePartyInvite, inviter, inviterName);
+		}
+	}
+
+	// Host: apply an invite response and update party membership.
+	private void HostProcessResponse(long responder, long inviter, bool accept)
+	{
+		string responderName = GetPlayerName(responder);
+		if (inviter == 1)
+		{
+			DeliverInviteResultLocally(responderName, accept);
+		}
+		else
+		{
+			RpcId(inviter, MethodName.ClientPartyInviteResult, responderName, accept);
+		}
+
+		if (!accept)
+		{
+			return;
+		}
+
+		long leader = _leaderOf.TryGetValue(inviter, out long existing) ? existing : inviter;
+		_leaderOf[inviter] = leader;
+		_leaderOf[responder] = leader;
+		BroadcastPartyForLeader(leader);
+	}
+
+	private void BroadcastPartyForLeader(long leader)
+	{
+		var members = new List<long> { leader };
+		foreach (KeyValuePair<long, long> entry in _leaderOf)
+		{
+			if (entry.Value == leader && entry.Key != leader)
+			{
+				members.Add(entry.Key);
+			}
+		}
+
+		var peers = members.ToArray();
+		var names = new string[members.Count];
+		for (int i = 0; i < members.Count; i++)
+		{
+			names[i] = GetPlayerName(members[i]);
+		}
+
+		foreach (long member in members)
+		{
+			if (member == 1)
+			{
+				SetLocalPartyMirror(names);
+			}
+			else
+			{
+				RpcId(member, MethodName.ClientPartyMembers, peers, names);
+			}
+		}
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ClientReceivePartyInvite(long inviterPeer, string inviterName)
+	{
+		PartyInviteReceived?.Invoke(inviterPeer, inviterName);
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ClientPartyMembers(long[] peers, string[] names)
+	{
+		SetLocalPartyMirror(names);
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ClientPartyInviteResult(string responderName, bool accepted)
+	{
+		DeliverInviteResultLocally(responderName, accepted);
+	}
+
+	private void SetLocalPartyMirror(string[] names)
+	{
+		_localPartyNames.Clear();
+		if (names != null)
+		{
+			_localPartyNames.AddRange(names);
+		}
+
+		PartyChanged?.Invoke();
+	}
+
+	private void DeliverInviteResultLocally(string responderName, bool accepted)
+	{
+		string key = accepted ? "system.party.accepted" : "system.party.declined";
+		PostWorldMessage(LocaleText.F(key, responderName), accepted ? new Color(0.7f, 1.0f, 0.78f) : new Color(1.0f, 0.78f, 0.55f));
+	}
+
+	private void HandlePartyDisconnect(long peerId)
+	{
+		if (!IsHost)
+		{
+			return;
+		}
+
+		_leaderOf.TryGetValue(peerId, out long leaderOfPeer);
+		bool wasMember = _leaderOf.Remove(peerId);
+
+		// Members led by the departing peer are orphaned — clear their party.
+		var orphans = new List<long>();
+		foreach (KeyValuePair<long, long> entry in _leaderOf)
+		{
+			if (entry.Value == peerId)
+			{
+				orphans.Add(entry.Key);
+			}
+		}
+
+		foreach (long orphan in orphans)
+		{
+			_leaderOf.Remove(orphan);
+			if (orphan == 1)
+			{
+				SetLocalPartyMirror(System.Array.Empty<string>());
+			}
+			else
+			{
+				RpcId(orphan, MethodName.ClientPartyMembers, System.Array.Empty<long>(), System.Array.Empty<string>());
+			}
+		}
+
+		// A remaining party shrinks by one — refresh it.
+		if (wasMember && leaderOfPeer != peerId)
+		{
+			BroadcastPartyForLeader(leaderOfPeer);
 		}
 	}
 }
