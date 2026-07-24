@@ -121,13 +121,20 @@ public partial class World : Node3D
 	public string ActiveMapId => _activeMapId;
 	public string GetActiveMapDisplayName()
 	{
-		if (IsCaveMapId(_activeMapId))
+		return GetMapDisplayName(_activeMapId);
+	}
+
+	// Localized display name for any map id (used by the multiplayer party list).
+	public string GetMapDisplayName(string mapId)
+	{
+		if (IsCaveMapId(mapId))
 		{
-			return GetCaveMapDisplayName(_activeMapId);
+			return GetCaveMapDisplayName(mapId);
 		}
-		return _activeMapId == "city"
+
+		return mapId == "city"
 			? LocaleText.T("map.city")
-			: GetWildMapDisplayName(_activeMapId);
+			: GetWildMapDisplayName(mapId);
 	}
 	public int CurrentLivingMonsterCount
 	{
@@ -252,8 +259,12 @@ public partial class World : Node3D
 		NetworkAfterWorldReady();
 		_musicPlayer.PlayForMap(_activeMapId);
 
-		// Multiplayer: broadcast the player's chosen character name (not OS name).
-		if (NetworkManager.Instance is { IsOnline: true } && _player != null && IsInstanceValid(_player))
+		// Multiplayer: broadcast the player's chosen character name — but only if
+		// they actually named their character. Otherwise keep the unique default
+		// name so two default players don't both show the same generic name.
+		if (NetworkManager.Instance is { IsOnline: true } && _player != null && IsInstanceValid(_player)
+			&& !string.IsNullOrWhiteSpace(_player.PlayerName)
+			&& _player.PlayerName != "player.default_name")
 		{
 			NetworkManager.Instance.SetLocalPlayerName(LocaleText.T(_player.PlayerName));
 		}

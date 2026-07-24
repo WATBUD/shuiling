@@ -248,6 +248,40 @@ public partial class PlayerController
 		UpdateMouseModeForPanels();
 	}
 
+	private void CreatePartyInvitePanel()
+	{
+		var layer = new CanvasLayer { Name = "PartyInviteLayer", Layer = 31 };
+		AddChild(layer);
+		_partyInvitePanel = new PartyInvitePanel();
+		layer.AddChild(_partyInvitePanel);
+		_partyInvitePanel.CloseRequested = () => SetPartyInvitePanelVisible(false);
+
+		// Invite popup lives on a high layer so it appears over any open panel.
+		var dialogLayer = new CanvasLayer { Name = "PartyInviteDialogLayer", Layer = 47 };
+		AddChild(dialogLayer);
+		dialogLayer.AddChild(new PartyInviteDialog());
+	}
+
+	private void SetPartyInvitePanelVisible(bool visible)
+	{
+		_partyInvitePanel.SetPanelVisible(visible);
+		if (visible)
+		{
+			SetPauseMenuVisible(false, false);
+			_partyPanel.SetPanelVisible(false);
+			_settingsPanel.SetPanelVisible(false);
+			_inventoryPanel.SetPanelVisible(false);
+			_formationPanel.SetPanelVisible(false);
+			_merchantShopPanel.SetPanelVisible(false);
+			_mercenaryShopPanel.SetPanelVisible(false);
+			_warehousePanel.SetPanelVisible(false);
+			CloseNpcQuestDialog();
+			CloseMapTravelDialog();
+		}
+
+		UpdateMouseModeForPanels();
+	}
+
 	private void SetInventoryPanelVisible(bool visible)
 	{
 		_inventoryPanel.SetPanelVisible(visible);
