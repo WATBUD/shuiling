@@ -309,9 +309,9 @@ public partial class PlayerController
 			return;
 		}
 
-		// High level so every core slot (1 main + 6 support) is already unlocked, then
-		// deck it out with a full fire-mage core chain to showcase the system.
-		SimpleActor bunny = world.SpawnPurchasedPet("name.monster.bunny", 40, 1100, 150, 80);
+		// Starter showcase pet — tentatively max level (100) with matching stats so
+		// every core slot is unlocked and the full core chain can be shown off.
+		SimpleActor bunny = world.SpawnPurchasedPet("name.monster.bunny", 100, 2600, 260, 150);
 		CaptureActor(bunny);
 		EquipFullCoreShowcase(bunny);
 	}

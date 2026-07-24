@@ -251,7 +251,7 @@ public partial class PlayerController : CharacterBody3D
 	public bool BossAnnouncementsEnabled => _bossAnnouncementsEnabled;
 	public float BossAnnouncementOpacity => _bossAnnouncementOpacity;
 	public float HealthRatio => MaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)MaxHealth, 0.0f, 1.0f);
-	public int ExperienceToNextLevel => 60 + Level * 30;
+	public int ExperienceToNextLevel => ExperienceTable.ToNextLevel(Level);
 
 	public override void _Ready()
 	{

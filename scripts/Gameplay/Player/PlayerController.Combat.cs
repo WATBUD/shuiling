@@ -324,15 +324,18 @@ public partial class PlayerController
 		return healing;
 	}
 
-	public void GrantCombatExperience(int amount)
+	public void GrantCombatExperience(int amount, int sourceLevel = 1)
 	{
-		int experience = Mathf.Max(amount, 0);
-		if (experience <= 0)
+		int amountBase = Mathf.Max(amount, 0);
+		if (amountBase <= 0)
 		{
 			return;
 		}
 
-		Experience += experience;
+		// The player and each companion scale the reward by their OWN level gap to
+		// the defeated monster — over-leveled earners gain almost nothing.
+		int playerXp = ExperienceTable.ScaleReward(amountBase, Level, sourceLevel);
+		Experience += playerXp;
 		while (Experience >= ExperienceToNextLevel)
 		{
 			Experience -= ExperienceToNextLevel;
@@ -347,11 +350,11 @@ public partial class PlayerController
 		{
 			if (IsInstanceValid(actor) && actor.IsInActiveParty)
 			{
-				actor.GrantTraining(experience);
+				actor.GrantTraining(ExperienceTable.ScaleReward(amountBase, actor.Level, sourceLevel));
 			}
 		}
 
-		PostSystemMessage(LocaleText.F("system.exp.party_gain", experience), new Color(0.86f, 0.78f, 1.0f), GameMessageChannel.Combat);
+		PostSystemMessage(LocaleText.F("system.exp.party_gain", playerXp), new Color(0.86f, 0.78f, 1.0f), GameMessageChannel.Combat);
 		_partyPanel.RefreshParty();
 	}
 
