@@ -91,6 +91,16 @@ public partial class NetworkManager : Node
 		return string.Empty;
 	}
 
+	// Host-only: use an existing world's saved seed so a hosted world matches its
+	// single-player layout. Call after CreateServer, before entering the world.
+	public void OverrideWorldSeed(int seed)
+	{
+		if (IsHost && seed != 0)
+		{
+			WorldSeed = seed;
+		}
+	}
+
 	public string JoinServer(string address, int port)
 	{
 		if (IsOnline)

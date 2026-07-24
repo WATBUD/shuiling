@@ -199,16 +199,37 @@ public partial class PlayerController
 
 	private void SaveCurrentGame()
 	{
+		SaveGameToActiveWorld(true);
+	}
+
+	// Save the current world to its slot. announce=false suppresses the on-screen
+	// message (used for the silent auto-save when a new world is first created).
+	public void SaveGameToActiveWorld(bool announce)
+	{
 		if (GetParent() is not World world)
 		{
 			return;
 		}
 
-		if (SaveGameManager.TrySave(world.ExportSaveData(), out string error))
+		string worldId = GameLaunchOptions.ActiveWorldId;
+		if (string.IsNullOrEmpty(worldId))
 		{
-			PostSystemMessage(LocaleText.T("system.save.success"), new Color(0.72f, 1.0f, 0.78f));
+			if (announce)
+			{
+				PostSystemMessage(LocaleText.T("system.save.no_world"), new Color(1.0f, 0.72f, 0.5f));
+			}
+
+			return;
 		}
-		else
+
+		if (SaveGameManager.TrySave(worldId, world.ExportSaveData(), out string error))
+		{
+			if (announce)
+			{
+				PostSystemMessage(LocaleText.T("system.save.success"), new Color(0.72f, 1.0f, 0.78f));
+			}
+		}
+		else if (announce)
 		{
 			PostSystemMessage(LocaleText.F("system.save.failed", error), new Color(1.0f, 0.42f, 0.34f));
 		}

@@ -73,6 +73,10 @@ public partial class World : Node3D
 	[Export] public int SeedValue { get; set; }
 
 	private readonly RandomNumberGenerator _rng = new();
+	// Active world-slot identity/seed for saving (Minecraft-style worlds).
+	private int _activeWorldSeed;
+	private string _worldSaveId = string.Empty;
+	private string _worldSaveName = string.Empty;
 	private readonly List<Vector3> _obstaclePositions = new();
 	private readonly List<Vector3> _wildObstaclePositions = new();
 	private readonly Dictionary<string, Node3D> _wildMapRootsById = new();
@@ -202,6 +206,12 @@ public partial class World : Node3D
 		LocaleText.LanguageChanged += RefreshLocalizedWorldLabels;
 
 		NetworkBeforeWorldGeneration();
+		// Offline: seed from the chosen/loaded world slot (online: NetworkBefore…
+		// already forced SeedValue to the shared Net.WorldSeed).
+		if (SeedValue == 0 && GameLaunchOptions.ActiveSeed != 0)
+		{
+			SeedValue = GameLaunchOptions.ActiveSeed;
+		}
 		if (SeedValue == 0)
 		{
 			_rng.Randomize();
@@ -210,6 +220,9 @@ public partial class World : Node3D
 		{
 			_rng.Seed = (ulong)SeedValue;
 		}
+		_activeWorldSeed = unchecked((int)_rng.Seed);
+		_worldSaveId = GameLaunchOptions.ActiveWorldId;
+		_worldSaveName = GameLaunchOptions.NewWorldName;
 
 		CreateMaterials();
 		BuildEnvironment();
@@ -221,6 +234,12 @@ public partial class World : Node3D
 		{
 			LoadRequestedSave();
 			GameLaunchOptions.StartNewGame();
+		}
+		else if (!string.IsNullOrEmpty(_worldSaveId) && NetworkManager.Instance is not { IsClient: true })
+		{
+			// A brand-new world (single-player or fresh host): persist it once so
+			// it appears in the world list even before the first manual save.
+			CallDeferred(nameof(AutoSaveNewWorld));
 		}
 		NetworkAfterWorldReady();
 	}
@@ -2545,6 +2564,10 @@ public partial class World : Node3D
 	{
 		return new SaveGameData
 		{
+			WorldId = _worldSaveId,
+			WorldName = _worldSaveName,
+			WorldSeed = _activeWorldSeed,
+			LastMode = NetworkManager.Instance is { IsOnline: true } ? "multiplayer" : "single",
 			ActiveMapId = _activeMapId,
 			PlayerPosition = ToSaveVector(_player.GlobalPosition),
 			Player = _player.ExportSaveData(),
@@ -2554,9 +2577,18 @@ public partial class World : Node3D
 		};
 	}
 
+	// Persist a freshly-created world once so it shows up in the world list.
+	private void AutoSaveNewWorld()
+	{
+		if (_player != null && IsInstanceValid(_player))
+		{
+			_player.SaveGameToActiveWorld(false);
+		}
+	}
+
 	private void LoadRequestedSave()
 	{
-		if (!SaveGameManager.TryLoad(out SaveGameData data, out string error))
+		if (!SaveGameManager.TryLoad(GameLaunchOptions.ActiveWorldId, out SaveGameData data, out string error))
 		{
 			_player.PostSystemMessage(LocaleText.F("system.load.failed", error), new Color(1.0f, 0.42f, 0.34f));
 			return;
@@ -2620,6 +2652,15 @@ public partial class World : Node3D
 		_player.ApplySaveData(data.Player, loadedCompanions);
 		_player.TeleportPartyTo(FromSaveVector(data.PlayerPosition));
 		NetworkManager.Instance?.ImportPendingMail(data.PendingMail);
+		// Preserve the loaded world's identity so re-saving keeps name/seed.
+		if (!string.IsNullOrWhiteSpace(data.WorldName))
+		{
+			_worldSaveName = data.WorldName;
+		}
+		if (data.WorldSeed != 0)
+		{
+			_activeWorldSeed = data.WorldSeed;
+		}
 		UpdateActorMapActivity();
 	}
 
