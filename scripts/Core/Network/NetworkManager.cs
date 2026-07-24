@@ -52,6 +52,10 @@ public partial class NetworkManager : Node
 	private readonly Dictionary<long, long> _leaderOf = new();
 	private readonly List<string> _localPartyNames = new();
 	public IReadOnlyList<string> LocalPartyNames => _localPartyNames;
+	public bool LocalIsPartyLeader { get; private set; }
+	public bool LocalInParty => _localPartyNames.Count > 0;
+	// Only a leader (or a solo player about to become one) may send invites.
+	public bool CanInviteToParty => IsOnline && (!LocalInParty || LocalIsPartyLeader);
 	public event System.Action<long, string>? PartyInviteReceived;
 	public event System.Action? PartyChanged;
 	private float _playerStateRemaining;
@@ -147,7 +151,7 @@ public partial class NetworkManager : Node
 		WorldSeed = 0;
 		_playerNames.Clear();
 		_leaderOf.Clear();
-		SetLocalPartyMirror(System.Array.Empty<string>());
+		SetLocalPartyMirror(System.Array.Empty<string>(), -1);
 		ClearPlayerPuppets();
 	}
 
@@ -281,15 +285,25 @@ public partial class NetworkManager : Node
 
 	private void OnServerDisconnected()
 	{
+		bool wasInWorld = ActiveWorld != null && IsInstanceValid(ActiveWorld);
 		ResetSession();
-		if (ActiveWorld != null && IsInstanceValid(ActiveWorld))
+		if (wasInWorld)
 		{
-			ActiveWorld.ClearNetworkPuppetMonsters();
-			PostWorldMessage(LocaleText.T("system.net.server_closed"), new Color(1.0f, 0.5f, 0.4f));
+			// Host closed the room — kick the client back to the main menu.
+			Input.MouseMode = Input.MouseModeEnum.Visible;
+			CallDeferred(MethodName.ReturnClientToMainMenu);
 		}
 		else
 		{
 			JoinFailed?.Invoke(LocaleText.T("net.error.connect_failed"));
+		}
+	}
+
+	private void ReturnClientToMainMenu()
+	{
+		if (IsInstanceValid(this) && GetTree() != null)
+		{
+			GetTree().ChangeSceneToFile("res://main_menu.tscn");
 		}
 	}
 
@@ -1007,6 +1021,33 @@ public partial class NetworkManager : Node
 		}
 	}
 
+	// Local player leaves their party (leader leaving disbands it).
+	public void LeaveParty()
+	{
+		if (!IsOnline)
+		{
+			return;
+		}
+
+		if (IsHost)
+		{
+			HostProcessLeave(1);
+		}
+		else
+		{
+			RpcId(1, MethodName.ServerLeaveParty);
+		}
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ServerLeaveParty()
+	{
+		if (Multiplayer.IsServer())
+		{
+			HostProcessLeave(Multiplayer.GetRemoteSenderId());
+		}
+	}
+
 	[Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
 	private void ServerRequestPartyInvite(long targetPeer)
 	{
@@ -1030,6 +1071,14 @@ public partial class NetworkManager : Node
 	{
 		if (inviter == target || !_playerNames.ContainsKey(target))
 		{
+			return;
+		}
+
+		// Only the party leader (or a solo player) may invite. A non-leader member
+		// must leave their party first.
+		if (_leaderOf.TryGetValue(inviter, out long inviterLeader) && inviterLeader != inviter)
+		{
+			NotifyPartyPeer(inviter, "system.party.not_leader");
 			return;
 		}
 
@@ -1070,6 +1119,7 @@ public partial class NetworkManager : Node
 
 	private void BroadcastPartyForLeader(long leader)
 	{
+		// Leader always first so clients can flag it.
 		var members = new List<long> { leader };
 		foreach (KeyValuePair<long, long> entry in _leaderOf)
 		{
@@ -1077,6 +1127,14 @@ public partial class NetworkManager : Node
 			{
 				members.Add(entry.Key);
 			}
+		}
+
+		// A party of one is not a party — disband it.
+		if (members.Count <= 1)
+		{
+			_leaderOf.Remove(leader);
+			SendEmptyPartyTo(leader);
+			return;
 		}
 
 		var peers = members.ToArray();
@@ -1090,12 +1148,72 @@ public partial class NetworkManager : Node
 		{
 			if (member == 1)
 			{
-				SetLocalPartyMirror(names);
+				SetLocalPartyMirror(names, leader);
 			}
 			else
 			{
-				RpcId(member, MethodName.ClientPartyMembers, peers, names);
+				RpcId(member, MethodName.ClientPartyMembers, peers, names, leader);
 			}
+		}
+	}
+
+	// Host: a member leaves; a leader leaving disbands the whole party.
+	private void HostProcessLeave(long peer)
+	{
+		if (!_leaderOf.TryGetValue(peer, out long leader))
+		{
+			return;
+		}
+
+		if (peer == leader)
+		{
+			// Disband: clear everyone in this party and tell them.
+			var members = new List<long> { leader };
+			foreach (KeyValuePair<long, long> entry in _leaderOf)
+			{
+				if (entry.Value == leader && entry.Key != leader)
+				{
+					members.Add(entry.Key);
+				}
+			}
+
+			foreach (long member in members)
+			{
+				_leaderOf.Remove(member);
+				SendEmptyPartyTo(member);
+				NotifyPartyPeer(member, "system.party.disbanded");
+			}
+
+			return;
+		}
+
+		_leaderOf.Remove(peer);
+		SendEmptyPartyTo(peer);
+		NotifyPartyPeer(peer, "system.party.left");
+		BroadcastPartyForLeader(leader);
+	}
+
+	private void SendEmptyPartyTo(long peer)
+	{
+		if (peer == 1)
+		{
+			SetLocalPartyMirror(System.Array.Empty<string>(), -1);
+		}
+		else
+		{
+			RpcId(peer, MethodName.ClientPartyMembers, System.Array.Empty<long>(), System.Array.Empty<string>(), -1L);
+		}
+	}
+
+	private void NotifyPartyPeer(long peer, string messageKey)
+	{
+		if (peer == 1)
+		{
+			PostWorldMessage(LocaleText.T(messageKey), new Color(1.0f, 0.82f, 0.55f));
+		}
+		else
+		{
+			RpcId(peer, MethodName.ClientPartyNotice, messageKey);
 		}
 	}
 
@@ -1106,9 +1224,9 @@ public partial class NetworkManager : Node
 	}
 
 	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-	private void ClientPartyMembers(long[] peers, string[] names)
+	private void ClientPartyMembers(long[] peers, string[] names, long leaderPeer)
 	{
-		SetLocalPartyMirror(names);
+		SetLocalPartyMirror(names, leaderPeer);
 	}
 
 	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
@@ -1117,7 +1235,13 @@ public partial class NetworkManager : Node
 		DeliverInviteResultLocally(responderName, accepted);
 	}
 
-	private void SetLocalPartyMirror(string[] names)
+	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ClientPartyNotice(string messageKey)
+	{
+		PostWorldMessage(LocaleText.T(messageKey), new Color(1.0f, 0.82f, 0.55f));
+	}
+
+	private void SetLocalPartyMirror(string[] names, long leaderPeer)
 	{
 		_localPartyNames.Clear();
 		if (names != null)
@@ -1125,6 +1249,7 @@ public partial class NetworkManager : Node
 			_localPartyNames.AddRange(names);
 		}
 
+		LocalIsPartyLeader = leaderPeer == Multiplayer.GetUniqueId();
 		PartyChanged?.Invoke();
 	}
 
@@ -1157,14 +1282,8 @@ public partial class NetworkManager : Node
 		foreach (long orphan in orphans)
 		{
 			_leaderOf.Remove(orphan);
-			if (orphan == 1)
-			{
-				SetLocalPartyMirror(System.Array.Empty<string>());
-			}
-			else
-			{
-				RpcId(orphan, MethodName.ClientPartyMembers, System.Array.Empty<long>(), System.Array.Empty<string>());
-			}
+			SendEmptyPartyTo(orphan);
+			NotifyPartyPeer(orphan, "system.party.disbanded");
 		}
 
 		// A remaining party shrinks by one — refresh it.

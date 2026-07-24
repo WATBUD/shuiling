@@ -9,6 +9,7 @@ public partial class PartyInvitePanel : PanelContainer
 	private Label _membersLabel = null!;
 	private Label _emptyLabel = null!;
 	private VBoxContainer _cityList = null!;
+	private Button _leaveButton = null!;
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -108,6 +109,10 @@ public partial class PartyInvitePanel : PanelContainer
 		_emptyLabel.AddThemeColorOverride("font_color", new Color(0.62f, 0.70f, 0.80f));
 		root.AddChild(_emptyLabel);
 
+		_leaveButton = new Button { Text = LocaleText.T("party.mp.leave"), CustomMinimumSize = new Vector2(0.0f, 38.0f), Visible = false };
+		_leaveButton.Pressed += () => NetworkManager.Instance?.LeaveParty();
+		root.AddChild(_leaveButton);
+
 		var closeButton = new Button { Text = LocaleText.T("dialog.button.close"), CustomMinimumSize = new Vector2(0.0f, 40.0f) };
 		closeButton.Pressed += () => CloseRequested?.Invoke();
 		root.AddChild(closeButton);
@@ -124,9 +129,23 @@ public partial class PartyInvitePanel : PanelContainer
 
 		NetworkManager? net = NetworkManager.Instance;
 		IReadOnlyList<string> members = net?.LocalPartyNames ?? new List<string>();
-		_membersLabel.Text = members.Count > 0
-			? LocaleText.F("party.mp.members", string.Join("、", members))
-			: LocaleText.T("party.mp.no_party");
+		if (members.Count > 0)
+		{
+			// Leader is first; mark it with a star.
+			var decorated = new List<string>();
+			for (int i = 0; i < members.Count; i++)
+			{
+				decorated.Add(i == 0 ? "★" + members[i] : members[i]);
+			}
+
+			_membersLabel.Text = LocaleText.F("party.mp.members", string.Join("、", decorated));
+		}
+		else
+		{
+			_membersLabel.Text = LocaleText.T("party.mp.no_party");
+		}
+
+		_leaveButton.Visible = net != null && net.LocalInParty;
 
 		ClearChildren(_cityList);
 
@@ -137,6 +156,8 @@ public partial class PartyInvitePanel : PanelContainer
 			return;
 		}
 
+		// Non-leader members can't invite until they leave their party.
+		bool canInvite = net.CanInviteToParty;
 		int shown = 0;
 		foreach (NetworkManager.ConnectedPlayer player in net.GetConnectedPlayers())
 		{
@@ -145,15 +166,27 @@ public partial class PartyInvitePanel : PanelContainer
 				continue;
 			}
 
-			_cityList.AddChild(BuildInviteRow(player));
+			_cityList.AddChild(BuildInviteRow(player, canInvite));
 			shown++;
 		}
 
-		_emptyLabel.Text = LocaleText.T("party.mp.no_players");
-		_emptyLabel.Visible = shown == 0;
+		if (shown == 0)
+		{
+			_emptyLabel.Text = LocaleText.T("party.mp.no_players");
+			_emptyLabel.Visible = true;
+		}
+		else if (!canInvite)
+		{
+			_emptyLabel.Text = LocaleText.T("party.mp.leader_only");
+			_emptyLabel.Visible = true;
+		}
+		else
+		{
+			_emptyLabel.Visible = false;
+		}
 	}
 
-	private Control BuildInviteRow(NetworkManager.ConnectedPlayer player)
+	private Control BuildInviteRow(NetworkManager.ConnectedPlayer player, bool canInvite)
 	{
 		var row = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
 		var rowStyle = new StyleBoxFlat
@@ -182,7 +215,13 @@ public partial class PartyInvitePanel : PanelContainer
 		line.AddChild(name);
 
 		long targetPeer = player.PeerId;
-		var invite = new Button { Text = LocaleText.T("party.mp.invite"), CustomMinimumSize = new Vector2(120.0f, 36.0f) };
+		var invite = new Button
+		{
+			Text = LocaleText.T("party.mp.invite"),
+			CustomMinimumSize = new Vector2(120.0f, 36.0f),
+			Disabled = !canInvite,
+			TooltipText = canInvite ? string.Empty : LocaleText.T("party.mp.leader_only"),
+		};
 		invite.Pressed += () => NetworkManager.Instance?.InvitePlayerToParty(targetPeer);
 		line.AddChild(invite);
 

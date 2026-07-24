@@ -592,6 +592,11 @@
 	"party.mp.no_players": "No other players in the main city right now",
 	"party.mp.offline": "Multiplayer only",
 	"party.mp.invite": "Invite",
+	"party.mp.leave": "Leave Party",
+	"party.mp.leader_only": "Only the leader can invite — leave your party first",
+	"system.party.not_leader": "Only the party leader can invite. Leave your current party first.",
+	"system.party.left": "You left the party.",
+	"system.party.disbanded": "The party has disbanded.",
 	"party.invite.prompt": "{0} invited you to a party!",
 	"party.invite.accept": "Accept",
 	"party.invite.decline": "Decline",
@@ -848,5 +853,6 @@
 	"world.auto_save_select_hint": "When enabled, progress is saved automatically when leaving the world or closing the game.",
 	"world.default_name": "New World",
 	"world.migrated_name": "My World",
-	"system.save.no_world": "No active world to save."
+	"system.save.no_world": "No active world to save.",
+	"system.save.client_blocked": "You're a guest on this server — progress isn't saved."
 }

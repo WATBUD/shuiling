@@ -919,18 +919,11 @@ public partial class MainMenu : Control
 	private void OnJoinWelcomed()
 	{
 		_awaitingJoin = false;
-		// Seed received from the host — enter the shared world. A dedicated "guest"
-		// slot carries this player's own character/progress across servers.
-		GameLaunchOptions.ActiveWorldId = "guest";
-		if (SaveGameManager.HasWorld("guest"))
-		{
-			GameLaunchOptions.LoadSavedGame();
-		}
-		else
-		{
-			GameLaunchOptions.StartNewGame();
-		}
-
+		// Seed received from the host — enter the shared world as a transient guest.
+		// A client keeps NO local save (no world slot), so it never holds the host's
+		// world save and nothing from the session shows up in its world list.
+		GameLaunchOptions.ActiveWorldId = string.Empty;
+		GameLaunchOptions.StartNewGame();
 		GetTree().ChangeSceneToFile("res://node_3d.tscn");
 	}
 

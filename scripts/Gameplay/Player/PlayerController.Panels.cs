@@ -488,12 +488,16 @@ public partial class PlayerController
 
 	private void ReturnToMainMenu()
 	{
-		// Only save on exit if this world has auto-save enabled (chosen at creation).
+		// Only save on exit if this world has auto-save enabled (client saves are
+		// blocked inside SaveCurrentGame anyway).
 		if (GetParent() is World world && world.AutoSaveOnExit)
 		{
 			SaveCurrentGame();
 		}
 
+		// Leaving the world also leaves the session: a host closing the room kicks
+		// its clients, and a client cleanly disconnects.
+		NetworkManager.Instance?.ResetSession();
 		Input.MouseMode = Input.MouseModeEnum.Visible;
 		GetTree().ChangeSceneToFile("res://main_menu.tscn");
 	}
