@@ -184,6 +184,23 @@ public partial class PlayerController
 		return actor.TryEvolve();
 	}
 
+	public bool CanRebirthActor(SimpleActor actor)
+	{
+		return IsInstanceValid(actor) && actor.CanRebirth;
+	}
+
+	public bool TryRebirthActor(SimpleActor actor)
+	{
+		if (!CanRebirthActor(actor) || !actor.TryRebirth())
+		{
+			return false;
+		}
+
+		PostSystemMessage(LocaleText.F("system.rebirth.done", actor.LocalizedDisplayName, actor.RebirthCount, SimpleActor.RebirthStatBonus), new Color(1.0f, 0.86f, 0.4f), GameMessageChannel.Party);
+		_partyPanel.RefreshParty();
+		return true;
+	}
+
 	public SkillGemUpgradeCost? GetCompanionSkillGemUpgradeCost(SimpleActor actor, int slot)
 	{
 		if (!IsInstanceValid(actor) || slot < 0 || slot >= actor.BuildLoadout.SkillGemIds.Length)

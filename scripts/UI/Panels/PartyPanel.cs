@@ -432,6 +432,11 @@ public partial class PartyPanel : PanelContainer
 		_memberContextMenu.AddItem(evolveText, 4);
 		_memberContextMenu.SetItemDisabled(_memberContextMenu.GetItemIndex(4), !_player.CanEvolveActor(actor));
 		_memberContextMenu.AddItem(LocaleText.T("button.enhance_ability"), 5);
+		string rebirthText = actor.RebirthCount > 0
+			? LocaleText.F("button.rebirth_count", actor.RebirthCount)
+			: LocaleText.T("button.rebirth");
+		_memberContextMenu.AddItem(rebirthText, 7);
+		_memberContextMenu.SetItemDisabled(_memberContextMenu.GetItemIndex(7), !_player.CanRebirthActor(actor));
 		_memberContextMenu.Position = new Vector2I(Mathf.RoundToInt(screenPosition.X), Mathf.RoundToInt(screenPosition.Y));
 		_memberContextMenu.ResetSize();
 		_memberContextMenu.Popup();
@@ -463,6 +468,9 @@ public partial class PartyPanel : PanelContainer
 				break;
 			case 6:
 				_player.ToggleMountCompanion(_contextActor);
+				break;
+			case 7:
+				_player.TryRebirthActor(_contextActor);
 				break;
 		}
 

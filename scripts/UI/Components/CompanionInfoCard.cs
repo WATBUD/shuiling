@@ -156,7 +156,8 @@ public partial class CompanionInfoCard : PanelContainer
 		_equipmentTitle.Text = LocaleText.T("build.equipment");
 		_skillGemsTitle.Text = LocaleText.T("build.skill_gems");
 		_experienceBar.Visible = true;
-		_title.Text = $"{_actor.LocalizedDisplayName} - {LocaleText.F("inventory.info_header", _actor.Level)}";
+		string rebirthTag = _actor.RebirthCount > 0 ? $"  ✦x{_actor.RebirthCount}" : string.Empty;
+		_title.Text = $"{_actor.LocalizedDisplayName} - {LocaleText.F("inventory.info_header", _actor.Level)}{rebirthTag}";
 		_experienceBar.MaxValue = Mathf.Max(_actor.ExperienceToNextLevel, 1);
 		_experienceBar.Value = Mathf.Clamp(_actor.Experience, 0, _actor.ExperienceToNextLevel);
 		_experience.Text = $"{LocaleText.T("stat.experience")} {_actor.Experience}/{_actor.ExperienceToNextLevel}";
