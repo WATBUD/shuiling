@@ -87,29 +87,49 @@ public partial class MultiplayerPartyHud : PanelContainer
 		}
 
 		NetworkManager? net = NetworkManager.Instance;
-		if (net == null || !net.IsOnline)
+		// Only show once you're actually in a party — not for every connected player.
+		if (net == null || !net.IsOnline || !net.LocalInParty)
 		{
 			Visible = false;
 			return;
 		}
 
-		List<NetworkManager.ConnectedPlayer> players = net.GetConnectedPlayers();
-		Visible = players.Count > 0;
-		_title.Text = LocaleText.F("net.party.title_count", players.Count);
+		IReadOnlyList<long> memberPeers = net.LocalPartyPeers;
+		IReadOnlyList<string> memberNames = net.LocalPartyNames;
+		Visible = memberPeers.Count > 0;
+		_title.Text = LocaleText.F("net.party.title_count", memberPeers.Count);
+
+		// Map each member's peer id to where they currently are.
+		var byPeer = new Dictionary<long, NetworkManager.ConnectedPlayer>();
+		foreach (NetworkManager.ConnectedPlayer player in net.GetConnectedPlayers())
+		{
+			byPeer[player.PeerId] = player;
+		}
 
 		ClearRows();
 		World? world = net.ActiveWorld;
-		foreach (NetworkManager.ConnectedPlayer player in players)
+		long selfPeer = net.LocalPeerId;
+		for (int i = 0; i < memberPeers.Count; i++)
 		{
-			string mapName = world != null && IsInstanceValid(world) ? world.GetMapDisplayName(player.MapId) : player.MapId;
-			string location = player.MapId == "city" ? mapName : LocaleText.F("net.party.location_tier", mapName, player.Tier);
+			long peer = memberPeers[i];
+			string name = i < memberNames.Count ? memberNames[i] : peer.ToString();
+			string display = (i == 0 ? "★" + name : name) + (peer == selfPeer ? " " + LocaleText.T("party.mp.you") : string.Empty);
 
-			var row = new Label
+			string text;
+			if (byPeer.TryGetValue(peer, out NetworkManager.ConnectedPlayer cp) && world != null && IsInstanceValid(world))
 			{
-				Text = LocaleText.F("net.party.row", player.Name, location),
-			};
+				string mapName = world.GetMapDisplayName(cp.MapId);
+				string location = cp.MapId == "city" ? mapName : LocaleText.F("net.party.location_tier", mapName, cp.Tier);
+				text = LocaleText.F("net.party.row", display, location);
+			}
+			else
+			{
+				text = display;
+			}
+
+			var row = new Label { Text = text };
 			row.AddThemeFontSizeOverride("font_size", 13);
-			row.AddThemeColorOverride("font_color", player.IsLocal ? new Color(1.0f, 0.94f, 0.66f) : new Color(0.86f, 0.92f, 1.0f));
+			row.AddThemeColorOverride("font_color", peer == selfPeer ? new Color(1.0f, 0.94f, 0.66f) : new Color(0.86f, 0.92f, 1.0f));
 			_rows.AddChild(row);
 		}
 	}

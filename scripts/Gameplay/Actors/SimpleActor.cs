@@ -51,6 +51,11 @@ public partial class SimpleActor : CharacterBody3D
 	// the evolution-stage display name; stats are already baked in at spawn.
 	[Export] public int WorldTier { get; set; } = 1;
 
+	// Party/session instance this wild actor belongs to (0 = single-player / solo).
+	// Same (MapId, WorldTier, GroupId) = same hunting-ground instance, so different
+	// parties/solo players never share monsters (no kill-stealing).
+	[Export] public int GroupId { get; set; }
+
 	private readonly RandomNumberGenerator _rng = new();
 	// Multiplayer puppet state: on clients, wild monsters are display-only
 	// mirrors of the host's actors (no AI, no local damage — see World.Network.cs).
