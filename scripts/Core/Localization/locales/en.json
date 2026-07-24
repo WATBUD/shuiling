@@ -38,6 +38,8 @@
 	"net.dialog.host_title": "Create Server",
 	"net.dialog.join_title": "Join Server",
 	"net.dialog.port": "Port",
+	"net.dialog.recent": "Recent servers",
+	"net.dialog.recent_none": "(none yet)",
 	"net.dialog.lan_ip": "LAN IP (same WiFi): {0}",
 	"net.dialog.wan_ip": "Public IP (over internet): {0}",
 	"net.dialog.wan_checking": "checking…",

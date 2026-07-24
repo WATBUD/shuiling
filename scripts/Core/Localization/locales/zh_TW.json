@@ -38,6 +38,8 @@
 	"net.dialog.host_title": "創造伺服器",
 	"net.dialog.join_title": "加入伺服器",
 	"net.dialog.port": "連接埠",
+	"net.dialog.recent": "最近的伺服器",
+	"net.dialog.recent_none": "（尚無紀錄）",
 	"net.dialog.lan_ip": "區網 IP（同 WiFi 用）：{0}",
 	"net.dialog.wan_ip": "外網 IP（跨網路用）：{0}",
 	"net.dialog.wan_checking": "查詢中…",

@@ -188,6 +188,26 @@ public partial class NetworkManager : Node
 		return _playerNames.TryGetValue(peerId, out string? name) ? name : LocaleText.T("net.player.default_name");
 	}
 
+	// Use the player's chosen character name (not the OS user name) for multiplayer.
+	// Broadcasts the new name so every connected peer relabels this player.
+	public void SetLocalPlayerName(string name)
+	{
+		string sanitized = SanitizeName(name);
+		if (sanitized == LocalPlayerName)
+		{
+			return;
+		}
+
+		LocalPlayerName = sanitized;
+		if (!IsOnline)
+		{
+			return;
+		}
+
+		_playerNames[Multiplayer.GetUniqueId()] = sanitized;
+		Rpc(MethodName.ReceivePlayerName, sanitized);
+	}
+
 	// ---------------------------------------------------------------- events
 
 	private void OnPeerConnected(long peerId)
