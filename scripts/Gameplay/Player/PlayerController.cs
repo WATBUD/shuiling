@@ -89,8 +89,8 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public string PlayerModelPath { get; set; } = string.Empty;
 	[Export] public int Level { get; set; } = 1;
 	[Export] public int Experience { get; set; }
-	[Export] public int MaxHealth { get; set; } = 150;
-	[Export] public int CurrentHealth { get; set; } = 150;
+	[Export] public int MaxHealth { get; set; } = 3000;
+	[Export] public int CurrentHealth { get; set; } = 3000;
 	[Export] public int Attack { get; set; } = 16;
 	[Export] public int Defense { get; set; } = 10;
 	[Export] public int Gold { get; set; } = 5000;
@@ -327,6 +327,8 @@ public partial class PlayerController : CharacterBody3D
 			UpdateMountedVisualOffset();
 		}
 		UpdateCaptureNetRecharge((float)delta);
+		UpdateMeleeCooldown((float)delta);
+		UpdateHealthRegen((float)delta);
 		UpdateCamera();
 		UpdateTargetInfoPanel();
 		UpdateCaptureAmmoHud();
@@ -532,8 +534,15 @@ public partial class PlayerController : CharacterBody3D
 				}
 				else
 				{
+					bool wasCaptured = Input.MouseMode == Input.MouseModeEnum.Captured;
 					Input.MouseMode = Input.MouseModeEnum.Captured;
 					TrySelectActorTarget();
+					// First click just re-captures the cursor; once captured, left-click
+					// is the player's melee swing.
+					if (wasCaptured)
+					{
+						PerformMeleeAttack();
+					}
 				}
 				return;
 			}

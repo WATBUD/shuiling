@@ -3,6 +3,127 @@ using System.Collections.Generic;
 
 public partial class PlayerController
 {
+	private float _meleeCooldownRemaining;
+
+	// Out-of-combat regeneration: after this long without taking damage, the
+	// player recovers a fraction of max HP per second. This is the main healing
+	// means — survive an encounter, back off, and you heal back up.
+	private const ulong RegenCombatDelayMsec = 4000;
+	private const float RegenFractionPerSecond = 0.06f;
+	private float _regenAccumulator;
+
+	// Player melee: swing at hostile monsters in a frontal arc within reach.
+	private void PerformMeleeAttack()
+	{
+		if (_meleeCooldownRemaining > 0.0f || CurrentHealth <= 0)
+		{
+			return;
+		}
+
+		_meleeCooldownRemaining = AttackCooldown;
+
+		Vector3 origin = GlobalPosition;
+		Vector3 forward = -GlobalTransform.Basis.Z;
+		forward.Y = 0.0f;
+		forward = forward.LengthSquared() < 0.0001f ? Vector3.Forward : forward.Normalized();
+
+		float reach = AttackRange + 0.8f;
+		SpawnMeleeSwingEffect(origin + forward * (reach * 0.5f) + Vector3.Up);
+
+		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
+		{
+			if (node is not SimpleActor monster || !IsInstanceValid(monster) || !monster.IsHostileToPlayer)
+			{
+				continue;
+			}
+
+			Vector3 toMonster = monster.GlobalPosition - origin;
+			toMonster.Y = 0.0f;
+			float distance = toMonster.Length();
+			if (distance > reach)
+			{
+				continue;
+			}
+
+			// Frontal arc (~110°): don't hit things behind you.
+			if (distance > 0.15f && forward.Dot(toMonster / distance) < 0.34f)
+			{
+				continue;
+			}
+
+			// null attacker: for a client this forwards the hit to the host, which
+			// owns the monster's HP (same path companions/net use).
+			monster.ReceiveDamage(Attack, null);
+			MarkRecentCombat();
+		}
+	}
+
+	private void UpdateMeleeCooldown(float step)
+	{
+		if (_meleeCooldownRemaining > 0.0f)
+		{
+			_meleeCooldownRemaining = Mathf.Max(0.0f, _meleeCooldownRemaining - step);
+		}
+	}
+
+	private void UpdateHealthRegen(float step)
+	{
+		if (CurrentHealth <= 0 || CurrentHealth >= MaxHealth)
+		{
+			_regenAccumulator = 0.0f;
+			return;
+		}
+
+		if (Time.GetTicksMsec() - _lastCombatMsec < RegenCombatDelayMsec)
+		{
+			return;
+		}
+
+		_regenAccumulator += MaxHealth * RegenFractionPerSecond * step;
+		if (_regenAccumulator >= 1.0f)
+		{
+			int amount = Mathf.FloorToInt(_regenAccumulator);
+			_regenAccumulator -= amount;
+			CurrentHealth = Mathf.Min(CurrentHealth + amount, MaxHealth);
+		}
+	}
+
+	private void SpawnMeleeSwingEffect(Vector3 center)
+	{
+		var material = new StandardMaterial3D
+		{
+			AlbedoColor = new Color(0.9f, 0.96f, 1.0f, 0.5f),
+			Emission = new Color(0.7f, 0.86f, 1.0f),
+			EmissionEnabled = true,
+			EmissionEnergyMultiplier = 2.4f,
+			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			BlendMode = BaseMaterial3D.BlendModeEnum.Add,
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+			CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+		};
+
+		var slash = new MeshInstance3D
+		{
+			Name = "MeleeSwing",
+			Mesh = new TorusMesh { InnerRadius = AttackRange * 0.45f, OuterRadius = AttackRange * 0.7f, RingSegments = 6, Rings = 18 },
+			MaterialOverride = material,
+			RotationDegrees = new Vector3(90.0f, 0.0f, 0.0f),
+		};
+
+		Node parent = GetTree().CurrentScene ?? GetParent();
+		parent.AddChild(slash);
+		slash.GlobalPosition = center;
+
+		SceneTreeTimer timer = GetTree().CreateTimer(0.16);
+		timer.Timeout += () =>
+		{
+			if (IsInstanceValid(slash))
+			{
+				slash.QueueFree();
+			}
+		};
+	}
+
 	private void CreateCaptureRhythmPanel()
 	{
 		var layer = new CanvasLayer
@@ -323,7 +444,7 @@ public partial class PlayerController
 
 		if (CurrentHealth <= 0)
 		{
-			RecoverFromKnockdown();
+			HandlePlayerDeath();
 		}
 
 		return mitigatedDamage;
@@ -377,10 +498,21 @@ public partial class PlayerController
 		_partyPanel.RefreshParty();
 	}
 
-	private void RecoverFromKnockdown()
+	// Real death (no more invincible knockdown-in-place): the player is sent back
+	// to the city and revived there. Losing your spot is the cost of dying.
+	private void HandlePlayerDeath()
 	{
-		CurrentHealth = Mathf.Max(MaxHealth / 2, 1);
-		TeleportToSafePosition();
+		PostSystemMessage(LocaleText.T("system.player.defeated"), new Color(1.0f, 0.42f, 0.36f));
+		CurrentHealth = MaxHealth;
+		_lastCombatMsec = 0;
+		if (GetParent() is World world && world.ActiveMapId != "city")
+		{
+			world.RequestMapTravel("city");
+		}
+		else
+		{
+			TeleportToSafePosition();
+		}
 	}
 
 	private void SpawnFloatingEffect(string text, Color color, float lifetime, float radius)

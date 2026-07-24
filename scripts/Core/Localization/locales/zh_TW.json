@@ -258,6 +258,7 @@
 	"system.companion.fallen_recover": "{0} 已昏迷並離開隊伍，請回到倒下處碰觸拾回。",
 	"system.companion.recovered": "已拾回昏迷的 {0}，現在可以帶到夥伴復活師處復活。",
 	"system.exp.party_gain": "隊伍獲得 {0} 經驗值。",
+	"system.player.defeated": "你被擊敗了，已被送回主城。",
 	"system.combat.defeated": "{0} 擊敗了 {1}。",
 	"drop.gold": "{0} 金幣",
 	"drop.card": "怪物卡片：{0}",

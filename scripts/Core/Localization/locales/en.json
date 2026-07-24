@@ -258,6 +258,7 @@
 	"system.companion.fallen_recover": "{0} is unconscious and has left the party. Return to where they fell and touch them to retrieve them.",
 	"system.companion.recovered": "Recovered the unconscious {0}. They can now be revived by the Companion Revivalist.",
 	"system.exp.party_gain": "Party gained {0} EXP.",
+	"system.player.defeated": "You were defeated and sent back to the city.",
 	"system.combat.defeated": "{0} defeated {1}.",
 	"drop.gold": "{0} Gold",
 	"drop.card": "Monster Card: {0}",
