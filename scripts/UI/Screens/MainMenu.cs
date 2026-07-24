@@ -23,6 +23,10 @@ public partial class MainMenu : Control
 	private bool _diagPending;
 	private Button _joinConfirmButton = null!;
 
+	private SettingsPanel? _settingsPanel;
+	private AudioStreamPlayer? _menuMusic;
+	private System.Collections.Generic.List<string> _menuTracks = new();
+
 	// The world chosen from the list to host.
 	private string _hostWorldId = string.Empty;
 	private int _hostWorldSeed;
@@ -116,6 +120,10 @@ public partial class MainMenu : Control
 		joinButton.Pressed += ShowJoinDialog;
 		root.AddChild(joinButton);
 
+		Button settingsButton = MakeMenuButton(LocaleText.T("ui.settings"));
+		settingsButton.Pressed += ShowSettings;
+		root.AddChild(settingsButton);
+
 		Button quitButton = MakeMenuButton(LocaleText.T("main_menu.quit"));
 		quitButton.Pressed += () => GetTree().Quit();
 		root.AddChild(quitButton);
@@ -124,6 +132,59 @@ public partial class MainMenu : Control
 		BuildNewWorldModeDialog();
 		BuildHostDialog();
 		BuildJoinDialog();
+		BuildSettingsPanel();
+		StartMenuMusic();
+	}
+
+	private void BuildSettingsPanel()
+	{
+		_settingsPanel = new SettingsPanel { Visible = false };
+		AddChild(_settingsPanel);
+		_settingsPanel.CloseRequested = () => _settingsPanel!.SetPanelVisible(false);
+	}
+
+	private void ShowSettings()
+	{
+		if (_worldListDialog != null) _worldListDialog.Visible = false;
+		if (_newWorldModeDialog != null) _newWorldModeDialog.Visible = false;
+		if (_hostDialog != null) _hostDialog.Visible = false;
+		if (_joinDialog != null) _joinDialog.Visible = false;
+		_settingsPanel?.SetPanelVisible(true);
+	}
+
+	// Main-menu background music (its own looping player, on the Music bus).
+	private void StartMenuMusic()
+	{
+		AudioSettings.Initialize();
+		_menuTracks = MusicPlayer.ScanTracks("res://assets/audio/music/menu/");
+		if (_menuTracks.Count == 0)
+		{
+			return;
+		}
+
+		_menuMusic = new AudioStreamPlayer { Name = "MenuMusic", Bus = AudioSettings.MusicBus, VolumeDb = -8.0f };
+		AddChild(_menuMusic);
+		_menuMusic.Finished += PlayRandomMenuTrack;
+		PlayRandomMenuTrack();
+	}
+
+	private void PlayRandomMenuTrack()
+	{
+		if (_menuMusic == null || _menuTracks.Count == 0)
+		{
+			return;
+		}
+
+		string path = _menuTracks[(int)(GD.Randi() % (uint)_menuTracks.Count)];
+		var stream = ResourceLoader.Exists(path) ? GD.Load<AudioStream>(path) : null;
+		if (stream == null)
+		{
+			return;
+		}
+
+		MusicPlayer.SetStreamLoop(stream, _menuTracks.Count == 1);
+		_menuMusic.Stream = stream;
+		_menuMusic.Play();
 	}
 
 	// Shared "new world" window: pick single-player or multiplayer BEFORE going to

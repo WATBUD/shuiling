@@ -19,8 +19,9 @@ public partial class MusicPlayer : Node
 
 	public override void _Ready()
 	{
+		AudioSettings.Initialize();
 		_rng.Randomize();
-		_player = new AudioStreamPlayer { Name = "BgmPlayer", VolumeDb = -8.0f, Autoplay = false };
+		_player = new AudioStreamPlayer { Name = "BgmPlayer", VolumeDb = -8.0f, Autoplay = false, Bus = AudioSettings.MusicBus };
 		AddChild(_player);
 		_player.Finished += OnTrackFinished;
 
@@ -70,7 +71,7 @@ public partial class MusicPlayer : Node
 		PlayRandomFromContext();
 	}
 
-	private static void SetStreamLoop(AudioStream stream, bool loop)
+	public static void SetStreamLoop(AudioStream stream, bool loop)
 	{
 		switch (stream)
 		{
@@ -86,7 +87,7 @@ public partial class MusicPlayer : Node
 		}
 	}
 
-	private static List<string> ScanTracks(string directory)
+	public static List<string> ScanTracks(string directory)
 	{
 		var tracks = new List<string>();
 		using DirAccess dir = DirAccess.Open(directory);
