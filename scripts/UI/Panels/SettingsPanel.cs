@@ -7,6 +7,7 @@ public partial class SettingsPanel : PanelContainer
 	{
 		Language,
 		Video,
+		Audio,
 		Controls,
 		Shortcuts,
 	}
@@ -30,6 +31,10 @@ public partial class SettingsPanel : PanelContainer
 	private Label _damageTextScaleValueLabel = null!;
 	private HSlider _nameplateScaleSlider = null!;
 	private Label _nameplateScaleValueLabel = null!;
+	private HSlider _musicVolumeSlider = null!;
+	private Label _musicVolumeValueLabel = null!;
+	private HSlider _sfxVolumeSlider = null!;
+	private Label _sfxVolumeValueLabel = null!;
 	private CheckButton _bossAnnouncementToggle = null!;
 	private HSlider _bossAnnouncementOpacitySlider = null!;
 	private Label _bossAnnouncementOpacityValueLabel = null!;
@@ -126,6 +131,7 @@ public partial class SettingsPanel : PanelContainer
 		content.AddChild(nav);
 		AddCategoryButton(nav, SettingsCategory.Language, "ui.language");
 		AddCategoryButton(nav, SettingsCategory.Video, "ui.video");
+		AddCategoryButton(nav, SettingsCategory.Audio, "ui.audio");
 		AddCategoryButton(nav, SettingsCategory.Controls, "ui.controls");
 		AddCategoryButton(nav, SettingsCategory.Shortcuts, "ui.shortcuts");
 
@@ -166,6 +172,10 @@ public partial class SettingsPanel : PanelContainer
 		_damageTextScaleValueLabel = null!;
 		_nameplateScaleSlider = null!;
 		_nameplateScaleValueLabel = null!;
+		_musicVolumeSlider = null!;
+		_musicVolumeValueLabel = null!;
+		_sfxVolumeSlider = null!;
+		_sfxVolumeValueLabel = null!;
 		_bossAnnouncementToggle = null!;
 		_bossAnnouncementOpacitySlider = null!;
 		_bossAnnouncementOpacityValueLabel = null!;
@@ -177,6 +187,9 @@ public partial class SettingsPanel : PanelContainer
 				break;
 			case SettingsCategory.Video:
 				BuildDisplaySection(_settingsRows);
+				break;
+			case SettingsCategory.Audio:
+				BuildAudioSection(_settingsRows);
 				break;
 			case SettingsCategory.Controls:
 				BuildControlSection(_settingsRows);
@@ -222,6 +235,76 @@ public partial class SettingsPanel : PanelContainer
 		applyButton.CustomMinimumSize = new Vector2(160.0f, 38.0f);
 		applyButton.Pressed += ApplyDisplaySettings;
 		AddSettingRow(section, string.Empty, applyButton);
+	}
+
+	private void BuildAudioSection(VBoxContainer rows)
+	{
+		AudioSettings.Initialize();
+		var section = MakeSection(rows, "ui.audio");
+
+		var musicControl = new HBoxContainer();
+		musicControl.AddThemeConstantOverride("separation", 12);
+		_musicVolumeSlider = new HSlider
+		{
+			MinValue = 0.0,
+			MaxValue = 1.0,
+			Step = 0.05,
+			CustomMinimumSize = new Vector2(230.0f, 36.0f),
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		_musicVolumeSlider.ValueChanged += OnMusicVolumeChanged;
+		musicControl.AddChild(_musicVolumeSlider);
+		_musicVolumeValueLabel = MakeLabel(string.Empty, 15, new Color(1.0f, 0.92f, 0.66f));
+		_musicVolumeValueLabel.CustomMinimumSize = new Vector2(64.0f, 36.0f);
+		_musicVolumeValueLabel.HorizontalAlignment = HorizontalAlignment.Right;
+		musicControl.AddChild(_musicVolumeValueLabel);
+		AddSettingRow(section, "ui.music_volume", musicControl);
+
+		var sfxControl = new HBoxContainer();
+		sfxControl.AddThemeConstantOverride("separation", 12);
+		_sfxVolumeSlider = new HSlider
+		{
+			MinValue = 0.0,
+			MaxValue = 1.0,
+			Step = 0.05,
+			CustomMinimumSize = new Vector2(230.0f, 36.0f),
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		_sfxVolumeSlider.ValueChanged += OnSfxVolumeChanged;
+		sfxControl.AddChild(_sfxVolumeSlider);
+		_sfxVolumeValueLabel = MakeLabel(string.Empty, 15, new Color(1.0f, 0.92f, 0.66f));
+		_sfxVolumeValueLabel.CustomMinimumSize = new Vector2(64.0f, 36.0f);
+		_sfxVolumeValueLabel.HorizontalAlignment = HorizontalAlignment.Right;
+		sfxControl.AddChild(_sfxVolumeValueLabel);
+		AddSettingRow(section, "ui.sfx_volume", sfxControl);
+	}
+
+	private void SyncAudioVolumes()
+	{
+		_musicVolumeSlider.SetValueNoSignal(AudioSettings.MusicVolume);
+		UpdateVolumeLabel(_musicVolumeValueLabel, AudioSettings.MusicVolume);
+		_sfxVolumeSlider.SetValueNoSignal(AudioSettings.SfxVolume);
+		UpdateVolumeLabel(_sfxVolumeValueLabel, AudioSettings.SfxVolume);
+	}
+
+	private void OnMusicVolumeChanged(double value)
+	{
+		AudioSettings.SetMusicVolume((float)value);
+		UpdateVolumeLabel(_musicVolumeValueLabel, (float)value);
+	}
+
+	private void OnSfxVolumeChanged(double value)
+	{
+		AudioSettings.SetSfxVolume((float)value);
+		UpdateVolumeLabel(_sfxVolumeValueLabel, (float)value);
+	}
+
+	private static void UpdateVolumeLabel(Label label, float value)
+	{
+		if (label != null)
+		{
+			label.Text = LocaleText.F("ui.opacity_value", Mathf.RoundToInt(value * 100.0f));
+		}
 	}
 
 	private void BuildControlSection(VBoxContainer rows)
@@ -379,6 +462,11 @@ public partial class SettingsPanel : PanelContainer
 		if (_nameplateScaleSlider != null)
 		{
 			SyncNameplateScale();
+		}
+
+		if (_musicVolumeSlider != null && _sfxVolumeSlider != null)
+		{
+			SyncAudioVolumes();
 		}
 
 		if (_bossAnnouncementToggle != null && _bossAnnouncementOpacitySlider != null)
