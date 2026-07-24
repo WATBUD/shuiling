@@ -260,6 +260,11 @@ public partial class PlayerController
 		var dialogLayer = new CanvasLayer { Name = "PartyInviteDialogLayer", Layer = 47 };
 		AddChild(dialogLayer);
 		dialogLayer.AddChild(new PartyInviteDialog());
+
+		// Disconnect notice (host closed / link dropped) on an even higher layer.
+		var noticeLayer = new CanvasLayer { Name = "DisconnectNoticeLayer", Layer = 49 };
+		AddChild(noticeLayer);
+		noticeLayer.AddChild(new DisconnectNotice());
 	}
 
 	private void SetPartyInvitePanelVisible(bool visible)
