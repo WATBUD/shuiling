@@ -18,6 +18,37 @@ public partial class PlayerController
 		layer.AddChild(_captureRhythmPanel);
 	}
 
+	// Net hit dispatch: ready monsters open the capture challenge; healthy ones
+	// only take stagger (weaken/combo first). Returns true if the net is consumed.
+	public bool HandleCaptureNetHit(SimpleActor actor)
+	{
+		if (!IsInstanceValid(actor))
+		{
+			return false;
+		}
+
+		if (actor.IsNetworkPuppet)
+		{
+			PostSystemMessage(LocaleText.T("system.net.capture_blocked"), new Color(1.0f, 0.72f, 0.5f));
+			return true;
+		}
+
+		if (!actor.CanBeCaptured)
+		{
+			return false; // not a capture target — let the net keep flying
+		}
+
+		if (actor.CaptureReady)
+		{
+			return BeginCaptureChallenge(actor);
+		}
+
+		// Not weakened enough yet: chip its guard and hint the player.
+		actor.AddCaptureStagger(actor.MaxStagger * 0.25f);
+		PostSystemMessage(LocaleText.F("system.capture.not_ready", actor.LocalizedDisplayName), new Color(1.0f, 0.82f, 0.5f), GameMessageChannel.Party);
+		return true;
+	}
+
 	public bool BeginCaptureChallenge(SimpleActor actor)
 	{
 		if (IsInstanceValid(actor) && actor.IsNetworkPuppet)
@@ -29,6 +60,7 @@ public partial class PlayerController
 
 		if (!IsInstanceValid(actor)
 			|| !actor.CanBeCaptured
+			|| !actor.CaptureReady
 			|| _capturedCollection.Contains(actor)
 			|| _captureRhythmPanel == null)
 		{
@@ -54,28 +86,175 @@ public partial class PlayerController
 			GameMessageChannel.Party);
 	}
 
-	private void ThrowCaptureNet()
+	// charge in 0..1 (from how long the throw was held) scales speed + range.
+	private void ThrowCaptureNet(float charge)
 	{
 		if (_captureCooldownRemaining > 0.0f || _captureNetCharges <= 0)
 		{
 			return;
 		}
 
+		charge = Mathf.Clamp(charge, 0.0f, 1.0f);
 		_captureCooldownRemaining = CaptureCooldown;
 		_captureNetCharges = Mathf.Max(_captureNetCharges - 1, 0);
-		Vector3 direction = GetCaptureThrowDirection();
-		Vector3 spawnPosition = GlobalPosition + new Vector3(0.0f, 1.18f, 0.0f) + direction * 1.05f;
+		Vector3 launch = ComputeNetLaunchVelocity(charge);
 		var net = new CaptureNet
 		{
 			OwnerPlayer = this,
-			Direction = direction,
+			LaunchVelocity = launch,
+			Gravity = NetGravity,
 		};
 
 		Node projectileParent = GetTree().CurrentScene ?? GetParent();
 		projectileParent.AddChild(net);
-		net.GlobalPosition = spawnPosition;
-		net.AlignToDirection();
+		net.GlobalPosition = NetLaunchOrigin;
 		UpdateCaptureAmmoHud();
+	}
+
+	private Vector3 NetLaunchOrigin => GlobalPosition + new Vector3(0.0f, 1.4f, 0.0f);
+
+	// Parabolic launch velocity. In God View the arc lands exactly on the cursor's
+	// ground point (distance follows the mouse); otherwise it uses facing + charge.
+	private Vector3 ComputeNetLaunchVelocity(float charge)
+	{
+		Vector3 start = NetLaunchOrigin;
+		if (_cameraMode == CameraViewMode.GodView
+			&& TryGetMouseGroundPoint(GetViewport().GetMousePosition(), out Vector3 target))
+		{
+			// Solve v so the projectile reaches `target` in `flight` seconds under
+			// gravity: v = (target - start)/flight + 0.5*g*flight (upward).
+			float horizontalDist = new Vector2(target.X - start.X, target.Z - start.Z).Length();
+			float flight = Mathf.Clamp(horizontalDist * 0.09f, 0.45f, 1.6f);
+			Vector3 velocity = (target - start) / flight;
+			velocity.Y += 0.5f * NetGravity * flight;
+			return velocity;
+		}
+
+		Vector3 direction = GetCaptureThrowDirection();
+		direction.Y = 0.0f;
+		direction = direction.LengthSquared() > 0.001f ? direction.Normalized() : -GlobalTransform.Basis.Z;
+		float horizontalSpeed = 12.0f + charge * 16.0f;
+		float verticalSpeed = 6.0f + charge * 2.5f;
+		return direction * horizontalSpeed + Vector3.Up * verticalSpeed;
+	}
+
+	// --- aimed / charged throw (hold R to aim, release to throw) ---------------
+
+	private void BeginAimingNet()
+	{
+		if (_captureCooldownRemaining > 0.0f || _captureNetCharges <= 0)
+		{
+			return;
+		}
+
+		_isAimingNet = true;
+		_netAimCharge = 0.0f;
+		EnsureNetAimIndicator();
+		_netAimIndicator.Visible = true;
+		UpdateNetAimIndicator();
+	}
+
+	private void ReleaseCaptureNet()
+	{
+		if (!_isAimingNet)
+		{
+			return;
+		}
+
+		_isAimingNet = false;
+		if (_netAimIndicator != null && IsInstanceValid(_netAimIndicator))
+		{
+			_netAimIndicator.Visible = false;
+		}
+
+		ThrowCaptureNet(_netAimCharge);
+	}
+
+	private void UpdateNetAiming(float step)
+	{
+		if (!_isAimingNet)
+		{
+			return;
+		}
+
+		_netAimCharge = Mathf.Min(1.0f, _netAimCharge + step / NetChargeTime);
+		UpdateNetAimIndicator();
+	}
+
+	private const int NetAimDotCount = 20;
+
+	private void EnsureNetAimIndicator()
+	{
+		if (_netAimIndicator != null && IsInstanceValid(_netAimIndicator))
+		{
+			return;
+		}
+
+		_netAimIndicator = new Node3D { Name = "NetAimIndicator", Visible = false };
+		(GetTree().CurrentScene ?? GetParent()).AddChild(_netAimIndicator);
+
+		_netAimDotMaterial = new StandardMaterial3D
+		{
+			AlbedoColor = new Color(0.6f, 0.92f, 1.0f, 0.85f),
+			EmissionEnabled = true,
+			Emission = new Color(0.5f, 0.85f, 1.0f),
+			EmissionEnergyMultiplier = 2.4f,
+			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+		};
+
+		_netAimDots.Clear();
+		for (int i = 0; i < NetAimDotCount; i++)
+		{
+			// Nearer dots are a touch larger so the arc reads with depth.
+			float radius = Mathf.Lerp(0.11f, 0.05f, i / (float)NetAimDotCount);
+			var dot = new MeshInstance3D
+			{
+				Name = $"AimDot{i}",
+				Mesh = new SphereMesh { Radius = radius, Height = radius * 2.0f, RadialSegments = 8, Rings = 4 },
+			};
+			dot.SetSurfaceOverrideMaterial(0, _netAimDotMaterial);
+			_netAimIndicator.AddChild(dot);
+			_netAimDots.Add(dot);
+		}
+	}
+
+	private void UpdateNetAimIndicator()
+	{
+		if (_netAimIndicator == null || !IsInstanceValid(_netAimIndicator) || _netAimDots.Count == 0)
+		{
+			return;
+		}
+
+		// Charge tints the whole arc blue -> gold.
+		_netAimDotMaterial.AlbedoColor = new Color(0.6f, 0.92f, 1.0f, 0.85f).Lerp(new Color(1.0f, 0.86f, 0.35f, 0.95f), _netAimCharge);
+		_netAimDotMaterial.Emission = new Color(0.5f, 0.85f, 1.0f).Lerp(new Color(1.0f, 0.8f, 0.3f), _netAimCharge);
+
+		Vector3 start = NetLaunchOrigin;
+		Vector3 velocity = ComputeNetLaunchVelocity(_netAimCharge);
+		const float dt = 0.07f;
+		bool landed = false;
+		for (int i = 0; i < _netAimDots.Count; i++)
+		{
+			MeshInstance3D dot = _netAimDots[i];
+			if (landed)
+			{
+				dot.Visible = false;
+				continue;
+			}
+
+			float t = i * dt;
+			Vector3 pos = start + velocity * t + 0.5f * Vector3.Down * NetGravity * t * t;
+			if (i > 2 && pos.Y < start.Y - 1.4f)
+			{
+				landed = true;
+				dot.Visible = false;
+				continue;
+			}
+
+			dot.Visible = true;
+			dot.GlobalPosition = pos;
+		}
 	}
 
 	public bool CaptureActor(SimpleActor actor)

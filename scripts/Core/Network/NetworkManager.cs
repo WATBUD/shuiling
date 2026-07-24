@@ -35,6 +35,14 @@ public partial class NetworkManager : Node
 
 	private readonly Dictionary<long, string> _playerNames = new();
 	private readonly Dictionary<long, RemotePlayerPuppet> _playerPuppets = new();
+	// Per-owner companion puppets: ownerPeerId -> (partySlot -> puppet).
+	private readonly Dictionary<long, Dictionary<int, RemoteCompanionPuppet>> _companionPuppets = new();
+	private float _companionStateRemaining;
+	private float _companionRosterRemaining;
+	private bool _companionRosterDirty;
+	private const float CompanionStateInterval = 1.0f / 10.0f;
+	private const float CompanionRosterInterval = 3.0f;
+	private const int MaxSyncedCompanions = 8;
 	// Host-only outbox: gift mail for players not currently connected, keyed by
 	// name and flushed when that player next joins (persisted in the host save).
 	private readonly List<PendingMailSaveData> _pendingMail = new();
@@ -143,6 +151,36 @@ public partial class NetworkManager : Node
 			}
 		}
 		_playerPuppets.Clear();
+
+		foreach (Dictionary<int, RemoteCompanionPuppet> owner in _companionPuppets.Values)
+		{
+			foreach (RemoteCompanionPuppet companion in owner.Values)
+			{
+				if (IsInstanceValid(companion))
+				{
+					companion.QueueFree();
+				}
+			}
+		}
+		_companionPuppets.Clear();
+	}
+
+	private void RemoveCompanionPuppetsFor(long peerId)
+	{
+		if (!_companionPuppets.TryGetValue(peerId, out Dictionary<int, RemoteCompanionPuppet>? owner))
+		{
+			return;
+		}
+
+		foreach (RemoteCompanionPuppet companion in owner.Values)
+		{
+			if (IsInstanceValid(companion))
+			{
+				companion.QueueFree();
+			}
+		}
+
+		_companionPuppets.Remove(peerId);
 	}
 
 	public string GetPlayerName(long peerId)
@@ -170,6 +208,7 @@ public partial class NetworkManager : Node
 			}
 			_playerPuppets.Remove(peerId);
 		}
+		RemoveCompanionPuppetsFor(peerId);
 		PostWorldMessage(LocaleText.F("system.net.player_left", name), new Color(1.0f, 0.72f, 0.5f));
 	}
 
@@ -299,7 +338,28 @@ public partial class NetworkManager : Node
 			}
 		}
 
+		_companionStateRemaining -= step;
+		if (_companionStateRemaining <= 0.0f)
+		{
+			_companionStateRemaining = CompanionStateInterval;
+			BroadcastLocalCompanionState();
+		}
+
+		_companionRosterRemaining -= step;
+		if (_companionRosterDirty || _companionRosterRemaining <= 0.0f)
+		{
+			_companionRosterDirty = false;
+			_companionRosterRemaining = CompanionRosterInterval;
+			BroadcastLocalCompanionRoster();
+		}
+
 		UpdatePlayerPuppetVisibility();
+	}
+
+	// Party changed locally — push a fresh roster to peers on the next tick.
+	public void MarkCompanionRosterDirty()
+	{
+		_companionRosterDirty = true;
 	}
 
 	private void BroadcastLocalPlayerState()
@@ -349,6 +409,20 @@ public partial class NetworkManager : Node
 			if (IsInstanceValid(puppet))
 			{
 				puppet.Visible = ActiveWorld!.IsInstanceVisibleLocally(puppet.MapId, puppet.Tier);
+			}
+		}
+
+		// A companion is visible only when its owning player is (same instance).
+		foreach (KeyValuePair<long, Dictionary<int, RemoteCompanionPuppet>> owner in _companionPuppets)
+		{
+			bool ownerVisible = _playerPuppets.TryGetValue(owner.Key, out RemotePlayerPuppet? ownerPuppet)
+				&& IsInstanceValid(ownerPuppet) && ownerPuppet.Visible;
+			foreach (RemoteCompanionPuppet companion in owner.Value.Values)
+			{
+				if (IsInstanceValid(companion))
+				{
+					companion.Visible = ownerVisible;
+				}
 			}
 		}
 	}
@@ -693,6 +767,149 @@ public partial class NetworkManager : Node
 		if (pending != null)
 		{
 			_pendingMail.AddRange(pending);
+		}
+	}
+
+	// ---------------------------------------------------------------- companion sync
+
+	// Stream this player's deployed companions' transforms to peers (visuals only;
+	// combat stays local to each owner). Mirrors the player-state broadcast.
+	private void BroadcastLocalCompanionState()
+	{
+		PlayerController? player = ActiveWorld?.ActivePlayer;
+		if (player == null || !IsInstanceValid(player))
+		{
+			return;
+		}
+
+		IReadOnlyList<SimpleActor> party = player.ActiveParty;
+		int count = Mathf.Min(party.Count, MaxSyncedCompanions);
+		var ids = new List<int>();
+		var positions = new List<Vector3>();
+		var yaws = new List<float>();
+		for (int i = 0; i < count; i++)
+		{
+			SimpleActor actor = party[i];
+			if (!IsInstanceValid(actor) || !actor.IsCaptured || !actor.IsInActiveParty)
+			{
+				continue;
+			}
+
+			ids.Add(i);
+			positions.Add(actor.GlobalPosition);
+			yaws.Add(actor.Rotation.Y);
+		}
+
+		Rpc(MethodName.ClientCompanionStates, ids.ToArray(), positions.ToArray(), yaws.ToArray());
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Unreliable)]
+	private void ClientCompanionStates(int[] slots, Vector3[] positions, float[] yaws)
+	{
+		if (ActiveWorld == null || !IsInstanceValid(ActiveWorld))
+		{
+			return;
+		}
+
+		long owner = Multiplayer.GetRemoteSenderId();
+		if (!_companionPuppets.TryGetValue(owner, out Dictionary<int, RemoteCompanionPuppet>? map))
+		{
+			return; // wait for the roster to create the puppets
+		}
+
+		int count = Mathf.Min(slots.Length, Mathf.Min(positions.Length, yaws.Length));
+		for (int i = 0; i < count; i++)
+		{
+			if (map.TryGetValue(slots[i], out RemoteCompanionPuppet? puppet) && IsInstanceValid(puppet))
+			{
+				puppet.ApplyNetworkState(positions[i], yaws[i]);
+			}
+		}
+	}
+
+	// Push the identity (model/name/level) of this player's deployed companions so
+	// peers can spawn the right puppets. Reliable; sent on change + periodically.
+	private void BroadcastLocalCompanionRoster()
+	{
+		PlayerController? player = ActiveWorld?.ActivePlayer;
+		if (player == null || !IsInstanceValid(player))
+		{
+			return;
+		}
+
+		IReadOnlyList<SimpleActor> party = player.ActiveParty;
+		int count = Mathf.Min(party.Count, MaxSyncedCompanions);
+		var ids = new List<int>();
+		var models = new List<string>();
+		var names = new List<string>();
+		var levels = new List<int>();
+		for (int i = 0; i < count; i++)
+		{
+			SimpleActor actor = party[i];
+			if (!IsInstanceValid(actor) || !actor.IsCaptured || !actor.IsInActiveParty)
+			{
+				continue;
+			}
+
+			ids.Add(i);
+			models.Add(actor.GetExternalModelPath());
+			names.Add(actor.LocalizedDisplayName);
+			levels.Add(actor.Level);
+		}
+
+		Rpc(MethodName.ClientCompanionRoster, ids.ToArray(), models.ToArray(), names.ToArray(), levels.ToArray());
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ClientCompanionRoster(int[] slots, string[] models, string[] names, int[] levels)
+	{
+		if (ActiveWorld == null || !IsInstanceValid(ActiveWorld))
+		{
+			return;
+		}
+
+		long owner = Multiplayer.GetRemoteSenderId();
+		if (!_companionPuppets.TryGetValue(owner, out Dictionary<int, RemoteCompanionPuppet>? map))
+		{
+			map = new Dictionary<int, RemoteCompanionPuppet>();
+			_companionPuppets[owner] = map;
+		}
+
+		var present = new HashSet<int>();
+		int count = Mathf.Min(slots.Length, Mathf.Min(models.Length, Mathf.Min(names.Length, levels.Length)));
+		for (int i = 0; i < count; i++)
+		{
+			int slot = slots[i];
+			present.Add(slot);
+			if (!map.TryGetValue(slot, out RemoteCompanionPuppet? puppet) || !IsInstanceValid(puppet))
+			{
+				puppet = new RemoteCompanionPuppet { Name = $"RemoteCompanion_{owner}_{slot}" };
+				ActiveWorld.AddChild(puppet);
+				map[slot] = puppet;
+			}
+
+			puppet.SetModel(models[i]);
+			puppet.SetInfo(names[i], levels[i]);
+		}
+
+		// Drop puppets for companions no longer in the owner's synced party.
+		var stale = new List<int>();
+		foreach (int slot in map.Keys)
+		{
+			if (!present.Contains(slot))
+			{
+				stale.Add(slot);
+			}
+		}
+
+		foreach (int slot in stale)
+		{
+			if (IsInstanceValid(map[slot]))
+			{
+				map[slot].QueueFree();
+			}
+
+			map.Remove(slot);
 		}
 	}
 }

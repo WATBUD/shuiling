@@ -135,6 +135,13 @@ public partial class PlayerController : CharacterBody3D
 	private Vector3 _lastSafePosition = new(0.0f, 0.2f, 8.0f);
 	private float _gravity;
 	private float _captureCooldownRemaining;
+	private bool _isAimingNet;
+	private float _netAimCharge;
+	private Node3D _netAimIndicator = null!;
+	private readonly List<MeshInstance3D> _netAimDots = new();
+	private StandardMaterial3D _netAimDotMaterial = null!;
+	private const float NetChargeTime = 0.8f;
+	private const float NetGravity = 18.0f;
 	private float _interactionPromptRefreshRemaining;
 	private float _worldDropCollectRefreshRemaining;
 	private int _captureNetCharges;
@@ -517,7 +524,11 @@ public partial class PlayerController : CharacterBody3D
 
 		if (@event.IsActionPressed("capture_net"))
 		{
-			ThrowCaptureNet();
+			BeginAimingNet();
+		}
+		else if (@event.IsActionReleased("capture_net"))
+		{
+			ReleaseCaptureNet();
 		}
 
 		if (@event.IsActionPressed("save_game"))
@@ -562,6 +573,7 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 		_captureCooldownRemaining = Mathf.Max(_captureCooldownRemaining - step, 0.0f);
+		UpdateNetAiming(step);
 		Vector3 velocity = Velocity;
 
 		if (!IsOnFloor())
