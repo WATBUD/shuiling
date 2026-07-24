@@ -251,6 +251,12 @@ public partial class World : Node3D
 		}
 		NetworkAfterWorldReady();
 		_musicPlayer.PlayForMap(_activeMapId);
+
+		// Multiplayer: broadcast the player's chosen character name (not OS name).
+		if (NetworkManager.Instance is { IsOnline: true } && _player != null && IsInstanceValid(_player))
+		{
+			NetworkManager.Instance.SetLocalPlayerName(LocaleText.T(_player.PlayerName));
+		}
 	}
 
 	public override void _ExitTree()

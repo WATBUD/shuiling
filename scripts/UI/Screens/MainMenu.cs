@@ -13,6 +13,8 @@ public partial class MainMenu : Control
 	private LineEdit _hostPortEdit = null!;
 	private LineEdit _joinAddressEdit = null!;
 	private LineEdit _joinPortEdit = null!;
+	private OptionButton _recentServerOption = null!;
+	private System.Collections.Generic.List<NetworkPrefs.ServerEntry> _recentServers = new();
 	private Label _hostStatusLabel = null!;
 	private Label _hostWorldLabel = null!;
 	private Label _hostIpLabel = null!;
@@ -602,6 +604,11 @@ public partial class MainMenu : Control
 	{
 		_joinDialog = MakeDialogPanel("net.dialog.join_title", out VBoxContainer content);
 
+		content.AddChild(MakeFieldLabel("net.dialog.recent"));
+		_recentServerOption = new OptionButton { CustomMinimumSize = new Vector2(0.0f, 36.0f) };
+		_recentServerOption.ItemSelected += OnRecentServerSelected;
+		content.AddChild(_recentServerOption);
+
 		content.AddChild(MakeFieldLabel("net.dialog.ip"));
 		_joinAddressEdit = new LineEdit { Text = "127.0.0.1", CustomMinimumSize = new Vector2(0.0f, 38.0f) };
 		content.AddChild(_joinAddressEdit);
@@ -693,8 +700,43 @@ public partial class MainMenu : Control
 		{
 			_joinStatusLabel.Text = string.Empty;
 			_joinConfirmButton.Disabled = false;
+			PopulateRecentServers();
 			_joinDialog.Visible = true;
 		}
+	}
+
+	private void PopulateRecentServers()
+	{
+		_recentServers = NetworkPrefs.GetRecentServers();
+		_recentServerOption.Clear();
+		if (_recentServers.Count == 0)
+		{
+			_recentServerOption.AddItem(LocaleText.T("net.dialog.recent_none"));
+			_recentServerOption.Disabled = true;
+			return;
+		}
+
+		_recentServerOption.Disabled = false;
+		foreach (NetworkPrefs.ServerEntry entry in _recentServers)
+		{
+			_recentServerOption.AddItem($"{entry.Address}:{entry.Port}");
+		}
+
+		// Pre-fill with the most recently used server.
+		_recentServerOption.Selected = 0;
+		_joinAddressEdit.Text = _recentServers[0].Address;
+		_joinPortEdit.Text = _recentServers[0].Port.ToString();
+	}
+
+	private void OnRecentServerSelected(long index)
+	{
+		if (index < 0 || index >= _recentServers.Count)
+		{
+			return;
+		}
+
+		_joinAddressEdit.Text = _recentServers[(int)index].Address;
+		_joinPortEdit.Text = _recentServers[(int)index].Port.ToString();
 	}
 
 	private static bool TryParsePort(string text, out int port)
@@ -835,6 +877,8 @@ public partial class MainMenu : Control
 			return;
 		}
 
+		// Remember this server for next time.
+		NetworkPrefs.AddRecentServer(address, port);
 		_joinConfirmButton.Disabled = true;
 		_joinStatusLabel.Text = LocaleText.T("net.status.connecting");
 	}
