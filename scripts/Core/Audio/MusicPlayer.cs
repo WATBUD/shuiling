@@ -2,20 +2,24 @@ using Godot;
 using System.Collections.Generic;
 
 // Background music (背景音樂). Plays CC0 tracks dropped into
-// res://assets/audio/music/city/ and .../wild/. Switches automatically between
-// the city playlist and the wild playlist as the player changes maps. Multiple
-// tracks rotate randomly; a single track loops.
+// res://assets/audio/music/. City uses city/; each wild map uses its own
+// wild/<mapId>/ folder (e.g. wild/wild_forest/), falling back to any files
+// placed directly in wild/ when a map has no dedicated track. Multiple tracks
+// rotate randomly; a single track loops.
 public partial class MusicPlayer : Node
 {
-	private const string CityDir = "res://assets/audio/music/city/";
-	private const string WildDir = "res://assets/audio/music/wild/";
+	private const string MusicRoot = "res://assets/audio/music/";
+	private const string CityDir = MusicRoot + "city/";
+	private const string WildDir = MusicRoot + "wild/";
 
 	private readonly List<string> _cityTracks = new();
-	private readonly List<string> _wildTracks = new();
+	private readonly List<string> _wildTracks = new(); // shared fallback (files in wild/)
+	private readonly Dictionary<string, List<string>> _mapTracks = new(); // wild/<mapId>/
 	private readonly RandomNumberGenerator _rng = new();
 
 	private AudioStreamPlayer _player = null!;
-	private string _context = string.Empty; // "city" | "wild"
+	private string _context = string.Empty;
+	private List<string> _currentList = new();
 
 	public override void _Ready()
 	{
@@ -27,48 +31,91 @@ public partial class MusicPlayer : Node
 
 		_cityTracks.AddRange(ScanTracks(CityDir));
 		_wildTracks.AddRange(ScanTracks(WildDir));
+		ScanMapFolders();
 	}
 
-	// Called on every map change. City maps use the city playlist; every other
-	// map uses the wild playlist.
+	// Called on every map change. City → city playlist; each wild map → its own
+	// wild/<mapId>/ playlist (else the shared wild/ fallback).
 	public void PlayForMap(string mapId)
 	{
-		string context = mapId == "city" ? "city" : "wild";
-		if (context == _context && _player.Playing)
+		string key;
+		List<string> list;
+		if (mapId == "city")
+		{
+			key = "city";
+			list = _cityTracks;
+		}
+		else if (_mapTracks.TryGetValue(mapId, out List<string>? mapList) && mapList.Count > 0)
+		{
+			key = mapId;
+			list = mapList;
+		}
+		else
+		{
+			key = "wild";
+			list = _wildTracks;
+		}
+
+		if (key == _context && _player.Playing)
 		{
 			return;
 		}
 
-		_context = context;
-		PlayRandomFromContext();
+		_context = key;
+		_currentList = list;
+		PlayRandom();
 	}
 
-	private void PlayRandomFromContext()
+	private void PlayRandom()
 	{
-		List<string> list = _context == "city" ? _cityTracks : _wildTracks;
-		if (list.Count == 0)
+		if (_currentList.Count == 0)
 		{
 			_player.Stop();
 			return;
 		}
 
-		string path = list[_rng.RandiRange(0, list.Count - 1)];
+		string path = _currentList[_rng.RandiRange(0, _currentList.Count - 1)];
 		var stream = ResourceLoader.Exists(path) ? GD.Load<AudioStream>(path) : null;
 		if (stream == null)
 		{
 			return;
 		}
 
-		// A lone track loops seamlessly; playlists advance on Finished instead.
-		SetStreamLoop(stream, list.Count == 1);
+		SetStreamLoop(stream, _currentList.Count == 1);
 		_player.Stream = stream;
 		_player.Play();
 	}
 
 	private void OnTrackFinished()
 	{
-		// Only advances when the current stream isn't looping (playlist of 2+).
-		PlayRandomFromContext();
+		PlayRandom();
+	}
+
+	// Discover wild/<mapId>/ subfolders and index their tracks by folder name.
+	private void ScanMapFolders()
+	{
+		using DirAccess dir = DirAccess.Open(WildDir);
+		if (dir == null)
+		{
+			return;
+		}
+
+		dir.ListDirBegin();
+		for (string name = dir.GetNext(); !string.IsNullOrEmpty(name); name = dir.GetNext())
+		{
+			if (!dir.CurrentIsDir() || name is "." or "..")
+			{
+				continue;
+			}
+
+			List<string> tracks = ScanTracks(WildDir + name + "/");
+			if (tracks.Count > 0)
+			{
+				_mapTracks[name] = tracks;
+			}
+		}
+
+		dir.ListDirEnd();
 	}
 
 	public static void SetStreamLoop(AudioStream stream, bool loop)
@@ -104,8 +151,6 @@ public partial class MusicPlayer : Node
 				continue;
 			}
 
-			// In exported builds Godot appends nothing; in the editor audio files
-			// sit next to a ".import" companion we must skip.
 			string lower = name.ToLowerInvariant();
 			if (lower.EndsWith(".ogg") || lower.EndsWith(".mp3") || lower.EndsWith(".wav"))
 			{
