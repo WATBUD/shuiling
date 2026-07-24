@@ -12,9 +12,7 @@ public partial class CharacterSelect : Control
 	private List<(string Path, string Display)> _models = new();
 	private LineEdit _nameEdit = null!;
 	private LineEdit _worldNameEdit = null!;
-	private LineEdit _portEdit = null!;
 	private CheckBox _autoSaveCheck = null!;
-	private Label _statusLabel = null!;
 	private Button _startButton = null!;
 	private int _selectedIndex;
 	private bool _isMultiplayer;
@@ -143,35 +141,6 @@ public partial class CharacterSelect : Control
 		_autoSaveCheck.AddThemeFontSizeOverride("font_size", 14);
 		root.AddChild(_autoSaveCheck);
 
-		// Port entry only matters when hosting a multiplayer world.
-		var portRow = new HBoxContainer { Visible = _isMultiplayer };
-		portRow.AddThemeConstantOverride("separation", 10);
-		root.AddChild(portRow);
-
-		var portLabel = new Label { Text = LocaleText.T("net.dialog.port") };
-		portLabel.AddThemeFontSizeOverride("font_size", 13);
-		portLabel.AddThemeColorOverride("font_color", new Color(0.82f, 0.9f, 1.0f));
-		portRow.AddChild(portLabel);
-
-		_portEdit = new LineEdit
-		{
-			Text = NetworkManager.DefaultPort.ToString(),
-			CustomMinimumSize = new Vector2(180.0f, 30.0f),
-			SizeFlagsHorizontal = SizeFlags.ExpandFill,
-		};
-		portRow.AddChild(_portEdit);
-
-		_statusLabel = new Label
-		{
-			Visible = _isMultiplayer,
-			HorizontalAlignment = HorizontalAlignment.Center,
-			AutowrapMode = TextServer.AutowrapMode.WordSmart,
-			SizeFlagsHorizontal = SizeFlags.ExpandFill,
-		};
-		_statusLabel.AddThemeFontSizeOverride("font_size", 14);
-		_statusLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.72f, 0.68f));
-		root.AddChild(_statusLabel);
-
 		var buttons = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
 		buttons.AddThemeConstantOverride("separation", 12);
 		root.AddChild(buttons);
@@ -179,6 +148,13 @@ public partial class CharacterSelect : Control
 		var backButton = MakeButton(LocaleText.T("dialog.button.cancel"));
 		backButton.Pressed += () =>
 		{
+			// Multiplayer: a server was created on the host screen before this step;
+			// tear it down when backing out.
+			if (_isMultiplayer)
+			{
+				NetworkManager.Instance?.ResetSession();
+			}
+
 			// Return to the previous screen (world list + single/multiplayer choice).
 			GameLaunchOptions.ReturnToNewWorldMode = true;
 			GetTree().ChangeSceneToFile("res://main_menu.tscn");
@@ -314,44 +290,35 @@ public partial class CharacterSelect : Control
 			worldName = LocaleText.T("world.default_name");
 		}
 
-		int seed = unchecked((int)GD.Randi());
-		if (seed == 0)
+		// Multiplayer: the server is already running (created on the host screen
+		// before this step), so use its world seed. Single-player: fresh seed.
+		int seed;
+		if (host && NetworkManager.Instance is { IsOnline: true } net && net.WorldSeed != 0)
 		{
-			seed = 1;
-		}
-
-		// Hosting: stand up the server before entering so the world generates in
-		// online mode with the new world's seed.
-		if (host)
-		{
-			if (NetworkManager.Instance == null)
-			{
-				return;
-			}
-
-			if (!int.TryParse(_portEdit.Text.Trim(), out int port) || port < 1024 || port > 65535)
-			{
-				_statusLabel.Text = LocaleText.T("net.error.invalid_port");
-				return;
-			}
-
-			string error = NetworkManager.Instance.CreateServer(port);
-			if (error.Length > 0)
-			{
-				_statusLabel.Text = LocaleText.F("net.error.create_failed", error);
-				return;
-			}
-
-			NetworkManager.Instance.OverrideWorldSeed(seed);
+			seed = net.WorldSeed;
 		}
 		else
 		{
-			NetworkManager.Instance?.ResetSession();
+			seed = unchecked((int)GD.Randi());
+			if (seed == 0)
+			{
+				seed = 1;
+			}
 		}
 
 		GameLaunchOptions.NewWorldAutoSave = _autoSaveCheck.ButtonPressed;
 		GameLaunchOptions.StartNewWorld(SaveGameManager.NewWorldId(), worldName, seed, _models[_selectedIndex].Path, name);
-		GetTree().ChangeSceneToFile("res://node_3d.tscn");
+
+		if (host)
+		{
+			// Server already up — just enter the shared world.
+			GetTree().ChangeSceneToFile("res://node_3d.tscn");
+		}
+		else
+		{
+			NetworkManager.Instance?.ResetSession();
+			GetTree().ChangeSceneToFile("res://node_3d.tscn");
+		}
 	}
 
 	// Center + uniformly scale a preview model to a consistent frame, using its

@@ -25,6 +25,7 @@ public static class GameLaunchOptions
 	// world list + new-world mode window (returns to the previous screen).
 	public static bool ReturnToNewWorldMode { get; set; }
 
+
 	// Begin a brand-new world (single-player entry point).
 	public static void StartNewWorld(string worldId, string worldName, int seed, string modelPath, string playerName)
 	{
