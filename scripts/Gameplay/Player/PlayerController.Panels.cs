@@ -454,7 +454,12 @@ public partial class PlayerController
 
 	private void ReturnToMainMenu()
 	{
-		SaveCurrentGame();
+		// Only save on exit if this world has auto-save enabled (chosen at creation).
+		if (GetParent() is World world && world.AutoSaveOnExit)
+		{
+			SaveCurrentGame();
+		}
+
 		Input.MouseMode = Input.MouseModeEnum.Visible;
 		GetTree().ChangeSceneToFile("res://main_menu.tscn");
 	}

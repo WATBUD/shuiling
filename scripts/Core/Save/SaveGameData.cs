@@ -9,6 +9,7 @@ public sealed class SaveGameData
 	public string WorldName { get; set; } = string.Empty;
 	public int WorldSeed { get; set; }
 	public string LastMode { get; set; } = "single"; // "single" | "multiplayer"
+	public bool AutoSaveOnExit { get; set; } = true;
 	public string ActiveMapId { get; set; } = "city";
 	public SaveVector3 PlayerPosition { get; set; } = new();
 	public PlayerSaveData Player { get; set; } = new();

@@ -807,6 +807,7 @@
 	"world.host_start": "Start Hosting",
 	"world.host_world": "Hosting world: {0}",
 	"world.name_label": "World name:",
+	"world.auto_save": "Auto-save on exit",
 	"world.default_name": "New World",
 	"world.migrated_name": "My World",
 	"system.save.no_world": "No active world to save."
