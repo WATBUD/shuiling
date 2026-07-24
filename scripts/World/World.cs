@@ -78,6 +78,7 @@ public partial class World : Node3D
 	private string _worldSaveId = string.Empty;
 	private string _worldSaveName = string.Empty;
 	private bool _autoSaveOnExit = true;
+	private MusicPlayer _musicPlayer = null!;
 
 	// Whether leaving this world (to menu or app close) saves automatically.
 	public bool AutoSaveOnExit => _autoSaveOnExit;
@@ -235,6 +236,8 @@ public partial class World : Node3D
 		CreatePlayer();
 		SpawnActors();
 		AddCrosshair();
+		_musicPlayer = new MusicPlayer { Name = "MusicPlayer" };
+		AddChild(_musicPlayer);
 		if (GameLaunchOptions.LoadSaveOnWorldReady)
 		{
 			LoadRequestedSave();
@@ -247,6 +250,7 @@ public partial class World : Node3D
 			CallDeferred(nameof(AutoSaveNewWorld));
 		}
 		NetworkAfterWorldReady();
+		_musicPlayer.PlayForMap(_activeMapId);
 	}
 
 	public override void _ExitTree()
@@ -2702,6 +2706,7 @@ public partial class World : Node3D
 		_activeMapId = mapId;
 		_mapTravelCooldownRemaining = MapTravelCooldownSeconds;
 		ApplyMapAtmosphere(mapId);
+		_musicPlayer?.PlayForMap(mapId);
 		if (_cityMapRoot != null)
 		{
 			SetMapRootActive(_cityMapRoot, mapId == "city");
