@@ -468,6 +468,13 @@ public partial class SimpleActor : CharacterBody3D
 	public Color AttackFxColor => GetAttackColor();
 	public int ExperienceToNextLevel => 35 + Level * 18 + EvolutionStage * 20;
 	public bool CanEvolve => EvolutionStage < 3 && Level >= (EvolutionStage + 1) * 5;
+
+	// Rebirth (轉生): companions cap at level 100; rebirthing resets level to 1 and
+	// permanently adds +5 to every base stat, stackable without limit.
+	public const int MaxCompanionLevel = 100;
+	public const int RebirthStatBonus = 5;
+	[Export] public int RebirthCount { get; set; }
+	public bool CanRebirth => _isCaptured && Level >= MaxCompanionLevel;
 	public string EvolutionMaterialId => EvolutionStage switch
 	{
 		0 => "loot.cracked_core",
@@ -1153,6 +1160,7 @@ public partial class SimpleActor : CharacterBody3D
 			Level = Level,
 			WorldTier = WorldTier,
 			Rarity = Rarity,
+			RebirthCount = RebirthCount,
 			MaxHealth = MaxHealth,
 			CurrentHealth = CurrentHealth,
 			IsDefeated = _isDefeated,
@@ -1195,6 +1203,7 @@ public partial class SimpleActor : CharacterBody3D
 		Level = Mathf.Max(data.Level, 1);
 		WorldTier = WorldTierCatalog.ClampTier(data.WorldTier);
 		Rarity = data.Rarity;
+		RebirthCount = Mathf.Max(data.RebirthCount, 0);
 		MaxHealth = Mathf.Max(data.MaxHealth, 1);
 		_isDefeated = data.IsDefeated || data.CurrentHealth <= 0;
 		_isAwaitingRecovery = _isDefeated && data.IsAwaitingRecovery;
@@ -1363,14 +1372,48 @@ public partial class SimpleActor : CharacterBody3D
 
 	public void GrantTraining(int amount)
 	{
+		// Companions stop gaining levels at the cap; excess XP is discarded until
+		// the player rebirths them (轉生) to start climbing again.
+		if (_isCaptured && Level >= MaxCompanionLevel)
+		{
+			Experience = 0;
+			RefreshNameplate();
+			return;
+		}
+
 		Experience += Mathf.Max(amount, 0);
 		while (Experience >= ExperienceToNextLevel)
 		{
 			Experience -= ExperienceToNextLevel;
 			LevelUp();
+			if (_isCaptured && Level >= MaxCompanionLevel)
+			{
+				Experience = 0;
+				break;
+			}
 		}
 
 		RefreshNameplate();
+	}
+
+	// Reset to level 1 and bank a permanent +5 to every base stat (stackable).
+	public bool TryRebirth()
+	{
+		if (!CanRebirth)
+		{
+			return false;
+		}
+
+		RebirthCount++;
+		Level = 1;
+		Experience = 0;
+		MaxHealth += RebirthStatBonus;
+		Attack += RebirthStatBonus;
+		Defense += RebirthStatBonus;
+		MarkBaseStatsChanged();
+		CurrentHealth = EffectiveMaxHealth;
+		RefreshNameplate();
+		return true;
 	}
 
 	public bool TryEvolve()
@@ -1586,9 +1629,11 @@ public partial class SimpleActor : CharacterBody3D
 		string rarityPrefix = ActorKind == "monster" && !_isCaptured && Rarity > MonsterRarity.Common
 			? MonsterRarity.StarPrefix(Rarity)
 			: string.Empty;
+		// Rebirth count (轉生) shown as ✦xN next to a companion's level.
+		string rebirthSuffix = _isCaptured && RebirthCount > 0 ? $" ✦x{RebirthCount}" : string.Empty;
 		_nameplate.Text = IsBoss
 			? LocaleText.F("boss.nameplate", Level, LocalizedDisplayName, capturedText)
-			: $"{rarityPrefix}{LocaleText.T("actor.level_prefix")}{Level} {LocalizedDisplayName}{capturedText}";
+			: $"{rarityPrefix}{LocaleText.T("actor.level_prefix")}{Level} {LocalizedDisplayName}{rebirthSuffix}{capturedText}";
 		_nameplate.FontSize = Mathf.RoundToInt((IsBoss ? 28 : 20) * NameplateScale);
 		Color markerColor = GetNameplateStatusColor();
 		_nameplate.Modulate = markerColor;
