@@ -919,22 +919,10 @@ public partial class MainMenu : Control
 	private void OnJoinWelcomed()
 	{
 		_awaitingJoin = false;
-		// Seed received from the host — enter the shared world as a transient guest.
-		// A client keeps NO local save (no world slot), so it never holds the host's
-		// world save and nothing from the session shows up in its world list.
-		if (NetworkPrefs.HasGuestProfile())
-		{
-			// Returning guest: reuse the saved character record, enter directly.
-			NetworkPrefs.GuestProfile profile = NetworkPrefs.GetGuestProfile();
-			GameLaunchOptions.IsJoiningGuest = false;
-			GameLaunchOptions.StartJoinGuest(profile.ModelPath, profile.Name);
-			GetTree().ChangeSceneToFile("res://node_3d.tscn");
-			return;
-		}
-
-		// First-time join: pick a character first (the connection stays open — the
-		// NetworkManager autoload survives the scene change). Character-select saves
-		// the record and enters the world.
+		// Seed received from the host — now pick a character before entering the
+		// shared world (the NetworkManager autoload survives the scene change, so the
+		// connection stays open). A returning guest sees their last-used character
+		// pre-selected but can still change it. A client keeps NO local save.
 		GameLaunchOptions.IsJoiningGuest = true;
 		GetTree().ChangeSceneToFile("res://character_select.tscn");
 	}

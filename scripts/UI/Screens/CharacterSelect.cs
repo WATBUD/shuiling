@@ -106,9 +106,20 @@ public partial class CharacterSelect : Control
 		nameLabel.AddThemeColorOverride("font_color", new Color(0.82f, 0.9f, 1.0f));
 		nameRow.AddChild(nameLabel);
 
+		// A returning guest gets their last-used name pre-filled (still editable).
+		string initialName = LocaleText.T("player.default_name");
+		if (_isJoiningGuest)
+		{
+			NetworkPrefs.GuestProfile profile = NetworkPrefs.GetGuestProfile();
+			if (!string.IsNullOrWhiteSpace(profile.Name))
+			{
+				initialName = profile.Name;
+			}
+		}
+
 		_nameEdit = new LineEdit
 		{
-			Text = LocaleText.T("player.default_name"),
+			Text = initialName,
 			CustomMinimumSize = new Vector2(180.0f, 30.0f),
 			MaxLength = 24,
 			SizeFlagsHorizontal = SizeFlags.ExpandFill,
@@ -188,8 +199,29 @@ public partial class CharacterSelect : Control
 		};
 		buttons.AddChild(_startButton);
 
-		SelectModel(0);
+		SelectModel(GetInitialModelIndex());
 		UpdateStartEnabled();
+	}
+
+	// Default selection: a returning guest starts on their last-used character.
+	private int GetInitialModelIndex()
+	{
+		if (_isJoiningGuest)
+		{
+			string recordedPath = NetworkPrefs.GetGuestProfile().ModelPath;
+			if (!string.IsNullOrWhiteSpace(recordedPath))
+			{
+				for (int i = 0; i < _models.Count; i++)
+				{
+					if (_models[i].Path == recordedPath)
+					{
+						return i;
+					}
+				}
+			}
+		}
+
+		return 0;
 	}
 
 	private Control BuildModelCell(int index)

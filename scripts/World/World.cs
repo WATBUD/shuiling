@@ -1742,7 +1742,10 @@ public partial class World : Node3D
 		else if (NetworkManager.Instance is { IsHost: true }
 			&& actor.ActorKind == "monster" && !actor.IsCaptured && IsWildMapId(actor.MapId))
 		{
-			simulate = IsWildInstanceInUse(actor.MapId, actor.WorldTier, actor.GroupId);
+			// Simulate only instances a player is physically standing in right now —
+			// not every alive instance. Otherwise the host keeps running its own wild
+			// monsters while it's back in the city, and they attack it unseen.
+			simulate = IsWildInstanceOccupied(actor.MapId, actor.WorldTier, actor.GroupId);
 		}
 		else
 		{
@@ -3297,8 +3300,22 @@ public partial class World : Node3D
 
 	private bool IsWildInstanceInUse(string mapId, int tier, int groupId)
 	{
-		// Local player's own instance stays alive.
+		// Kept alive (not despawned) whenever it's the local player's selected tier
+		// instance — so monsters persist across trips back to the city — or a remote
+		// player is in it.
 		if (GetSelectedTier(mapId) == tier && LocalGroupId() == groupId)
+		{
+			return true;
+		}
+
+		return NetworkManager.Instance is { IsHost: true } net && net.IsRemoteInstanceInUse(mapId, tier, groupId);
+	}
+
+	// Whether a player is PHYSICALLY present in this instance right now (as opposed
+	// to merely alive). Drives host simulation so idle instances stop running.
+	private bool IsWildInstanceOccupied(string mapId, int tier, int groupId)
+	{
+		if (_activeMapId == mapId && GetSelectedTier(mapId) == tier && LocalGroupId() == groupId)
 		{
 			return true;
 		}

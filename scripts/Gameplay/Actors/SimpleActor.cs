@@ -70,6 +70,11 @@ public partial class SimpleActor : CharacterBody3D
 	private bool _isAwaitingRecovery;
 	private string _fallenMapId = string.Empty;
 	private bool _isWorldMapActive = true;
+	// True only when this actor shares the LOCAL player's instance (same map, tier
+	// and party group). The host simulates other groups' monsters invisibly for
+	// network streaming, and those must never chase or attack the local player —
+	// otherwise the player is hit by unseen enemies from a parallel instance.
+	private bool _engagesLocalPlayer = true;
 	private uint _defaultCollisionLayer;
 	private uint _defaultCollisionMask;
 	private PlayerController? _followTarget;
@@ -643,7 +648,7 @@ public partial class SimpleActor : CharacterBody3D
 		bool chasing = false;
 		Vector3 destination = _targetPosition;
 
-		if (ActorKind == "monster" && player != null)
+		if (ActorKind == "monster" && player != null && _engagesLocalPlayer)
 		{
 			if (TryGetRetaliationTarget(out SimpleActor retaliationTarget))
 			{
@@ -767,6 +772,7 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		_isWorldMapActive = simulate;
+		_engagesLocalPlayer = visible;
 		Visible = visible;
 		SetPhysicsProcess(simulate && !_isDefeated);
 		if (simulate && !_isDefeated)
