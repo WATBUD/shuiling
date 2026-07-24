@@ -1,4 +1,5 @@
 using Godot;
+using System;
 using System.Collections.Generic;
 
 // Listen-server (P2P) reachability diagnostics for "建立房間". Answers the four
@@ -43,6 +44,101 @@ public static class NetworkDiagnostics
 
 	// Background thread: discover the router via UPnP, report the public IP,
 	// auto-open the port, and flag CGNAT / private WAN addresses.
+	// This machine's LAN address (192.168.x / 10.x / 172.16-31.x) for same-WiFi play.
+	public static string GetLocalIPv4()
+	{
+		foreach (string address in IP.GetLocalAddresses())
+		{
+			if (address.Contains(':') || address.StartsWith("127."))
+			{
+				continue;
+			}
+
+			if (address.StartsWith("192.168.") || address.StartsWith("10.") || IsPrivate172(address))
+			{
+				return address;
+			}
+		}
+
+		foreach (string address in IP.GetLocalAddresses())
+		{
+			if (!address.Contains(':') && !address.StartsWith("127."))
+			{
+				return address;
+			}
+		}
+
+		return string.Empty;
+	}
+
+	// Public HTTP echo services, tried in order when UPnP can't report the WAN IP.
+	private static readonly string[] PublicIpServices =
+	{
+		"https://api.ipify.org",
+		"https://checkip.amazonaws.com",
+		"https://ifconfig.me/ip",
+		"https://icanhazip.com",
+	};
+
+	private static readonly System.Net.Http.HttpClient IpHttpClient = new() { Timeout = TimeSpan.FromSeconds(4.0) };
+
+	// Blocking: the router's public/WAN address. Call off the main thread.
+	// Tries UPnP first (instant if the router supports it), then falls back to
+	// public HTTP echo services so a non-UPnP router still resolves the IP.
+	public static string QueryExternalIp()
+	{
+		try
+		{
+			var upnp = new Upnp();
+			if (upnp.Discover() == (int)Upnp.UpnpResult.Success)
+			{
+				UpnpDevice gateway = upnp.GetGateway();
+				if (gateway != null && gateway.IsValidGateway())
+				{
+					string external = upnp.QueryExternalAddress();
+					if (!string.IsNullOrWhiteSpace(external) && System.Net.IPAddress.TryParse(external, out _))
+					{
+						return external;
+					}
+				}
+			}
+		}
+		catch (Exception exception)
+		{
+			GD.PushWarning($"UPnP external IP lookup failed: {exception.Message}");
+		}
+
+		foreach (string service in PublicIpServices)
+		{
+			try
+			{
+				string body = IpHttpClient.GetStringAsync(service).GetAwaiter().GetResult();
+				string ip = body.Trim();
+				if (System.Net.IPAddress.TryParse(ip, out _))
+				{
+					return ip;
+				}
+			}
+			catch (Exception)
+			{
+				// Try the next service.
+			}
+		}
+
+		return string.Empty;
+	}
+
+	private static bool IsPrivate172(string address)
+	{
+		if (!address.StartsWith("172."))
+		{
+			return false;
+		}
+
+		string[] parts = address.Split('.');
+		return parts.Length >= 2 && int.TryParse(parts[1], out int second) && second >= 16 && second <= 31;
+	}
+
 	public static List<Line> RunNat(int port)
 	{
 		var lines = new List<Line>();

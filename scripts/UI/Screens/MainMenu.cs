@@ -15,15 +15,18 @@ public partial class MainMenu : Control
 	private LineEdit _joinPortEdit = null!;
 	private Label _hostStatusLabel = null!;
 	private Label _hostWorldLabel = null!;
+	private Label _hostIpLabel = null!;
 	private Label _joinStatusLabel = null!;
 	private Button _hostStartButton = null!;
-	private Button _hostTestButton = null!;
 	private Label _hostDiagLabel = null!;
+	private bool _diagRunning;
+	private bool _diagPending;
 	private Button _joinConfirmButton = null!;
 
 	// The world chosen from the list to host.
 	private string _hostWorldId = string.Empty;
 	private int _hostWorldSeed;
+	private bool _hostIsNewWorld;
 
 	public override void _Ready()
 	{
@@ -54,6 +57,7 @@ public partial class MainMenu : Control
 				_newWorldModeDialog.Visible = true;
 			}
 		}
+
 	}
 
 	public override void _ExitTree()
@@ -157,9 +161,22 @@ public partial class MainMenu : Control
 
 	private void ChooseNewWorldMode(bool multiplayer)
 	{
-		NetworkManager.Instance?.ResetSession();
 		GameLaunchOptions.NewWorldIsMultiplayer = multiplayer;
-		GetTree().ChangeSceneToFile("res://character_select.tscn");
+		if (_newWorldModeDialog != null)
+		{
+			_newWorldModeDialog.Visible = false;
+		}
+
+		if (multiplayer)
+		{
+			// Set up the server FIRST, then go to character creation.
+			ShowHostDialogForNewWorld();
+		}
+		else
+		{
+			NetworkManager.Instance?.ResetSession();
+			GetTree().ChangeSceneToFile("res://character_select.tscn");
+		}
 	}
 
 	// ---------------------------------------------------------------- world list
@@ -388,6 +405,8 @@ public partial class MainMenu : Control
 
 		content.AddChild(MakeFieldLabel("net.dialog.port"));
 		_hostPortEdit = new LineEdit { Text = NetworkManager.DefaultPort.ToString(), CustomMinimumSize = new Vector2(0.0f, 38.0f) };
+		// Re-run the reachability check whenever the port is edited.
+		_hostPortEdit.TextChanged += _ => RequestDiagnostic();
 		content.AddChild(_hostPortEdit);
 
 		var playerCapLabel = new Label
@@ -399,6 +418,26 @@ public partial class MainMenu : Control
 		playerCapLabel.AddThemeColorOverride("font_color", new Color(0.62f, 0.72f, 0.82f));
 		content.AddChild(playerCapLabel);
 
+		// Host addresses so friends know what to type in "Join"; the reachability
+		// result is shown on the line directly below the public IP.
+		_hostIpLabel = new Label
+		{
+			HorizontalAlignment = HorizontalAlignment.Center,
+			AutowrapMode = TextServer.AutowrapMode.WordSmart,
+		};
+		_hostIpLabel.AddThemeFontSizeOverride("font_size", 14);
+		_hostIpLabel.AddThemeColorOverride("font_color", new Color(0.72f, 1.0f, 0.82f));
+		content.AddChild(_hostIpLabel);
+
+		_hostDiagLabel = new Label
+		{
+			HorizontalAlignment = HorizontalAlignment.Center,
+			AutowrapMode = TextServer.AutowrapMode.WordSmart,
+		};
+		_hostDiagLabel.AddThemeFontSizeOverride("font_size", 13);
+		_hostDiagLabel.AddThemeColorOverride("font_color", new Color(0.82f, 0.9f, 1.0f));
+		content.AddChild(_hostDiagLabel);
+
 		_hostStatusLabel = new Label
 		{
 			HorizontalAlignment = HorizontalAlignment.Center,
@@ -408,25 +447,24 @@ public partial class MainMenu : Control
 		_hostStatusLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.72f, 0.68f));
 		content.AddChild(_hostStatusLabel);
 
-		_hostTestButton = MakeMenuButton(LocaleText.T("net.diag.button"));
-		_hostTestButton.Pressed += RunNetworkTest;
-		content.AddChild(_hostTestButton);
-
-		_hostDiagLabel = new Label
-		{
-			HorizontalAlignment = HorizontalAlignment.Left,
-			AutowrapMode = TextServer.AutowrapMode.WordSmart,
-		};
-		_hostDiagLabel.AddThemeFontSizeOverride("font_size", 13);
-		_hostDiagLabel.AddThemeColorOverride("font_color", new Color(0.82f, 0.9f, 1.0f));
-		content.AddChild(_hostDiagLabel);
-
 		_hostStartButton = MakeMenuButton(LocaleText.T("world.host_start"));
 		_hostStartButton.Pressed += StartHosting;
 		content.AddChild(_hostStartButton);
 
 		Button cancel = MakeMenuButton(LocaleText.T("dialog.button.cancel"));
-		cancel.Pressed += () => _hostDialog!.Visible = false;
+		cancel.Pressed += () =>
+		{
+			_hostDialog!.Visible = false;
+			if (_hostIsNewWorld && _newWorldModeDialog != null)
+			{
+				// Back to the single/multiplayer choice for a new world.
+				_newWorldModeDialog.Visible = true;
+			}
+			else
+			{
+				ShowWorldList();
+			}
+		};
 		content.AddChild(cancel);
 	}
 
@@ -462,18 +500,59 @@ public partial class MainMenu : Control
 
 	private void ShowHostDialog(SaveGameManager.WorldSaveInfo world)
 	{
+		_hostIsNewWorld = false;
 		_hostWorldId = world.Id;
 		_hostWorldSeed = world.Seed;
+		OpenHostDialog(LocaleText.F("world.host_world", world.Name));
+	}
+
+	// New multiplayer world: create the server here, BEFORE character creation.
+	private void ShowHostDialogForNewWorld()
+	{
+		_hostIsNewWorld = true;
+		_hostWorldId = string.Empty;
+		_hostWorldSeed = 0;
+		OpenHostDialog(LocaleText.T("world.host_new_title"));
+	}
+
+	private void OpenHostDialog(string titleText)
+	{
 		if (_worldListDialog != null) _worldListDialog.Visible = false;
+		if (_newWorldModeDialog != null) _newWorldModeDialog.Visible = false;
 		if (_joinDialog != null) _joinDialog.Visible = false;
 		if (_hostDialog != null)
 		{
-			_hostWorldLabel.Text = LocaleText.F("world.host_world", world.Name);
+			_hostWorldLabel.Text = titleText;
+			_hostStartButton.Text = LocaleText.T(_hostIsNewWorld ? "world.host_create" : "world.host_start");
 			_hostStatusLabel.Text = string.Empty;
 			_hostDiagLabel.Text = string.Empty;
-			_hostTestButton.Disabled = false;
+			ShowHostAddresses();
 			_hostDialog.Visible = true;
+			// Auto-detect reachability on entry (no manual button).
+			RequestDiagnostic();
 		}
+	}
+
+	// LAN IP is instant; the public/WAN IP needs a (blocking) UPnP query, so fetch
+	// it on a worker and fill it in when it arrives.
+	private void ShowHostAddresses()
+	{
+		string lan = NetworkDiagnostics.GetLocalIPv4();
+		string lanText = string.IsNullOrEmpty(lan) ? LocaleText.T("net.dialog.ip_unknown") : lan;
+		_hostIpLabel.Text = LocaleText.F("net.dialog.lan_ip", lanText) + "\n" + LocaleText.F("net.dialog.wan_ip", LocaleText.T("net.dialog.wan_checking"));
+
+		System.Threading.Tasks.Task.Run(() =>
+		{
+			string wan = NetworkDiagnostics.QueryExternalIp();
+			Callable.From(() =>
+			{
+				if (_hostIpLabel != null && IsInstanceValid(_hostIpLabel))
+				{
+					string wanText = string.IsNullOrEmpty(wan) ? LocaleText.T("net.dialog.ip_unknown") : wan;
+					_hostIpLabel.Text = LocaleText.F("net.dialog.lan_ip", lanText) + "\n" + LocaleText.F("net.dialog.wan_ip", wanText);
+				}
+			}).CallDeferred();
+		});
 	}
 
 	private void ShowJoinDialog()
@@ -496,15 +575,29 @@ public partial class MainMenu : Control
 	// Runs the listen-server reachability diagnostic. The quick bind test is on
 	// the main thread; the blocking UPnP discovery + firewall calls run on a
 	// worker and marshal the results back with CallDeferred.
-	private void RunNetworkTest()
+	// Auto-detect reachability (runs on host-screen entry and on every port edit).
+	// Guarded so overlapping requests coalesce; the latest port is re-checked once
+	// the in-flight check finishes.
+	private void RequestDiagnostic()
 	{
+		if (_hostDialog == null || !_hostDialog.Visible)
+		{
+			return;
+		}
+
 		if (!TryParsePort(_hostPortEdit.Text, out int port))
 		{
 			_hostDiagLabel.Text = NetworkDiagnostics.Marker(NetworkDiagnostics.Level.Fail) + LocaleText.T("net.error.invalid_port");
 			return;
 		}
 
-		_hostTestButton.Disabled = true;
+		if (_diagRunning)
+		{
+			_diagPending = true;
+			return;
+		}
+
+		_diagRunning = true;
 		_hostDiagLabel.Text = LocaleText.T("net.diag.running");
 
 		NetworkDiagnostics.Line bindLine = NetworkDiagnostics.TestPortBind(port);
@@ -529,25 +622,30 @@ public partial class MainMenu : Control
 			anyWarn |= line.Level == NetworkDiagnostics.Level.Warn;
 		}
 
-		builder.AppendLine();
-		builder.Append(anyFail
-			? LocaleText.T("net.diag.result_blocked")
-			: anyWarn
-				? LocaleText.T("net.diag.result_maybe")
-				: LocaleText.T("net.diag.result_reachable"));
-
-		_hostDiagLabel.Text = builder.ToString();
+		_hostDiagLabel.Text = builder.ToString().TrimEnd();
 		_hostDiagLabel.AddThemeColorOverride("font_color", anyFail
 			? new Color(1.0f, 0.6f, 0.55f)
 			: anyWarn
 				? new Color(1.0f, 0.85f, 0.5f)
 				: new Color(0.6f, 1.0f, 0.7f));
-		_hostTestButton.Disabled = false;
+
+		// Re-run once more if the port changed while this check was in flight.
+		_diagRunning = false;
+		if (_diagPending)
+		{
+			_diagPending = false;
+			RequestDiagnostic();
+		}
 	}
 
 	private void StartHosting()
 	{
-		if (NetworkManager.Instance == null || string.IsNullOrEmpty(_hostWorldId))
+		if (NetworkManager.Instance == null)
+		{
+			return;
+		}
+
+		if (!_hostIsNewWorld && string.IsNullOrEmpty(_hostWorldId))
 		{
 			return;
 		}
@@ -565,10 +663,19 @@ public partial class MainMenu : Control
 			return;
 		}
 
-		// Host the chosen world with its saved seed + progress.
-		NetworkManager.Instance.OverrideWorldSeed(_hostWorldSeed);
-		GameLaunchOptions.LoadWorld(_hostWorldId, _hostWorldSeed);
-		GetTree().ChangeSceneToFile("res://node_3d.tscn");
+		if (_hostIsNewWorld)
+		{
+			// Server is up (its WorldSeed is the new world's seed). Now pick the
+			// character; character-select enters the world when done.
+			GetTree().ChangeSceneToFile("res://character_select.tscn");
+		}
+		else
+		{
+			// Existing world: host with its saved seed + progress, enter directly.
+			NetworkManager.Instance.OverrideWorldSeed(_hostWorldSeed);
+			GameLaunchOptions.LoadWorld(_hostWorldId, _hostWorldSeed);
+			GetTree().ChangeSceneToFile("res://node_3d.tscn");
+		}
 	}
 
 	private void StartJoining()
