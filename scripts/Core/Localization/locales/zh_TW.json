@@ -592,6 +592,11 @@
 	"party.mp.no_players": "目前主城沒有其他玩家",
 	"party.mp.offline": "需連線才能組隊",
 	"party.mp.invite": "邀請",
+	"party.mp.leave": "退出隊伍",
+	"party.mp.leader_only": "只有隊長能邀請，請先退出隊伍",
+	"system.party.not_leader": "只有隊長能邀請隊員，請先退出目前隊伍。",
+	"system.party.left": "你已退出隊伍。",
+	"system.party.disbanded": "隊伍已解散。",
 	"party.invite.prompt": "{0} 邀請你組隊！",
 	"party.invite.accept": "接受",
 	"party.invite.decline": "婉拒",
@@ -848,5 +853,6 @@
 	"world.auto_save_select_hint": "開啟後，離開世界或關閉遊戲時會自動保存目前進度。",
 	"world.default_name": "新世界",
 	"world.migrated_name": "我的世界",
-	"system.save.no_world": "目前沒有可存檔的世界。"
+	"system.save.no_world": "目前沒有可存檔的世界。",
+	"system.save.client_blocked": "多人客戶端為訪客身分，不會儲存存檔。"
 }

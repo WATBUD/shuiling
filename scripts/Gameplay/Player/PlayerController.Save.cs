@@ -211,6 +211,18 @@ public partial class PlayerController
 			return;
 		}
 
+		// A multiplayer client is a transient guest on someone else's world — it
+		// must not write any local save (never holds the host's world).
+		if (NetworkManager.Instance is { IsClient: true })
+		{
+			if (announce)
+			{
+				PostSystemMessage(LocaleText.T("system.save.client_blocked"), new Color(1.0f, 0.72f, 0.5f));
+			}
+
+			return;
+		}
+
 		string worldId = GameLaunchOptions.ActiveWorldId;
 		if (string.IsNullOrEmpty(worldId))
 		{
