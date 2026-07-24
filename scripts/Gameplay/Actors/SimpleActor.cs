@@ -753,15 +753,23 @@ public partial class SimpleActor : CharacterBody3D
 
 	public void SetWorldMapActive(bool active)
 	{
+		SetWorldMapState(active, active);
+	}
+
+	// Simulation (physics/AI/collision) and visibility are decoupled so the host
+	// can keep another group's instance running (simulate) without showing it to
+	// the local player (visible). Clients never simulate (simulate=false).
+	public void SetWorldMapState(bool simulate, bool visible)
+	{
 		if (_isCaptured)
 		{
 			return;
 		}
 
-		_isWorldMapActive = active;
-		Visible = active;
-		SetPhysicsProcess(active && !_isDefeated);
-		if (active && !_isDefeated)
+		_isWorldMapActive = simulate;
+		Visible = visible;
+		SetPhysicsProcess(simulate && !_isDefeated);
+		if (simulate && !_isDefeated)
 		{
 			CollisionLayer = _defaultCollisionLayer;
 			CollisionMask = _defaultCollisionMask;
@@ -3022,8 +3030,9 @@ public partial class SimpleActor : CharacterBody3D
 			if (ActorKind == "monster")
 			{
 				DropMonsterLoot(attacker._followTarget);
-				// Every monster yields its own exclusive name card (one per model).
-				attacker._followTarget.AwardMonsterCard(this);
+				// A monster's exclusive name card is a rare physical drop (5%). We
+				// only bother rolling if the player doesn't already own it.
+				MaybeDropMonsterCard(attacker._followTarget);
 			}
 			if (IsBoss)
 			{
@@ -3134,6 +3143,35 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		player.PostSystemMessage(LocaleText.F("system.drop.loot", LocalizedDisplayName, LocaleText.T(MonsterLootCatalog.GetNameKey(primaryLootId))), new Color(1.0f, 0.86f, 0.48f), GameMessageChannel.Loot);
+	}
+
+	// Chance for a defeated monster to drop its exclusive name card as a physical
+	// card-shaped pickup. Skipped when the player already owns the card.
+	private const float CardDropChance = 0.05f;
+
+	private void MaybeDropMonsterCard(PlayerController player)
+	{
+		if (player == null || !IsInstanceValid(player))
+		{
+			return;
+		}
+
+		string cardKey = GetCardKey();
+		if (string.IsNullOrWhiteSpace(cardKey) || player.HasCard(cardKey))
+		{
+			return;
+		}
+
+		if (_rng.Randf() >= CardDropChance)
+		{
+			return;
+		}
+
+		var drop = new WorldDrop { CardKey = cardKey };
+		Node parent = GetTree().CurrentScene ?? GetParent();
+		parent.AddChild(drop);
+		Vector3 position = GlobalPosition + RandomDropOffset(0.6f);
+		drop.GlobalPosition = new Vector3(position.X, 0.04f, position.Z);
 	}
 
 	private void DropBossLoot(PlayerController player)

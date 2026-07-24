@@ -57,6 +57,27 @@ public partial class NetworkManager : Node
 	public IReadOnlyList<string> LocalPartyNames => _localPartyNames;
 	public IReadOnlyList<long> LocalPartyPeers => _localPartyPeers;
 	public long LocalPeerId => IsOnline ? Multiplayer.GetUniqueId() : 0;
+
+	// The hunting-ground instance group of the local player: the party leader's
+	// peer id when in a party, otherwise the player's own id. 0 in single-player,
+	// so each party / solo player gets a separate wild-map instance.
+	public int LocalGroupId
+	{
+		get
+		{
+			if (!IsOnline)
+			{
+				return 0;
+			}
+
+			if (_localPartyPeers.Count > 0)
+			{
+				return (int)_localPartyPeers[0]; // leader is broadcast first
+			}
+
+			return (int)Multiplayer.GetUniqueId();
+		}
+	}
 	public bool LocalIsPartyLeader { get; private set; }
 	public bool LocalInParty => _localPartyNames.Count > 0;
 	// Only a leader (or a solo player about to become one) may send invites.
@@ -453,11 +474,11 @@ public partial class NetworkManager : Node
 		}
 
 		string mapId = ActiveWorld!.ActiveMapId;
-		Rpc(MethodName.ReceivePlayerState, player.GlobalPosition, player.Rotation.Y, mapId, ActiveWorld.GetSelectedTier(mapId));
+		Rpc(MethodName.ReceivePlayerState, player.GlobalPosition, player.Rotation.Y, mapId, ActiveWorld.GetSelectedTier(mapId), LocalGroupId);
 	}
 
 	[Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Unreliable)]
-	private void ReceivePlayerState(Vector3 position, float yaw, string mapId, int tier)
+	private void ReceivePlayerState(Vector3 position, float yaw, string mapId, int tier, int groupId)
 	{
 		if (ActiveWorld == null || !IsInstanceValid(ActiveWorld))
 		{
@@ -473,15 +494,15 @@ public partial class NetworkManager : Node
 			_playerPuppets[peerId] = puppet;
 		}
 
-		// Host: a remote player entered a (map, tier) instance — make sure it
-		// is simulated so there is something for them to fight.
-		if (IsHost && (puppet.MapId != mapId || puppet.Tier != tier))
+		// Host: a remote player entered a (map, tier, group) instance — make sure
+		// that group's instance is populated so they have monsters to fight.
+		if (IsHost && (puppet.MapId != mapId || puppet.Tier != tier || puppet.GroupId != groupId))
 		{
-			ActiveWorld.EnsureWildInstancePopulated(mapId, tier);
+			ActiveWorld.EnsureWildInstancePopulated(mapId, tier, groupId);
 		}
 
 		puppet.SetPlayerName(GetPlayerName(peerId));
-		puppet.ApplyNetworkState(position, yaw, mapId, tier);
+		puppet.ApplyNetworkState(position, yaw, mapId, tier, groupId);
 	}
 
 	private void UpdatePlayerPuppetVisibility()
@@ -490,7 +511,7 @@ public partial class NetworkManager : Node
 		{
 			if (IsInstanceValid(puppet))
 			{
-				puppet.Visible = ActiveWorld!.IsInstanceVisibleLocally(puppet.MapId, puppet.Tier);
+				puppet.Visible = ActiveWorld!.IsInstanceVisibleLocally(puppet.MapId, puppet.Tier, puppet.GroupId);
 			}
 		}
 
@@ -509,12 +530,12 @@ public partial class NetworkManager : Node
 		}
 	}
 
-	// Host-side: is any remote player currently inside this (map, tier)?
-	public bool IsRemoteInstanceInUse(string mapId, int tier)
+	// Host-side: is any remote player currently inside this (map, tier, group)?
+	public bool IsRemoteInstanceInUse(string mapId, int tier, int groupId)
 	{
 		foreach (RemotePlayerPuppet puppet in _playerPuppets.Values)
 		{
-			if (IsInstanceValid(puppet) && puppet.MapId == mapId && puppet.Tier == tier)
+			if (IsInstanceValid(puppet) && puppet.MapId == mapId && puppet.Tier == tier && puppet.GroupId == groupId)
 			{
 				return true;
 			}
@@ -526,31 +547,31 @@ public partial class NetworkManager : Node
 	// ---------------------------------------------------------------- monsters
 
 	// Host → clients: a monster now exists (also used for join snapshots).
-	public void BroadcastMonsterSpawn(int netId, string mapId, string nameKey, int level, int tier, int rarity,
+	public void BroadcastMonsterSpawn(int netId, string mapId, string nameKey, int level, int tier, int groupId, int rarity,
 		int maxHealth, int health, bool isBoss, string bossNameKey, float visualScale, Color auraColor, Vector3 position)
 	{
 		if (IsHost)
 		{
-			Rpc(MethodName.ClientMonsterSpawn, netId, mapId, nameKey, level, tier, rarity, maxHealth, health, isBoss, bossNameKey, visualScale, auraColor, position);
+			Rpc(MethodName.ClientMonsterSpawn, netId, mapId, nameKey, level, tier, groupId, rarity, maxHealth, health, isBoss, bossNameKey, visualScale, auraColor, position);
 		}
 	}
 
-	public void SendMonsterSpawnTo(long peerId, int netId, string mapId, string nameKey, int level, int tier, int rarity,
+	public void SendMonsterSpawnTo(long peerId, int netId, string mapId, string nameKey, int level, int tier, int groupId, int rarity,
 		int maxHealth, int health, bool isBoss, string bossNameKey, float visualScale, Color auraColor, Vector3 position)
 	{
 		if (IsHost)
 		{
-			RpcId(peerId, MethodName.ClientMonsterSpawn, netId, mapId, nameKey, level, tier, rarity, maxHealth, health, isBoss, bossNameKey, visualScale, auraColor, position);
+			RpcId(peerId, MethodName.ClientMonsterSpawn, netId, mapId, nameKey, level, tier, groupId, rarity, maxHealth, health, isBoss, bossNameKey, visualScale, auraColor, position);
 		}
 	}
 
 	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-	private void ClientMonsterSpawn(int netId, string mapId, string nameKey, int level, int tier, int rarity,
+	private void ClientMonsterSpawn(int netId, string mapId, string nameKey, int level, int tier, int groupId, int rarity,
 		int maxHealth, int health, bool isBoss, string bossNameKey, float visualScale, Color auraColor, Vector3 position)
 	{
 		if (ActiveWorld != null && IsInstanceValid(ActiveWorld))
 		{
-			ActiveWorld.HandleNetworkMonsterSpawn(netId, mapId, nameKey, level, tier, rarity, maxHealth, health, isBoss, bossNameKey, visualScale, auraColor, position);
+			ActiveWorld.HandleNetworkMonsterSpawn(netId, mapId, nameKey, level, tier, groupId, rarity, maxHealth, health, isBoss, bossNameKey, visualScale, auraColor, position);
 		}
 	}
 

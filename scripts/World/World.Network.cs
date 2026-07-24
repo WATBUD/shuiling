@@ -50,14 +50,19 @@ public partial class World
 
 	// Whether content living in (mapId, tier) is visible to the LOCAL player
 	// right now — same map, and for wild maps also the same selected tier.
-	public bool IsInstanceVisibleLocally(string mapId, int tier)
+	public bool IsInstanceVisibleLocally(string mapId, int tier, int groupId)
 	{
 		if (mapId != _activeMapId)
 		{
 			return false;
 		}
 
-		return !IsWildMapId(mapId) || tier == GetSelectedTier(mapId);
+		if (!IsWildMapId(mapId))
+		{
+			return true;
+		}
+
+		return tier == GetSelectedTier(mapId) && groupId == LocalGroupId();
 	}
 
 	private void NetworkOnWorldExit()
@@ -86,7 +91,7 @@ public partial class World
 		int netId = ++_nextNetMonsterId;
 		actor.NetworkMonsterId = netId;
 		_netMonstersById[netId] = new NetMonsterInfo(actor, visualScale, auraColor);
-		Net!.BroadcastMonsterSpawn(netId, actor.MapId, actor.DisplayName, actor.Level, actor.WorldTier, actor.Rarity,
+		Net!.BroadcastMonsterSpawn(netId, actor.MapId, actor.DisplayName, actor.Level, actor.WorldTier, actor.GroupId, actor.Rarity,
 			actor.MaxHealth, actor.CurrentHealth, actor.IsBoss, actor.BossNameKey, visualScale, auraColor, actor.Position);
 	}
 
@@ -105,7 +110,7 @@ public partial class World
 				continue;
 			}
 
-			Net!.SendMonsterSpawnTo(peerId, entry.Key, actor.MapId, actor.DisplayName, actor.Level, actor.WorldTier, actor.Rarity,
+			Net!.SendMonsterSpawnTo(peerId, entry.Key, actor.MapId, actor.DisplayName, actor.Level, actor.WorldTier, actor.GroupId, actor.Rarity,
 				actor.MaxHealth, actor.CurrentHealth, actor.IsBoss, actor.BossNameKey,
 				entry.Value.VisualScale, entry.Value.AuraColor, actor.Position);
 		}
@@ -224,7 +229,7 @@ public partial class World
 
 	// ---------------------------------------------------------------- client side
 
-	public void HandleNetworkMonsterSpawn(int netId, string mapId, string nameKey, int level, int tier, int rarity,
+	public void HandleNetworkMonsterSpawn(int netId, string mapId, string nameKey, int level, int tier, int groupId, int rarity,
 		int maxHealth, int health, bool isBoss, string bossNameKey, float visualScale, Color auraColor, Vector3 position)
 	{
 		if (!IsNetworkClientWorld)
@@ -248,15 +253,16 @@ public partial class World
 		// locally, these values are only shown in info panels.
 		actor.ConfigureStats(nameKey, level, maxHealth, 9 + level * 4, 5 + level * 3, 0, 0);
 		actor.WorldTier = tier;
+		actor.GroupId = groupId;
 
 		if (isBoss)
 		{
-			actor.Name = $"NetBoss_{mapId}_t{tier}";
+			actor.Name = $"NetBoss_{mapId}_t{tier}_g{groupId}";
 			actor.ConfigureBoss(bossNameKey, string.Empty);
 			ScaleActorVisualChildren(actor, visualScale);
 			ScaleBossCollision(actor, visualScale);
 			AddBossAura(actor, auraColor, visualScale);
-			_wildBossesByInstance[WildInstanceKey(mapId, tier)] = actor;
+			_wildBossesByInstance[WildInstanceKey(mapId, tier, groupId)] = actor;
 		}
 		else
 		{
@@ -288,10 +294,11 @@ public partial class World
 		_actorsRoot.AddChild(actor);
 		actor.SetNetworkPuppet(netId);
 		actor.CurrentHealth = Mathf.Clamp(health, 0, actor.EffectiveMaxHealth);
-		actor.SetWorldMapActive(IsActorInstanceActive(actor));
+		// Client never simulates; it only mirrors visibility for its own group's instance.
+		actor.SetWorldMapState(false, IsActorInstanceActive(actor));
 		_netMonstersById[netId] = new NetMonsterInfo(actor, visualScale, auraColor);
 
-		if (isBoss && mapId == _activeMapId && tier == GetSelectedTier(mapId))
+		if (isBoss && mapId == _activeMapId && tier == GetSelectedTier(mapId) && groupId == LocalGroupId())
 		{
 			UpdateActiveBossHud(false);
 		}

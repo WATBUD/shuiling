@@ -6,6 +6,7 @@ public partial class RemotePlayerPuppet : Node3D
 {
 	public string MapId { get; private set; } = "city";
 	public int Tier { get; private set; } = 1;
+	public int GroupId { get; private set; }
 
 	private Vector3 _targetPosition;
 	private float _targetYaw;
@@ -67,10 +68,11 @@ public partial class RemotePlayerPuppet : Node3D
 		}
 	}
 
-	public void ApplyNetworkState(Vector3 position, float yaw, string mapId, int tier)
+	public void ApplyNetworkState(Vector3 position, float yaw, string mapId, int tier, int groupId)
 	{
 		MapId = mapId;
 		Tier = tier;
+		GroupId = groupId;
 		_targetPosition = position;
 		_targetYaw = yaw;
 		if (!_hasState)

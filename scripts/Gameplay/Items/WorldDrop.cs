@@ -13,6 +13,8 @@ public partial class WorldDrop : Node3D
 	private static Mesh? _sharedGoldMesh;
 	private static Mesh? _sharedItemMesh;
 	private static Mesh? _sharedGlowMesh;
+	private static Mesh? _sharedCardFrameMesh;
+	private static Mesh? _sharedCardFaceMesh;
 
 	private static StandardMaterial3D GetBodyMaterial(Color color, bool isGold)
 	{
@@ -56,6 +58,7 @@ public partial class WorldDrop : Node3D
 	[Export] public string ItemId { get; set; } = string.Empty;
 	[Export] public int Amount { get; set; } = 1;
 	[Export] public int GoldAmount { get; set; }
+	[Export] public string CardKey { get; set; } = string.Empty;
 	[Export] public float PickupRadius { get; set; } = 1.65f;
 	[Export] public float LifetimeSeconds { get; set; } = 90.0f;
 
@@ -64,6 +67,7 @@ public partial class WorldDrop : Node3D
 	private Label3D? _label;
 
 	public bool IsGoldDrop => GoldAmount > 0;
+	public bool IsCardDrop => !string.IsNullOrEmpty(CardKey);
 	public bool IsCollected { get; private set; }
 
 	public override void _Ready()
@@ -99,7 +103,11 @@ public partial class WorldDrop : Node3D
 		}
 
 		IsCollected = true;
-		if (IsGoldDrop)
+		if (IsCardDrop)
+		{
+			player.AwardMonsterCardByKey(CardKey);
+		}
+		else if (IsGoldDrop)
 		{
 			player.AddGold(GoldAmount);
 		}
@@ -114,6 +122,12 @@ public partial class WorldDrop : Node3D
 
 	private void BuildVisual()
 	{
+		if (IsCardDrop)
+		{
+			BuildCardVisual();
+			return;
+		}
+
 		var color = IsGoldDrop
 			? new Color(1.0f, 0.78f, 0.18f, 0.96f)
 			: GetItemColor(ItemId);
@@ -167,8 +181,85 @@ public partial class WorldDrop : Node3D
 		AddChild(_label);
 	}
 
+	// A monster name card renders as an upright, glowing collectible card: a gold
+	// frame around a bright face, floating and spinning like other drops.
+	private void BuildCardVisual()
+	{
+		var frameColor = new Color(1.0f, 0.82f, 0.34f, 1.0f);
+		var faceColor = new Color(0.16f, 0.24f, 0.42f, 1.0f);
+
+		var frame = new MeshInstance3D
+		{
+			Name = "CardFrame",
+			Mesh = _sharedCardFrameMesh ??= new BoxMesh { Size = new Vector3(0.40f, 0.56f, 0.035f) },
+			Position = new Vector3(0.0f, 0.42f, 0.0f),
+		};
+		frame.SetSurfaceOverrideMaterial(0, GetCardMaterial(frameColor, true));
+		AddChild(frame);
+
+		var face = new MeshInstance3D
+		{
+			Name = "CardFace",
+			Mesh = _sharedCardFaceMesh ??= new BoxMesh { Size = new Vector3(0.32f, 0.46f, 0.05f) },
+			Position = new Vector3(0.0f, 0.42f, 0.0f),
+		};
+		face.SetSurfaceOverrideMaterial(0, GetCardMaterial(faceColor, false));
+		AddChild(face);
+
+		var glow = new MeshInstance3D
+		{
+			Name = "CardGlow",
+			Mesh = _sharedGlowMesh ??= new SphereMesh { Radius = 0.32f, Height = 0.42f },
+			Position = new Vector3(0.0f, 0.42f, 0.0f),
+			Scale = new Vector3(1.15f, 1.5f, 1.15f),
+		};
+		glow.SetSurfaceOverrideMaterial(0, GetGlowMaterial(frameColor));
+		AddChild(glow);
+
+		_label = new Label3D
+		{
+			Name = "DropLabel",
+			Text = GetDisplayText(),
+			Position = new Vector3(0.0f, 1.05f, 0.0f),
+			Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+			FontSize = 18,
+			PixelSize = 0.007f,
+			OutlineSize = 5,
+			HorizontalAlignment = HorizontalAlignment.Center,
+			Width = 260.0f,
+		};
+		_label.OutlineModulate = new Color(0.02f, 0.02f, 0.018f, 0.96f);
+		_label.Modulate = frameColor.Lightened(0.2f);
+		AddChild(_label);
+	}
+
+	private static StandardMaterial3D GetCardMaterial(Color color, bool isFrame)
+	{
+		int key = unchecked((int)color.ToRgba32() * 2 + (isFrame ? 1 : 0)) ^ 0x5C0DE;
+		if (BodyMaterialCache.TryGetValue(key, out StandardMaterial3D? cached))
+		{
+			return cached;
+		}
+
+		var material = new StandardMaterial3D
+		{
+			AlbedoColor = color,
+			EmissionEnabled = true,
+			Emission = color * (isFrame ? 0.55f : 0.32f),
+			Roughness = 0.3f,
+			Metallic = isFrame ? 0.6f : 0.15f,
+		};
+		BodyMaterialCache[key] = material;
+		return material;
+	}
+
 	private string GetDisplayText()
 	{
+		if (IsCardDrop)
+		{
+			return LocaleText.F("drop.card", ExternalModelLibrary.LocalizedCardName(CardKey));
+		}
+
 		if (IsGoldDrop)
 		{
 			return LocaleText.F("drop.gold", GoldAmount);

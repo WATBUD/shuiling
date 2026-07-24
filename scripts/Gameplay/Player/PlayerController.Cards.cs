@@ -58,10 +58,16 @@ public partial class PlayerController
 			return;
 		}
 
-		string key = monster.GetCardKey();
+		AwardMonsterCardByKey(monster.GetCardKey());
+	}
+
+	// Add a specific card to the album by its canonical key (used when a physical
+	// card drop is picked up). No-op if empty or already owned.
+	public bool AwardMonsterCardByKey(string key)
+	{
 		if (string.IsNullOrWhiteSpace(key) || _ownedCards.Contains(key))
 		{
-			return;
+			return false;
 		}
 
 		_ownedCards.Add(key);
@@ -73,6 +79,8 @@ public partial class PlayerController
 		{
 			_cardAlbumPanel.RefreshAll();
 		}
+
+		return true;
 	}
 
 	// Hand a card over (NPC quest exchange). Losing it lowers the team bonus.

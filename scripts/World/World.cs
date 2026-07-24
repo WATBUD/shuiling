@@ -95,7 +95,7 @@ public partial class World : Node3D
 	private readonly Dictionary<string, SimpleActor> _wildBossesByInstance = new();
 	private readonly Dictionary<string, int> _wildMapUnlockedTiersById = new();
 	private readonly Dictionary<string, int> _wildMapSelectedTiersById = new();
-	private readonly Dictionary<string, (string MapId, int Tier)> _spawnedWildInstancesByKey = new();
+	private readonly Dictionary<string, (string MapId, int Tier, int GroupId)> _spawnedWildInstancesByKey = new();
 	private readonly Dictionary<string, float> _wildBossRespawnRemainingByInstance = new();
 	private readonly List<string> _instanceCleanupScratch = new();
 	private readonly Dictionary<string, Vector3> _wildBossSpawnPositionsByMapId = new();
@@ -144,7 +144,7 @@ public partial class World : Node3D
 			{
 				if (wildMap.Id == _activeMapId)
 				{
-					return CountLivingMonstersInInstance(_activeMapId, GetSelectedTier(_activeMapId));
+					return CountLivingMonstersInInstance(_activeMapId, GetSelectedTier(_activeMapId), LocalGroupId());
 				}
 			}
 			if (IsCaveMapId(_activeMapId))
@@ -216,6 +216,10 @@ public partial class World : Node3D
 	public override void _Ready()
 	{
 		LocaleText.LanguageChanged += RefreshLocalizedWorldLabels;
+		if (NetworkManager.Instance is { } net)
+		{
+			net.PartyChanged += OnLocalPartyChanged;
+		}
 
 		NetworkBeforeWorldGeneration();
 		// Offline: seed from the chosen/loaded world slot (online: NetworkBefore…
@@ -273,7 +277,27 @@ public partial class World : Node3D
 	public override void _ExitTree()
 	{
 		LocaleText.LanguageChanged -= RefreshLocalizedWorldLabels;
+		if (NetworkManager.Instance is { } net)
+		{
+			net.PartyChanged -= OnLocalPartyChanged;
+		}
 		NetworkOnWorldExit();
+	}
+
+	// The local player's party (and therefore their GroupId) changed. On the host
+	// side, make sure the new group's wild instance exists and refresh which
+	// monsters simulate/are visible so the player instantly shares — or leaves —
+	// a hunting ground. Clients only need their visibility refreshed; the host
+	// drives their monster spawns.
+	private void OnLocalPartyChanged()
+	{
+		if (IsWildMapId(_activeMapId) && !IsNetworkClientWorld)
+		{
+			EnsureWildInstancePopulated(_activeMapId, GetSelectedTier(_activeMapId), LocalGroupId());
+		}
+
+		UpdateActorMapActivity();
+		UpdateActiveBossHud(false);
 	}
 
 	public override void _Process(double delta)
@@ -1628,7 +1652,7 @@ public partial class World : Node3D
 			foreach (WildMapDefinition wildMap in WildMaps)
 			{
 				_wildMonsterTargetCountsById[wildMap.Id] = Mathf.Max(ActorCount / WildMaps.Length, 8);
-				EnsureWildInstancePopulated(wildMap.Id, GetSelectedTier(wildMap.Id));
+				EnsureWildInstancePopulated(wildMap.Id, GetSelectedTier(wildMap.Id), LocalGroupId());
 			}
 		}
 
@@ -1639,9 +1663,10 @@ public partial class World : Node3D
 		_player.RefreshBossWorldStatus(true);
 	}
 
-	private SimpleActor SpawnMonsterForMap(string mapId, int forcedTier = 0)
+	private SimpleActor SpawnMonsterForMap(string mapId, int forcedTier = 0, int groupId = 0)
 	{
 		SimpleActor actor = CreateActor(true, mapId, "", "", 0, forcedTier);
+		actor.GroupId = groupId;
 
 		// Tier evolution cues beyond raw stats: bigger body, sharper AI.
 		int tier = actor.WorldTier;
@@ -1678,15 +1703,15 @@ public partial class World : Node3D
 		actor.Position = spawnPosition;
 		actor.HomePosition = spawnPosition;
 		_actorsRoot.AddChild(actor);
-		actor.SetWorldMapActive(IsActorInstanceActive(actor));
+		ApplyActorInstanceState(actor);
 		RegisterNetworkMonster(actor, tierVisualScale, Colors.Transparent);
 		return actor;
 	}
 
-	// A wild monster/boss is only live for the local player when they're on its
-	// map AND (for wild maps) on its tier — map+tier pairs are parallel
-	// instances (docs/world_progression.md). Captured companions and caves
-	// keep the plain map check.
+	// A wild monster/boss is only VISIBLE to the local player on its map AND (for
+	// wild maps) on its tier AND in its group instance — (map, tier, group) are
+	// parallel instances so different parties/solo players never share monsters.
+	// Captured companions and caves keep the plain map check.
 	private bool IsActorInstanceActive(SimpleActor actor)
 	{
 		if (actor.MapId != _activeMapId)
@@ -1696,13 +1721,38 @@ public partial class World : Node3D
 
 		if (actor.ActorKind == "monster" && !actor.IsCaptured && IsWildMapId(actor.MapId))
 		{
-			return actor.WorldTier == GetSelectedTier(actor.MapId);
+			return actor.WorldTier == GetSelectedTier(actor.MapId) && actor.GroupId == LocalGroupId();
 		}
 
 		return true;
 	}
 
-	private SimpleActor SpawnBossForMap(BossDefinition definition, int tier, bool announce)
+	// Set a wild monster's simulate/visible state: the host keeps every in-use
+	// instance simulated (so remote groups have live monsters) but only shows its
+	// own; clients never simulate (they render host puppets); single-player shows
+	// and simulates its own instance.
+	private void ApplyActorInstanceState(SimpleActor actor)
+	{
+		bool visible = IsActorInstanceActive(actor);
+		bool simulate;
+		if (NetworkManager.Instance is { IsClient: true })
+		{
+			simulate = false;
+		}
+		else if (NetworkManager.Instance is { IsHost: true }
+			&& actor.ActorKind == "monster" && !actor.IsCaptured && IsWildMapId(actor.MapId))
+		{
+			simulate = IsWildInstanceInUse(actor.MapId, actor.WorldTier, actor.GroupId);
+		}
+		else
+		{
+			simulate = visible;
+		}
+
+		actor.SetWorldMapState(simulate, visible);
+	}
+
+	private SimpleActor SpawnBossForMap(BossDefinition definition, int tier, int groupId, bool announce)
 	{
 		UseWildMapObstacleContext(definition.MapId);
 		// Boss stats are hand-authored per map, so the tier layer is applied
@@ -1713,7 +1763,8 @@ public partial class World : Node3D
 		float rewardMultiplier = WorldTierCatalog.GetRewardMultiplier(tier);
 
 		SimpleActor boss = CreateActor(true, definition.MapId, definition.SpeciesNameKey, definition.CombatRole, bossLevel, tier);
-		boss.Name = $"Boss_{definition.MapId}_t{tier}";
+		boss.GroupId = groupId;
+		boss.Name = $"Boss_{definition.MapId}_t{tier}_g{groupId}";
 		boss.ConfigureStats(
 			definition.SpeciesNameKey,
 			bossLevel,
@@ -1745,18 +1796,18 @@ public partial class World : Node3D
 		boss.HomePosition = spawnPosition;
 		_actorsRoot.AddChild(boss);
 		boss.CurrentHealth = boss.EffectiveMaxHealth;
-		boss.SetWorldMapActive(IsActorInstanceActive(boss));
-		string instanceKey = WildInstanceKey(definition.MapId, tier);
+		ApplyActorInstanceState(boss);
+		string instanceKey = WildInstanceKey(definition.MapId, tier, groupId);
 		_wildBossesByInstance[instanceKey] = boss;
 		_wildBossRespawnRemainingByInstance.Remove(instanceKey);
 		RegisterNetworkMonster(boss, definition.VisualScale, definition.AuraColor);
 
-		bool isLocalInstance = definition.MapId == _activeMapId && tier == GetSelectedTier(definition.MapId);
+		bool isLocalInstance = definition.MapId == _activeMapId && tier == GetSelectedTier(definition.MapId) && groupId == LocalGroupId();
 		if (isLocalInstance)
 		{
 			_player.SetActiveBoss(boss);
 		}
-		if (announce && tier == GetSelectedTier(definition.MapId))
+		if (announce && isLocalInstance)
 		{
 			_player.ShowBossAppeared(boss, GetWildMapDisplayName(definition.MapId));
 		}
@@ -2671,7 +2722,7 @@ public partial class World : Node3D
 		}
 		foreach (WildMapDefinition wildMap in WildMaps)
 		{
-			EnsureWildInstancePopulated(wildMap.Id, GetSelectedTier(wildMap.Id));
+			EnsureWildInstancePopulated(wildMap.Id, GetSelectedTier(wildMap.Id), LocalGroupId());
 		}
 		DespawnInactiveWildInstances();
 
@@ -2788,7 +2839,7 @@ public partial class World : Node3D
 		{
 			if (node is SimpleActor actor && IsInstanceValid(actor))
 			{
-				actor.SetWorldMapActive(IsActorInstanceActive(actor));
+				ApplyActorInstanceState(actor);
 			}
 		}
 
@@ -2880,9 +2931,9 @@ public partial class World : Node3D
 
 		_monsterRespawnRemaining = Mathf.Max(MonsterRespawnInterval, 3.0f);
 		DespawnInactiveWildInstances();
-		foreach (KeyValuePair<string, (string MapId, int Tier)> entry in _spawnedWildInstancesByKey)
+		foreach (KeyValuePair<string, (string MapId, int Tier, int GroupId)> entry in _spawnedWildInstancesByKey)
 		{
-			RespawnMonstersIfNeeded(entry.Value.MapId, entry.Value.Tier);
+			RespawnMonstersIfNeeded(entry.Value.MapId, entry.Value.Tier, entry.Value.GroupId);
 		}
 	}
 
@@ -2893,11 +2944,11 @@ public partial class World : Node3D
 			return;
 		}
 
-		// One boss per populated (map, tier) instance.
-		foreach (KeyValuePair<string, (string MapId, int Tier)> instanceEntry in _spawnedWildInstancesByKey)
+		// One boss per populated (map, tier, group) instance.
+		foreach (KeyValuePair<string, (string MapId, int Tier, int GroupId)> instanceEntry in _spawnedWildInstancesByKey)
 		{
 			string instanceKey = instanceEntry.Key;
-			(string mapId, int tier) = instanceEntry.Value;
+			(string mapId, int tier, int groupId) = instanceEntry.Value;
 			BossDefinition? definition = FindBossDefinition(mapId);
 			if (definition == null)
 			{
@@ -2916,7 +2967,7 @@ public partial class World : Node3D
 			if (!_wildBossRespawnRemainingByInstance.TryGetValue(instanceKey, out float remaining))
 			{
 				_wildBossRespawnRemainingByInstance[instanceKey] = Mathf.Max(BossRespawnInterval, 15.0f);
-				if (mapId == _activeMapId && tier == GetSelectedTier(mapId))
+				if (mapId == _activeMapId && tier == GetSelectedTier(mapId) && groupId == LocalGroupId())
 				{
 					_player.SetActiveBoss(null);
 				}
@@ -2931,7 +2982,7 @@ public partial class World : Node3D
 				continue;
 			}
 
-			SpawnBossForMap(definition.Value, tier, true);
+			SpawnBossForMap(definition.Value, tier, groupId, true);
 		}
 	}
 
@@ -2948,10 +2999,10 @@ public partial class World : Node3D
 		return null;
 	}
 
-	private void RespawnMonstersIfNeeded(string mapId, int tier)
+	private void RespawnMonstersIfNeeded(string mapId, int tier, int groupId)
 	{
 		int targetCount = GetWildMonsterTargetCount(mapId);
-		int livingCount = CountLivingMonstersInInstance(mapId, tier, false);
+		int livingCount = CountLivingMonstersInInstance(mapId, tier, groupId, false);
 		int threshold = Mathf.Max(1, Mathf.FloorToInt(targetCount * Mathf.Clamp(MonsterRespawnThresholdRatio, 0.1f, 0.95f)));
 		if (livingCount >= threshold)
 		{
@@ -2967,7 +3018,7 @@ public partial class World : Node3D
 		UseWildMapObstacleContext(mapId);
 		for (int index = 0; index < spawnCount; index++)
 		{
-			SpawnMonsterForMap(mapId, tier);
+			SpawnMonsterForMap(mapId, tier, groupId);
 		}
 	}
 
@@ -3000,7 +3051,7 @@ public partial class World : Node3D
 		return count;
 	}
 
-	private int CountLivingMonstersInInstance(string mapId, int tier, bool includeBosses = true)
+	private int CountLivingMonstersInInstance(string mapId, int tier, int groupId, bool includeBosses = true)
 	{
 		int count = 0;
 		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
@@ -3009,6 +3060,7 @@ public partial class World : Node3D
 				&& IsInstanceValid(actor)
 				&& actor.MapId == mapId
 				&& actor.WorldTier == tier
+				&& actor.GroupId == groupId
 				&& !actor.IsDefeated
 				&& !actor.IsCaptured
 				&& (includeBosses || !actor.IsBoss))
@@ -3121,15 +3173,22 @@ public partial class World : Node3D
 		return IsWildMapId(mapId);
 	}
 
-	private static string WildInstanceKey(string mapId, int tier)
+	private static string WildInstanceKey(string mapId, int tier, int groupId)
 	{
-		return $"{mapId}#t{tier}";
+		return $"{mapId}#t{tier}#g{groupId}";
 	}
 
-	// The instance key of THIS player's view of a map (their selected tier).
+	// The local player's instance group: their party (leader) or solo id online,
+	// 0 in single-player. Different groups never share a hunting-ground instance.
+	private int LocalGroupId()
+	{
+		return NetworkManager.Instance is { IsOnline: true } net ? net.LocalGroupId : 0;
+	}
+
+	// The instance key of THIS player's view of a map (their selected tier + group).
 	private string GetLocalWildInstanceKey(string mapId)
 	{
-		return WildInstanceKey(mapId, GetSelectedTier(mapId));
+		return WildInstanceKey(mapId, GetSelectedTier(mapId), LocalGroupId());
 	}
 
 	// Selecting a tier is a per-player choice: it never despawns other tiers'
@@ -3154,7 +3213,7 @@ public partial class World : Node3D
 			return false;
 		}
 
-		EnsureWildInstancePopulated(mapId, tier);
+		EnsureWildInstancePopulated(mapId, tier, LocalGroupId());
 		DespawnInactiveWildInstances();
 		UpdateActiveBossHud(false);
 		if (_player != null && IsInstanceValid(_player))
@@ -3167,7 +3226,7 @@ public partial class World : Node3D
 	// Host/singleplayer: make sure the (map, tier) instance has a population.
 	// No-op on multiplayer clients (the host simulates and streams puppets).
 	// Also called by NetworkManager when a remote player enters an instance.
-	public void EnsureWildInstancePopulated(string mapId, int tier)
+	public void EnsureWildInstancePopulated(string mapId, int tier, int groupId)
 	{
 		if (IsNetworkClientWorld || !_worldActorsGenerated || !IsWildMapId(mapId))
 		{
@@ -3175,30 +3234,30 @@ public partial class World : Node3D
 		}
 
 		tier = WorldTierCatalog.ClampTier(tier);
-		string instanceKey = WildInstanceKey(mapId, tier);
+		string instanceKey = WildInstanceKey(mapId, tier, groupId);
 		if (_spawnedWildInstancesByKey.ContainsKey(instanceKey))
 		{
 			return;
 		}
 
-		_spawnedWildInstancesByKey[instanceKey] = (mapId, tier);
+		_spawnedWildInstancesByKey[instanceKey] = (mapId, tier, groupId);
 		UseWildMapObstacleContext(mapId);
 		int targetCount = GetWildMonsterTargetCount(mapId);
 		for (int index = 0; index < targetCount; index++)
 		{
-			SpawnMonsterForMap(mapId, tier);
+			SpawnMonsterForMap(mapId, tier, groupId);
 		}
 
 		BossDefinition? definition = FindBossDefinition(mapId);
 		if (definition != null)
 		{
-			SpawnBossForMap(definition.Value, tier, false);
+			SpawnBossForMap(definition.Value, tier, groupId, false);
 		}
 	}
 
 	// Frees populations no player is using. An instance stays alive while it is
 	// some player's current selection for that map (local player) or a remote
-	// player is standing in it.
+	// player is standing in it — per (map, tier, group).
 	private void DespawnInactiveWildInstances()
 	{
 		if (IsNetworkClientWorld)
@@ -3207,9 +3266,9 @@ public partial class World : Node3D
 		}
 
 		_instanceCleanupScratch.Clear();
-		foreach (KeyValuePair<string, (string MapId, int Tier)> entry in _spawnedWildInstancesByKey)
+		foreach (KeyValuePair<string, (string MapId, int Tier, int GroupId)> entry in _spawnedWildInstancesByKey)
 		{
-			if (!IsWildInstanceInUse(entry.Value.MapId, entry.Value.Tier))
+			if (!IsWildInstanceInUse(entry.Value.MapId, entry.Value.Tier, entry.Value.GroupId))
 			{
 				_instanceCleanupScratch.Add(entry.Key);
 			}
@@ -3217,7 +3276,7 @@ public partial class World : Node3D
 
 		foreach (string instanceKey in _instanceCleanupScratch)
 		{
-			(string mapId, int tier) = _spawnedWildInstancesByKey[instanceKey];
+			(string mapId, int tier, int groupId) = _spawnedWildInstancesByKey[instanceKey];
 			_spawnedWildInstancesByKey.Remove(instanceKey);
 			_wildBossesByInstance.Remove(instanceKey);
 			_wildBossRespawnRemainingByInstance.Remove(instanceKey);
@@ -3227,6 +3286,7 @@ public partial class World : Node3D
 					&& IsInstanceValid(actor)
 					&& actor.MapId == mapId
 					&& actor.WorldTier == tier
+					&& actor.GroupId == groupId
 					&& !actor.IsCaptured)
 				{
 					actor.QueueFree();
@@ -3235,14 +3295,15 @@ public partial class World : Node3D
 		}
 	}
 
-	private bool IsWildInstanceInUse(string mapId, int tier)
+	private bool IsWildInstanceInUse(string mapId, int tier, int groupId)
 	{
-		if (GetSelectedTier(mapId) == tier)
+		// Local player's own instance stays alive.
+		if (GetSelectedTier(mapId) == tier && LocalGroupId() == groupId)
 		{
 			return true;
 		}
 
-		return NetworkManager.Instance is { IsHost: true } net && net.IsRemoteInstanceInUse(mapId, tier);
+		return NetworkManager.Instance is { IsHost: true } net && net.IsRemoteInstanceInUse(mapId, tier, groupId);
 	}
 
 	// Shared unlock rule: beating a map's boss at your highest unlocked tier

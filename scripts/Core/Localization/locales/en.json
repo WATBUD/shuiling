@@ -260,6 +260,7 @@
 	"system.exp.party_gain": "Party gained {0} EXP.",
 	"system.combat.defeated": "{0} defeated {1}.",
 	"drop.gold": "{0} Gold",
+	"drop.card": "Monster Card: {0}",
 	"item.loot.slime_mucus": "Slime Mucus",
 	"item.loot.beast_hide": "Coarse Beast Hide",
 	"item.loot.sharp_claw": "Sharp Beast Claw",

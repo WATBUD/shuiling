@@ -260,6 +260,7 @@
 	"system.exp.party_gain": "隊伍獲得 {0} 經驗值。",
 	"system.combat.defeated": "{0} 擊敗了 {1}。",
 	"drop.gold": "{0} 金幣",
+	"drop.card": "怪物卡片：{0}",
 	"item.loot.slime_mucus": "史萊姆黏液",
 	"item.loot.beast_hide": "粗糙獸皮",
 	"item.loot.sharp_claw": "銳利獸爪",
