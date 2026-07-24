@@ -102,7 +102,7 @@ public partial class PlayerController
 		{
 			OwnerPlayer = this,
 			LaunchVelocity = launch,
-			Gravity = NetGravity,
+			FallGravity = NetGravity,
 		};
 
 		Node projectileParent = GetTree().CurrentScene ?? GetParent();

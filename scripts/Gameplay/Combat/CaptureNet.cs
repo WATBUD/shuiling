@@ -7,7 +7,7 @@ public partial class CaptureNet : Area3D
 {
 	[Export] public float CaptureRadius { get; set; } = 1.05f;
 	[Export] public float Lifetime { get; set; } = 3.0f;
-	[Export] public float Gravity { get; set; } = 18.0f;
+	[Export] public float FallGravity { get; set; } = 18.0f;
 
 	public PlayerController? OwnerPlayer { get; set; }
 	public Vector3 LaunchVelocity { get; set; } = Vector3.Forward * 16.0f;
@@ -45,7 +45,7 @@ public partial class CaptureNet : Area3D
 		_age += step;
 
 		// Parabolic integration.
-		_velocity.Y -= Gravity * step;
+		_velocity.Y -= FallGravity * step;
 		GlobalPosition += _velocity * step;
 
 		// Pulse the halo for a lively energy look.

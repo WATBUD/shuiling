@@ -265,14 +265,14 @@ public partial class World : Node3D
 		// correctly and the join message uses the right name. The name is only sent
 		// if actually chosen (otherwise the unique default name is kept so two
 		// default players don't collide); the model is always sent.
-		if (NetworkManager.Instance is { IsOnline: true } net && _player != null && IsInstanceValid(_player))
+		if (NetworkManager.Instance is { IsOnline: true } onlineNet && _player != null && IsInstanceValid(_player))
 		{
 			if (!string.IsNullOrWhiteSpace(_player.PlayerName) && _player.PlayerName != "player.default_name")
 			{
-				net.SetLocalPlayerName(LocaleText.T(_player.PlayerName));
+				onlineNet.SetLocalPlayerName(LocaleText.T(_player.PlayerName));
 			}
 
-			net.SetLocalPlayerModel(_player.PlayerModelPath);
+			onlineNet.SetLocalPlayerModel(_player.PlayerModelPath);
 		}
 
 		NetworkAfterWorldReady();

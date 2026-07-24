@@ -144,7 +144,7 @@ public static class NetworkDiagnostics
 		var lines = new List<Line>();
 		var upnp = new Upnp();
 		int discover = upnp.Discover();
-		UpnpDevice gateway = discover == (int)Upnp.UpnpResult.Success ? upnp.GetGateway() : null;
+		UpnpDevice? gateway = discover == (int)Upnp.UpnpResult.Success ? upnp.GetGateway() : null;
 		if (gateway == null || !gateway.IsValidGateway())
 		{
 			lines.Add(new Line(Level.Warn, LocaleText.T("net.diag.upnp_none")));
