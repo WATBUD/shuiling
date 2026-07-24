@@ -13,6 +13,7 @@ public partial class CharacterSelect : Control
 	private LineEdit _nameEdit = null!;
 	private LineEdit _worldNameEdit = null!;
 	private LineEdit _portEdit = null!;
+	private CheckBox _autoSaveCheck = null!;
 	private Label _statusLabel = null!;
 	private Button _startButton = null!;
 	private int _selectedIndex;
@@ -132,6 +133,15 @@ public partial class CharacterSelect : Control
 		};
 		_worldNameEdit.TextChanged += _ => UpdateStartEnabled();
 		worldRow.AddChild(_worldNameEdit);
+
+		_autoSaveCheck = new CheckBox
+		{
+			Text = LocaleText.T("world.auto_save"),
+			ButtonPressed = true,
+			SizeFlagsHorizontal = SizeFlags.ShrinkCenter,
+		};
+		_autoSaveCheck.AddThemeFontSizeOverride("font_size", 14);
+		root.AddChild(_autoSaveCheck);
 
 		// Port entry only matters when hosting a multiplayer world.
 		var portRow = new HBoxContainer { Visible = _isMultiplayer };
@@ -339,6 +349,7 @@ public partial class CharacterSelect : Control
 			NetworkManager.Instance?.ResetSession();
 		}
 
+		GameLaunchOptions.NewWorldAutoSave = _autoSaveCheck.ButtonPressed;
 		GameLaunchOptions.StartNewWorld(SaveGameManager.NewWorldId(), worldName, seed, _models[_selectedIndex].Path, name);
 		GetTree().ChangeSceneToFile("res://node_3d.tscn");
 	}

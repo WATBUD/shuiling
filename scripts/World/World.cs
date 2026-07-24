@@ -77,6 +77,10 @@ public partial class World : Node3D
 	private int _activeWorldSeed;
 	private string _worldSaveId = string.Empty;
 	private string _worldSaveName = string.Empty;
+	private bool _autoSaveOnExit = true;
+
+	// Whether leaving this world (to menu or app close) saves automatically.
+	public bool AutoSaveOnExit => _autoSaveOnExit;
 	private readonly List<Vector3> _obstaclePositions = new();
 	private readonly List<Vector3> _wildObstaclePositions = new();
 	private readonly Dictionary<string, Node3D> _wildMapRootsById = new();
@@ -223,6 +227,7 @@ public partial class World : Node3D
 		_activeWorldSeed = unchecked((int)_rng.Seed);
 		_worldSaveId = GameLaunchOptions.ActiveWorldId;
 		_worldSaveName = GameLaunchOptions.NewWorldName;
+		_autoSaveOnExit = GameLaunchOptions.NewWorldAutoSave;
 
 		CreateMaterials();
 		BuildEnvironment();
@@ -2568,6 +2573,7 @@ public partial class World : Node3D
 			WorldName = _worldSaveName,
 			WorldSeed = _activeWorldSeed,
 			LastMode = NetworkManager.Instance is { IsOnline: true } ? "multiplayer" : "single",
+			AutoSaveOnExit = _autoSaveOnExit,
 			ActiveMapId = _activeMapId,
 			PlayerPosition = ToSaveVector(_player.GlobalPosition),
 			Player = _player.ExportSaveData(),
@@ -2575,6 +2581,17 @@ public partial class World : Node3D
 			SelectedMapTiers = new Dictionary<string, int>(_wildMapSelectedTiersById),
 			PendingMail = NetworkManager.Instance?.ExportPendingMail() ?? new List<PendingMailSaveData>(),
 		};
+	}
+
+	public override void _Notification(int what)
+	{
+		// App/window close: auto-save the world first if the player opted in.
+		if (what == NotificationWMCloseRequest && _autoSaveOnExit
+			&& NetworkManager.Instance is not { IsClient: true }
+			&& _player != null && IsInstanceValid(_player))
+		{
+			_player.SaveGameToActiveWorld(false);
+		}
 	}
 
 	// Persist a freshly-created world once so it shows up in the world list.
@@ -2661,6 +2678,7 @@ public partial class World : Node3D
 		{
 			_activeWorldSeed = data.WorldSeed;
 		}
+		_autoSaveOnExit = data.AutoSaveOnExit;
 		UpdateActorMapActivity();
 	}
 

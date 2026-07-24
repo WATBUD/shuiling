@@ -297,10 +297,20 @@ public partial class PlayerController
 	public void RebuildPlayerExternalModel()
 	{
 		Node3D? existing = GetNodeOrNull<Node3D>("PlayerExternalModel");
-		if (existing != null && existing == _playerExternalModel)
+		if (existing != null)
 		{
+			// Detach immediately (rename + remove) BEFORE rebuilding: QueueFree is
+			// deferred, so if the old node stayed in the tree TryAddPlayerModel would
+			// find the still-named "PlayerExternalModel" and hand back the node we're
+			// about to free — leaving the player with no visible model after load.
+			if (existing == _playerExternalModel)
+			{
+				_playerExternalModel = null;
+			}
+
+			existing.Name = "PlayerExternalModelDiscarded";
+			RemoveChild(existing);
 			existing.QueueFree();
-			_playerExternalModel = null;
 		}
 
 		Node3D? rebuilt = ExternalModelLibrary.TryAddPlayerModel(this, PlayerModelPath);

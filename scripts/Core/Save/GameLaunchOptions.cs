@@ -18,6 +18,9 @@ public static class GameLaunchOptions
 	// world will be entered single-player or hosted for multiplayer.
 	public static bool NewWorldIsMultiplayer { get; set; }
 
+	// Chosen on the "new world" character screen: auto-save when leaving the world.
+	public static bool NewWorldAutoSave { get; set; } = true;
+
 	// Set when leaving character-select via Cancel, so the main menu reopens the
 	// world list + new-world mode window (returns to the previous screen).
 	public static bool ReturnToNewWorldMode { get; set; }

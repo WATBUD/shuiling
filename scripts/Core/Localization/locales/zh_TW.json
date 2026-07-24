@@ -807,6 +807,7 @@
 	"world.host_start": "開始主持",
 	"world.host_world": "主持世界：{0}",
 	"world.name_label": "世界名稱：",
+	"world.auto_save": "退出時自動存檔",
 	"world.default_name": "新世界",
 	"world.migrated_name": "我的世界",
 	"system.save.no_world": "目前沒有可存檔的世界。"
