@@ -648,7 +648,7 @@ public partial class SimpleActor : CharacterBody3D
 		bool chasing = false;
 		Vector3 destination = _targetPosition;
 
-		if (ActorKind == "monster" && player != null && _engagesLocalPlayer)
+		if (ActorKind == "monster")
 		{
 			if (TryGetRetaliationTarget(out SimpleActor retaliationTarget))
 			{
@@ -661,14 +661,24 @@ public partial class SimpleActor : CharacterBody3D
 			}
 			else
 			{
-				float distanceToPlayer = GlobalPosition.DistanceTo(player.GlobalPosition);
-				if (distanceToPlayer <= ChaseRadius)
+				// Target the nearest player sharing this monster's instance: the local
+				// player (when the host/single-player stands in it) and, on the host,
+				// any remote players. Remote players are damaged over the network.
+				Node3D? target = ResolveHostileTarget(player, out bool targetIsRemote, out long remotePeerId);
+				if (target != null)
 				{
-					chasing = true;
-					destination = player.GlobalPosition;
-					if (TryAttackPlayer(player, velocity, step))
+					float distanceToTarget = GlobalPosition.DistanceTo(target.GlobalPosition);
+					if (distanceToTarget <= ChaseRadius)
 					{
-						return;
+						chasing = true;
+						destination = target.GlobalPosition;
+						bool attacked = targetIsRemote
+							? TryAttackRemotePlayer(target, remotePeerId, velocity, step)
+							: TryAttackPlayer(target, velocity, step);
+						if (attacked)
+						{
+							return;
+						}
 					}
 				}
 			}
@@ -2851,6 +2861,63 @@ public partial class SimpleActor : CharacterBody3D
 	{
 		float scale = 1.0f + EvolutionStage * 0.08f;
 		Scale = Vector3.One * scale;
+	}
+
+	// Pick the nearest valid player this monster should hunt within its own
+	// instance. The local player counts only when the monster shares the local
+	// player's instance (_engagesLocalPlayer); remote players are resolved on the
+	// host so host-simulated monsters can attack clients too.
+	private Node3D? ResolveHostileTarget(Node3D? localPlayer, out bool isRemote, out long remotePeerId)
+	{
+		isRemote = false;
+		remotePeerId = 0;
+		Node3D? best = null;
+		float bestDistance = float.MaxValue;
+
+		if (_engagesLocalPlayer && localPlayer != null)
+		{
+			best = localPlayer;
+			bestDistance = GlobalPosition.DistanceTo(localPlayer.GlobalPosition);
+		}
+
+		if (NetworkManager.Instance is { IsHost: true } net)
+		{
+			Node3D? puppet = net.FindNearestRemotePlayer(MapId, WorldTier, GroupId, GlobalPosition, out long peerId, out float distance);
+			if (puppet != null && distance < bestDistance)
+			{
+				best = puppet;
+				bestDistance = distance;
+				isRemote = true;
+				remotePeerId = peerId;
+			}
+		}
+
+		return best;
+	}
+
+	// Attack a remote player's puppet: the host deals the damage on that client via
+	// an RPC (the puppet itself is a display-only stand-in with no combat state).
+	private bool TryAttackRemotePlayer(Node3D puppet, long peerId, Vector3 velocity, float step)
+	{
+		Vector3 toTarget = puppet.GlobalPosition - GlobalPosition;
+		toTarget.Y = 0.0f;
+		if (toTarget.Length() > EffectiveAttackRange)
+		{
+			return false;
+		}
+
+		Velocity = SlowToStop(velocity, step);
+		FaceDirection(toTarget, step);
+		if (_attackCooldownRemaining <= 0.0f)
+		{
+			SpawnPlayerAttackCue(puppet.GlobalPosition);
+			PlayAttackAction(puppet.GlobalPosition, false);
+			NetworkManager.Instance?.SendMonsterAttackToPlayer(peerId, EffectiveAttack);
+			_attackCooldownRemaining = EffectiveAttackCooldown;
+		}
+
+		MoveAndSlideWithEffects(step);
+		return true;
 	}
 
 	private bool TryAttackPlayer(Node3D player, Vector3 velocity, float step)

@@ -1742,7 +1742,11 @@ public partial class World : Node3D
 		bool simulate;
 		if (NetworkManager.Instance is { IsClient: true })
 		{
-			simulate = false;
+			// Client monsters are puppets: they don't run AI, but they DO need physics
+			// enabled to lerp toward their host-streamed positions and to keep their
+			// collision so the local player can target/attack them. So a client
+			// simulates exactly its visible (own-instance) puppets.
+			simulate = visible;
 		}
 		else if (NetworkManager.Instance is { IsHost: true }
 			&& actor.ActorKind == "monster" && !actor.IsCaptured && IsWildMapId(actor.MapId))

@@ -620,6 +620,53 @@ public partial class NetworkManager : Node
 		return false;
 	}
 
+	// Host-side: nearest remote player standing in this monster's instance, so a
+	// host-simulated monster can chase and attack players other than the host.
+	public Node3D? FindNearestRemotePlayer(string mapId, int tier, int groupId, Vector3 origin, out long peerId, out float distance)
+	{
+		peerId = 0;
+		distance = float.MaxValue;
+		RemotePlayerPuppet? best = null;
+		foreach (KeyValuePair<long, RemotePlayerPuppet> entry in _playerPuppets)
+		{
+			RemotePlayerPuppet puppet = entry.Value;
+			if (!IsInstanceValid(puppet) || puppet.MapId != mapId || puppet.Tier != tier || puppet.GroupId != groupId)
+			{
+				continue;
+			}
+
+			float d = origin.DistanceTo(puppet.GlobalPosition);
+			if (d < distance)
+			{
+				distance = d;
+				best = puppet;
+				peerId = entry.Key;
+			}
+		}
+
+		return best;
+	}
+
+	// Host → a specific client: a monster in that player's instance hit them.
+	public void SendMonsterAttackToPlayer(long peerId, int damage)
+	{
+		if (!IsHost || peerId == 1)
+		{
+			return;
+		}
+
+		RpcId(peerId, MethodName.ClientReceiveMonsterAttack, damage);
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ClientReceiveMonsterAttack(int damage)
+	{
+		if (ActiveWorld != null && IsInstanceValid(ActiveWorld) && ActiveWorld.ActivePlayer is { } player && IsInstanceValid(player))
+		{
+			player.ReceiveDamage(Mathf.Clamp(damage, 1, 99999), null);
+		}
+	}
+
 	// ---------------------------------------------------------------- monsters
 
 	// Host → clients: a monster now exists (also used for join snapshots).

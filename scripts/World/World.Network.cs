@@ -294,8 +294,10 @@ public partial class World
 		_actorsRoot.AddChild(actor);
 		actor.SetNetworkPuppet(netId);
 		actor.CurrentHealth = Mathf.Clamp(health, 0, actor.EffectiveMaxHealth);
-		// Client never simulates; it only mirrors visibility for its own group's instance.
-		actor.SetWorldMapState(false, IsActorInstanceActive(actor));
+		// Puppet physics on when it's in the local player's instance (see
+		// ApplyActorInstanceState) so it moves toward streamed positions and stays
+		// targetable; hidden + inert otherwise.
+		ApplyActorInstanceState(actor);
 		_netMonstersById[netId] = new NetMonsterInfo(actor, visualScale, auraColor);
 
 		if (isBoss && mapId == _activeMapId && tier == GetSelectedTier(mapId) && groupId == LocalGroupId())
