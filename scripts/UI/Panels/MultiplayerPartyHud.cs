@@ -112,11 +112,16 @@ public partial class MultiplayerPartyHud : PanelContainer
 		for (int i = 0; i < memberPeers.Count; i++)
 		{
 			long peer = memberPeers[i];
-			string name = i < memberNames.Count ? memberNames[i] : peer.ToString();
+			bool haveLive = byPeer.TryGetValue(peer, out NetworkManager.ConnectedPlayer cp);
+			// Prefer the live connected-player nickname (kept current via name RPCs)
+			// over the party snapshot, which is captured once when the party forms.
+			string name = haveLive && !string.IsNullOrWhiteSpace(cp.Name)
+				? cp.Name
+				: (i < memberNames.Count ? memberNames[i] : peer.ToString());
 			string display = (i == 0 ? "★" + name : name) + (peer == selfPeer ? " " + LocaleText.T("party.mp.you") : string.Empty);
 
 			string text;
-			if (byPeer.TryGetValue(peer, out NetworkManager.ConnectedPlayer cp) && world != null && IsInstanceValid(world))
+			if (haveLive && world != null && IsInstanceValid(world))
 			{
 				string mapName = world.GetMapDisplayName(cp.MapId);
 				string location = cp.MapId == "city" ? mapName : LocaleText.F("net.party.location_tier", mapName, cp.Tier);
