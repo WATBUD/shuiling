@@ -25,6 +25,9 @@ public partial class NetworkManager : Node
 	public bool IsOnline => Mode != NetMode.Offline;
 	public int WorldSeed { get; private set; }
 	public string LocalPlayerName { get; private set; } = "Player";
+	// The local player's chosen character model, mirrored to every peer so their
+	// puppet shows the right character (not the default model).
+	public string LocalPlayerModelPath { get; private set; } = string.Empty;
 
 	// Set by World on _Ready/_ExitTree so RPC handlers can reach the live world.
 	public World? ActiveWorld { get; set; }
@@ -36,6 +39,7 @@ public partial class NetworkManager : Node
 	public event System.Action? ServerConnectionLost;
 
 	private readonly Dictionary<long, string> _playerNames = new();
+	private readonly Dictionary<long, string> _playerModels = new();
 	private readonly Dictionary<long, RemotePlayerPuppet> _playerPuppets = new();
 	// Per-owner companion puppets: ownerPeerId -> (partySlot -> puppet).
 	private readonly Dictionary<long, Dictionary<int, RemoteCompanionPuppet>> _companionPuppets = new();
@@ -176,6 +180,7 @@ public partial class NetworkManager : Node
 		Mode = NetMode.Offline;
 		WorldSeed = 0;
 		_playerNames.Clear();
+		_playerModels.Clear();
 		_leaderOf.Clear();
 		SetLocalPartyMirror(System.Array.Empty<long>(), System.Array.Empty<string>(), -1);
 		ClearPlayerPuppets();
@@ -273,18 +278,39 @@ public partial class NetworkManager : Node
 		Rpc(MethodName.ReceivePlayerName, sanitized);
 	}
 
+	// Mirror the local player's chosen character model to every peer so their
+	// puppet renders the right character. Sent alongside the name on world entry.
+	public void SetLocalPlayerModel(string modelPath)
+	{
+		LocalPlayerModelPath = modelPath ?? string.Empty;
+		if (!IsOnline)
+		{
+			return;
+		}
+
+		_playerModels[Multiplayer.GetUniqueId()] = LocalPlayerModelPath;
+		Rpc(MethodName.ReceivePlayerModel, LocalPlayerModelPath);
+	}
+
+	public string GetPlayerModel(long peerId)
+	{
+		return _playerModels.TryGetValue(peerId, out string? path) ? path : string.Empty;
+	}
+
 	// ---------------------------------------------------------------- events
 
 	private void OnPeerConnected(long peerId)
 	{
-		// Everyone introduces themselves to the newcomer directly.
+		// Everyone introduces themselves to the newcomer directly (name + model).
 		RpcId(peerId, MethodName.ReceivePlayerName, LocalPlayerName);
+		RpcId(peerId, MethodName.ReceivePlayerModel, LocalPlayerModelPath);
 	}
 
 	private void OnPeerDisconnected(long peerId)
 	{
 		string name = GetPlayerName(peerId);
 		_playerNames.Remove(peerId);
+		_playerModels.Remove(peerId);
 		if (_playerPuppets.TryGetValue(peerId, out RemotePlayerPuppet? puppet))
 		{
 			if (IsInstanceValid(puppet))
@@ -362,7 +388,9 @@ public partial class NetworkManager : Node
 		long peerId = Multiplayer.GetRemoteSenderId();
 		_playerNames[peerId] = SanitizeName(playerName);
 		RpcId(peerId, MethodName.ClientReceiveWelcome, WorldSeed);
-		PostWorldMessage(LocaleText.F("system.net.player_joined", _playerNames[peerId]), new Color(0.6f, 1.0f, 0.7f));
+		// The "joined" announcement is deferred to ServerReceiveWorldReady — a client
+		// only counts as having joined once it has picked a character and actually
+		// entered the shared world (not merely completed the TCP handshake).
 	}
 
 	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
@@ -375,7 +403,23 @@ public partial class NetworkManager : Node
 	[Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
 	private void ReceivePlayerName(string playerName)
 	{
-		_playerNames[Multiplayer.GetRemoteSenderId()] = SanitizeName(playerName);
+		long peerId = Multiplayer.GetRemoteSenderId();
+		_playerNames[peerId] = SanitizeName(playerName);
+		if (_playerPuppets.TryGetValue(peerId, out RemotePlayerPuppet? puppet) && IsInstanceValid(puppet))
+		{
+			puppet.SetPlayerName(_playerNames[peerId]);
+		}
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ReceivePlayerModel(string modelPath)
+	{
+		long peerId = Multiplayer.GetRemoteSenderId();
+		_playerModels[peerId] = modelPath ?? string.Empty;
+		if (_playerPuppets.TryGetValue(peerId, out RemotePlayerPuppet? puppet) && IsInstanceValid(puppet))
+		{
+			puppet.SetPlayerModel(_playerModels[peerId]);
+		}
 	}
 
 	private static string SanitizeName(string name)
@@ -404,6 +448,37 @@ public partial class NetworkManager : Node
 		}
 
 		FlushPendingMailTo(peerId, GetPlayerName(peerId));
+
+		// Send the newcomer the character (name + model) of every player already in
+		// the session, so pre-existing players render correctly on the late joiner's
+		// screen (their own info already reached everyone via the broadcast above).
+		foreach (KeyValuePair<long, string> entry in _playerNames)
+		{
+			if (entry.Key == peerId)
+			{
+				continue;
+			}
+
+			RpcId(peerId, MethodName.ClientReceiveRosterEntry, entry.Key, entry.Value, GetPlayerModel(entry.Key));
+		}
+
+		// The client has entered the world (after character-select). Announce the
+		// join now, using the character name it just sent.
+		PostWorldMessage(LocaleText.F("system.net.player_joined", GetPlayerName(peerId)), new Color(0.6f, 1.0f, 0.7f));
+	}
+
+	// Server → a single client: another player's authoritative name + model. Used
+	// to catch a late joiner up on everyone already present.
+	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ClientReceiveRosterEntry(long entryPeer, string playerName, string modelPath)
+	{
+		_playerNames[entryPeer] = SanitizeName(playerName);
+		_playerModels[entryPeer] = modelPath ?? string.Empty;
+		if (_playerPuppets.TryGetValue(entryPeer, out RemotePlayerPuppet? puppet) && IsInstanceValid(puppet))
+		{
+			puppet.SetPlayerName(_playerNames[entryPeer]);
+			puppet.SetPlayerModel(_playerModels[entryPeer]);
+		}
 	}
 
 	public void NotifyWorldReady()
@@ -491,6 +566,7 @@ public partial class NetworkManager : Node
 			puppet = new RemotePlayerPuppet { Name = $"RemotePlayer_{peerId}" };
 			ActiveWorld.AddChild(puppet);
 			puppet.SetPlayerName(GetPlayerName(peerId));
+			puppet.SetPlayerModel(GetPlayerModel(peerId));
 			_playerPuppets[peerId] = puppet;
 		}
 

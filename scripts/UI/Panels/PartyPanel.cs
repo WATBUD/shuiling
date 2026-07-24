@@ -3,6 +3,9 @@ using System.Collections.Generic;
 
 public partial class PartyPanel : PanelContainer
 {
+	// XP granted per "培養/Train" click; the context-menu label shows this amount.
+	private const int TrainingXpPerClick = 25;
+
 	private PlayerController? _player;
 	private VBoxContainer _memberList = null!;
 	private Label _titleLabel = null!;
@@ -382,18 +385,63 @@ public partial class PartyPanel : PanelContainer
 			return;
 		}
 
-		if (inputEvent is not InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Right } mouseButton)
+		if (inputEvent is not InputEventMouseButton { Pressed: true } mouseButton)
 		{
 			return;
 		}
 
-		// Do not call SelectMember here: it rebuilds the complete roster and queues
-		// sourceButton for deletion while its GuiInput signal is still executing.
-		// Depending on the window/embed mode, that also closes the popup immediately.
-		_selected = actor;
+		// Do not rebuild the roster inline: it queues sourceButton for deletion while
+		// its GuiInput signal is still executing (and can close the popup). Right-click
+		// defers via the popup; double-click defers the toggle with CallDeferred.
+		if (mouseButton.ButtonIndex == MouseButton.Right)
+		{
+			_selected = actor;
+			UpdateDetails();
+			sourceButton.AcceptEvent();
+			ShowMemberContextMenu(actor, GetViewport().GetMousePosition());
+			return;
+		}
+
+		// Double-click quickly toggles deployment: stored → 出戰, active → 回到收藏.
+		if (mouseButton is { ButtonIndex: MouseButton.Left, DoubleClick: true })
+		{
+			_selected = actor;
+			sourceButton.AcceptEvent();
+			CallDeferred(nameof(ToggleDeployment), actor);
+		}
+	}
+
+	// Toggle a companion between the active party and the collection. Deploying
+	// into a full active party is refused with a tip message rather than silently
+	// bumping someone (use right-click "替換出戰" for a deliberate replacement).
+	private void ToggleDeployment(SimpleActor actor)
+	{
+		if (_player == null || actor == null || !IsInstanceValid(actor))
+		{
+			return;
+		}
+
+		if (_player.IsInActiveParty(actor))
+		{
+			_player.StoreCompanion(actor);
+		}
+		else if (actor.IsDefeated || actor.IsAwaitingRecovery)
+		{
+			_player.PostSystemMessage(LocaleText.T("party.tip.cannot_deploy"), new Color(1.0f, 0.78f, 0.55f));
+			return;
+		}
+		else if (_player.ActiveParty.Count >= _player.ActivePartyLimit)
+		{
+			_player.PostSystemMessage(LocaleText.F("party.tip.full", _player.ActivePartyLimit), new Color(1.0f, 0.78f, 0.55f));
+			return;
+		}
+		else
+		{
+			_player.DeployCompanion(actor, false);
+		}
+
+		RefreshParty();
 		UpdateDetails();
-		sourceButton.AcceptEvent();
-		ShowMemberContextMenu(actor, GetViewport().GetMousePosition());
 	}
 
 	private void ShowMemberContextMenu(SimpleActor actor, Vector2 screenPosition)
@@ -422,7 +470,7 @@ public partial class PartyPanel : PanelContainer
 		}
 
 		_memberContextMenu.AddSeparator();
-		_memberContextMenu.AddItem(LocaleText.T("button.train"), 3);
+		_memberContextMenu.AddItem(LocaleText.F("button.train_xp", TrainingXpPerClick), 3);
 		string materialName = string.IsNullOrEmpty(actor.EvolutionMaterialId)
 			? string.Empty
 			: LocaleText.T(MonsterLootCatalog.GetNameKey(actor.EvolutionMaterialId));
@@ -458,7 +506,7 @@ public partial class PartyPanel : PanelContainer
 				_player.DeployCompanion(_contextActor, true);
 				break;
 			case 3:
-				_contextActor.GrantTraining(25);
+				_contextActor.GrantTraining(TrainingXpPerClick);
 				break;
 			case 4:
 				_player.TryEvolveActor(_contextActor);

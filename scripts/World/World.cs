@@ -260,18 +260,23 @@ public partial class World : Node3D
 			// it appears in the world list even before the first manual save.
 			CallDeferred(nameof(AutoSaveNewWorld));
 		}
+		// Multiplayer: mirror the player's chosen character (name + model) to every
+		// peer BEFORE announcing world-ready, so the host labels/renders this player
+		// correctly and the join message uses the right name. The name is only sent
+		// if actually chosen (otherwise the unique default name is kept so two
+		// default players don't collide); the model is always sent.
+		if (NetworkManager.Instance is { IsOnline: true } net && _player != null && IsInstanceValid(_player))
+		{
+			if (!string.IsNullOrWhiteSpace(_player.PlayerName) && _player.PlayerName != "player.default_name")
+			{
+				net.SetLocalPlayerName(LocaleText.T(_player.PlayerName));
+			}
+
+			net.SetLocalPlayerModel(_player.PlayerModelPath);
+		}
+
 		NetworkAfterWorldReady();
 		_musicPlayer.PlayForMap(_activeMapId);
-
-		// Multiplayer: broadcast the player's chosen character name — but only if
-		// they actually named their character. Otherwise keep the unique default
-		// name so two default players don't both show the same generic name.
-		if (NetworkManager.Instance is { IsOnline: true } && _player != null && IsInstanceValid(_player)
-			&& !string.IsNullOrWhiteSpace(_player.PlayerName)
-			&& _player.PlayerName != "player.default_name")
-		{
-			NetworkManager.Instance.SetLocalPlayerName(LocaleText.T(_player.PlayerName));
-		}
 	}
 
 	public override void _ExitTree()

@@ -11,6 +11,7 @@ public partial class RemotePlayerPuppet : Node3D
 	private Vector3 _targetPosition;
 	private float _targetYaw;
 	private bool _hasState;
+	private string _modelPath = string.Empty;
 	private Label3D _nameLabel = null!;
 
 	public override void _Ready()
@@ -31,9 +32,35 @@ public partial class RemotePlayerPuppet : Node3D
 		Visible = false;
 	}
 
+	// Swap to the specific character model this player chose. The default build
+	// (or a previously-set model) is torn down first so the correct one shows.
+	public void SetPlayerModel(string modelPath)
+	{
+		if (string.IsNullOrWhiteSpace(modelPath) || modelPath == _modelPath)
+		{
+			return;
+		}
+
+		_modelPath = modelPath;
+		foreach (string nodeName in new[] { "PlayerExternalModel", "PuppetBody", "PuppetHead" })
+		{
+			Node? existing = GetNodeOrNull<Node>(nodeName);
+			if (existing != null)
+			{
+				// Rename before freeing so the deferred QueueFree doesn't clash with
+				// the freshly-built node of the same name.
+				existing.Name = nodeName + "_old";
+				RemoveChild(existing);
+				existing.QueueFree();
+			}
+		}
+
+		BuildVisual();
+	}
+
 	private void BuildVisual()
 	{
-		if (ExternalModelLibrary.TryAddPlayerModel(this) != null)
+		if (ExternalModelLibrary.TryAddPlayerModel(this, _modelPath) != null)
 		{
 			return;
 		}
