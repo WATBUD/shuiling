@@ -283,6 +283,15 @@ public partial class SimpleActor : CharacterBody3D
 	private float _staggerRemaining;
 	private const float StaggerDuration = 4.0f;
 
+	// Capture invincibility: once a capture orb lands, the target can't drop below
+	// 1 HP until the attempt ends — so it can't die mid-capture. Driven on the host
+	// (authoritative for HP) and mirrored to clients for the shield visual.
+	private float _captureProtectionRemaining;
+	private bool _captureLocked;
+	private bool _captureProtectionSynced;
+	private MeshInstance3D? _captureShield;
+	public bool IsCaptureProtected => _captureLocked || _captureProtectionRemaining > 0.0f;
+
 	public bool CanBeCaptured => ActorKind == "monster" && !IsBoss && !_isCaptured && !_isDefeated && !_isNetworkPuppet;
 	public bool IsNetworkPuppet => _isNetworkPuppet;
 
@@ -329,6 +338,92 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			// Guard recovers if you stop comboing (~5s to fully drain).
 			_staggerValue = Mathf.Max(0.0f, _staggerValue - MaxStagger * 0.2f * step);
+		}
+
+		if (_captureProtectionRemaining > 0.0f)
+		{
+			_captureProtectionRemaining = Mathf.Max(0.0f, _captureProtectionRemaining - step);
+		}
+		SyncCaptureProtection();
+	}
+
+	// A capture orb landed: protect the target from dying for a while. Refreshed by
+	// each subsequent orb hit so the whole weaken/capture sequence is safe.
+	public void GrantCaptureProtection(float seconds)
+	{
+		_captureProtectionRemaining = Mathf.Max(_captureProtectionRemaining, seconds);
+		SyncCaptureProtection();
+	}
+
+	// Held true for the duration of the rhythm challenge (which pauses the world),
+	// so the target stays protected even though its timer isn't ticking.
+	public void SetCaptureLocked(bool locked)
+	{
+		_captureLocked = locked;
+		SyncCaptureProtection();
+	}
+
+	// The capture attempt ended (success or failure): normal combat rules resume.
+	public void EndCaptureProtection()
+	{
+		_captureLocked = false;
+		_captureProtectionRemaining = 0.0f;
+		SyncCaptureProtection();
+	}
+
+	// Client-side entry point: mirror the host's protected flag for the shield VFX.
+	public void SetCaptureProtectedVisual(bool on)
+	{
+		RefreshCaptureShield(on);
+	}
+
+	// Broadcast protection changes to clients (host authority) and refresh the local
+	// shield visual. HP no-death itself is already synced because the host owns HP.
+	private void SyncCaptureProtection()
+	{
+		bool now = IsCaptureProtected;
+		if (now == _captureProtectionSynced)
+		{
+			return;
+		}
+
+		_captureProtectionSynced = now;
+		RefreshCaptureShield(now);
+		if (NetworkManager.Instance is { IsHost: true } net && NetworkMonsterId >= 0)
+		{
+			net.BroadcastMonsterCaptureProtection(NetworkMonsterId, now);
+		}
+	}
+
+	private void RefreshCaptureShield(bool on)
+	{
+		if (on)
+		{
+			if (_captureShield == null || !IsInstanceValid(_captureShield))
+			{
+				var material = new StandardMaterial3D
+				{
+					AlbedoColor = new Color(0.42f, 0.82f, 1.0f, 0.22f),
+					Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+					EmissionEnabled = true,
+					Emission = new Color(0.42f, 0.82f, 1.0f) * 0.5f,
+					CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+				};
+				_captureShield = new MeshInstance3D
+				{
+					Name = "CaptureShield",
+					Mesh = new SphereMesh { Radius = 1.15f, Height = 2.3f },
+					Position = new Vector3(0.0f, 1.0f, 0.0f),
+				};
+				_captureShield.SetSurfaceOverrideMaterial(0, material);
+				AddChild(_captureShield);
+			}
+
+			_captureShield.Visible = true;
+		}
+		else if (_captureShield != null && IsInstanceValid(_captureShield))
+		{
+			_captureShield.Visible = false;
 		}
 	}
 
@@ -743,6 +838,10 @@ public partial class SimpleActor : CharacterBody3D
 		_followTarget = followTarget;
 		_isInActiveParty = false;
 		_waitTime = 0.0f;
+		_captureLocked = false;
+		_captureProtectionRemaining = 0.0f;
+		_captureProtectionSynced = false;
+		RefreshCaptureShield(false);
 		ResetSquadActivity();
 		Velocity = Vector3.Zero;
 		CurrentHealth = Mathf.Max(CurrentHealth, Mathf.RoundToInt(EffectiveMaxHealth * 0.45f));
@@ -1657,6 +1756,12 @@ public partial class SimpleActor : CharacterBody3D
 		}
 		RememberAttacker(attacker);
 		CurrentHealth = Mathf.Max(CurrentHealth - mitigatedDamage, 0);
+		// A capture in progress keeps the target alive (min 1 HP) so it can't die
+		// mid-capture. Damage still lands and still builds the stagger meter.
+		if (CurrentHealth <= 0 && IsCaptureProtected)
+		{
+			CurrentHealth = 1;
+		}
 		SpawnCombatEffect(mitigatedDamage, attacker?.GetAttackColor() ?? new Color(1.0f, 0.5f, 0.22f, 0.92f));
 		// Hits build the capture stagger meter (combo finisher path).
 		AddCaptureStagger(mitigatedDamage);

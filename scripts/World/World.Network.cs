@@ -218,6 +218,15 @@ public partial class World
 		}
 	}
 
+	// Client-side: mirror a monster's capture-protection flag (shield visual).
+	public void SetNetworkMonsterCaptureProtection(int netId, bool protectedState)
+	{
+		if (_netMonstersById.TryGetValue(netId, out NetMonsterInfo info) && IsInstanceValid(info.Actor))
+		{
+			info.Actor.SetCaptureProtectedVisual(protectedState);
+		}
+	}
+
 	// A boss WE killed on the host's world — apply our own tier unlock.
 	public void HandleRemoteBossDefeat(string mapId, int tier)
 	{

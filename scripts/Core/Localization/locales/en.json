@@ -134,7 +134,7 @@
 	"capture.rhythm.failed": "Rhythm broken. Taming failed!",
 	"capture.rhythm.success": "Rhythm synchronized! Taming successful!",
 	"system.capture.rhythm_failed": "You could not match {0}'s rhythm. Capture failed.",
-	"system.capture.target_lost": "The capture target is no longer valid.",
+	"system.capture.target_lost": "The capture target has died.",
 	"channel.title": "MESSAGE CHANNEL · {0}",
 	"channel.all": "All",
 	"channel.system": "System",

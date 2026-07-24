@@ -647,6 +647,27 @@ public partial class NetworkManager : Node
 		return best;
 	}
 
+	// Host → clients: a monster is (un)protected during a capture attempt, so the
+	// clients can show/hide the shield. HP no-death is already enforced host-side.
+	public void BroadcastMonsterCaptureProtection(int netId, bool protectedState)
+	{
+		if (!IsHost)
+		{
+			return;
+		}
+
+		Rpc(MethodName.ClientMonsterCaptureProtection, netId, protectedState);
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ClientMonsterCaptureProtection(int netId, bool protectedState)
+	{
+		if (ActiveWorld != null && IsInstanceValid(ActiveWorld))
+		{
+			ActiveWorld.SetNetworkMonsterCaptureProtection(netId, protectedState);
+		}
+	}
+
 	// Host → a specific client: a monster in that player's instance hit them.
 	public void SendMonsterAttackToPlayer(long peerId, int damage)
 	{

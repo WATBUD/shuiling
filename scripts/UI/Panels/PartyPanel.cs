@@ -3,9 +3,6 @@ using System.Collections.Generic;
 
 public partial class PartyPanel : PanelContainer
 {
-	// XP granted per "培養/Train" click; the context-menu label shows this amount.
-	private const int TrainingXpPerClick = 25;
-
 	private PlayerController? _player;
 	private VBoxContainer _memberList = null!;
 	private Label _titleLabel = null!;
@@ -470,7 +467,6 @@ public partial class PartyPanel : PanelContainer
 		}
 
 		_memberContextMenu.AddSeparator();
-		_memberContextMenu.AddItem(LocaleText.F("button.train_xp", TrainingXpPerClick), 3);
 		string materialName = string.IsNullOrEmpty(actor.EvolutionMaterialId)
 			? string.Empty
 			: LocaleText.T(MonsterLootCatalog.GetNameKey(actor.EvolutionMaterialId));
@@ -479,7 +475,6 @@ public partial class PartyPanel : PanelContainer
 			: LocaleText.T("button.evolve");
 		_memberContextMenu.AddItem(evolveText, 4);
 		_memberContextMenu.SetItemDisabled(_memberContextMenu.GetItemIndex(4), !_player.CanEvolveActor(actor));
-		_memberContextMenu.AddItem(LocaleText.T("button.enhance_ability"), 5);
 		string rebirthText = actor.RebirthCount > 0
 			? LocaleText.F("button.rebirth_count", actor.RebirthCount)
 			: LocaleText.T("button.rebirth");
@@ -505,14 +500,8 @@ public partial class PartyPanel : PanelContainer
 			case 2:
 				_player.DeployCompanion(_contextActor, true);
 				break;
-			case 3:
-				_contextActor.GrantTraining(TrainingXpPerClick);
-				break;
 			case 4:
 				_player.TryEvolveActor(_contextActor);
-				break;
-			case 5:
-				_contextActor.EnhanceAbility();
 				break;
 			case 6:
 				_player.ToggleMountCompanion(_contextActor);

@@ -38,6 +38,10 @@ public partial class PlayerController
 			return false; // not a capture target — let the net keep flying
 		}
 
+		// The orb landed on a capture target: protect it from dying while the
+		// weaken/capture sequence plays out (refreshed by each subsequent hit).
+		actor.GrantCaptureProtection(CaptureProtectionSeconds);
+
 		if (actor.CaptureReady)
 		{
 			return BeginCaptureChallenge(actor);
@@ -67,11 +71,22 @@ public partial class PlayerController
 			return false;
 		}
 
-		return _captureRhythmPanel.Begin(actor);
+		bool began = _captureRhythmPanel.Begin(actor);
+		if (began)
+		{
+			// Locked for the whole challenge (which pauses the world), so the target
+			// can't be killed by anyone before the attempt resolves.
+			actor.SetCaptureLocked(true);
+		}
+		return began;
 	}
 
 	private void OnCaptureChallengeSucceeded(SimpleActor actor)
 	{
+		if (IsInstanceValid(actor))
+		{
+			actor.EndCaptureProtection();
+		}
 		if (!CaptureActor(actor))
 		{
 			PostSystemMessage(LocaleText.T("system.capture.target_lost"), new Color(1.0f, 0.58f, 0.42f), GameMessageChannel.Party);
@@ -80,6 +95,10 @@ public partial class PlayerController
 
 	private void OnCaptureChallengeFailed(SimpleActor actor)
 	{
+		if (IsInstanceValid(actor))
+		{
+			actor.EndCaptureProtection();
+		}
 		PostSystemMessage(
 			LocaleText.F("system.capture.rhythm_failed", actor.LocalizedDisplayName),
 			new Color(1.0f, 0.58f, 0.42f),

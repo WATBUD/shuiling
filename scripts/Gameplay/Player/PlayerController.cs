@@ -142,6 +142,8 @@ public partial class PlayerController : CharacterBody3D
 	private StandardMaterial3D _netAimDotMaterial = null!;
 	private const float NetChargeTime = 0.8f;
 	private const float NetGravity = 18.0f;
+	// How long a capture orb hit keeps the target from dying (refreshed per hit).
+	private const float CaptureProtectionSeconds = 8.0f;
 	private float _interactionPromptRefreshRemaining;
 	private float _worldDropCollectRefreshRemaining;
 	private int _captureNetCharges;

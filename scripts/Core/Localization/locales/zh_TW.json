@@ -134,7 +134,7 @@
 	"capture.rhythm.failed": "節奏中斷，馴服失敗！",
 	"capture.rhythm.success": "節奏同步！成功收服！",
 	"system.capture.rhythm_failed": "未能跟上 {0} 的節奏，捕捉失敗。",
-	"system.capture.target_lost": "捕捉目標已失效。",
+	"system.capture.target_lost": "捕捉目標已死亡。",
 	"channel.title": "訊息頻道 · {0}",
 	"channel.all": "全部",
 	"channel.system": "系統",
