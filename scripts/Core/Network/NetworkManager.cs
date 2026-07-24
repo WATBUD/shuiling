@@ -549,16 +549,16 @@ public partial class NetworkManager : Node
 	}
 
 	// Host → killer client: reward for a monster your damage finished off.
-	public void SendKillRewardTo(long peerId, string monsterName, int experience, int gold)
+	public void SendKillRewardTo(long peerId, string monsterName, int experience, int gold, int sourceLevel)
 	{
 		if (IsHost && peerId != 1)
 		{
-			RpcId(peerId, MethodName.ClientReceiveKillReward, monsterName, experience, gold);
+			RpcId(peerId, MethodName.ClientReceiveKillReward, monsterName, experience, gold, sourceLevel);
 		}
 	}
 
 	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-	private void ClientReceiveKillReward(string monsterName, int experience, int gold)
+	private void ClientReceiveKillReward(string monsterName, int experience, int gold, int sourceLevel)
 	{
 		PlayerController? player = ActiveWorld != null && IsInstanceValid(ActiveWorld) ? ActiveWorld.ActivePlayer : null;
 		if (player == null || !IsInstanceValid(player))
@@ -566,7 +566,7 @@ public partial class NetworkManager : Node
 			return;
 		}
 
-		player.GrantCombatExperience(experience);
+		player.GrantCombatExperience(experience, sourceLevel);
 		player.AddGold(gold);
 		player.PostSystemMessage(LocaleText.F("system.net.kill_reward", monsterName, experience, gold), new Color(0.72f, 1.0f, 0.78f), GameMessageChannel.Combat);
 	}

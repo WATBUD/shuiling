@@ -517,7 +517,7 @@ public partial class SimpleActor : CharacterBody3D
 	public string CombatRangeName => LocaleText.T(IsRangedCombatant ? "combat.range.ranged" : "combat.range.melee");
 	public string CombatSummary => $"{LocaleText.F("combat.summary", CombatRoleName, LocalizedPersonality, Affinity)} / {CombatRangeName} / {LocaleText.F("stat.affinity_value", Affinity)}";
 	public Color AttackFxColor => GetAttackColor();
-	public int ExperienceToNextLevel => 35 + Level * 18 + EvolutionStage * 20;
+	public int ExperienceToNextLevel => ExperienceTable.ToNextLevel(Level, EvolutionStage);
 	public bool CanEvolve => EvolutionStage < 3 && Level >= (EvolutionStage + 1) * 5;
 
 	// Rebirth (轉生): companions cap at level 100; rebirthing resets level to 1 and
@@ -2927,7 +2927,7 @@ public partial class SimpleActor : CharacterBody3D
 		if (attacker?._followTarget != null && IsInstanceValid(attacker._followTarget))
 		{
 			attacker._followTarget.PostSystemMessage(LocaleText.F("system.combat.defeated", attacker.LocalizedDisplayName, LocalizedDisplayName), new Color(1.0f, 0.70f, 0.42f), GameMessageChannel.Combat);
-			attacker._followTarget.GrantCombatExperience(ExperienceReward);
+			attacker._followTarget.GrantCombatExperience(ExperienceReward, Level);
 			if (ActorKind == "monster")
 			{
 				DropMonsterLoot(attacker._followTarget);

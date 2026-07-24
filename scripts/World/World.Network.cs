@@ -204,7 +204,7 @@ public partial class World
 		info.Actor.ReceiveDamage(Mathf.Clamp(rawDamage, 1, 99999), null);
 		if (info.Actor.IsDefeated)
 		{
-			Net!.SendKillRewardTo(attackerPeerId, info.Actor.LocalizedDisplayName, info.Actor.ExperienceReward, info.Actor.GoldReward);
+			Net!.SendKillRewardTo(attackerPeerId, info.Actor.LocalizedDisplayName, info.Actor.ExperienceReward, info.Actor.GoldReward, info.Actor.Level);
 			if (info.Actor.IsBoss)
 			{
 				// Per-player progression: the killer unlocks their own next tier.
