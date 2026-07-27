@@ -308,6 +308,25 @@ public partial class SimpleActor : CharacterBody3D
 	public bool CanBeCaptured => ActorKind == "monster" && !IsBoss && !_isCaptured && !_isDefeated && !_isNetworkPuppet;
 	public bool IsNetworkPuppet => _isNetworkPuppet;
 
+	// ── Behaviour gates: SINGLE SOURCE OF TRUTH ────────────────────────────────
+	// Every networking/combat/instancing/death cross-cutting bug we hit came from
+	// each method re-deriving its OWN mix of the raw state flags (_isMourning,
+	// _isPassive, _engagesLocalPlayer, _isDefeated, …). Define each behaviour gate
+	// ONCE here and have every subsystem read these instead of the raw flags, so a
+	// newly-added state only has to be wired into one gate — not hunted down across
+	// _PhysicsProcess, ReceiveDamage, targeting and SetWorldMapState.
+
+	// Untouchable by locally-applied damage (dead or grieving).
+	private bool IsInvulnerable => _isDefeated || _isMourning;
+
+	// Shares the LOCAL player's instance (same map, tier and party group). Gates
+	// both visibility and whether this actor may engage the local player.
+	private bool SharesLocalInstance => _engagesLocalPlayer;
+
+	// A wild monster that actively hunts, as opposed to a passive "幼年" newbie
+	// monster that only fights back for a short window after being attacked.
+	private bool IsProactivelyAggressive => !_isPassive || _provokeRemaining > 0.0f;
+
 	// HP fraction at/under which the monster can be netted; rarer = must be weaker.
 	public float CaptureHealthThreshold => Mathf.Clamp(0.45f - Rarity * 0.06f, 0.18f, 0.45f);
 	public float MaxStagger => Mathf.Max(EffectiveMaxHealth * 0.65f, 1.0f);
@@ -760,14 +779,62 @@ public partial class SimpleActor : CharacterBody3D
 		StabilizeExternalModelRootMotion();
 	}
 
+	// Per-frame dispatcher. Each actor state now owns exactly one handler, so the
+	// behaviour for a given frame is chosen in ONE place instead of being threaded
+	// through a 140-line method with interleaved early-returns. Ticks are shared;
+	// then the first matching state fully handles the frame.
 	public override void _PhysicsProcess(double delta)
 	{
 		float step = (float)delta;
+
+		// Network puppets are display-only: driven entirely by streamed host state.
 		if (_isNetworkPuppet)
 		{
 			UpdateNetworkPuppet(step);
 			return;
 		}
+
+		TickActorTimers(step);
+		Vector3 velocity = Velocity;
+
+		// Frozen states — each ends the frame in place.
+		if (_isDefeated)
+		{
+			StopInPlace(velocity, step);
+			return;
+		}
+
+		if (_isMountedByPlayer && _followTarget != null && IsInstanceValid(_followTarget))
+		{
+			RunMountedFrame(step);
+			return;
+		}
+
+		if (_stunRemaining > 0.0f)
+		{
+			StopInPlace(Velocity, step);
+			return;
+		}
+
+		if (!IsOnFloor())
+		{
+			velocity.Y -= _gravity * step;
+		}
+
+		// Captured companions follow their owner (or grieve when mourning); wild
+		// actors run monster combat + wandering.
+		if (_isCaptured)
+		{
+			RunCapturedFrame(velocity, step);
+			return;
+		}
+
+		RunWildActorFrame(velocity, step);
+	}
+
+	// Shared per-frame bookkeeping for every non-puppet actor.
+	private void TickActorTimers(float step)
+	{
 		UpdateStatusEffects(step);
 		if (ActorKind == "monster" && !_isCaptured)
 		{
@@ -778,90 +845,44 @@ public partial class SimpleActor : CharacterBody3D
 		_specialControlCooldownRemaining = Mathf.Max(_specialControlCooldownRemaining - step, 0.0f);
 		_combatTargetSearchRemaining = Mathf.Max(_combatTargetSearchRemaining - step, 0.0f);
 		_provokeRemaining = Mathf.Max(_provokeRemaining - step, 0.0f);
-		Vector3 velocity = Velocity;
+	}
 
-		if (_isDefeated)
+	private void StopInPlace(Vector3 velocity, float step)
+	{
+		Velocity = SlowToStop(velocity, step);
+		MoveAndSlideWithEffects(step);
+	}
+
+	private void RunMountedFrame(float step)
+	{
+		GlobalPosition = _followTarget!.GlobalPosition;
+		Rotation = _followTarget.Rotation;
+		Velocity = _followTarget.Velocity;
+		UpdateMovementAnimation(step);
+	}
+
+	private void RunCapturedFrame(Vector3 velocity, float step)
+	{
+		if (_isMourning)
 		{
-			Velocity = SlowToStop(velocity, step);
-			MoveAndSlideWithEffects(step);
+			// Grieving in place — no following, no combat.
+			StopInPlace(velocity, step);
 			return;
 		}
 
-		if (_isMountedByPlayer && _followTarget != null && IsInstanceValid(_followTarget))
-		{
-			GlobalPosition = _followTarget.GlobalPosition;
-			Rotation = _followTarget.Rotation;
-			Velocity = _followTarget.Velocity;
-			UpdateMovementAnimation(step);
-			return;
-		}
+		FollowCapturedTarget(velocity, step);
+	}
 
-		if (_stunRemaining > 0.0f)
-		{
-			Velocity = SlowToStop(Velocity, step);
-			MoveAndSlideWithEffects(step);
-			return;
-		}
-
-		if (!IsOnFloor())
-		{
-			velocity.Y -= _gravity * step;
-		}
-
-		if (_isCaptured)
-		{
-			if (_isMourning)
-			{
-				// Grieving in place — no following, no combat.
-				Velocity = SlowToStop(velocity, step);
-				MoveAndSlideWithEffects(step);
-				return;
-			}
-
-			FollowCapturedTarget(velocity, step);
-			return;
-		}
-
+	// Wild monster / NPC frame: resolve combat (monsters only), then wander/chase.
+	private void RunWildActorFrame(Vector3 velocity, float step)
+	{
 		Node3D? player = GetCachedPlayerNode();
 		bool chasing = false;
 		Vector3 destination = _targetPosition;
 
-		if (ActorKind == "monster")
+		if (ActorKind == "monster" && TryRunMonsterCombat(player, velocity, ref destination, ref chasing, step))
 		{
-			if (TryGetRetaliationTarget(out SimpleActor retaliationTarget))
-			{
-				chasing = true;
-				destination = retaliationTarget.GlobalPosition;
-				if (TryAttackActorTarget(retaliationTarget, velocity, step))
-				{
-					return;
-				}
-			}
-			// Passive newbie-zone monsters don't seek the player out; they only fight
-			// back for a short window after being attacked (被動反擊).
-			else if (!_isPassive || _provokeRemaining > 0.0f)
-			{
-				// Target the nearest player sharing this monster's instance: the local
-				// player (when the host/single-player stands in it) and, on the host,
-				// any remote players. Remote players are damaged over the network.
-				Node3D? target = ResolveHostileTarget(player, out bool targetIsRemote, out long remotePeerId);
-				if (target != null)
-				{
-					float distanceToTarget = GlobalPosition.DistanceTo(target.GlobalPosition);
-					if (distanceToTarget <= ChaseRadius)
-					{
-						chasing = true;
-						destination = target.GlobalPosition;
-						bool attacked = targetIsRemote
-							? TryAttackRemotePlayer(target, remotePeerId, velocity, step)
-							: TryAttackPlayer(target, velocity, step);
-						if (attacked)
-						{
-							return;
-						}
-					}
-				}
-			}
+			return; // an attack consumed the frame
 		}
 
 		if (!chasing)
@@ -870,8 +891,7 @@ public partial class SimpleActor : CharacterBody3D
 			_waitTime = Mathf.Max(_waitTime - step, 0.0f);
 			if (_waitTime > 0.0f)
 			{
-				Velocity = SlowToStop(velocity, step);
-				MoveAndSlideWithEffects(step);
+				StopInPlace(velocity, step);
 				return;
 			}
 		}
@@ -900,6 +920,43 @@ public partial class SimpleActor : CharacterBody3D
 
 		Velocity = velocity;
 		MoveAndSlideWithEffects(step);
+	}
+
+	// Monster combat decision: retaliate against a recent attacker, else (if not a
+	// passive newbie) hunt the nearest player sharing this instance — local player
+	// or, on the host, a remote player (damaged over the network). Returns true when
+	// an attack fully consumed the frame; otherwise updates chasing/destination for
+	// the wander/chase movement that follows.
+	private bool TryRunMonsterCombat(Node3D? player, Vector3 velocity, ref Vector3 destination, ref bool chasing, float step)
+	{
+		if (TryGetRetaliationTarget(out SimpleActor retaliationTarget))
+		{
+			chasing = true;
+			destination = retaliationTarget.GlobalPosition;
+			return TryAttackActorTarget(retaliationTarget, velocity, step);
+		}
+
+		if (!IsProactivelyAggressive)
+		{
+			return false;
+		}
+
+		Node3D? target = ResolveHostileTarget(player, out bool targetIsRemote, out long remotePeerId);
+		if (target == null)
+		{
+			return false;
+		}
+
+		if (GlobalPosition.DistanceTo(target.GlobalPosition) > ChaseRadius)
+		{
+			return false;
+		}
+
+		chasing = true;
+		destination = target.GlobalPosition;
+		return targetIsRemote
+			? TryAttackRemotePlayer(target, remotePeerId, velocity, step)
+			: TryAttackPlayer(target, velocity, step);
 	}
 
 	private Node3D? GetCachedPlayerNode()
@@ -1815,7 +1872,7 @@ public partial class SimpleActor : CharacterBody3D
 
 	public int ReceiveDamage(int rawDamage, SimpleActor? attacker)
 	{
-		if (_isDefeated || _isMourning)
+		if (IsInvulnerable)
 		{
 			return 0;
 		}
@@ -3069,7 +3126,7 @@ public partial class SimpleActor : CharacterBody3D
 		Node3D? best = null;
 		float bestDistance = float.MaxValue;
 
-		if (_engagesLocalPlayer && localPlayer != null)
+		if (SharesLocalInstance && localPlayer != null)
 		{
 			best = localPlayer;
 			bestDistance = GlobalPosition.DistanceTo(localPlayer.GlobalPosition);
