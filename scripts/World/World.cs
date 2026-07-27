@@ -723,18 +723,20 @@ public partial class World : Node3D
 		CreateTorch(center + new Vector3(-7.1f, 0.0f, -24.4f));
 		CreateTorch(center + new Vector3(7.1f, 0.0f, -24.4f));
 
-		Vector3 itemShopOffset = RingOffset(54.0f, shopRadius);
-		Vector3 blacksmithOffset = RingOffset(306.0f, shopRadius);
-		Vector3 mercenaryOffset = RingOffset(126.0f, shopRadius);
-		Vector3 petShopOffset = RingOffset(234.0f, shopRadius);
-		Vector3 revivalOffset = RingOffset(0.0f, shopRadius);
+		// 主城改為六屋圍繞：六棟建築等距（每 60°）環繞中央，並整體偏移 30° 讓正北（180°）
+		// 的傳送廣場走廊保持淨空。順序沿環：30 道具、90 強化屋、150 傭兵、210 寵物、270 倉庫、330 鐵匠。
+		Vector3 itemShopOffset = RingOffset(30.0f, shopRadius);
+		Vector3 refinementOffset = RingOffset(90.0f, shopRadius);
+		Vector3 mercenaryOffset = RingOffset(150.0f, shopRadius);
+		Vector3 petShopOffset = RingOffset(210.0f, shopRadius);
+		Vector3 warehouseOffset = RingOffset(270.0f, shopRadius);
+		Vector3 blacksmithOffset = RingOffset(330.0f, shopRadius);
 		CreateItemShop(center + itemShopOffset, YawFacingCenter(itemShopOffset));
-		CreateBlacksmithShop(center + blacksmithOffset, YawFacingCenter(blacksmithOffset));
+		CreateRefinementHouse(center + refinementOffset, YawFacingCenter(refinementOffset));
 		CreateMercenaryGuild(center + mercenaryOffset, YawFacingCenter(mercenaryOffset));
 		CreatePetShop(center + petShopOffset, YawFacingCenter(petShopOffset));
-		// This spot is now the warehouse (the warehouse keeper stands here);
-		// revival moved to the pet merchant.
-		CreateWarehouseBuilding(center + revivalOffset, YawFacingCenter(revivalOffset));
+		CreateWarehouseBuilding(center + warehouseOffset, YawFacingCenter(warehouseOffset));
+		CreateBlacksmithShop(center + blacksmithOffset, YawFacingCenter(blacksmithOffset));
 
 		for (int index = 0; index < 8; index++)
 		{
@@ -1137,6 +1139,27 @@ public partial class World : Node3D
 		AddMesh(shop, "WarehouseCrateA", BoxMeshFor(new Vector3(0.9f, 0.9f, 0.9f)), new Vector3(-0.9f, 0.45f, -3.3f), new Vector3(0.0f, 14.0f, 0.0f), Vector3.One, _matWood);
 		AddMesh(shop, "WarehouseCrateB", BoxMeshFor(new Vector3(0.8f, 0.8f, 0.8f)), new Vector3(0.5f, 0.4f, -3.4f), new Vector3(0.0f, -22.0f, 0.0f), Vector3.One, _matWood);
 		AddMesh(shop, "WarehouseCrateC", BoxMeshFor(new Vector3(0.7f, 0.7f, 0.7f)), new Vector3(0.2f, 1.15f, -3.35f), new Vector3(0.0f, 8.0f, 0.0f), Vector3.One, _matWood);
+	}
+
+	private void CreateRefinementHouse(Vector3 position, float yawDegrees)
+	{
+		StaticBody3D shop = CreateCityShopShell(
+			"CityRefinementHouse",
+			position,
+			yawDegrees,
+			new Vector3(7.8f, 3.1f, 6.0f),
+			_matWall,
+			_matCrystal,
+			"shop.refinement",
+			new Color(0.62f, 0.82f, 1.0f)
+		);
+
+		// 鐵砧 + 懸浮的發光強化水晶，象徵精煉裝備。
+		AddMesh(shop, "RefineAnvilBase", BoxMeshFor(new Vector3(0.95f, 0.5f, 0.6f)), new Vector3(0.0f, 0.25f, -3.2f), Vector3.Zero, Vector3.One, _matMetal);
+		AddMesh(shop, "RefineAnvilTop", BoxMeshFor(new Vector3(1.3f, 0.28f, 0.66f)), new Vector3(0.0f, 0.62f, -3.2f), Vector3.Zero, Vector3.One, _matMetal);
+		AddMesh(shop, "RefineCrystal", new SphereMesh { Radius = 0.34f, Height = 0.9f }, new Vector3(0.0f, 1.35f, -3.2f), Vector3.Zero, new Vector3(1.0f, 1.7f, 1.0f), _matCrystal);
+		AddMesh(shop, "RefineShardLeft", CylinderMeshFor(0.0f, 0.16f, 0.72f), new Vector3(-2.7f, 1.08f, -3.3f), new Vector3(0.0f, 0.0f, -12.0f), Vector3.One, _matCrystal);
+		AddMesh(shop, "RefineShardRight", CylinderMeshFor(0.0f, 0.16f, 0.72f), new Vector3(2.7f, 1.08f, -3.3f), new Vector3(0.0f, 0.0f, 12.0f), Vector3.One, _matCrystal);
 	}
 
 	private void CreateMercenaryGuild(Vector3 position, float yawDegrees)
@@ -1921,12 +1944,12 @@ public partial class World : Node3D
 		const float frontDistance = 5.0f;
 		CityNpcStation[] stations =
 		{
-			new("name.npc.blacksmith", RingFrontOffset(306.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(306.0f, shopRadius)), 0.8f, "Tank"),
-			new("name.npc.item_merchant", RingFrontOffset(54.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(54.0f, shopRadius)), 0.8f, "Support"),
-			new("name.npc.pet_trainer", RingFrontOffset(234.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(234.0f, shopRadius)), 0.7f, "Support"),
-			new("name.npc.mercenary_broker", RingFrontOffset(126.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(126.0f, shopRadius)), 0.7f, "DPS"),
-			new("name.npc.warehouse_keeper", RingFrontOffset(0.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(0.0f, shopRadius)), 0.8f, "Support"),
+			new("name.npc.item_merchant", RingFrontOffset(30.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(30.0f, shopRadius)), 0.8f, "Support"),
 			new("name.npc.refiner", RingFrontOffset(90.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(90.0f, shopRadius)), 0.7f, "Tank"),
+			new("name.npc.mercenary_broker", RingFrontOffset(150.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(150.0f, shopRadius)), 0.7f, "DPS"),
+			new("name.npc.pet_trainer", RingFrontOffset(210.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(210.0f, shopRadius)), 0.7f, "Support"),
+			new("name.npc.warehouse_keeper", RingFrontOffset(270.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(270.0f, shopRadius)), 0.8f, "Support"),
+			new("name.npc.blacksmith", RingFrontOffset(330.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(330.0f, shopRadius)), 0.8f, "Tank"),
 		};
 
 		// Functional shop NPCs (always present).
@@ -1992,7 +2015,7 @@ public partial class World : Node3D
 		actor.ConfigureStats(offer.NameKey, offer.Level, offer.MaxHealth, offer.Attack, offer.Defense, offer.Level * 6, 0);
 		actor.ConfigureGrowth(offer.CombatRole == "Support" ? "ability.npc.heal" : "ability.npc.guard", Mathf.Max(offer.Level / 2, 1));
 		actor.ConfigureCombatProfile(offer.CombatRole, "personality.brave", offer.CombatRole == "Support" ? "passive.protector" : "passive.combo_rhythm", 5);
-		Vector3 spawnPosition = _mainCityCenter + RingFrontOffset(126.0f, 31.0f, 2.6f);
+		Vector3 spawnPosition = _mainCityCenter + RingFrontOffset(150.0f, 31.0f, 2.6f);
 		actor.Position = spawnPosition;
 		actor.HomePosition = spawnPosition;
 		actor.WanderRadius = 0.6f;
@@ -2008,7 +2031,7 @@ public partial class World : Node3D
 		actor.ConfigureStats(monsterNameKey, level, maxHealth, attack, defense, level * 8, 0);
 		actor.ConfigureGrowth("ability.monster.track", Mathf.Max(level / 2, 1));
 		actor.ConfigureCombatProfile(combatRole, "personality.friendly", "passive.fast_growth", 5);
-		Vector3 spawnPosition = _mainCityCenter + RingFrontOffset(234.0f, 31.0f, 2.4f);
+		Vector3 spawnPosition = _mainCityCenter + RingFrontOffset(210.0f, 31.0f, 2.4f);
 		actor.Position = spawnPosition;
 		actor.HomePosition = spawnPosition;
 		actor.WanderRadius = 0.6f;
