@@ -173,7 +173,7 @@ public partial class CompanionInfoCard : PanelContainer
 		var metaLines = new List<string>
 		{
 			$"{_actor.TypeName} / {_actor.CombatRangeName}",
-			$"{LocaleText.T("stat.role")} {_actor.CombatRoleName}",
+			$"{LocaleText.T("stat.race")} {LocaleText.T(BuildCatalog.GetRaceNameKey(BuildCatalog.GetRaceId(_actor)))} / {LocaleText.T("stat.element")} {_actor.BuildElementName}",
 			$"{LocaleText.T("stat.affinity")} {_actor.Affinity} / 100",
 		};
 		if (rebirthBonus > 0)

@@ -17,9 +17,6 @@ public partial class PlayerController
 		1, 3, 5, 9, 15, 19, 21, 23,
 		0, 4, 20, 24,
 	};
-	private static readonly int[] FormationFrontRow = { 6, 7, 8 };
-	private static readonly int[] FormationBackRow = { 16, 17, 18 };
-
 	private readonly Dictionary<int, SimpleActor> _formationActorsBySlot = new();
 	private readonly Dictionary<SimpleActor, int> _formationSlotsByActor = new();
 
@@ -199,10 +196,19 @@ public partial class PlayerController
 		_formationSlotsByActor[actor] = slotIndex;
 	}
 
+	// 陣盤加成只看「身分」不看「站位」：定位（前/後排）只是提示，不再給任何數值。
+	// 種族羈絆：同種族 3 隻 → 該種族全體 +10% 攻擊與防禦。
+	// 屬性共鳴：同屬性 3 隻 → 該屬性全體 +10% 攻擊（不加防禦）。
+	// 統計對象僅限實際擺放在陣盤格子上的寵物。
+	private const int FormationTraitThreshold = 3;
+	private const float FormationRaceAttackBonus = 1.10f;
+	private const float FormationRaceDefenseBonus = 1.10f;
+	private const float FormationElementAttackBonus = 1.10f;
+
 	public void RecalculateFormationBonuses()
 	{
-		bool tankFrontAura = AreSlotsFilledByRole(FormationFrontRow, "Tank");
-		bool rangedBackAura = AreSlotsFilledByRole(FormationBackRow, "Ranged");
+		var raceCounts = new Dictionary<string, int>();
+		var elementCounts = new Dictionary<string, int>();
 		foreach (KeyValuePair<int, SimpleActor> entry in _formationActorsBySlot)
 		{
 			SimpleActor actor = entry.Value;
@@ -211,36 +217,38 @@ public partial class PlayerController
 				continue;
 			}
 
-			int adjacentTanks = 0;
-			int adjacentSupports = 0;
-			int sameElementNeighbors = 0;
-			string elementId = BuildCatalog.GetAttributeGem(actor.BuildLoadout.AttributeGemId).ElementId;
-			foreach (int neighborSlot in GetAdjacentSlots(entry.Key))
-			{
-				SimpleActor? neighbor = GetFormationActor(neighborSlot);
-				if (neighbor == null)
-				{
-					continue;
-				}
+			string raceId = BuildCatalog.GetRaceId(actor);
+			raceCounts[raceId] = raceCounts.GetValueOrDefault(raceId) + 1;
 
-				adjacentTanks += neighbor.CombatRole == "Tank" ? 1 : 0;
-				adjacentSupports += neighbor.CombatRole == "Support" ? 1 : 0;
-				string neighborElement = BuildCatalog.GetAttributeGem(neighbor.BuildLoadout.AttributeGemId).ElementId;
-				sameElementNeighbors += elementId != "physical" && neighborElement == elementId ? 1 : 0;
+			string elementId = BuildCatalog.GetElementId(actor);
+			if (elementId != "physical")
+			{
+				elementCounts[elementId] = elementCounts.GetValueOrDefault(elementId) + 1;
+			}
+		}
+
+		foreach (KeyValuePair<int, SimpleActor> entry in _formationActorsBySlot)
+		{
+			SimpleActor actor = entry.Value;
+			if (!IsInstanceValid(actor) || !actor.IsCaptured || !actor.IsInActiveParty)
+			{
+				continue;
 			}
 
-			float attackMultiplier = 1.0f + Mathf.Min(sameElementNeighbors, 3) * 0.08f;
-			float defenseMultiplier = tankFrontAura ? 1.12f : 1.0f;
-			float cooldownMultiplier = Mathf.Max(1.0f - adjacentSupports * 0.08f, 0.80f);
-			float incomingMultiplier = Mathf.Max(1.0f - adjacentTanks * 0.10f, 0.80f);
-			float rangeBonus = rangedBackAura ? 1.25f : 0.0f;
+			string raceId = BuildCatalog.GetRaceId(actor);
+			string elementId = BuildCatalog.GetElementId(actor);
+			bool raceBonusActive = raceCounts.GetValueOrDefault(raceId) >= FormationTraitThreshold;
+			bool elementBonusActive = elementId != "physical" && elementCounts.GetValueOrDefault(elementId) >= FormationTraitThreshold;
+
+			float attackMultiplier = (raceBonusActive ? FormationRaceAttackBonus : 1.0f) * (elementBonusActive ? FormationElementAttackBonus : 1.0f);
+			float defenseMultiplier = raceBonusActive ? FormationRaceDefenseBonus : 1.0f;
+
 			var bonuses = new List<string>();
-			if (sameElementNeighbors > 0) bonuses.Add(LocaleText.T("formation.bonus.resonance"));
-			if (adjacentTanks > 0) bonuses.Add(LocaleText.T("formation.bonus.guard"));
-			if (adjacentSupports > 0) bonuses.Add(LocaleText.T("formation.bonus.support"));
-			if (tankFrontAura) bonuses.Add(LocaleText.T("formation.bonus.frontline"));
-			if (rangedBackAura) bonuses.Add(LocaleText.T("formation.bonus.backline"));
-			actor.SetFormationBonuses(attackMultiplier, defenseMultiplier, cooldownMultiplier, incomingMultiplier, rangeBonus, string.Join(" / ", bonuses));
+			if (raceBonusActive) bonuses.Add(LocaleText.F("formation.bonus.race", LocaleText.T(BuildCatalog.GetRaceNameKey(raceId))));
+			if (elementBonusActive) bonuses.Add(LocaleText.F("formation.bonus.element", LocaleText.T($"element.{elementId}")));
+
+			// 定位不再影響冷卻／受傷／射程，維持中性值。
+			actor.SetFormationBonuses(attackMultiplier, defenseMultiplier, 1.0f, 1.0f, 0.0f, string.Join(" / ", bonuses));
 		}
 
 		// Party membership may have changed — re-apply the card collection buff too.
@@ -248,35 +256,6 @@ public partial class PlayerController
 
 		// Tell peers to refresh which companions to render for this player.
 		NetworkManager.Instance?.MarkCompanionRosterDirty();
-	}
-
-	private bool AreSlotsFilledByRole(int[] slots, string role)
-	{
-		foreach (int slot in slots)
-		{
-			if (GetFormationActor(slot)?.CombatRole != role)
-			{
-				return false;
-			}
-		}
-		return true;
-	}
-
-	private static IEnumerable<int> GetAdjacentSlots(int slotIndex)
-	{
-		int row = slotIndex / FormationGridSideLength;
-		int column = slotIndex % FormationGridSideLength;
-		for (int rowOffset = -1; rowOffset <= 1; rowOffset++)
-		{
-			for (int columnOffset = -1; columnOffset <= 1; columnOffset++)
-			{
-				if ((rowOffset == 0 && columnOffset == 0) || row + rowOffset < 0 || row + rowOffset >= FormationGridSideLength || column + columnOffset < 0 || column + columnOffset >= FormationGridSideLength)
-				{
-					continue;
-				}
-				yield return (row + rowOffset) * FormationGridSideLength + column + columnOffset;
-			}
-		}
 	}
 
 	private void ClearFormationAssignment(SimpleActor actor)

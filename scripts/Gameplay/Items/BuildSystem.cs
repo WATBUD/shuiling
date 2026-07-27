@@ -405,6 +405,20 @@ public static class BuildCatalog
 		["name.npc.guard"] = "identity.guardian",
 	};
 
+	// 種族分類：把每個 identity(物種) 歸到一個上層種族群組，用於陣盤的種族羈絆加成。
+	private static readonly Dictionary<string, string> RaceByIdentity = new()
+	{
+		["identity.traveler"] = "race.human",
+		["identity.guardian"] = "race.human",
+		["identity.wolf"] = "race.beast",
+		["identity.redhorn"] = "race.beast",
+		["identity.dragon"] = "race.dragon",
+		["identity.venom_imp"] = "race.demon",
+		["identity.water_spirit"] = "race.spirit",
+	};
+
+	private const string DefaultRaceId = "race.human";
+
 	private static readonly List<EquipmentDefinition> Equipment = new()
 	{
 		new EquipmentDefinition { Id = "equip.helmet.none", NameKey = "equipment.none", SummaryKey = "gem.summary.none", Slot = EquipmentSlot.Helmet },
@@ -487,6 +501,25 @@ public static class BuildCatalog
 			? mappedId
 			: actor.ActorKind == "monster" ? "identity.redhorn" : "identity.traveler";
 		return Identities.TryGetValue(identityId, out CompanionIdentity? identity) ? identity : Identities["identity.traveler"];
+	}
+
+	// 回傳寵物的種族群組 id（如 race.dragon）。
+	public static string GetRaceId(SimpleActor actor)
+	{
+		string identityId = GetIdentity(actor).Id;
+		return RaceByIdentity.TryGetValue(identityId, out string? raceId) ? raceId : DefaultRaceId;
+	}
+
+	// 種族群組 id 本身就是本地化 key（race.human / race.beast ...），這裡集中一處方便日後改動。
+	public static string GetRaceNameKey(string raceId)
+	{
+		return string.IsNullOrEmpty(raceId) ? DefaultRaceId : raceId;
+	}
+
+	// 回傳寵物的屬性 id（如 fire / water / physical）。
+	public static string GetElementId(SimpleActor actor)
+	{
+		return GetAttributeGem(actor.BuildLoadout.AttributeGemId).ElementId;
 	}
 
 	public static CompanionBuildLoadout CreateStarterLoadout(SimpleActor actor)

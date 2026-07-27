@@ -142,19 +142,62 @@ public partial class PlayerController
 		StabilizePlayerExternalModel();
 	}
 
-	// Play the character's melee swing animation and hold it briefly. Called on
-	// every melee swing (external-model characters only; the procedural fallback
-	// has no attack clip).
+	private Tween? _playerAttackPoseTween;
+	private Node3D? _playerAttackPoseTarget;
+	private Vector3 _playerAttackPoseBaseScale = Vector3.One;
+
+	// Melee swing feedback. Always plays the same squash-and-stretch "lunge" shake
+	// that wild monsters and companions use (works on every model), and ALSO holds
+	// the model's dedicated attack clip only when it actually has one — so a
+	// clip-less model reads as a real swing instead of freezing in an idle pose.
 	private void PlayPlayerAttackAnimation()
 	{
+		AnimatePlayerAttackPose();
+
 		if (_playerExternalModel == null)
 		{
 			return;
 		}
 
 		_playerExternalAnimationState = string.Empty; // force a replay each swing
-		SetPlayerExternalAnimationState("attack");
-		_playerAttackAnimRemaining = PlayerAttackAnimationSeconds;
+		if (ExternalModelLibrary.TryPlayActorAnimation(_playerExternalModel, "attack"))
+		{
+			_playerExternalAnimationState = "attack";
+			StabilizePlayerExternalModel();
+			_playerAttackAnimRemaining = PlayerAttackAnimationSeconds;
+		}
+	}
+
+	// Squash-and-stretch scale pop on the player's visual root (never the physics
+	// body), mirroring SimpleActor.AnimateAttackPose. StabilizeRootMotion only
+	// touches position/rotation, so this scale tween is safe alongside it.
+	private void AnimatePlayerAttackPose()
+	{
+		if (_playerAttackPoseTween != null && IsInstanceValid(_playerAttackPoseTween))
+		{
+			_playerAttackPoseTween.Kill();
+		}
+
+		// Undo any mid-tween scale from a previous swing before recapturing base.
+		if (_playerAttackPoseTarget != null && IsInstanceValid(_playerAttackPoseTarget))
+		{
+			_playerAttackPoseTarget.Scale = _playerAttackPoseBaseScale;
+		}
+
+		Node3D? visual = _playerVisualRoot;
+		if (visual == null || !IsInstanceValid(visual))
+		{
+			return;
+		}
+
+		_playerAttackPoseTarget = visual;
+		_playerAttackPoseBaseScale = visual.Scale;
+		_playerAttackPoseTween = CreateTween();
+		_playerAttackPoseTween.SetTrans(Tween.TransitionType.Sine);
+		_playerAttackPoseTween.SetEase(Tween.EaseType.Out);
+		_playerAttackPoseTween.TweenProperty(visual, "scale", _playerAttackPoseBaseScale * new Vector3(1.12f, 0.90f, 1.20f), 0.075f);
+		_playerAttackPoseTween.TweenProperty(visual, "scale", _playerAttackPoseBaseScale * new Vector3(0.94f, 1.08f, 0.92f), 0.085f);
+		_playerAttackPoseTween.TweenProperty(visual, "scale", _playerAttackPoseBaseScale, 0.13f);
 	}
 
 	private void StabilizePlayerExternalModel()
