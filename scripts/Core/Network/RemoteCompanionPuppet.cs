@@ -9,6 +9,9 @@ public partial class RemoteCompanionPuppet : Node3D
 	private bool _hasState;
 	private string _modelPath = string.Empty;
 	private Label3D _label = null!;
+	private string _baseInfo = string.Empty;
+	private float _healthRatio = 1.0f;
+	private bool _hasHealth;
 
 	public override void _Ready()
 	{
@@ -62,10 +65,66 @@ public partial class RemoteCompanionPuppet : Node3D
 
 	public void SetInfo(string displayName, int level)
 	{
-		if (_label != null && IsInstanceValid(_label))
+		_baseInfo = $"Lv{level} {displayName}";
+		RefreshLabel();
+	}
+
+	// Mirror the owner's companion health so peers see it get hurt: a hit flash on
+	// any drop, a HP% suffix, and a label tint that reddens as health falls.
+	public void SetHealth(float ratio)
+	{
+		ratio = Mathf.Clamp(ratio, 0.0f, 1.0f);
+		if (_hasHealth && ratio < _healthRatio - 0.001f)
 		{
-			_label.Text = $"Lv{level} {displayName}";
+			SpawnHitFlash();
 		}
+
+		_healthRatio = ratio;
+		_hasHealth = true;
+		RefreshLabel();
+	}
+
+	private void RefreshLabel()
+	{
+		if (_label == null || !IsInstanceValid(_label))
+		{
+			return;
+		}
+
+		_label.Text = _hasHealth ? $"{_baseInfo}  {Mathf.RoundToInt(_healthRatio * 100.0f)}%" : _baseInfo;
+		// Green when healthy, shifting to red as it takes damage.
+		_label.Modulate = new Color(0.7f, 1.0f, 0.8f).Lerp(new Color(1.0f, 0.4f, 0.35f), 1.0f - _healthRatio);
+	}
+
+	private void SpawnHitFlash()
+	{
+		var material = new StandardMaterial3D
+		{
+			AlbedoColor = new Color(1.0f, 0.32f, 0.28f, 0.5f),
+			Emission = new Color(1.0f, 0.35f, 0.3f),
+			EmissionEnabled = true,
+			EmissionEnergyMultiplier = 2.2f,
+			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			BlendMode = BaseMaterial3D.BlendModeEnum.Add,
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+			CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+		};
+		var flash = new MeshInstance3D
+		{
+			Name = "CompanionHitFlash",
+			Mesh = new SphereMesh { Radius = 0.6f, Height = 1.2f },
+			Position = new Vector3(0.0f, 0.7f, 0.0f),
+			MaterialOverride = material,
+		};
+		AddChild(flash);
+		SceneTreeTimer timer = GetTree().CreateTimer(0.15);
+		timer.Timeout += () =>
+		{
+			if (IsInstanceValid(flash))
+			{
+				flash.QueueFree();
+			}
+		};
 	}
 
 	public void ApplyNetworkState(Vector3 position, float yaw)

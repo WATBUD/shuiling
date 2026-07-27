@@ -328,6 +328,7 @@ public partial class PlayerController : CharacterBody3D
 		}
 		UpdateCaptureNetRecharge((float)delta);
 		UpdateMeleeCooldown((float)delta);
+		UpdateAutoAttack((float)delta);
 		UpdateHealthRegen((float)delta);
 		UpdateCamera();
 		UpdateTargetInfoPanel();
@@ -346,6 +347,12 @@ public partial class PlayerController : CharacterBody3D
 	public override void _UnhandledInput(InputEvent @event)
 	{
 		if (_captureRhythmPanel != null && _captureRhythmPanel.IsChallengeActive)
+		{
+			return;
+		}
+
+		// While downed, only the death prompt's return button is interactive.
+		if (_isDead)
 		{
 			return;
 		}
@@ -583,6 +590,14 @@ public partial class PlayerController : CharacterBody3D
 
 	public override void _PhysicsProcess(double delta)
 	{
+		// Downed: the player can't move or act until they choose to return to town.
+		if (_isDead)
+		{
+			Velocity = SlowPlayerToStop(Velocity, (float)delta);
+			MoveAndSlide();
+			return;
+		}
+
 		if (_settingsPanel.Visible || _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _npcQuestDialog.Visible)
 		{
 			Velocity = SlowPlayerToStop(Velocity, (float)delta);
@@ -616,6 +631,12 @@ public partial class PlayerController : CharacterBody3D
 		Vector3 forward = GetCameraPlanarForward();
 		Vector3 right = new(-forward.Z, 0.0f, forward.X);
 		Vector3 direction = (right * inputDirection.X + forward * -inputDirection.Y).Normalized();
+		// Click-to-attack: with no manual movement input, auto-walk toward the
+		// clicked (focused) monster until in melee range, where auto-attack kicks in.
+		if (inputDirection.LengthSquared() < 0.01f && TryGetAutoApproachDirection(out Vector3 approachDirection))
+		{
+			direction = approachDirection;
+		}
 		float targetSpeed = Input.IsActionPressed("sprint") ? SprintSpeed : WalkSpeed;
 		if (MountedCompanion is SimpleActor mount)
 		{

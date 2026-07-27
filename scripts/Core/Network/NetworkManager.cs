@@ -1034,6 +1034,7 @@ public partial class NetworkManager : Node
 		var ids = new List<int>();
 		var positions = new List<Vector3>();
 		var yaws = new List<float>();
+		var healths = new List<float>();
 		for (int i = 0; i < count; i++)
 		{
 			SimpleActor actor = party[i];
@@ -1045,13 +1046,14 @@ public partial class NetworkManager : Node
 			ids.Add(i);
 			positions.Add(actor.GlobalPosition);
 			yaws.Add(actor.Rotation.Y);
+			healths.Add(actor.HealthRatio);
 		}
 
-		Rpc(MethodName.ClientCompanionStates, ids.ToArray(), positions.ToArray(), yaws.ToArray());
+		Rpc(MethodName.ClientCompanionStates, ids.ToArray(), positions.ToArray(), yaws.ToArray(), healths.ToArray());
 	}
 
 	[Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Unreliable)]
-	private void ClientCompanionStates(int[] slots, Vector3[] positions, float[] yaws)
+	private void ClientCompanionStates(int[] slots, Vector3[] positions, float[] yaws, float[] healths)
 	{
 		if (ActiveWorld == null || !IsInstanceValid(ActiveWorld))
 		{
@@ -1070,6 +1072,10 @@ public partial class NetworkManager : Node
 			if (map.TryGetValue(slots[i], out RemoteCompanionPuppet? puppet) && IsInstanceValid(puppet))
 			{
 				puppet.ApplyNetworkState(positions[i], yaws[i]);
+				if (i < healths.Length)
+				{
+					puppet.SetHealth(healths[i]);
+				}
 			}
 		}
 	}

@@ -4,6 +4,14 @@ using System.Collections.Generic;
 public partial class PlayerController
 {
 	private float _meleeCooldownRemaining;
+	private float _playerAttackAnimRemaining;
+	private const float PlayerAttackAnimationSeconds = 0.45f;
+
+	// Death: the player is downed on the spot while their pets grieve, and stays
+	// down (with a return prompt) until they choose to go back to town.
+	private bool _isDead;
+	private CanvasLayer? _deathPromptLayer;
+	public bool IsPlayerDead => _isDead;
 
 	// Out-of-combat regeneration: after this long without taking damage, the
 	// player recovers a fraction of max HP per second. This is the main healing
@@ -12,7 +20,9 @@ public partial class PlayerController
 	private const float RegenFractionPerSecond = 0.06f;
 	private float _regenAccumulator;
 
-	// Player melee: swing at hostile monsters in a frontal arc within reach.
+	// Player melee: swing at hostile monsters in a frontal arc within reach. The
+	// clicked/focused target is always included (even slightly off-arc) so a click
+	// reliably hits what you aimed at.
 	private void PerformMeleeAttack()
 	{
 		if (_meleeCooldownRemaining > 0.0f || CurrentHealth <= 0)
@@ -21,6 +31,7 @@ public partial class PlayerController
 		}
 
 		_meleeCooldownRemaining = AttackCooldown;
+		PlayPlayerAttackAnimation();
 
 		Vector3 origin = GlobalPosition;
 		Vector3 forward = -GlobalTransform.Basis.Z;
@@ -28,8 +39,9 @@ public partial class PlayerController
 		forward = forward.LengthSquared() < 0.0001f ? Vector3.Forward : forward.Normalized();
 
 		float reach = AttackRange + 0.8f;
-		SpawnMeleeSwingEffect(origin + forward * (reach * 0.5f) + Vector3.Up);
 
+		bool hitAny = false;
+		SimpleActor? focused = FocusedTarget;
 		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
 		{
 			if (node is not SimpleActor monster || !IsInstanceValid(monster) || !monster.IsHostileToPlayer)
@@ -45,8 +57,9 @@ public partial class PlayerController
 				continue;
 			}
 
-			// Frontal arc (~110°): don't hit things behind you.
-			if (distance > 0.15f && forward.Dot(toMonster / distance) < 0.34f)
+			// Frontal arc (~110°) for cleave, but the focused target always connects.
+			bool inArc = distance <= 0.15f || forward.Dot(toMonster / distance) >= 0.34f;
+			if (!inArc && monster != focused)
 			{
 				continue;
 			}
@@ -54,8 +67,67 @@ public partial class PlayerController
 			// null attacker: for a client this forwards the hit to the host, which
 			// owns the monster's HP (same path companions/net use).
 			monster.ReceiveDamage(Attack, null);
+			SpawnImpactEffect(monster.GlobalPosition + Vector3.Up * 0.9f);
+			hitAny = true;
+		}
+
+		if (hitAny)
+		{
 			MarkRecentCombat();
 		}
+	}
+
+	// Click-to-attack pathing: when a monster is focused and out of melee range,
+	// report the planar direction to walk toward it. Returns false once in range
+	// (auto-attack takes over) or when there's no valid focused target.
+	private bool TryGetAutoApproachDirection(out Vector3 direction)
+	{
+		direction = Vector3.Zero;
+		if (_isDead)
+		{
+			return false;
+		}
+
+		SimpleActor? focused = FocusedTarget;
+		if (focused == null || !IsInstanceValid(focused) || focused.IsDefeated)
+		{
+			return false;
+		}
+
+		Vector3 toTarget = focused.GlobalPosition - GlobalPosition;
+		toTarget.Y = 0.0f;
+		if (toTarget.Length() <= (AttackRange + 0.8f) * 0.9f)
+		{
+			return false; // already in range
+		}
+
+		direction = toTarget.Normalized();
+		return true;
+	}
+
+	// Auto-attack: once you've clicked (focused) a monster, keep swinging at it on
+	// cooldown while it stays in reach — no need to keep clicking.
+	private void UpdateAutoAttack(float step)
+	{
+		if (_meleeCooldownRemaining > 0.0f || CurrentHealth <= 0)
+		{
+			return;
+		}
+
+		SimpleActor? focused = FocusedTarget;
+		if (focused == null || !IsInstanceValid(focused) || focused.IsDefeated)
+		{
+			return;
+		}
+
+		Vector3 toTarget = focused.GlobalPosition - GlobalPosition;
+		toTarget.Y = 0.0f;
+		if (toTarget.Length() > AttackRange + 0.8f)
+		{
+			return; // move closer to keep auto-attacking
+		}
+
+		PerformMeleeAttack();
 	}
 
 	private void UpdateMeleeCooldown(float step)
@@ -88,40 +160,47 @@ public partial class PlayerController
 		}
 	}
 
-	private void SpawnMeleeSwingEffect(Vector3 center)
+	// A short impact burst where a melee hit lands: a bright spark that pops and
+	// fades on the struck monster (replaces the old swing halo).
+	private void SpawnImpactEffect(Vector3 point)
 	{
 		var material = new StandardMaterial3D
 		{
-			AlbedoColor = new Color(0.9f, 0.96f, 1.0f, 0.5f),
-			Emission = new Color(0.7f, 0.86f, 1.0f),
+			AlbedoColor = new Color(1.0f, 0.86f, 0.5f, 0.95f),
+			Emission = new Color(1.0f, 0.7f, 0.32f),
 			EmissionEnabled = true,
-			EmissionEnergyMultiplier = 2.4f,
+			EmissionEnergyMultiplier = 3.4f,
 			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
 			BlendMode = BaseMaterial3D.BlendModeEnum.Add,
 			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
 			CullMode = BaseMaterial3D.CullModeEnum.Disabled,
 		};
 
-		var slash = new MeshInstance3D
+		var burst = new MeshInstance3D
 		{
-			Name = "MeleeSwing",
-			Mesh = new TorusMesh { InnerRadius = AttackRange * 0.45f, OuterRadius = AttackRange * 0.7f, RingSegments = 6, Rings = 18 },
+			Name = "MeleeImpact",
+			Mesh = new SphereMesh { Radius = 0.32f, Height = 0.64f, RadialSegments = 12, Rings = 6 },
 			MaterialOverride = material,
-			RotationDegrees = new Vector3(90.0f, 0.0f, 0.0f),
+			Scale = Vector3.One * 0.35f,
 		};
 
 		Node parent = GetTree().CurrentScene ?? GetParent();
-		parent.AddChild(slash);
-		slash.GlobalPosition = center;
+		parent.AddChild(burst);
+		burst.GlobalPosition = point;
 
-		SceneTreeTimer timer = GetTree().CreateTimer(0.16);
-		timer.Timeout += () =>
+		// Pop outward while fading, then free.
+		Tween tween = burst.CreateTween();
+		tween.SetParallel(true);
+		tween.TweenProperty(burst, "scale", Vector3.One * 1.45f, 0.18);
+		tween.TweenProperty(material, "albedo_color", new Color(1.0f, 0.7f, 0.32f, 0.0f), 0.18);
+		tween.SetParallel(false);
+		tween.TweenCallback(Callable.From(() =>
 		{
-			if (IsInstanceValid(slash))
+			if (IsInstanceValid(burst))
 			{
-				slash.QueueFree();
+				burst.QueueFree();
 			}
-		};
+		}));
 	}
 
 	private void CreateCaptureRhythmPanel()
@@ -498,13 +577,129 @@ public partial class PlayerController
 		_partyPanel.RefreshParty();
 	}
 
-	// Real death (no more invincible knockdown-in-place): the player is sent back
-	// to the city and revived there. Losing your spot is the cost of dying.
+	// Real death (no more invincible knockdown): the player is downed on the spot
+	// and their deployed pets stand guard and grieve (invincible, can't fight). The
+	// player stays down — with a "you died / return?" prompt — until THEY choose to
+	// return to the city. No auto-respawn.
 	private void HandlePlayerDeath()
 	{
+		if (_isDead)
+		{
+			return;
+		}
+
+		_isDead = true;
+		CurrentHealth = 0;
+		Velocity = Vector3.Zero;
 		PostSystemMessage(LocaleText.T("system.player.defeated"), new Color(1.0f, 0.42f, 0.36f));
+
+		foreach (SimpleActor actor in _activeParty)
+		{
+			if (IsInstanceValid(actor))
+			{
+				actor.EnterMourning();
+			}
+		}
+
+		ShowDeathPrompt();
+	}
+
+	private void ShowDeathPrompt()
+	{
+		EnsureDeathPrompt();
+		if (_deathPromptLayer != null)
+		{
+			_deathPromptLayer.Visible = true;
+		}
+		Input.MouseMode = Input.MouseModeEnum.Visible;
+	}
+
+	private void EnsureDeathPrompt()
+	{
+		if (_deathPromptLayer != null && IsInstanceValid(_deathPromptLayer))
+		{
+			return;
+		}
+
+		_deathPromptLayer = new CanvasLayer { Name = "DeathPromptLayer", Layer = 95 };
+		AddChild(_deathPromptLayer);
+
+		var center = new CenterContainer { AnchorRight = 1.0f, AnchorBottom = 1.0f };
+		_deathPromptLayer.AddChild(center);
+
+		var panel = new PanelContainer();
+		var style = new StyleBoxFlat
+		{
+			BgColor = new Color(0.06f, 0.02f, 0.03f, 0.94f),
+			BorderColor = new Color(0.85f, 0.28f, 0.26f, 0.95f),
+		};
+		style.SetBorderWidthAll(2);
+		style.SetCornerRadiusAll(8);
+		style.SetContentMarginAll(26.0f);
+		panel.AddThemeStyleboxOverride("panel", style);
+		center.AddChild(panel);
+
+		var vbox = new VBoxContainer();
+		vbox.AddThemeConstantOverride("separation", 16);
+		panel.AddChild(vbox);
+
+		var title = new Label
+		{
+			Text = LocaleText.T("system.player.defeated"),
+			HorizontalAlignment = HorizontalAlignment.Center,
+		};
+		title.AddThemeFontSizeOverride("font_size", 26);
+		title.AddThemeColorOverride("font_color", new Color(1.0f, 0.5f, 0.44f));
+		vbox.AddChild(title);
+
+		var prompt = new Label
+		{
+			Text = LocaleText.T("system.player.death_prompt"),
+			HorizontalAlignment = HorizontalAlignment.Center,
+		};
+		prompt.AddThemeFontSizeOverride("font_size", 16);
+		prompt.AddThemeColorOverride("font_color", new Color(0.92f, 0.9f, 0.9f));
+		vbox.AddChild(prompt);
+
+		var returnButton = new Button
+		{
+			Text = LocaleText.T("button.return_town"),
+			CustomMinimumSize = new Vector2(220.0f, 44.0f),
+			SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter,
+		};
+		returnButton.AddThemeFontSizeOverride("font_size", 18);
+		returnButton.Pressed += ConfirmReturnToTown;
+		vbox.AddChild(returnButton);
+	}
+
+	// The player chose to return: revive, send them to the city, and let the pets
+	// stop grieving and rejoin.
+	private void ConfirmReturnToTown()
+	{
+		if (!_isDead)
+		{
+			return;
+		}
+
+		_isDead = false;
+		if (_deathPromptLayer != null && IsInstanceValid(_deathPromptLayer))
+		{
+			_deathPromptLayer.Visible = false;
+		}
+		Input.MouseMode = Input.MouseModeEnum.Captured;
+
 		CurrentHealth = MaxHealth;
 		_lastCombatMsec = 0;
+
+		foreach (SimpleActor actor in _activeParty)
+		{
+			if (IsInstanceValid(actor))
+			{
+				actor.ExitMourning();
+			}
+		}
+
+		PostSystemMessage(LocaleText.T("system.player.revived"), new Color(0.7f, 1.0f, 0.8f));
 		if (GetParent() is World world && world.ActiveMapId != "city")
 		{
 			world.RequestMapTravel("city");

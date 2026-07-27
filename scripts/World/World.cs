@@ -1654,9 +1654,12 @@ public partial class World : Node3D
 		// they receive host-authoritative puppets instead (World.Network.cs).
 		if (!IsNetworkClientWorld)
 		{
+			// Wild population scales with map area: (length × width) / 800. A 150×150
+			// map yields 150*150/800 = 28 monsters.
+			int wildMonsterTarget = Mathf.Max(Mathf.FloorToInt(MapSize * MapSize / 800.0f), 8);
 			foreach (WildMapDefinition wildMap in WildMaps)
 			{
-				_wildMonsterTargetCountsById[wildMap.Id] = Mathf.Max(ActorCount / WildMaps.Length, 8);
+				_wildMonsterTargetCountsById[wildMap.Id] = wildMonsterTarget;
 				EnsureWildInstancePopulated(wildMap.Id, GetSelectedTier(wildMap.Id), LocalGroupId());
 			}
 		}
@@ -2290,6 +2293,12 @@ public partial class World : Node3D
 		int experience = isMonster ? Mathf.RoundToInt((level * 9 + _rng.RandiRange(3, 12)) * rewardMultiplier) : level * 4 + _rng.RandiRange(1, 5);
 		int gold = isMonster ? Mathf.RoundToInt((level * 3 + _rng.RandiRange(0, 8)) * rewardMultiplier) : level + _rng.RandiRange(0, 4);
 		actor.WorldTier = tier;
+		// Tier 1 is the newbie band: "幼年" monsters are passive and only fight back
+		// when attacked, so new players can explore the starter zone safely.
+		if (isMonster)
+		{
+			actor.SetPassive(tier <= WorldTierCatalog.MinTier);
+		}
 		string[] namePool = isMonster ? MonsterSpeciesCatalog.Current.GetNamePool(actor.MapId) : NpcNames;
 		string displayName = string.IsNullOrWhiteSpace(forcedDisplayName)
 			? namePool[_rng.RandiRange(0, namePool.Length - 1)]
@@ -3301,6 +3310,13 @@ public partial class World : Node3D
 					&& actor.GroupId == groupId
 					&& !actor.IsCaptured)
 				{
+					// Tell clients to drop their puppet for this monster too, so a player
+					// who left the group doesn't keep a stale (hidden) copy around.
+					if (NetworkManager.Instance is { IsHost: true } net && actor.NetworkMonsterId >= 0)
+					{
+						net.BroadcastMonsterRemoved(actor.NetworkMonsterId, false);
+						_netMonstersById.Remove(actor.NetworkMonsterId);
+					}
 					actor.QueueFree();
 				}
 			}

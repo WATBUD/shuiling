@@ -29,11 +29,12 @@ public static class WorldTierCatalog
 		return Mathf.Clamp(tier, MinTier, MaxTier);
 	}
 
-	// Monster level band per tier: T1 = 2-10, each tier shifts the band up by 8.
+	// Monster level band per tier: a clean 10 levels each — T1 = 1-10, T2 = 11-20,
+	// … T10 = 91-100.
 	public static (int Min, int Max) GetMonsterLevelRange(int tier)
 	{
 		tier = ClampTier(tier);
-		return (2 + (tier - 1) * 8, 10 + (tier - 1) * 8);
+		return (1 + (tier - 1) * 10, tier * 10);
 	}
 
 	// Tier unlock is progression-only (defeat the previous tier's boss); there is
@@ -56,7 +57,8 @@ public static class WorldTierCatalog
 	// level-derived) plus a steeper stat multiplier than regular monsters.
 	public static int GetBossLevelBonus(int tier)
 	{
-		return (ClampTier(tier) - 1) * 8;
+		// +10 per tier so a tier's boss sits at the top of its 10-level band.
+		return (ClampTier(tier) - 1) * 10;
 	}
 
 	public static float GetBossStatMultiplier(int tier)

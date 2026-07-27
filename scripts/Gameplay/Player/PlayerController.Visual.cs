@@ -65,6 +65,15 @@ public partial class PlayerController
 
 		if (_playerExternalModel != null)
 		{
+			// Hold the swing animation for its short lock window before returning to
+			// locomotion, so melee attacks read as a real attack action.
+			if (_playerAttackAnimRemaining > 0.0f)
+			{
+				_playerAttackAnimRemaining -= step;
+				StabilizePlayerExternalModel();
+				return;
+			}
+
 			string state = !isMoving ? "idle" : moveRatio > 0.72f ? "run" : "walk";
 			SetPlayerExternalAnimationState(state);
 			StabilizePlayerExternalModel();
@@ -131,6 +140,21 @@ public partial class PlayerController
 		_playerExternalAnimationState = state;
 		ExternalModelLibrary.TryPlayActorAnimation(_playerExternalModel, state);
 		StabilizePlayerExternalModel();
+	}
+
+	// Play the character's melee swing animation and hold it briefly. Called on
+	// every melee swing (external-model characters only; the procedural fallback
+	// has no attack clip).
+	private void PlayPlayerAttackAnimation()
+	{
+		if (_playerExternalModel == null)
+		{
+			return;
+		}
+
+		_playerExternalAnimationState = string.Empty; // force a replay each swing
+		SetPlayerExternalAnimationState("attack");
+		_playerAttackAnimRemaining = PlayerAttackAnimationSeconds;
 	}
 
 	private void StabilizePlayerExternalModel()

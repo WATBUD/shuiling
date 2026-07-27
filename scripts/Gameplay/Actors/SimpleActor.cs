@@ -292,6 +292,19 @@ public partial class SimpleActor : CharacterBody3D
 	private MeshInstance3D? _captureShield;
 	public bool IsCaptureProtected => _captureLocked || _captureProtectionRemaining > 0.0f;
 
+	// Mourning: when the owner player dies, their deployed companions stand on the
+	// field crying, invincible and unable to fight, until the player returns.
+	private bool _isMourning;
+	private Label3D? _mournBubble;
+	public bool IsMourning => _isMourning;
+
+	// Passive (被動反擊): tier-1 "幼年" newbie-zone monsters never aggro on their own.
+	// They wander until attacked, then fight back for a short provoked window.
+	private bool _isPassive;
+	private float _provokeRemaining;
+	private const float PassiveProvokeSeconds = 8.0f;
+	public void SetPassive(bool passive) => _isPassive = passive;
+
 	public bool CanBeCaptured => ActorKind == "monster" && !IsBoss && !_isCaptured && !_isDefeated && !_isNetworkPuppet;
 	public bool IsNetworkPuppet => _isNetworkPuppet;
 
@@ -425,6 +438,67 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			_captureShield.Visible = false;
 		}
+	}
+
+	// Owner died: enter an invincible grieving state (no combat, can't be hit) and
+	// float a crying bubble above the companion until the owner returns.
+	public void EnterMourning()
+	{
+		if (!_isCaptured)
+		{
+			return;
+		}
+
+		_isMourning = true;
+		_combatTarget = null;
+		_retaliationTarget = null;
+		_retaliationTargetRemaining = 0.0f;
+		Velocity = Vector3.Zero;
+		CollisionLayer = 0;
+		CollisionMask = 0;
+		ShowMournBubble();
+	}
+
+	public void ExitMourning()
+	{
+		if (!_isMourning)
+		{
+			return;
+		}
+
+		_isMourning = false;
+		if (_mournBubble != null && IsInstanceValid(_mournBubble))
+		{
+			_mournBubble.Visible = false;
+		}
+
+		if (_isInActiveParty && !_isDefeated)
+		{
+			CollisionLayer = _defaultCollisionLayer;
+			CollisionMask = _defaultCollisionMask;
+		}
+	}
+
+	private void ShowMournBubble()
+	{
+		if (_mournBubble == null || !IsInstanceValid(_mournBubble))
+		{
+			_mournBubble = new Label3D
+			{
+				Name = "MournBubble",
+				Position = new Vector3(0.4f, 2.1f, 0.0f),
+				Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+				FontSize = 40,
+				OutlineSize = 10,
+				Modulate = new Color(0.72f, 0.86f, 1.0f),
+				NoDepthTest = true,
+			};
+			AddChild(_mournBubble);
+		}
+
+		string[] keys = { "system.mourn.1", "system.mourn.2", "system.mourn.3" };
+		_mournBubble.Text = LocaleText.T(keys[(int)(GD.Randi() % (uint)keys.Length)]);
+		_mournBubble.Visible = true;
 	}
 
 	// Overhead nameplate (Lv + name) font multiplier — 3x by default, adjustable
@@ -703,6 +777,7 @@ public partial class SimpleActor : CharacterBody3D
 		_retaliationTargetRemaining = Mathf.Max(_retaliationTargetRemaining - step, 0.0f);
 		_specialControlCooldownRemaining = Mathf.Max(_specialControlCooldownRemaining - step, 0.0f);
 		_combatTargetSearchRemaining = Mathf.Max(_combatTargetSearchRemaining - step, 0.0f);
+		_provokeRemaining = Mathf.Max(_provokeRemaining - step, 0.0f);
 		Vector3 velocity = Velocity;
 
 		if (_isDefeated)
@@ -735,6 +810,14 @@ public partial class SimpleActor : CharacterBody3D
 
 		if (_isCaptured)
 		{
+			if (_isMourning)
+			{
+				// Grieving in place — no following, no combat.
+				Velocity = SlowToStop(velocity, step);
+				MoveAndSlideWithEffects(step);
+				return;
+			}
+
 			FollowCapturedTarget(velocity, step);
 			return;
 		}
@@ -754,7 +837,9 @@ public partial class SimpleActor : CharacterBody3D
 					return;
 				}
 			}
-			else
+			// Passive newbie-zone monsters don't seek the player out; they only fight
+			// back for a short window after being attacked (被動反擊).
+			else if (!_isPassive || _provokeRemaining > 0.0f)
 			{
 				// Target the nearest player sharing this monster's instance: the local
 				// player (when the host/single-player stands in it) and, on the host,
@@ -1730,7 +1815,7 @@ public partial class SimpleActor : CharacterBody3D
 
 	public int ReceiveDamage(int rawDamage, SimpleActor? attacker)
 	{
-		if (_isDefeated)
+		if (_isDefeated || _isMourning)
 		{
 			return 0;
 		}
@@ -1755,6 +1840,11 @@ public partial class SimpleActor : CharacterBody3D
 			SpawnCombatEffect(string.Empty, new Color(0.35f, 0.78f, 1.0f, 0.78f), GlobalPosition + new Vector3(0.0f, 1.0f, 0.0f), 0.28f, 0.82f);
 		}
 		RememberAttacker(attacker);
+		// Attacking a passive newbie monster provokes it into fighting back.
+		if (_isPassive)
+		{
+			_provokeRemaining = PassiveProvokeSeconds;
+		}
 		CurrentHealth = Mathf.Max(CurrentHealth - mitigatedDamage, 0);
 		// A capture in progress keeps the target alive (min 1 HP) so it can't die
 		// mid-capture. Damage still lands and still builds the stagger meter.
