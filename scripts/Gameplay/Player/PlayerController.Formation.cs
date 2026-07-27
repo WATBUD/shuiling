@@ -197,12 +197,12 @@ public partial class PlayerController
 	}
 
 	// 陣盤加成只看「身分」不看「站位」：定位（前/後排）只是提示，不再給任何數值。
-	// 種族羈絆：同種族 3 隻 → 該種族全體 +10% 攻擊與防禦。
+	// 種族羈絆：同種族每 1 隻 +1%，2 隻才開始算（2 隻=2%、3 隻=3%…），攻擊與防禦皆吃。
 	// 屬性共鳴：同屬性 3 隻 → 該屬性全體 +10% 攻擊（不加防禦）。
 	// 統計對象僅限實際擺放在陣盤格子上的寵物。
-	private const int FormationTraitThreshold = 3;
-	private const float FormationRaceAttackBonus = 1.10f;
-	private const float FormationRaceDefenseBonus = 1.10f;
+	private const int FormationRaceMinCount = 2;
+	private const float FormationRacePerMember = 0.01f;
+	private const int FormationElementThreshold = 3;
 	private const float FormationElementAttackBonus = 1.10f;
 
 	public void RecalculateFormationBonuses()
@@ -237,14 +237,21 @@ public partial class PlayerController
 
 			string raceId = BuildCatalog.GetRaceId(actor);
 			string elementId = BuildCatalog.GetElementId(actor);
-			bool raceBonusActive = raceCounts.GetValueOrDefault(raceId) >= FormationTraitThreshold;
-			bool elementBonusActive = elementId != "physical" && elementCounts.GetValueOrDefault(elementId) >= FormationTraitThreshold;
+			int raceCount = raceCounts.GetValueOrDefault(raceId);
+			bool raceBonusActive = raceCount >= FormationRaceMinCount;
+			bool elementBonusActive = elementId != "physical" && elementCounts.GetValueOrDefault(elementId) >= FormationElementThreshold;
 
-			float attackMultiplier = (raceBonusActive ? FormationRaceAttackBonus : 1.0f) * (elementBonusActive ? FormationElementAttackBonus : 1.0f);
-			float defenseMultiplier = raceBonusActive ? FormationRaceDefenseBonus : 1.0f;
+			// 種族羈絆倍率：2 隻=+2%、3 隻=+3%…（每隻 +1%），攻防同吃。
+			float raceMultiplier = raceBonusActive ? 1.0f + raceCount * FormationRacePerMember : 1.0f;
+			float attackMultiplier = raceMultiplier * (elementBonusActive ? FormationElementAttackBonus : 1.0f);
+			float defenseMultiplier = raceMultiplier;
 
 			var bonuses = new List<string>();
-			if (raceBonusActive) bonuses.Add(LocaleText.F("formation.bonus.race", LocaleText.T(BuildCatalog.GetRaceNameKey(raceId))));
+			if (raceBonusActive)
+			{
+				int racePercent = Mathf.RoundToInt(raceCount * FormationRacePerMember * 100.0f);
+				bonuses.Add(LocaleText.F("formation.bonus.race", LocaleText.T(BuildCatalog.GetRaceNameKey(raceId)), racePercent));
+			}
 			if (elementBonusActive) bonuses.Add(LocaleText.F("formation.bonus.element", LocaleText.T($"element.{elementId}")));
 
 			// 定位不再影響冷卻／受傷／射程，維持中性值。

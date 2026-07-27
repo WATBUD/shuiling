@@ -823,7 +823,7 @@
 	"formation.bonus.support": "Support link (faster actions)",
 	"formation.bonus.frontline": "Tank frontline (+DEF aura)",
 	"formation.bonus.backline": "Ranged backline (+range aura)",
-	"formation.bonus.race": "Race bond · {0} (+10% ATK/DEF)",
+	"formation.bonus.race": "Race bond · {0} (+{1}% ATK/DEF)",
 	"formation.bonus.element": "Element resonance · {0} (+10% ATK)",
 	"mail.title": "Mailbox",
 	"mail.hint": "Read received letters and gifts, and claim attached items.",
