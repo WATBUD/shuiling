@@ -158,6 +158,7 @@ public partial class PlayerController : CharacterBody3D
 	private MerchantShopPanel _merchantShopPanel = null!;
 	private MercenaryShopPanel _mercenaryShopPanel = null!;
 	private RefinementPanel _refinementPanel = null!;
+	private QuestLogPanel _questLogPanel = null!;
 	private WarehousePanel _warehousePanel = null!;
 	private MailboxPanel _mailboxPanel = null!;
 	private ComposePanel _composePanel = null!;
@@ -280,6 +281,7 @@ public partial class PlayerController : CharacterBody3D
 		CreateMerchantShopPanel();
 		CreateMercenaryShopPanel();
 		CreateRefinementPanel();
+		CreateQuestLogPanel();
 		CreateWarehousePanel();
 		CreateMailboxPanel();
 		CreateComposePanel();
@@ -390,6 +392,10 @@ public partial class PlayerController : CharacterBody3D
 			{
 				SetFormationPanelVisible(false);
 			}
+			else if (_questLogPanel.Visible)
+			{
+				SetQuestLogPanelVisible(false);
+			}
 			else if (_merchantShopPanel.Visible)
 			{
 				SetMerchantShopPanelVisible(false);
@@ -456,7 +462,13 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
-		if (_inventoryPanel.Visible || _formationPanel.Visible)
+		if (@event.IsActionPressed("quest_panel"))
+		{
+			SetQuestLogPanelVisible(!_questLogPanel.Visible);
+			return;
+		}
+
+		if (_inventoryPanel.Visible || _formationPanel.Visible || _questLogPanel.Visible)
 		{
 			return;
 		}
@@ -688,6 +700,7 @@ public partial class PlayerController : CharacterBody3D
 		AddKeyAction("companion_party_panel", Key.U);
 		AddKeyAction("inventory_panel", Key.I);
 		AddKeyAction("formation_panel", Key.F);
+		AddKeyAction("quest_panel", Key.Q);
 		AddKeyAction("town_portal", Key.T);
 		AddKeyAction("ui_cancel", Key.Escape);
 	}

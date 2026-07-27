@@ -252,6 +252,7 @@ public partial class PlayerController
 			SetPauseMenuVisible(false, false);
 			_settingsPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
+			_questLogPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
 			_merchantShopPanel.SetPanelVisible(false);
 			_mercenaryShopPanel.SetPanelVisible(false);
@@ -291,6 +292,7 @@ public partial class PlayerController
 			_partyPanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
+			_questLogPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
 			_merchantShopPanel.SetPanelVisible(false);
 			_mercenaryShopPanel.SetPanelVisible(false);
@@ -329,6 +331,7 @@ public partial class PlayerController
 			SetPauseMenuVisible(false, false);
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
+			_questLogPanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
 			_merchantShopPanel.SetPanelVisible(false);
 			_mercenaryShopPanel.SetPanelVisible(false);
@@ -348,6 +351,7 @@ public partial class PlayerController
 			SetPauseMenuVisible(false, false);
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
+			_questLogPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
 			_merchantShopPanel.SetPanelVisible(false);
 			_mercenaryShopPanel.SetPanelVisible(false);
@@ -367,6 +371,7 @@ public partial class PlayerController
 			SetPauseMenuVisible(false, false);
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
+			_questLogPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
 			_mercenaryShopPanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
@@ -386,6 +391,7 @@ public partial class PlayerController
 			SetPauseMenuVisible(false, false);
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
+			_questLogPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
 			_merchantShopPanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
@@ -406,6 +412,7 @@ public partial class PlayerController
 			SetPauseMenuVisible(false, false);
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
+			_questLogPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
 			_merchantShopPanel.SetPanelVisible(false);
 			_mercenaryShopPanel.SetPanelVisible(false);
@@ -426,6 +433,7 @@ public partial class PlayerController
 			SetPauseMenuVisible(false, false);
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
+			_questLogPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
 			_merchantShopPanel.SetPanelVisible(false);
 			_mercenaryShopPanel.SetPanelVisible(false);
@@ -445,6 +453,7 @@ public partial class PlayerController
 			SetPauseMenuVisible(false, false);
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
+			_questLogPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
 			_merchantShopPanel.SetPanelVisible(false);
 			_mercenaryShopPanel.SetPanelVisible(false);
@@ -466,6 +475,7 @@ public partial class PlayerController
 			SetPauseMenuVisible(false, false);
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
+			_questLogPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
 			_merchantShopPanel.SetPanelVisible(false);
 			_mercenaryShopPanel.SetPanelVisible(false);
@@ -491,6 +501,7 @@ public partial class PlayerController
 			SetPauseMenuVisible(false, false);
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
+			_questLogPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
 			_merchantShopPanel.SetPanelVisible(false);
 			_mercenaryShopPanel.SetPanelVisible(false);
@@ -512,6 +523,7 @@ public partial class PlayerController
 		{
 			_partyPanel.SetPanelVisible(false);
 			_inventoryPanel.SetPanelVisible(false);
+			_questLogPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
 			_merchantShopPanel.SetPanelVisible(false);
 			_mercenaryShopPanel.SetPanelVisible(false);
