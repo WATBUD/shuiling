@@ -5,4 +5,10 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <!-- 更新器是獨立的 .NET 專案（launcher/），不要編進遊戲組件，
+       否則它的 Program.Main 會與遊戲衝突（多個進入點）。 -->
+  <ItemGroup>
+    <Compile Remove="launcher/**/*.cs" />
+  </ItemGroup>
 </Project>
