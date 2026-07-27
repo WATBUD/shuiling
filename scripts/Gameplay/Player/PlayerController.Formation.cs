@@ -20,19 +20,6 @@ public partial class PlayerController
 	private readonly Dictionary<int, SimpleActor> _formationActorsBySlot = new();
 	private readonly Dictionary<SimpleActor, int> _formationSlotsByActor = new();
 
-	// 定位跟著「格子」而不是寵物：把寵物放進哪一格，牠就採用那一格的定位。
-	// 依離敵人的遠近分層——前排(上方兩排)當坦克，中排輸出，後排(下方兩排)遠程。
-	private static string GetFormationSlotRole(int slotIndex)
-	{
-		int row = slotIndex / FormationGridSideLength;
-		if (row <= 1)
-		{
-			return "Tank";
-		}
-
-		return row == 2 ? "DPS" : "Ranged";
-	}
-
 	public int FormationGridSide => FormationGridSideLength;
 	public int FormationPlayerSlotIndex => FormationCenterSlotIndex;
 	public int FormationAssignedCount => _formationSlotsByActor.Count;
@@ -207,9 +194,6 @@ public partial class PlayerController
 
 		_formationActorsBySlot[slotIndex] = actor;
 		_formationSlotsByActor[actor] = slotIndex;
-
-		// 定位跟著格子走：進入這一格就套用該格的定位（僅作行為與提示用，不給數值加成）。
-		actor.CombatRole = GetFormationSlotRole(slotIndex);
 	}
 
 	// 陣盤加成只看「身分」不看「站位」：定位（前/後排）只是提示，不再給任何數值。

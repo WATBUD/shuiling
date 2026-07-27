@@ -357,12 +357,8 @@ public partial class FormationPanel : PanelContainer
 			return;
 		}
 
-		_selectedLabel.Visible = true;
-		_selectedLabel.Text = LocaleText.F("formation.selected_actor", actor.LocalizedDisplayName, actor.CombatRoleName, actor.EffectiveAttack, actor.EffectiveDefense);
-		if (!string.IsNullOrEmpty(actor.FormationBonusSummary))
-		{
-			_selectedLabel.Text += $"\n{LocaleText.F("formation.bonus.active", actor.FormationBonusSummary)}";
-		}
+		// 選取寵物的資料與綜效已在資訊卡（與珠子懸浮提示）呈現，面板底部不再重複顯示。
+		_selectedLabel.Visible = false;
 	}
 
 	private void RefreshRoster()
@@ -445,13 +441,34 @@ public partial class FormationPanel : PanelContainer
 
 	private static string BuildOrbTooltipBody(SimpleActor actor)
 	{
-		return string.Join("\n", new[]
+		BuildStats stats = actor.CurrentBuildStats;
+		string race = LocaleText.T(BuildCatalog.GetRaceNameKey(BuildCatalog.GetRaceId(actor)));
+		float attackSpeed = 1.0f / Mathf.Max(actor.EffectiveAttackCooldown, 0.01f);
+		var lines = new List<string>
 		{
-			$"{LocaleText.T("actor.level_prefix")}{actor.Level} / {actor.CombatRoleName}",
+			$"{LocaleText.T("actor.level_prefix")}{actor.Level} / {race} / {actor.BuildElementName}",
 			LocaleText.F("stat.health_value", actor.CurrentHealth, actor.EffectiveMaxHealth),
 			$"{LocaleText.T("stat.attack")} {actor.EffectiveAttack}",
 			$"{LocaleText.T("stat.defense")} {actor.EffectiveDefense}",
-		});
+			$"{LocaleText.T("stat.move_speed")} {actor.EffectiveMoveSpeed:0.0}",
+			LocaleText.F("stat.attack_speed_value", attackSpeed.ToString("0.00")),
+			$"{LocaleText.T("tooltip.attack_range")} {actor.EffectiveAttackRange:0.0}",
+			$"{LocaleText.T("tooltip.crit_chance")} {stats.CritChance * 100.0f:0.#}%",
+			$"{LocaleText.T("stat.affinity")} {actor.Affinity} / 100",
+		};
+
+		string traits = actor.TraitSummary;
+		if (!string.IsNullOrEmpty(traits))
+		{
+			lines.Add($"{LocaleText.T("build.traits")}: {traits}");
+		}
+
+		if (!string.IsNullOrEmpty(actor.FormationBonusSummary))
+		{
+			lines.Add(LocaleText.F("formation.bonus.active", actor.FormationBonusSummary));
+		}
+
+		return string.Join("\n", lines);
 	}
 
 	private void OnClosePressed()
@@ -726,11 +743,15 @@ public partial class FormationSlotButton : Button
 
 	// 每個種族一張可愛的小圓臉圖示（同種族共用）。舊的「大眼＋嘴巴」臉已移除，
 	// 改成柔和的球身＋種族專屬配件（耳朵／角／光點）＋一對亮亮的小眼睛。
+	// 設計座標以 64px 為基準；實際用 4 倍解析度繪製（256px），避免在陣盤上被放大後糊掉。
+	private const int OrbDesignSize = 64;
+	private const int OrbRenderScale = 4;
+
 	private static Texture2D CreateRaceOrbIcon(string raceId)
 	{
-		const int size = 64;
+		const int size = OrbDesignSize * OrbRenderScale;
 		const float center = (size - 1) * 0.5f;
-		const float radius = 27.0f;
+		const float radius = 27.0f * OrbRenderScale;
 		Image image = Image.CreateEmpty(size, size, false, Image.Format.Rgba8);
 		image.Fill(new Color(0.0f, 0.0f, 0.0f, 0.0f));
 
@@ -751,12 +772,12 @@ public partial class FormationSlotButton : Button
 
 				float t = Mathf.Clamp(distance / radius, 0.0f, 1.0f);
 				Color color = baseColor.Lerp(baseColor.Darkened(0.45f), t * 0.5f);
-				if (distance > radius - 3.5f)
+				if (distance > radius - 3.5f * OrbRenderScale)
 				{
 					color = color.Lerp(rimColor, 0.6f);
 				}
 
-				float shine = Mathf.Clamp(1.0f - new Vector2(dx + 9.0f, dy + 11.0f).Length() / 20.0f, 0.0f, 1.0f);
+				float shine = Mathf.Clamp(1.0f - new Vector2(dx + 9.0f * OrbRenderScale, dy + 11.0f * OrbRenderScale).Length() / (20.0f * OrbRenderScale), 0.0f, 1.0f);
 				color = color.Lerp(new Color(1.0f, 1.0f, 1.0f, 1.0f), shine * 0.4f);
 				image.SetPixel(x, y, color);
 			}
@@ -784,40 +805,43 @@ public partial class FormationSlotButton : Button
 	private static void DrawRaceEmblem(Image image, string raceId)
 	{
 		Color c = EmblemColor;
+		// 設計座標仍以 64px 思考，這裡統一乘上繪製倍率，讓剪影同樣是高解析度。
+		Vector2 P(float x, float y) => new Vector2(x * OrbRenderScale, y * OrbRenderScale);
+		float R(float r) => r * OrbRenderScale;
 		switch (raceId)
 		{
 			case "race.human": // 人形：頭＋肩身
-				EmblemCircle(image, new Vector2(32.0f, 20.0f), 6.5f, c);
-				EmblemTriangle(image, new Vector2(24.0f, 33.0f), new Vector2(40.0f, 33.0f), new Vector2(45.0f, 52.0f), c);
-				EmblemTriangle(image, new Vector2(24.0f, 33.0f), new Vector2(45.0f, 52.0f), new Vector2(19.0f, 52.0f), c);
+				EmblemCircle(image, P(32.0f, 20.0f), R(6.5f), c);
+				EmblemTriangle(image, P(24.0f, 33.0f), P(40.0f, 33.0f), P(45.0f, 52.0f), c);
+				EmblemTriangle(image, P(24.0f, 33.0f), P(45.0f, 52.0f), P(19.0f, 52.0f), c);
 				break;
 			case "race.beast": // 野獸腳印：大肉墊＋四趾
-				EmblemCircle(image, new Vector2(32.0f, 41.0f), 9.0f, c);
-				EmblemCircle(image, new Vector2(21.0f, 31.0f), 4.0f, c);
-				EmblemCircle(image, new Vector2(28.5f, 25.0f), 4.2f, c);
-				EmblemCircle(image, new Vector2(35.5f, 25.0f), 4.2f, c);
-				EmblemCircle(image, new Vector2(43.0f, 31.0f), 4.0f, c);
+				EmblemCircle(image, P(32.0f, 41.0f), R(9.0f), c);
+				EmblemCircle(image, P(21.0f, 31.0f), R(4.0f), c);
+				EmblemCircle(image, P(28.5f, 25.0f), R(4.2f), c);
+				EmblemCircle(image, P(35.5f, 25.0f), R(4.2f), c);
+				EmblemCircle(image, P(43.0f, 31.0f), R(4.0f), c);
 				break;
 			case "race.dragon": // 飛龍：雙翼＋帶角的小頭
-				EmblemTriangle(image, new Vector2(26.0f, 32.0f), new Vector2(8.0f, 26.0f), new Vector2(17.0f, 43.0f), c);
-				EmblemTriangle(image, new Vector2(38.0f, 32.0f), new Vector2(56.0f, 26.0f), new Vector2(47.0f, 43.0f), c);
-				EmblemCircle(image, new Vector2(32.0f, 35.0f), 6.0f, c);
-				EmblemCircle(image, new Vector2(32.0f, 24.0f), 4.5f, c);
-				EmblemTriangle(image, new Vector2(29.0f, 21.0f), new Vector2(27.0f, 12.0f), new Vector2(33.0f, 19.0f), c);
-				EmblemTriangle(image, new Vector2(35.0f, 21.0f), new Vector2(37.0f, 12.0f), new Vector2(31.0f, 19.0f), c);
+				EmblemTriangle(image, P(26.0f, 32.0f), P(8.0f, 26.0f), P(17.0f, 43.0f), c);
+				EmblemTriangle(image, P(38.0f, 32.0f), P(56.0f, 26.0f), P(47.0f, 43.0f), c);
+				EmblemCircle(image, P(32.0f, 35.0f), R(6.0f), c);
+				EmblemCircle(image, P(32.0f, 24.0f), R(4.5f), c);
+				EmblemTriangle(image, P(29.0f, 21.0f), P(27.0f, 12.0f), P(33.0f, 19.0f), c);
+				EmblemTriangle(image, P(35.0f, 21.0f), P(37.0f, 12.0f), P(31.0f, 19.0f), c);
 				break;
 			case "race.demon": // 惡魔：帶角的頭＋尖下巴
-				EmblemCircle(image, new Vector2(32.0f, 31.0f), 9.0f, c);
-				EmblemTriangle(image, new Vector2(25.0f, 24.0f), new Vector2(19.0f, 10.0f), new Vector2(30.0f, 22.0f), c);
-				EmblemTriangle(image, new Vector2(39.0f, 24.0f), new Vector2(45.0f, 10.0f), new Vector2(34.0f, 22.0f), c);
-				EmblemTriangle(image, new Vector2(27.0f, 39.0f), new Vector2(37.0f, 39.0f), new Vector2(32.0f, 51.0f), c);
+				EmblemCircle(image, P(32.0f, 31.0f), R(9.0f), c);
+				EmblemTriangle(image, P(25.0f, 24.0f), P(19.0f, 10.0f), P(30.0f, 22.0f), c);
+				EmblemTriangle(image, P(39.0f, 24.0f), P(45.0f, 10.0f), P(34.0f, 22.0f), c);
+				EmblemTriangle(image, P(27.0f, 39.0f), P(37.0f, 39.0f), P(32.0f, 51.0f), c);
 				break;
 			case "race.spirit": // 精靈：四角星光
-				EmblemTriangle(image, new Vector2(32.0f, 8.0f), new Vector2(29.0f, 32.0f), new Vector2(35.0f, 32.0f), c);
-				EmblemTriangle(image, new Vector2(32.0f, 56.0f), new Vector2(29.0f, 32.0f), new Vector2(35.0f, 32.0f), c);
-				EmblemTriangle(image, new Vector2(8.0f, 32.0f), new Vector2(32.0f, 29.0f), new Vector2(32.0f, 35.0f), c);
-				EmblemTriangle(image, new Vector2(56.0f, 32.0f), new Vector2(32.0f, 29.0f), new Vector2(32.0f, 35.0f), c);
-				EmblemCircle(image, new Vector2(32.0f, 32.0f), 5.0f, c);
+				EmblemTriangle(image, P(32.0f, 8.0f), P(29.0f, 32.0f), P(35.0f, 32.0f), c);
+				EmblemTriangle(image, P(32.0f, 56.0f), P(29.0f, 32.0f), P(35.0f, 32.0f), c);
+				EmblemTriangle(image, P(8.0f, 32.0f), P(32.0f, 29.0f), P(32.0f, 35.0f), c);
+				EmblemTriangle(image, P(56.0f, 32.0f), P(32.0f, 29.0f), P(32.0f, 35.0f), c);
+				EmblemCircle(image, P(32.0f, 32.0f), R(5.0f), c);
 				break;
 		}
 	}
