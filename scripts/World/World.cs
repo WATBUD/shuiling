@@ -1926,6 +1926,7 @@ public partial class World : Node3D
 			new("name.npc.pet_trainer", RingFrontOffset(234.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(234.0f, shopRadius)), 0.7f, "Support"),
 			new("name.npc.mercenary_broker", RingFrontOffset(126.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(126.0f, shopRadius)), 0.7f, "DPS"),
 			new("name.npc.warehouse_keeper", RingFrontOffset(0.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(0.0f, shopRadius)), 0.8f, "Support"),
+			new("name.npc.refiner", RingFrontOffset(90.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(90.0f, shopRadius)), 0.7f, "Tank"),
 		};
 
 		// Functional shop NPCs (always present).

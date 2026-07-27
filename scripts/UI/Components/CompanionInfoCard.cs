@@ -336,7 +336,7 @@ public partial class CompanionInfoCard : PanelContainer
 			string capturedSlot = slot;
 			string name = BuildCatalog.GetItemKind(id) == InventoryItemKind.AttributeGem
 				? LocaleText.T(BuildCatalog.GetAttributeGem(id).NameKey)
-				: LocaleText.T(BuildCatalog.GetEquipment(id).NameKey);
+				: LocaleText.T(BuildCatalog.GetEquipment(id).NameKey) + BuildCatalog.GetStarSuffix(id);
 			AddTerm(_equipmentFlow, name, () => (name, InventoryPanel.BuildItemTooltipBody(capturedId, capturedSlot)));
 		}
 

@@ -157,6 +157,7 @@ public partial class PlayerController : CharacterBody3D
 	private FormationPanel _formationPanel = null!;
 	private MerchantShopPanel _merchantShopPanel = null!;
 	private MercenaryShopPanel _mercenaryShopPanel = null!;
+	private RefinementPanel _refinementPanel = null!;
 	private WarehousePanel _warehousePanel = null!;
 	private MailboxPanel _mailboxPanel = null!;
 	private ComposePanel _composePanel = null!;
@@ -278,6 +279,7 @@ public partial class PlayerController : CharacterBody3D
 		CreateFormationPanel();
 		CreateMerchantShopPanel();
 		CreateMercenaryShopPanel();
+		CreateRefinementPanel();
 		CreateWarehousePanel();
 		CreateMailboxPanel();
 		CreateComposePanel();
@@ -287,7 +289,12 @@ public partial class PlayerController : CharacterBody3D
 		InitializeStarterInventory();
 		if (!GameLaunchOptions.LoadSaveOnWorldReady)
 		{
-			CallDeferred(nameof(GrantStarterBunny));
+			// 初始寵物改為開發者測試旗標控制：僅在 dev_config.cfg 的 grant_starter_pet=true 時贈送。
+			if (DevConfig.GrantStarterPet)
+			{
+				CallDeferred(nameof(GrantStarterBunny));
+			}
+
 			GrantStarterTownPortalScrolls();
 		}
 		InitializeCaptureNetAmmo();
@@ -391,6 +398,10 @@ public partial class PlayerController : CharacterBody3D
 			{
 				SetMercenaryShopPanelVisible(false);
 			}
+			else if (_refinementPanel.Visible)
+			{
+				SetRefinementPanelVisible(false);
+			}
 			else if (_warehousePanel.Visible)
 			{
 				SetWarehousePanelVisible(false);
@@ -428,7 +439,7 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
-		if (_pauseMenuPanel.Visible || _settingsPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _warehousePanel.Visible || _mailboxPanel.Visible || _composePanel.Visible || _cardAlbumPanel.Visible)
+		if (_pauseMenuPanel.Visible || _settingsPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _refinementPanel.Visible || _warehousePanel.Visible || _mailboxPanel.Visible || _composePanel.Visible || _cardAlbumPanel.Visible)
 		{
 			return;
 		}

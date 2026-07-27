@@ -18,7 +18,49 @@ public static class MonsterLootCatalog
 		new("loot.water_core", "item.loot.water_core", new Color(0.34f, 0.72f, 1.0f, 0.95f)),
 		new("loot.dragon_scale", "item.loot.dragon_scale", new Color(0.86f, 0.34f, 0.18f, 0.95f)),
 		new("loot.cracked_core", "item.loot.cracked_core", new Color(0.70f, 0.68f, 0.62f, 0.95f)),
+
+		// 強化水晶 T1~T10：所有怪物依其世界階級（WorldTier）掉落，作為精煉裝備的材料。
+		new("loot.enhance_crystal.t1", "item.loot.enhance_crystal.t1", new Color(0.70f, 0.74f, 0.80f, 0.96f)),
+		new("loot.enhance_crystal.t2", "item.loot.enhance_crystal.t2", new Color(0.56f, 0.82f, 0.72f, 0.96f)),
+		new("loot.enhance_crystal.t3", "item.loot.enhance_crystal.t3", new Color(0.42f, 0.84f, 0.58f, 0.96f)),
+		new("loot.enhance_crystal.t4", "item.loot.enhance_crystal.t4", new Color(0.50f, 0.80f, 1.00f, 0.96f)),
+		new("loot.enhance_crystal.t5", "item.loot.enhance_crystal.t5", new Color(0.36f, 0.62f, 1.00f, 0.96f)),
+		new("loot.enhance_crystal.t6", "item.loot.enhance_crystal.t6", new Color(0.62f, 0.48f, 1.00f, 0.96f)),
+		new("loot.enhance_crystal.t7", "item.loot.enhance_crystal.t7", new Color(0.82f, 0.42f, 0.98f, 0.96f)),
+		new("loot.enhance_crystal.t8", "item.loot.enhance_crystal.t8", new Color(1.00f, 0.44f, 0.72f, 0.96f)),
+		new("loot.enhance_crystal.t9", "item.loot.enhance_crystal.t9", new Color(1.00f, 0.58f, 0.30f, 0.96f)),
+		new("loot.enhance_crystal.t10", "item.loot.enhance_crystal.t10", new Color(1.00f, 0.86f, 0.36f, 0.98f)),
 	};
+
+	private static readonly string[] EnhanceCrystalIds =
+	{
+		"loot.enhance_crystal.t1", "loot.enhance_crystal.t2", "loot.enhance_crystal.t3",
+		"loot.enhance_crystal.t4", "loot.enhance_crystal.t5", "loot.enhance_crystal.t6",
+		"loot.enhance_crystal.t7", "loot.enhance_crystal.t8", "loot.enhance_crystal.t9",
+		"loot.enhance_crystal.t10",
+	};
+
+	// 對應世界階級 / 精煉目標星等的水晶 id（tier 1~10）。
+	public static string GetEnhanceCrystalId(int tier)
+	{
+		return EnhanceCrystalIds[Mathf.Clamp(tier, 1, EnhanceCrystalIds.Length) - 1];
+	}
+
+	public static bool IsEnhanceCrystal(string itemId)
+	{
+		return !string.IsNullOrEmpty(itemId) && itemId.StartsWith("loot.enhance_crystal.t", System.StringComparison.Ordinal);
+	}
+
+	public static int GetEnhanceCrystalTier(string itemId)
+	{
+		if (!IsEnhanceCrystal(itemId))
+		{
+			return 0;
+		}
+
+		string suffix = itemId.Substring("loot.enhance_crystal.t".Length);
+		return int.TryParse(suffix, out int tier) ? Mathf.Clamp(tier, 1, EnhanceCrystalIds.Length) : 0;
+	}
 
 	private static readonly string[] CommonQuestMaterialIds =
 	{

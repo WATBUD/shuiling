@@ -285,9 +285,13 @@ public partial class PlayerController
 
 	private static string GetInventoryItemDisplayName(string itemId)
 	{
-		return MonsterLootCatalog.IsMonsterLoot(itemId)
-			? LocaleText.T(MonsterLootCatalog.GetNameKey(itemId))
-			: LocaleText.T(BuildCatalog.GetItemNameKey(itemId));
+		if (MonsterLootCatalog.IsMonsterLoot(itemId))
+		{
+			return LocaleText.T(MonsterLootCatalog.GetNameKey(itemId));
+		}
+
+		// 裝備附上精煉星等後綴（例如「長劍 ★3」）。
+		return LocaleText.T(BuildCatalog.GetItemNameKey(itemId)) + BuildCatalog.GetStarSuffix(itemId);
 	}
 
 	public void OpenInventoryForActor(SimpleActor actor)

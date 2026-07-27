@@ -614,11 +614,11 @@ public static class BuildCatalog
 			CritChance = identity.CritChanceBonus,
 		};
 
-		ApplyEquipment(stats, GetEquipment(loadout.HelmetId));
-		ApplyEquipment(stats, GetEquipment(loadout.WeaponId));
-		ApplyEquipment(stats, GetEquipment(loadout.ArmorId));
-		ApplyEquipment(stats, GetEquipment(loadout.BootsId));
-		ApplyEquipment(stats, GetEquipment(loadout.AccessoryId));
+		ApplyEquipment(stats, GetEquipment(loadout.HelmetId), GetEquipmentStarMultiplier(loadout.HelmetId));
+		ApplyEquipment(stats, GetEquipment(loadout.WeaponId), GetEquipmentStarMultiplier(loadout.WeaponId));
+		ApplyEquipment(stats, GetEquipment(loadout.ArmorId), GetEquipmentStarMultiplier(loadout.ArmorId));
+		ApplyEquipment(stats, GetEquipment(loadout.BootsId), GetEquipmentStarMultiplier(loadout.BootsId));
+		ApplyEquipment(stats, GetEquipment(loadout.AccessoryId), GetEquipmentStarMultiplier(loadout.AccessoryId));
 
 		// Main core (attack core) only takes effect once unlocked; before that the
 		// creature attacks with the default physical core.
@@ -694,11 +694,65 @@ public static class BuildCatalog
 		return keys.ToArray();
 	}
 
+	// ── 精煉星等（Refinement stars）──────────────────────────────────────────
+	// 星等直接編碼在物品 id 尾端（例如 "equip.weapon.sword#3" = 3★），因此背包堆疊、
+	// 已裝備欄位、以及存檔全是字串就能自動保存，不需改資料結構。0★ 維持原本純 id。
+	public const int MaxEquipmentStars = 10;
+	public const float EquipmentStarBonusPerStar = 0.08f; // 每星 +8% 該裝備自身加成
+	private const char EquipmentStarSeparator = '#';
+
+	public static int GetEquipmentStars(string id)
+	{
+		if (string.IsNullOrEmpty(id))
+		{
+			return 0;
+		}
+
+		int index = id.IndexOf(EquipmentStarSeparator);
+		if (index < 0 || index + 1 >= id.Length)
+		{
+			return 0;
+		}
+
+		return int.TryParse(id.Substring(index + 1), out int stars) ? Mathf.Clamp(stars, 0, MaxEquipmentStars) : 0;
+	}
+
+	public static string GetBaseEquipmentId(string id)
+	{
+		if (string.IsNullOrEmpty(id))
+		{
+			return id;
+		}
+
+		int index = id.IndexOf(EquipmentStarSeparator);
+		return index < 0 ? id : id.Substring(0, index);
+	}
+
+	public static string MakeRefinedEquipmentId(string baseId, int stars)
+	{
+		string root = GetBaseEquipmentId(baseId);
+		int clamped = Mathf.Clamp(stars, 0, MaxEquipmentStars);
+		return clamped <= 0 ? root : $"{root}{EquipmentStarSeparator}{clamped}";
+	}
+
+	public static float GetEquipmentStarMultiplier(string id)
+	{
+		return 1.0f + GetEquipmentStars(id) * EquipmentStarBonusPerStar;
+	}
+
+	// 顯示用的星等後綴，例如 " ★3"；0★ 回傳空字串。
+	public static string GetStarSuffix(string id)
+	{
+		int stars = GetEquipmentStars(id);
+		return stars > 0 ? $" ★{stars}" : string.Empty;
+	}
+
 	public static EquipmentDefinition GetEquipment(string id)
 	{
+		string baseId = GetBaseEquipmentId(id);
 		foreach (EquipmentDefinition equipment in Equipment)
 		{
-			if (equipment.Id == id)
+			if (equipment.Id == baseId)
 			{
 				return equipment;
 			}
@@ -831,9 +885,10 @@ public static class BuildCatalog
 
 	public static string GetItemNameKey(string id)
 	{
+		string equipmentId = GetBaseEquipmentId(id);
 		foreach (EquipmentDefinition equipment in Equipment)
 		{
-			if (equipment.Id == id)
+			if (equipment.Id == equipmentId)
 			{
 				return equipment.NameKey;
 			}
@@ -865,9 +920,10 @@ public static class BuildCatalog
 
 	public static InventoryItemKind GetItemKind(string id)
 	{
+		string equipmentId = GetBaseEquipmentId(id);
 		foreach (EquipmentDefinition equipment in Equipment)
 		{
-			if (equipment.Id == id)
+			if (equipment.Id == equipmentId)
 			{
 				return InventoryItemKind.Equipment;
 			}
@@ -908,9 +964,10 @@ public static class BuildCatalog
 			}
 		}
 
+		string currentBaseId = GetBaseEquipmentId(currentId);
 		for (int index = 0; index < matching.Count; index++)
 		{
-			if (matching[index].Id == currentId)
+			if (matching[index].Id == currentBaseId)
 			{
 				return matching[(index + 1) % matching.Count].Id;
 			}
@@ -1114,15 +1171,16 @@ public static class BuildCatalog
 		});
 	}
 
-	private static void ApplyEquipment(BuildStats stats, EquipmentDefinition equipment)
+	// bonusMultiplier 由精煉星等提供（每星 +8%）；插槽數不受星等影響。
+	private static void ApplyEquipment(BuildStats stats, EquipmentDefinition equipment, float bonusMultiplier = 1.0f)
 	{
-		stats.MaxHealth += equipment.MaxHealthBonus;
-		stats.Attack += equipment.AttackBonus;
-		stats.Defense += equipment.DefenseBonus;
-		stats.MoveSpeedMultiplier += equipment.MoveSpeedBonus;
-		stats.AttackCooldownMultiplier -= equipment.AttackCooldownReduction;
-		stats.AttackRangeBonus += equipment.AttackRangeBonus;
-		stats.CritChance += equipment.CritChanceBonus;
+		stats.MaxHealth += Mathf.RoundToInt(equipment.MaxHealthBonus * bonusMultiplier);
+		stats.Attack += Mathf.RoundToInt(equipment.AttackBonus * bonusMultiplier);
+		stats.Defense += Mathf.RoundToInt(equipment.DefenseBonus * bonusMultiplier);
+		stats.MoveSpeedMultiplier += equipment.MoveSpeedBonus * bonusMultiplier;
+		stats.AttackCooldownMultiplier -= equipment.AttackCooldownReduction * bonusMultiplier;
+		stats.AttackRangeBonus += equipment.AttackRangeBonus * bonusMultiplier;
+		stats.CritChance += equipment.CritChanceBonus * bonusMultiplier;
 		stats.EquipmentSocketCount += equipment.SocketCount;
 	}
 

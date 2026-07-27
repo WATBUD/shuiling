@@ -3441,6 +3441,10 @@ public partial class SimpleActor : CharacterBody3D
 		int primaryAmount = Level >= 6 && _rng.Randf() < 0.42f ? 2 : 1;
 		SpawnWorldDrop(origin + RandomDropOffset(0.78f), primaryLootId, primaryAmount, 0);
 
+		// 所有怪物都會掉一顆對應自身世界階級的強化水晶（精煉材料）。
+		string crystalId = MonsterLootCatalog.GetEnhanceCrystalId(WorldTierCatalog.ClampTier(WorldTier));
+		SpawnWorldDrop(origin + RandomDropOffset(0.62f), crystalId, 1, 0);
+
 		if (_rng.Randf() < 0.34f)
 		{
 			string secondaryLootId = MonsterLootCatalog.PickSecondaryDropForMonster(primaryLootId, Level);
@@ -3511,6 +3515,10 @@ public partial class SimpleActor : CharacterBody3D
 		SpawnWorldDrop(origin + RandomDropOffset(0.85f), primaryLootId, _rng.RandiRange(4, 6), 0);
 		string secondaryLootId = MonsterLootCatalog.PickSecondaryDropForMonster(primaryLootId, Level + 5);
 		SpawnWorldDrop(origin + RandomDropOffset(1.05f), secondaryLootId, _rng.RandiRange(2, 3), 0);
+
+		// Boss 掉多顆對應階級的強化水晶。
+		string bossCrystalId = MonsterLootCatalog.GetEnhanceCrystalId(WorldTierCatalog.ClampTier(WorldTier));
+		SpawnWorldDrop(origin + RandomDropOffset(0.95f), bossCrystalId, _rng.RandiRange(2, 4), 0);
 
 		// Bosses always drop two high-value equipment pieces and at least one core.
 		SpawnWorldDrop(origin + RandomDropOffset(1.25f), PickBossEquipmentDropId(), 1, 0);

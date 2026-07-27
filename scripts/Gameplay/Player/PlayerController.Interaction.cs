@@ -99,6 +99,14 @@ public partial class PlayerController
 			return;
 		}
 
+		SimpleActor? refiner = GetNearestRefiner();
+		if (refiner != null)
+		{
+			_interactionPromptLabel.Visible = true;
+			_interactionPromptLabel.Text = LocaleText.F("prompt.refiner", "E", refiner.LocalizedDisplayName);
+			return;
+		}
+
 		SimpleActor? recruitNpc = GetNearestRecruitableNpc();
 		_interactionPromptLabel.Visible = recruitNpc != null;
 		if (recruitNpc == null)
@@ -160,6 +168,12 @@ public partial class PlayerController
 		if (GetNearestWarehouseKeeper() != null)
 		{
 			SetWarehousePanelVisible(true);
+			return;
+		}
+
+		if (GetNearestRefiner() != null)
+		{
+			SetRefinementPanelVisible(true);
 			return;
 		}
 
@@ -411,6 +425,7 @@ public partial class PlayerController
 			&& !IsMerchantShopkeeper(actor)
 			&& !IsMercenaryBroker(actor)
 			&& !IsWarehouseKeeper(actor)
+			&& !IsRefiner(actor)
 			&& actor.IsNpcRecruitCandidate
 			&& actor.MapId == "city"
 			&& actor.IsActiveWorldTarget;
@@ -433,6 +448,38 @@ public partial class PlayerController
 		foreach (Node node in GetTree().GetNodesInGroup("npcs"))
 		{
 			if (node is not SimpleActor actor || !IsWarehouseKeeper(actor) || !actor.IsActiveWorldTarget)
+			{
+				continue;
+			}
+
+			float distance = GlobalPosition.DistanceTo(actor.GlobalPosition);
+			if (distance <= nearestDistance)
+			{
+				nearest = actor;
+				nearestDistance = distance;
+			}
+		}
+
+		return nearest;
+	}
+
+	private static bool IsRefiner(SimpleActor actor)
+	{
+		return IsInstanceValid(actor) && actor.DisplayName == "name.npc.refiner";
+	}
+
+	private SimpleActor? GetNearestRefiner()
+	{
+		if (!IsInCityMap())
+		{
+			return null;
+		}
+
+		SimpleActor? nearest = null;
+		float nearestDistance = MerchantInteractRange;
+		foreach (Node node in GetTree().GetNodesInGroup("npcs"))
+		{
+			if (node is not SimpleActor actor || !IsRefiner(actor) || !actor.IsActiveWorldTarget)
 			{
 				continue;
 			}

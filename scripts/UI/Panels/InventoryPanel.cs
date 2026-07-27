@@ -1632,6 +1632,11 @@ public partial class InventoryPanel : PanelContainer
 		{
 			EquipmentDefinition equipment = BuildCatalog.GetEquipment(itemId);
 			lines.Add(LocaleText.F("tooltip.equipment_slot", LocaleText.T(GetEquipmentSlotKey(equipment.Slot))));
+			int equipmentStars = BuildCatalog.GetEquipmentStars(itemId);
+			if (equipmentStars > 0)
+			{
+				lines.Add(LocaleText.F("tooltip.refine_stars", equipmentStars, Mathf.RoundToInt(BuildCatalog.EquipmentStarBonusPerStar * equipmentStars * 100.0f)));
+			}
 		}
 		else if (BuildCatalog.GetItemKind(itemId) == InventoryItemKind.SkillGem)
 		{
@@ -1661,7 +1666,7 @@ public partial class InventoryPanel : PanelContainer
 		switch (BuildCatalog.GetItemKind(itemId))
 		{
 			case InventoryItemKind.Equipment:
-				AppendEquipmentTooltip(lines, BuildCatalog.GetEquipment(itemId));
+				AppendEquipmentTooltip(lines, BuildCatalog.GetEquipment(itemId), BuildCatalog.GetEquipmentStarMultiplier(itemId));
 				break;
 			case InventoryItemKind.AttributeGem:
 				AppendAttributeGemTooltip(lines, BuildCatalog.GetAttributeGem(itemId));
@@ -1724,16 +1729,17 @@ public partial class InventoryPanel : PanelContainer
 		};
 	}
 
-	private static void AppendEquipmentTooltip(List<string> lines, EquipmentDefinition item)
+	// starMultiplier 反映精煉星等（每星 +8%）；插槽數不受影響。
+	private static void AppendEquipmentTooltip(List<string> lines, EquipmentDefinition item, float starMultiplier = 1.0f)
 	{
 		AddSummaryLine(lines, item.SummaryKey);
-		AddStatLine(lines, "stat.health", item.MaxHealthBonus);
-		AddStatLine(lines, "stat.attack", item.AttackBonus);
-		AddStatLine(lines, "stat.defense", item.DefenseBonus);
-		AddPercentLine(lines, "tooltip.move_speed", item.MoveSpeedBonus);
-		AddPercentLine(lines, "tooltip.attack_cooldown", item.AttackCooldownReduction);
-		AddDecimalLine(lines, "tooltip.attack_range", item.AttackRangeBonus);
-		AddPercentLine(lines, "tooltip.crit_chance", item.CritChanceBonus);
+		AddStatLine(lines, "stat.health", Mathf.RoundToInt(item.MaxHealthBonus * starMultiplier));
+		AddStatLine(lines, "stat.attack", Mathf.RoundToInt(item.AttackBonus * starMultiplier));
+		AddStatLine(lines, "stat.defense", Mathf.RoundToInt(item.DefenseBonus * starMultiplier));
+		AddPercentLine(lines, "tooltip.move_speed", item.MoveSpeedBonus * starMultiplier);
+		AddPercentLine(lines, "tooltip.attack_cooldown", item.AttackCooldownReduction * starMultiplier);
+		AddDecimalLine(lines, "tooltip.attack_range", item.AttackRangeBonus * starMultiplier);
+		AddPercentLine(lines, "tooltip.crit_chance", item.CritChanceBonus * starMultiplier);
 		AddStatLine(lines, "tooltip.socket_count", item.SocketCount);
 	}
 

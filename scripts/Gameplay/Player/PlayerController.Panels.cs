@@ -78,6 +78,21 @@ public partial class PlayerController
 		_mercenaryShopPanel.CloseRequested = () => SetMercenaryShopPanelVisible(false);
 	}
 
+	private void CreateRefinementPanel()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "RefinementLayer",
+			Layer = 40,
+		};
+
+		AddChild(layer);
+		_refinementPanel = new RefinementPanel();
+		layer.AddChild(_refinementPanel);
+		_refinementPanel.Bind(this);
+		_refinementPanel.CloseRequested = () => SetRefinementPanelVisible(false);
+	}
+
 	private void CreateWarehousePanel()
 	{
 		var layer = new CanvasLayer
@@ -373,6 +388,27 @@ public partial class PlayerController
 			_inventoryPanel.SetPanelVisible(false);
 			_formationPanel.SetPanelVisible(false);
 			_merchantShopPanel.SetPanelVisible(false);
+			_settingsPanel.SetPanelVisible(false);
+			_warehousePanel.SetPanelVisible(false);
+			_refinementPanel.SetPanelVisible(false);
+			CloseNpcQuestDialog();
+			CloseMapTravelDialog();
+		}
+
+		UpdateMouseModeForPanels();
+	}
+
+	private void SetRefinementPanelVisible(bool visible)
+	{
+		_refinementPanel.SetPanelVisible(visible);
+		if (visible)
+		{
+			SetPauseMenuVisible(false, false);
+			_partyPanel.SetPanelVisible(false);
+			_inventoryPanel.SetPanelVisible(false);
+			_formationPanel.SetPanelVisible(false);
+			_merchantShopPanel.SetPanelVisible(false);
+			_mercenaryShopPanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
 			_warehousePanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
