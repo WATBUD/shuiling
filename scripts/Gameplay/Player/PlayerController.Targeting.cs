@@ -92,12 +92,39 @@ public partial class PlayerController
 		_selectedActor = actor;
 		bool isAttackCommandTarget = IsAttackCommandTarget(actor);
 		_focusedTarget = isAttackCommandTarget ? actor : null;
+		// 每次點擊怪物都立刻轉向面對它（不只首次；即使已在攻擊範圍內、不需走近也會轉）。
+		if (isAttackCommandTarget && _cameraMode == CameraViewMode.GodView)
+		{
+			FaceTargetPlanar(actor);
+		}
 		EnsureSelectedTargetMarker();
 		UpdateSelectedTargetMarkerColors(isAttackCommandTarget);
 		if (_selectedTargetMarker != null)
 		{
 			_selectedTargetMarker.Visible = true;
 		}
+	}
+
+	// 立即把身體轉向面對目標（水平面）。玩家前方為 -Z，與 FaceMovementDirection 同慣例。
+	private void FaceTargetPlanar(SimpleActor target)
+	{
+		if (!IsInstanceValid(target))
+		{
+			return;
+		}
+
+		Vector3 toTarget = target.GlobalPosition - GlobalPosition;
+		toTarget.Y = 0.0f;
+		if (toTarget.LengthSquared() < 0.0001f)
+		{
+			return;
+		}
+
+		toTarget = toTarget.Normalized();
+		float targetAngle = Mathf.Atan2(-toTarget.X, -toTarget.Z);
+		Vector3 rotation = Rotation;
+		rotation.Y = targetAngle;
+		Rotation = rotation;
 	}
 
 	private void ClearSelectedActor()

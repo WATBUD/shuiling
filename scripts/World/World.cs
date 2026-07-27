@@ -795,6 +795,8 @@ public partial class World : Node3D
 			Position = position,
 		};
 		_propsRoot.AddChild(fountain);
+		// 主城中央水池：站在旁邊按 E 可復活已死亡的夥伴（PlayerController 依此群組偵測）。
+		fountain.AddToGroup("revival_fountain");
 
 		AddExternalModelTo(fountain, "res://assets/models/environment/fountain-round-detail.glb", "KenneyRoundBasin", Vector3.Zero, Vector3.Zero, new Vector3(2.55f, 2.55f, 2.55f));
 		AddExternalModelTo(fountain, "res://assets/models/environment/fountain-center.glb", "KenneyCenterNozzle", new Vector3(0.0f, 0.28f, 0.0f), Vector3.Zero, new Vector3(2.25f, 2.25f, 2.25f));

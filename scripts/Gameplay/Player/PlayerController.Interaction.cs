@@ -61,6 +61,14 @@ public partial class PlayerController
 			return;
 		}
 
+		Node3D? revivalFountain = GetNearestRevivalFountain();
+		if (revivalFountain != null)
+		{
+			_interactionPromptLabel.Visible = true;
+			_interactionPromptLabel.Text = LocaleText.F("prompt.fountain_revive", "E");
+			return;
+		}
+
 		Node3D? mapPortal = GetNearestMapPortal();
 		if (mapPortal != null)
 		{
@@ -142,6 +150,12 @@ public partial class PlayerController
 		if (GetNearestRevivalNpc() != null)
 		{
 			ShowRevivalDialog(ReviveDefeatedCompanions());
+			return;
+		}
+
+		if (GetNearestRevivalFountain() is Node3D revivalFountain)
+		{
+			TryFountainRevive(revivalFountain.GlobalPosition);
 			return;
 		}
 
@@ -324,6 +338,33 @@ public partial class PlayerController
 			if (distance <= bestDistance)
 			{
 				nearest = npc;
+				bestDistance = distance;
+			}
+		}
+
+		return nearest;
+	}
+
+	private Node3D? GetNearestRevivalFountain()
+	{
+		if (!IsInCityMap())
+		{
+			return null;
+		}
+
+		Node3D? nearest = null;
+		float bestDistance = RevivalFountainInteractRange;
+		foreach (Node node in GetTree().GetNodesInGroup("revival_fountain"))
+		{
+			if (node is not Node3D fountain || !IsInstanceValid(fountain) || !fountain.IsVisibleInTree())
+			{
+				continue;
+			}
+
+			float distance = GlobalPosition.DistanceTo(fountain.GlobalPosition);
+			if (distance <= bestDistance)
+			{
+				nearest = fountain;
 				bestDistance = distance;
 			}
 		}

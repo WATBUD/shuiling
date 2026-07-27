@@ -85,6 +85,8 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float CaptureNetRechargeSeconds { get; set; } = 5.0f;
 	[Export] public float TargetInfoRange { get; set; } = 30.0f;
 	[Export] public float RevivalNpcInteractRange { get; set; } = 4.2f;
+	// 主城水池復活的互動距離（水池較大，範圍放寬一些）。
+	[Export] public float RevivalFountainInteractRange { get; set; } = 6.5f;
 	[Export] public float NpcRecruitInteractRange { get; set; } = 4.8f;
 	[Export] public float MapPortalInteractRange { get; set; } = 5.2f;
 	[Export] public string PlayerName { get; set; } = "player.default_name";
