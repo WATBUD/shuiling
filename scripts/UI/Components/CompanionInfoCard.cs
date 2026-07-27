@@ -220,8 +220,7 @@ public partial class CompanionInfoCard : PanelContainer
 			$"{LocaleText.T("tooltip.crit_chance")} {_player.CritChance * 100.0f:0.#}%",
 			$"{LocaleText.T("stat.state")} {LocaleText.T("party.playable")}");
 		_meta.Text = string.Join("\n",
-			$"Player / {LocaleText.T("combat.range.melee")}",
-			$"{LocaleText.T("stat.role")} {LocaleText.T("role.dps")} / {LocaleText.T("personality.brave")}",
+			$"Player / {LocaleText.T("combat.range.melee")} / {LocaleText.T("personality.brave")}",
 			LocaleText.F("inventory.gold", _player.Gold),
 			LocaleText.F("party.title", _player.ActiveParty.Count, _player.ActivePartyLimit, _player.AvailableCompanionCount));
 		_mode.Visible = false;

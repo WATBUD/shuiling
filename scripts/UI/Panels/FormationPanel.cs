@@ -712,36 +712,30 @@ public partial class FormationSlotButton : Button
 			return null;
 		}
 
-		string key = $"{Actor.ActorKind}:{Actor.DisplayName}:{Actor.CombatRole}";
-		if (OrbIconCache.TryGetValue(key, out Texture2D? cached))
+		// 定位不再影響外觀；同一種族共用同一張可愛圖示。
+		string raceId = BuildCatalog.GetRaceId(Actor);
+		if (OrbIconCache.TryGetValue(raceId, out Texture2D? cached))
 		{
 			return cached;
 		}
 
-		Texture2D icon = CreateOrbIcon(Actor);
-		OrbIconCache[key] = icon;
+		Texture2D icon = CreateRaceOrbIcon(raceId);
+		OrbIconCache[raceId] = icon;
 		return icon;
 	}
 
-	private static Texture2D CreateOrbIcon(SimpleActor actor)
+	// 每個種族一張可愛的小圓臉圖示（同種族共用）。舊的「大眼＋嘴巴」臉已移除，
+	// 改成柔和的球身＋種族專屬配件（耳朵／角／光點）＋一對亮亮的小眼睛。
+	private static Texture2D CreateRaceOrbIcon(string raceId)
 	{
 		const int size = 64;
 		const float center = (size - 1) * 0.5f;
-		const float radius = 28.0f;
+		const float radius = 27.0f;
 		Image image = Image.CreateEmpty(size, size, false, Image.Format.Rgba8);
 		image.Fill(new Color(0.0f, 0.0f, 0.0f, 0.0f));
 
-		Color baseColor = GetActorOrbColor(actor);
-		Color rimColor = actor.ActorKind == "monster"
-			? new Color(1.0f, 0.52f, 0.35f, 1.0f)
-			: new Color(0.45f, 0.90f, 1.0f, 1.0f);
-		Color markColor = actor.CombatRole switch
-		{
-			"Tank" => new Color(0.92f, 0.95f, 1.0f, 1.0f),
-			"Ranged" => new Color(1.0f, 0.92f, 0.48f, 1.0f),
-			"Support" => new Color(0.58f, 1.0f, 0.72f, 1.0f),
-			_ => new Color(1.0f, 0.86f, 0.72f, 1.0f),
-		};
+		Color baseColor = GetRaceOrbColor(raceId);
+		Color rimColor = baseColor.Lerp(new Color(1.0f, 1.0f, 1.0f, 1.0f), 0.35f);
 
 		for (int y = 0; y < size; y++)
 		{
@@ -756,68 +750,80 @@ public partial class FormationSlotButton : Button
 				}
 
 				float t = Mathf.Clamp(distance / radius, 0.0f, 1.0f);
-				Color color = baseColor.Lerp(new Color(0.025f, 0.030f, 0.040f, 1.0f), t * 0.55f);
-				if (distance > radius - 4.0f)
+				Color color = baseColor.Lerp(baseColor.Darkened(0.45f), t * 0.5f);
+				if (distance > radius - 3.5f)
 				{
-					color = color.Lerp(rimColor, 0.72f);
+					color = color.Lerp(rimColor, 0.6f);
 				}
 
-				float shine = Mathf.Clamp(1.0f - new Vector2(dx + 9.0f, dy + 10.0f).Length() / 22.0f, 0.0f, 1.0f);
-				color = color.Lerp(new Color(1.0f, 1.0f, 1.0f, 1.0f), shine * 0.34f);
+				float shine = Mathf.Clamp(1.0f - new Vector2(dx + 9.0f, dy + 11.0f).Length() / 20.0f, 0.0f, 1.0f);
+				color = color.Lerp(new Color(1.0f, 1.0f, 1.0f, 1.0f), shine * 0.4f);
 				image.SetPixel(x, y, color);
 			}
 		}
 
-		DrawOrbMark(image, actor.ActorKind, actor.CombatRole, markColor);
+		// 沒有臉，改在球身上疊一個代表該種族的深色剪影圖案（人形／野獸／龍／魔／精靈）。
+		DrawRaceEmblem(image, raceId);
 		return ImageTexture.CreateFromImage(image);
 	}
 
-	private static Color GetActorOrbColor(SimpleActor actor)
+	private static Color GetRaceOrbColor(string raceId) => raceId switch
 	{
-		uint hash = 2166136261u;
-		foreach (char character in actor.DisplayName)
-		{
-			hash ^= character;
-			hash *= 16777619u;
-		}
+		"race.human" => new Color(0.53f, 0.72f, 1.0f, 1.0f),    // 柔藍
+		"race.beast" => new Color(0.95f, 0.63f, 0.34f, 1.0f),   // 暖橙
+		"race.dragon" => new Color(0.44f, 0.82f, 0.50f, 1.0f),  // 嫩綠
+		"race.demon" => new Color(0.72f, 0.46f, 0.95f, 1.0f),   // 夢紫
+		"race.spirit" => new Color(0.42f, 0.88f, 0.92f, 1.0f),  // 水青
+		_ => new Color(0.66f, 0.72f, 0.80f, 1.0f),
+	};
 
-		float hue = actor.ActorKind == "monster"
-			? 0.02f + (hash % 18u) / 100.0f
-			: 0.50f + (hash % 16u) / 100.0f;
-		float saturation = actor.ActorKind == "monster" ? 0.76f : 0.58f;
-		float value = actor.ActorKind == "monster" ? 0.92f : 0.98f;
-		return Color.FromHsv(hue % 1.0f, saturation, value, 1.0f);
+	// 每個種族一個代表性剪影：人形、野獸腳印、飛龍、惡魔、精靈星光。
+	// 全部用深色，並裁切在球身內，維持乾淨的圓形外觀。
+	private static readonly Color EmblemColor = new Color(0.15f, 0.15f, 0.21f, 1.0f);
+
+	private static void DrawRaceEmblem(Image image, string raceId)
+	{
+		Color c = EmblemColor;
+		switch (raceId)
+		{
+			case "race.human": // 人形：頭＋肩身
+				EmblemCircle(image, new Vector2(32.0f, 20.0f), 6.5f, c);
+				EmblemTriangle(image, new Vector2(24.0f, 33.0f), new Vector2(40.0f, 33.0f), new Vector2(45.0f, 52.0f), c);
+				EmblemTriangle(image, new Vector2(24.0f, 33.0f), new Vector2(45.0f, 52.0f), new Vector2(19.0f, 52.0f), c);
+				break;
+			case "race.beast": // 野獸腳印：大肉墊＋四趾
+				EmblemCircle(image, new Vector2(32.0f, 41.0f), 9.0f, c);
+				EmblemCircle(image, new Vector2(21.0f, 31.0f), 4.0f, c);
+				EmblemCircle(image, new Vector2(28.5f, 25.0f), 4.2f, c);
+				EmblemCircle(image, new Vector2(35.5f, 25.0f), 4.2f, c);
+				EmblemCircle(image, new Vector2(43.0f, 31.0f), 4.0f, c);
+				break;
+			case "race.dragon": // 飛龍：雙翼＋帶角的小頭
+				EmblemTriangle(image, new Vector2(26.0f, 32.0f), new Vector2(8.0f, 26.0f), new Vector2(17.0f, 43.0f), c);
+				EmblemTriangle(image, new Vector2(38.0f, 32.0f), new Vector2(56.0f, 26.0f), new Vector2(47.0f, 43.0f), c);
+				EmblemCircle(image, new Vector2(32.0f, 35.0f), 6.0f, c);
+				EmblemCircle(image, new Vector2(32.0f, 24.0f), 4.5f, c);
+				EmblemTriangle(image, new Vector2(29.0f, 21.0f), new Vector2(27.0f, 12.0f), new Vector2(33.0f, 19.0f), c);
+				EmblemTriangle(image, new Vector2(35.0f, 21.0f), new Vector2(37.0f, 12.0f), new Vector2(31.0f, 19.0f), c);
+				break;
+			case "race.demon": // 惡魔：帶角的頭＋尖下巴
+				EmblemCircle(image, new Vector2(32.0f, 31.0f), 9.0f, c);
+				EmblemTriangle(image, new Vector2(25.0f, 24.0f), new Vector2(19.0f, 10.0f), new Vector2(30.0f, 22.0f), c);
+				EmblemTriangle(image, new Vector2(39.0f, 24.0f), new Vector2(45.0f, 10.0f), new Vector2(34.0f, 22.0f), c);
+				EmblemTriangle(image, new Vector2(27.0f, 39.0f), new Vector2(37.0f, 39.0f), new Vector2(32.0f, 51.0f), c);
+				break;
+			case "race.spirit": // 精靈：四角星光
+				EmblemTriangle(image, new Vector2(32.0f, 8.0f), new Vector2(29.0f, 32.0f), new Vector2(35.0f, 32.0f), c);
+				EmblemTriangle(image, new Vector2(32.0f, 56.0f), new Vector2(29.0f, 32.0f), new Vector2(35.0f, 32.0f), c);
+				EmblemTriangle(image, new Vector2(8.0f, 32.0f), new Vector2(32.0f, 29.0f), new Vector2(32.0f, 35.0f), c);
+				EmblemTriangle(image, new Vector2(56.0f, 32.0f), new Vector2(32.0f, 29.0f), new Vector2(32.0f, 35.0f), c);
+				EmblemCircle(image, new Vector2(32.0f, 32.0f), 5.0f, c);
+				break;
+		}
 	}
 
-	private static void DrawOrbMark(Image image, string actorKind, string combatRole, Color color)
-	{
-		if (actorKind == "monster")
-		{
-			DrawFilledCircle(image, new Vector2(24.0f, 25.0f), 4.2f, color);
-			DrawFilledCircle(image, new Vector2(40.0f, 25.0f), 4.2f, color);
-			DrawFilledCircle(image, new Vector2(32.0f, 40.0f), 7.0f, color.Darkened(0.18f));
-			return;
-		}
-
-		if (combatRole == "Support")
-		{
-			DrawRectMark(image, new Rect2I(29, 19, 6, 26), color);
-			DrawRectMark(image, new Rect2I(22, 29, 20, 6), color);
-			return;
-		}
-
-		if (combatRole == "Ranged")
-		{
-			DrawRectMark(image, new Rect2I(30, 17, 4, 30), color);
-			DrawRectMark(image, new Rect2I(22, 23, 20, 4), color);
-			return;
-		}
-
-		DrawFilledCircle(image, new Vector2(32.0f, 24.0f), 7.5f, color);
-		DrawRectMark(image, new Rect2I(25, 32, 14, 14), color.Darkened(0.12f));
-	}
-
-	private static void DrawFilledCircle(Image image, Vector2 center, float radius, Color color)
+	// 只在球身（alpha > 0）上作畫，剪影自然被裁進圓球裡，不會有碎塊飄在球外。
+	private static void EmblemCircle(Image image, Vector2 center, float radius, Color color)
 	{
 		int minX = Mathf.Max(Mathf.FloorToInt(center.X - radius), 0);
 		int maxX = Mathf.Min(Mathf.CeilToInt(center.X + radius), image.GetWidth() - 1);
@@ -827,7 +833,7 @@ public partial class FormationSlotButton : Button
 		{
 			for (int x = minX; x <= maxX; x++)
 			{
-				if (new Vector2(x - center.X, y - center.Y).Length() <= radius)
+				if (new Vector2(x - center.X, y - center.Y).Length() <= radius && image.GetPixel(x, y).A > 0.0f)
 				{
 					image.SetPixel(x, y, color);
 				}
@@ -835,18 +841,40 @@ public partial class FormationSlotButton : Button
 		}
 	}
 
-	private static void DrawRectMark(Image image, Rect2I rect, Color color)
+	private static void EmblemTriangle(Image image, Vector2 a, Vector2 b, Vector2 c, Color color)
 	{
-		for (int y = rect.Position.Y; y < rect.Position.Y + rect.Size.Y; y++)
+		int minX = Mathf.Max(Mathf.FloorToInt(Mathf.Min(a.X, Mathf.Min(b.X, c.X))), 0);
+		int maxX = Mathf.Min(Mathf.CeilToInt(Mathf.Max(a.X, Mathf.Max(b.X, c.X))), image.GetWidth() - 1);
+		int minY = Mathf.Max(Mathf.FloorToInt(Mathf.Min(a.Y, Mathf.Min(b.Y, c.Y))), 0);
+		int maxY = Mathf.Min(Mathf.CeilToInt(Mathf.Max(a.Y, Mathf.Max(b.Y, c.Y))), image.GetHeight() - 1);
+		float area = EdgeFunction(a, b, c);
+		if (Mathf.IsZeroApprox(area))
 		{
-			for (int x = rect.Position.X; x < rect.Position.X + rect.Size.X; x++)
+			return;
+		}
+
+		for (int y = minY; y <= maxY; y++)
+		{
+			for (int x = minX; x <= maxX; x++)
 			{
-				if (x >= 0 && x < image.GetWidth() && y >= 0 && y < image.GetHeight())
+				var p = new Vector2(x + 0.5f, y + 0.5f);
+				float w0 = EdgeFunction(b, c, p);
+				float w1 = EdgeFunction(c, a, p);
+				float w2 = EdgeFunction(a, b, p);
+				bool inside = area > 0.0f
+					? w0 >= 0.0f && w1 >= 0.0f && w2 >= 0.0f
+					: w0 <= 0.0f && w1 <= 0.0f && w2 <= 0.0f;
+				if (inside && image.GetPixel(x, y).A > 0.0f)
 				{
 					image.SetPixel(x, y, color);
 				}
 			}
 		}
+	}
+
+	private static float EdgeFunction(Vector2 a, Vector2 b, Vector2 c)
+	{
+		return (c.X - a.X) * (b.Y - a.Y) - (c.Y - a.Y) * (b.X - a.X);
 	}
 
 	private StyleBoxFlat MakeSlotStyle(bool highlighted)
