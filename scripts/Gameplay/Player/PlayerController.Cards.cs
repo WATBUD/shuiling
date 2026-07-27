@@ -1,16 +1,12 @@
 using Godot;
 using System.Collections.Generic;
 
-// Monster cards (卡片系統) — every monster drops its own exclusive name card, and
-// the album keeps at most one per model (deduped by canonical model key). Cards
-// grant a global team stat bonus that scales with how many are collected, and
-// can be handed over to certain NPCs to complete their quests.
+// Monster cards (卡片系統) — thin player-side adapter over the CardAlbum component.
+// The album owns the data + rules; this file wires the side-effects that need the
+// player/world (system messages, HUD refresh, applying the buff to companions).
 public partial class PlayerController
 {
-	private readonly HashSet<string> _ownedCards = new();
-
-	// +1% ATK / DEF / HP to every deployed companion per unique card owned.
-	private const float CardBonusPerCard = 0.01f;
+	private readonly CardAlbum _cardAlbum = new();
 
 	// Affinity granted when a recruit NPC accepts the specific card it collects.
 	private const int NpcCardExchangeAffinityReward = 40;
@@ -34,21 +30,16 @@ public partial class PlayerController
 		return keys[hash % keys.Count];
 	}
 
-	public int OwnedCardCount => _ownedCards.Count;
+	public int OwnedCardCount => _cardAlbum.Count;
 
-	public bool HasCard(string cardKey) => !string.IsNullOrEmpty(cardKey) && _ownedCards.Contains(cardKey);
+	public bool HasCard(string cardKey) => _cardAlbum.Has(cardKey);
 
-	public IReadOnlyCollection<string> OwnedCards => _ownedCards;
+	public IReadOnlyCollection<string> OwnedCards => _cardAlbum.Owned;
 
-	public List<string> GetOwnedCardKeys()
-	{
-		var keys = new List<string>(_ownedCards);
-		keys.Sort((a, b) => string.Compare(ExternalModelLibrary.LocalizedCardName(a), ExternalModelLibrary.LocalizedCardName(b), System.StringComparison.CurrentCulture));
-		return keys;
-	}
+	public List<string> GetOwnedCardKeys() => _cardAlbum.GetSortedKeys();
 
 	// Current collection multiplier (1.0 = no cards). Shown in the album panel.
-	public float CardCollectionMultiplier => 1.0f + _ownedCards.Count * CardBonusPerCard;
+	public float CardCollectionMultiplier => _cardAlbum.CollectionMultiplier;
 
 	// Award the defeated monster's card (one per model). No-op if already owned.
 	public void AwardMonsterCard(SimpleActor monster)
@@ -65,46 +56,33 @@ public partial class PlayerController
 	// card drop is picked up). No-op if empty or already owned.
 	public bool AwardMonsterCardByKey(string key)
 	{
-		if (string.IsNullOrWhiteSpace(key) || _ownedCards.Contains(key))
+		if (!_cardAlbum.Add(key))
 		{
 			return false;
 		}
 
-		_ownedCards.Add(key);
 		string name = ExternalModelLibrary.LocalizedCardName(key);
 		PostSystemMessage(LocaleText.F("system.card.obtained", name), new Color(0.62f, 0.86f, 1.0f));
-		RefreshCardCollectionBonus();
-		UpdateCardAlbumHud();
-		if (_cardAlbumPanel != null && IsInstanceValid(_cardAlbumPanel) && _cardAlbumPanel.Visible)
-		{
-			_cardAlbumPanel.RefreshAll();
-		}
-
+		OnCardCollectionChanged(refreshHiddenPanel: false);
 		return true;
 	}
 
 	// Hand a card over (NPC quest exchange). Losing it lowers the team bonus.
 	public bool TryConsumeCard(string cardKey)
 	{
-		if (string.IsNullOrEmpty(cardKey) || !_ownedCards.Remove(cardKey))
+		if (!_cardAlbum.Remove(cardKey))
 		{
 			return false;
 		}
 
-		RefreshCardCollectionBonus();
-		UpdateCardAlbumHud();
-		if (_cardAlbumPanel != null && IsInstanceValid(_cardAlbumPanel) && _cardAlbumPanel.Visible)
-		{
-			_cardAlbumPanel.RefreshAll();
-		}
-
+		OnCardCollectionChanged(refreshHiddenPanel: false);
 		return true;
 	}
 
 	// Re-apply the collection buff to every deployed companion.
 	public void RefreshCardCollectionBonus()
 	{
-		float multiplier = CardCollectionMultiplier;
+		float multiplier = _cardAlbum.CollectionMultiplier;
 		foreach (SimpleActor actor in _activeParty)
 		{
 			if (IsInstanceValid(actor))
@@ -114,32 +92,27 @@ public partial class PlayerController
 		}
 	}
 
-	// --- save round-trip ------------------------------------------------------
-
-	private List<string> ExportCards()
+	// Shared side-effects after the album changes: re-apply the buff and refresh
+	// UI. refreshHiddenPanel rebuilds the album even when it's closed (used after a
+	// save load); normal gains only rebuild it while it's open.
+	private void OnCardCollectionChanged(bool refreshHiddenPanel)
 	{
-		return new List<string>(_ownedCards);
-	}
-
-	private void RestoreCards(PlayerSaveData data)
-	{
-		_ownedCards.Clear();
-		if (data.OwnedCards != null)
-		{
-			foreach (string key in data.OwnedCards)
-			{
-				if (!string.IsNullOrWhiteSpace(key))
-				{
-					_ownedCards.Add(key);
-				}
-			}
-		}
-
 		RefreshCardCollectionBonus();
 		UpdateCardAlbumHud();
-		if (_cardAlbumPanel != null && IsInstanceValid(_cardAlbumPanel))
+		if (_cardAlbumPanel != null && IsInstanceValid(_cardAlbumPanel)
+			&& (refreshHiddenPanel || _cardAlbumPanel.Visible))
 		{
 			_cardAlbumPanel.RefreshAll();
 		}
+	}
+
+	// --- save round-trip ------------------------------------------------------
+
+	private List<string> ExportCards() => _cardAlbum.Export();
+
+	private void RestoreCards(PlayerSaveData data)
+	{
+		_cardAlbum.Restore(data.OwnedCards);
+		OnCardCollectionChanged(refreshHiddenPanel: true);
 	}
 }
