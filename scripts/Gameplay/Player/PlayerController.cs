@@ -10,7 +10,7 @@ public partial class PlayerController : CharacterBody3D
 		GodView,
 	}
 
-	public sealed record ContractCompanionOffer(string Id, string NameKey, string RoleNameKey, string CombatRole, string SummaryKey, int Level, int Cost, int MaxHealth, int Attack, int Defense);
+	public sealed record ContractCompanionOffer(string Id, string NameKey, string RoleNameKey, string CombatRole, string SummaryKey, int Level, int Cost, int MaxHealth, int Attack, int Defense, string Category = "mercenary");
 	public enum MerchantShopKind
 	{
 		Blacksmith,
@@ -36,6 +36,8 @@ public partial class PlayerController : CharacterBody3D
 	private const float PlayerVisualScale = 0.88f;
 	private const int NpcRecruitQuestItemCount = 3;
 	private const int NpcRecruitAffinityRequirement = 80;
+	// 騎乘夥伴所需的最低親密度。
+	public const int MountAffinityRequirement = 50;
 	private const float MercenaryBrokerInteractRange = 4.6f;
 	private const float MerchantInteractRange = 4.6f;
 	private const int MercenaryRefreshCost = 5000;
@@ -113,6 +115,11 @@ public partial class PlayerController : CharacterBody3D
 	private readonly List<string> _petShopStockNameKeys = new();
 	private readonly RandomNumberGenerator _mercenaryRng = new();
 	private double _mercenaryNextRefreshUnix;
+	// 夥伴招募所：傭兵與夥伴各自累積 1 隻/6 小時到上限。
+	private const int RecruitOfferCap = 6;
+	private readonly List<ContractCompanionOffer> _companionRecruitOffers = new();
+	private double _companionRecruitNextRefreshUnix;
+	public IReadOnlyList<ContractCompanionOffer> CompanionRecruitOffers => _companionRecruitOffers;
 	private double _merchantNextRefreshUnix;
 	private static readonly ContractCompanionOffer[] ContractCompanionOfferTemplates =
 	{
@@ -266,6 +273,7 @@ public partial class PlayerController : CharacterBody3D
 		_lastSafePosition = GlobalPosition + Vector3.Up * 0.2f;
 		_mercenaryRng.Seed = Time.GetTicksUsec() ^ (ulong)GetInstanceId();
 		EnsureMercenaryOffers();
+		EnsureCompanionRecruitOffers();
 		EnsureMerchantStock();
 		ConfigureThirdPersonCamera();
 		ApplyNewGameCharacterChoice();
@@ -346,6 +354,7 @@ public partial class PlayerController : CharacterBody3D
 		UpdateMovementAnimation((float)delta);
 		UpdateFocusedTargetMarker((float)delta);
 		UpdateMercenaryOfferRefresh();
+		UpdateCompanionRecruitRefresh();
 		UpdateMerchantStockRefresh();
 		UpdateInteractionPrompt((float)delta);
 		UpdateBossHud((float)delta);

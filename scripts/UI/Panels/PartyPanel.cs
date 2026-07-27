@@ -454,8 +454,10 @@ public partial class PartyPanel : PanelContainer
 		if (_player.IsInActiveParty(actor))
 		{
 			_memberContextMenu.AddItem(LocaleText.T("button.store"), 1);
-			_memberContextMenu.AddItem(_player.IsMountedCompanion(actor) ? "解除騎乘" : "騎乘這位夥伴", 6);
-			_memberContextMenu.SetItemDisabled(_memberContextMenu.GetItemIndex(6), actor.IsDefeated);
+			bool mounted = _player.IsMountedCompanion(actor);
+			_memberContextMenu.AddItem(mounted ? "解除騎乘" : LocaleText.F("button.ride", PlayerController.MountAffinityRequirement), 6);
+			// 騎乘需要親密度達 50 以上（已在騎乘者可隨時解除）。
+			_memberContextMenu.SetItemDisabled(_memberContextMenu.GetItemIndex(6), actor.IsDefeated || (!mounted && actor.Affinity < PlayerController.MountAffinityRequirement));
 		}
 		else
 		{
@@ -467,14 +469,6 @@ public partial class PartyPanel : PanelContainer
 		}
 
 		_memberContextMenu.AddSeparator();
-		string materialName = string.IsNullOrEmpty(actor.EvolutionMaterialId)
-			? string.Empty
-			: LocaleText.T(MonsterLootCatalog.GetNameKey(actor.EvolutionMaterialId));
-		string evolveText = actor.EvolutionMaterialCount > 0
-			? $"{LocaleText.T("button.evolve")} ({materialName} {actor.EvolutionMaterialCount})"
-			: LocaleText.T("button.evolve");
-		_memberContextMenu.AddItem(evolveText, 4);
-		_memberContextMenu.SetItemDisabled(_memberContextMenu.GetItemIndex(4), !_player.CanEvolveActor(actor));
 		string rebirthText = actor.RebirthCount > 0
 			? LocaleText.F("button.rebirth_count", actor.RebirthCount)
 			: LocaleText.T("button.rebirth");
@@ -499,9 +493,6 @@ public partial class PartyPanel : PanelContainer
 				break;
 			case 2:
 				_player.DeployCompanion(_contextActor, true);
-				break;
-			case 4:
-				_player.TryEvolveActor(_contextActor);
 				break;
 			case 6:
 				_player.ToggleMountCompanion(_contextActor);

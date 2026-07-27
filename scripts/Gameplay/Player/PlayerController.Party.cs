@@ -54,6 +54,13 @@ public partial class PlayerController
 		}
 		else
 		{
+			// 騎乘需要親密度達 50 以上。
+			if (actor.Affinity < MountAffinityRequirement)
+			{
+				PostSystemMessage(LocaleText.F("system.mount.need_affinity", MountAffinityRequirement), new Color(1.0f, 0.72f, 0.58f), GameMessageChannel.Party);
+				return false;
+			}
+
 			if (MountedCompanion != null)
 			{
 				MountedCompanion.SetMountedByPlayer(false);

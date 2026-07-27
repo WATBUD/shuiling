@@ -154,8 +154,17 @@ public partial class PlayerController
 
 		if (GetNearestMerchantShopkeeper(out MerchantShopKind merchantShopKind) != null)
 		{
-			_merchantShopPanel.Open(merchantShopKind);
-			UpdateMouseModeForPanels();
+			// 夥伴招募所（原寵物店）改開統一的招募清單面板（傭兵/夥伴分頁）。
+			if (merchantShopKind == MerchantShopKind.PetShop)
+			{
+				SetMercenaryShopPanelVisible(true);
+			}
+			else
+			{
+				_merchantShopPanel.Open(merchantShopKind);
+				UpdateMouseModeForPanels();
+			}
+
 			return;
 		}
 

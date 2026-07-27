@@ -1,14 +1,17 @@
 using Godot;
 using System.Collections.Generic;
 
+// 夥伴招募所面板：上方分頁切換「傭兵 / 夥伴」，兩個清單皆為每 6 小時累積 1 隻 1 等的候選。
 public partial class MercenaryShopPanel : PanelContainer
 {
 	private PlayerController? _player;
 	private VBoxContainer _offerList = null!;
 	private Label _goldLabel = null!;
 	private Label _titleLabel = null!;
-	private Label _refreshLabel = null!;
-	private Button _refreshButton = null!;
+	private Label _hintLabel = null!;
+	private Button _mercTabButton = null!;
+	private Button _companionTabButton = null!;
+	private int _selectedTab; // 0 = 傭兵, 1 = 夥伴
 	private float _refreshUiRemaining;
 
 	public System.Action? CloseRequested { get; set; }
@@ -58,6 +61,12 @@ public partial class MercenaryShopPanel : PanelContainer
 		}
 	}
 
+	private void SelectTab(int tab)
+	{
+		_selectedTab = tab;
+		RefreshAll();
+	}
+
 	public void RefreshAll()
 	{
 		if (_offerList == null)
@@ -65,11 +74,13 @@ public partial class MercenaryShopPanel : PanelContainer
 			return;
 		}
 
-		_titleLabel.Text = LocaleText.T("mercenary.shop.title");
+		_titleLabel.Text = LocaleText.T("recruit.title");
 		_goldLabel.Text = LocaleText.F("inventory.gold", _player?.Gold ?? 0);
-		_refreshLabel.Text = _player?.GetMercenaryRefreshCountdownText() ?? LocaleText.F("mercenary.refresh.countdown", 0, 0, 0);
-		_refreshButton.Text = LocaleText.F("mercenary.button.refresh", _player?.MercenaryManualRefreshCost ?? 50);
-		_refreshButton.Disabled = _player == null || _player.Gold < _player.MercenaryManualRefreshCost;
+		_mercTabButton.Text = LocaleText.T("recruit.tab.mercenary");
+		_companionTabButton.Text = LocaleText.T("recruit.tab.companion");
+		_mercTabButton.Disabled = _selectedTab == 0;
+		_companionTabButton.Disabled = _selectedTab == 1;
+		_hintLabel.Text = LocaleText.T("recruit.hint");
 		ClearChildren(_offerList);
 
 		if (_player == null)
@@ -77,7 +88,19 @@ public partial class MercenaryShopPanel : PanelContainer
 			return;
 		}
 
-		foreach (PlayerController.ContractCompanionOffer offer in _player.ContractCompanionOffers)
+		IReadOnlyList<PlayerController.ContractCompanionOffer> offers = _selectedTab == 0
+			? _player.ContractCompanionOffers
+			: _player.CompanionRecruitOffers;
+
+		if (offers.Count == 0)
+		{
+			var empty = MakeLabel(16, new Color(0.72f, 0.78f, 0.84f));
+			empty.Text = LocaleText.T("recruit.empty");
+			_offerList.AddChild(empty);
+			return;
+		}
+
+		foreach (PlayerController.ContractCompanionOffer offer in offers)
 		{
 			AddOfferRow(offer);
 		}
@@ -87,21 +110,15 @@ public partial class MercenaryShopPanel : PanelContainer
 	{
 		Name = "MercenaryShopPanel";
 		MouseFilter = MouseFilterEnum.Stop;
-		// Match the pet shop window size (a large centred 80% panel).
 		AnchorLeft = 0.10f;
 		AnchorTop = 0.10f;
 		AnchorRight = 0.90f;
 		AnchorBottom = 0.90f;
-		OffsetLeft = 0.0f;
-		OffsetTop = 0.0f;
-		OffsetRight = 0.0f;
-		OffsetBottom = 0.0f;
-		CustomMinimumSize = Vector2.Zero;
 
 		var style = new StyleBoxFlat
 		{
 			BgColor = new Color(0.045f, 0.052f, 0.064f, 0.97f),
-			BorderColor = new Color(0.72f, 0.58f, 0.34f, 0.96f),
+			BorderColor = new Color(0.64f, 0.86f, 0.72f, 0.96f),
 		};
 		style.SetBorderWidthAll(2);
 		style.SetCornerRadiusAll(6);
@@ -122,7 +139,7 @@ public partial class MercenaryShopPanel : PanelContainer
 		header.AddThemeConstantOverride("separation", 12);
 		root.AddChild(header);
 
-		_titleLabel = MakeLabel(24, new Color(1.0f, 0.92f, 0.72f));
+		_titleLabel = MakeLabel(24, new Color(0.82f, 1.0f, 0.90f));
 		_titleLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		header.AddChild(_titleLabel);
 
@@ -131,31 +148,23 @@ public partial class MercenaryShopPanel : PanelContainer
 		_goldLabel.CustomMinimumSize = new Vector2(160.0f, 0.0f);
 		header.AddChild(_goldLabel);
 
-		var hint = MakeLabel(15, new Color(0.72f, 0.82f, 0.88f));
-		hint.Text = LocaleText.T("mercenary.shop.hint");
-		hint.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-		root.AddChild(hint);
+		// 上方分頁籤：傭兵 / 夥伴
+		var tabRow = new HBoxContainer();
+		tabRow.AddThemeConstantOverride("separation", 8);
+		root.AddChild(tabRow);
 
-		var refreshRow = new HBoxContainer();
-		refreshRow.AddThemeConstantOverride("separation", 10);
-		root.AddChild(refreshRow);
+		_mercTabButton = new Button { CustomMinimumSize = new Vector2(150.0f, 40.0f) };
+		_mercTabButton.Pressed += () => SelectTab(0);
+		tabRow.AddChild(_mercTabButton);
 
-		_refreshLabel = MakeLabel(15, new Color(0.82f, 0.92f, 1.0f));
-		_refreshLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-		refreshRow.AddChild(_refreshLabel);
+		_companionTabButton = new Button { CustomMinimumSize = new Vector2(150.0f, 40.0f) };
+		_companionTabButton.Pressed += () => SelectTab(1);
+		tabRow.AddChild(_companionTabButton);
 
-		_refreshButton = new Button
-		{
-			CustomMinimumSize = new Vector2(150.0f, 38.0f),
-		};
-		_refreshButton.Pressed += () =>
-		{
-			if (_player != null && _player.TryRefreshMercenaryOffersManually())
-			{
-				RefreshAll();
-			}
-		};
-		refreshRow.AddChild(_refreshButton);
+		_hintLabel = MakeLabel(15, new Color(0.72f, 0.82f, 0.88f));
+		_hintLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		_hintLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+		root.AddChild(_hintLabel);
 
 		var scroll = new ScrollContainer
 		{
@@ -201,8 +210,13 @@ public partial class MercenaryShopPanel : PanelContainer
 		content.AddThemeConstantOverride("separation", 12);
 		margin.AddChild(content);
 
-		// Same rich info card as the pet shop: a preview companion fed into a
-		// CompanionInfoCard, freed when the row leaves the tree.
+		bool isCompanion = offer.Category == "companion";
+		var tagLabel = MakeLabel(14, isCompanion ? new Color(0.64f, 1.0f, 0.82f) : new Color(1.0f, 0.86f, 0.46f));
+		tagLabel.Text = LocaleText.T(isCompanion ? "recruit.tag.companion" : "recruit.tag.mercenary");
+		tagLabel.CustomMinimumSize = new Vector2(64.0f, 0.0f);
+		tagLabel.VerticalAlignment = VerticalAlignment.Center;
+		content.AddChild(tagLabel);
+
 		SimpleActor previewActor = CreateMercenaryOfferPreview(offer);
 		var infoCard = new CompanionInfoCard
 		{
@@ -221,13 +235,19 @@ public partial class MercenaryShopPanel : PanelContainer
 
 		var hireButton = new Button
 		{
-			Text = LocaleText.F("mercenary.button.hire", offer.Cost),
+			Text = LocaleText.F("recruit.button.recruit", offer.Cost),
 			CustomMinimumSize = new Vector2(150.0f, 54.0f),
 			Disabled = _player == null || _player.Gold < offer.Cost,
 		};
 		hireButton.Pressed += () =>
 		{
-			if (_player != null && _player.TryHireContractCompanion(offer))
+			if (_player == null)
+			{
+				return;
+			}
+
+			bool ok = isCompanion ? _player.TryRecruitCompanion(offer) : _player.TryHireContractCompanion(offer);
+			if (ok)
 			{
 				RefreshAll();
 			}
@@ -235,8 +255,6 @@ public partial class MercenaryShopPanel : PanelContainer
 		content.AddChild(hireButton);
 	}
 
-	// Build a throwaway companion that mirrors the mercenary offer, so the
-	// CompanionInfoCard shows the exact same rich layout as the pet shop.
 	private static SimpleActor CreateMercenaryOfferPreview(PlayerController.ContractCompanionOffer offer)
 	{
 		var actor = new SimpleActor

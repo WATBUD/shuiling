@@ -40,8 +40,13 @@ public partial class PlayerController
 			return false;
 		}
 
+		if (_contractCompanionOffers.Count >= RecruitOfferCap)
+		{
+			return false;
+		}
+
 		Gold -= MercenaryRefreshCost;
-		GenerateMercenaryOffers();
+		AddOneMercenaryOffer();
 		PostSystemMessage(LocaleText.F("system.mercenary.refreshed", MercenaryRefreshCost, Gold), new Color(0.82f, 0.94f, 1.0f));
 		_inventoryPanel.RefreshAll();
 		_mercenaryShopPanel.RefreshAll();
@@ -60,42 +65,67 @@ public partial class PlayerController
 
 	private void EnsureMercenaryOffers()
 	{
-		// Only generate on first init or when the refresh time is due — do NOT
-		// refill just because the list was emptied by hiring. Bought-out slots
-		// stay empty until the timer elapses or the player pays to refresh.
-		if (_mercenaryNextRefreshUnix <= 0.0 || Time.GetUnixTimeFromSystem() >= _mercenaryNextRefreshUnix)
+		// 傭兵每 6 小時累積 1 隻到上限；首次初始化先給 1 隻並排定下一次。
+		if (_mercenaryNextRefreshUnix <= 0.0)
 		{
-			GenerateMercenaryOffers();
+			AddOneMercenaryOffer();
+			_mercenaryNextRefreshUnix = Time.GetUnixTimeFromSystem() + MercenaryRefreshSeconds;
+			return;
 		}
+
+		AdvanceMercenaryOffers(false);
 	}
 
 	private void UpdateMercenaryOfferRefresh()
 	{
-		if (_mercenaryNextRefreshUnix > 0.0 && Time.GetUnixTimeFromSystem() >= _mercenaryNextRefreshUnix)
+		AdvanceMercenaryOffers(true);
+	}
+
+	private void AdvanceMercenaryOffers(bool announce)
+	{
+		if (_mercenaryNextRefreshUnix <= 0.0)
 		{
-			GenerateMercenaryOffers();
-			PostSystemMessage(LocaleText.T("system.mercenary.auto_refreshed"), new Color(0.82f, 0.94f, 1.0f));
+			return;
+		}
+
+		double now = Time.GetUnixTimeFromSystem();
+		bool added = false;
+		while (now >= _mercenaryNextRefreshUnix && _contractCompanionOffers.Count < RecruitOfferCap)
+		{
+			AddOneMercenaryOffer();
+			added = true;
+			_mercenaryNextRefreshUnix += MercenaryRefreshSeconds;
+		}
+
+		// 已達上限：把下一次時間貼齊到未來，避免一次灌爆或無限迴圈。
+		if (_contractCompanionOffers.Count >= RecruitOfferCap)
+		{
+			_mercenaryNextRefreshUnix = now + MercenaryRefreshSeconds;
+		}
+
+		if (added)
+		{
+			if (announce)
+			{
+				PostSystemMessage(LocaleText.T("system.mercenary.auto_refreshed"), new Color(0.82f, 0.94f, 1.0f));
+			}
+
+			if (_mercenaryShopPanel != null && _mercenaryShopPanel.Visible)
+			{
+				_mercenaryShopPanel.RefreshAll();
+			}
 		}
 	}
 
-	private void GenerateMercenaryOffers()
+	private void AddOneMercenaryOffer()
 	{
-		_contractCompanionOffers.Clear();
-		var available = new List<ContractCompanionOffer>(ContractCompanionOfferTemplates);
-		for (int index = 0; index < MercenaryOfferCount; index++)
+		if (_contractCompanionOffers.Count >= RecruitOfferCap)
 		{
-			if (available.Count == 0)
-			{
-				available.AddRange(ContractCompanionOfferTemplates);
-			}
-
-			int templateIndex = _mercenaryRng.RandiRange(0, available.Count - 1);
-			ContractCompanionOffer template = available[templateIndex];
-			available.RemoveAt(templateIndex);
-			_contractCompanionOffers.Add(CreateRandomMercenaryOffer(template, index));
+			return;
 		}
 
-		_mercenaryNextRefreshUnix = Time.GetUnixTimeFromSystem() + MercenaryRefreshSeconds;
+		ContractCompanionOffer template = ContractCompanionOfferTemplates[_mercenaryRng.RandiRange(0, ContractCompanionOfferTemplates.Length - 1)];
+		_contractCompanionOffers.Add(CreateRandomMercenaryOffer(template, _contractCompanionOffers.Count));
 	}
 
 	private ContractCompanionOffer CreateRandomMercenaryOffer(ContractCompanionOffer template, int index)

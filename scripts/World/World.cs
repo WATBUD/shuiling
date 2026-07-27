@@ -725,15 +725,14 @@ public partial class World : Node3D
 
 		// 主城改為六屋圍繞：六棟建築等距（每 60°）環繞中央，並整體偏移 30° 讓正北（180°）
 		// 的傳送廣場走廊保持淨空。順序沿環：30 道具、90 強化屋、150 傭兵、210 寵物、270 倉庫、330 鐵匠。
+		// 傭兵公會已移除；其清單併入夥伴招募所（pet shop）。150° 留給日後擴充。
 		Vector3 itemShopOffset = RingOffset(30.0f, shopRadius);
 		Vector3 refinementOffset = RingOffset(90.0f, shopRadius);
-		Vector3 mercenaryOffset = RingOffset(150.0f, shopRadius);
 		Vector3 petShopOffset = RingOffset(210.0f, shopRadius);
 		Vector3 warehouseOffset = RingOffset(270.0f, shopRadius);
 		Vector3 blacksmithOffset = RingOffset(330.0f, shopRadius);
 		CreateItemShop(center + itemShopOffset, YawFacingCenter(itemShopOffset));
 		CreateRefinementHouse(center + refinementOffset, YawFacingCenter(refinementOffset));
-		CreateMercenaryGuild(center + mercenaryOffset, YawFacingCenter(mercenaryOffset));
 		CreatePetShop(center + petShopOffset, YawFacingCenter(petShopOffset));
 		CreateWarehouseBuilding(center + warehouseOffset, YawFacingCenter(warehouseOffset));
 		CreateBlacksmithShop(center + blacksmithOffset, YawFacingCenter(blacksmithOffset));
@@ -1946,7 +1945,7 @@ public partial class World : Node3D
 		{
 			new("name.npc.item_merchant", RingFrontOffset(30.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(30.0f, shopRadius)), 0.8f, "Support"),
 			new("name.npc.refiner", RingFrontOffset(90.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(90.0f, shopRadius)), 0.7f, "Tank"),
-			new("name.npc.mercenary_broker", RingFrontOffset(150.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(150.0f, shopRadius)), 0.7f, "DPS"),
+			// 傭兵仲介已移除：傭兵清單併入「夥伴招募所」(pet_trainer) 的傭兵分頁。
 			new("name.npc.pet_trainer", RingFrontOffset(210.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(210.0f, shopRadius)), 0.7f, "Support"),
 			new("name.npc.warehouse_keeper", RingFrontOffset(270.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(270.0f, shopRadius)), 0.8f, "Support"),
 			new("name.npc.blacksmith", RingFrontOffset(330.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(330.0f, shopRadius)), 0.8f, "Tank"),
