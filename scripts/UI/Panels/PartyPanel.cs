@@ -110,12 +110,17 @@ public partial class PartyPanel : PanelContainer
 			activeIndex++;
 		}
 
-		AddHeader(LocaleText.T("party.collection"));
-		int storedIndex = 1;
-		foreach (SimpleActor actor in GetStoredCompanions())
+		// 不再顯示「收藏」清單；改為列出已死亡的夥伴（供水池復活辨識）。
+		List<SimpleActor> deadCompanions = GetDeadCompanions();
+		if (deadCompanions.Count > 0)
 		{
-			AddMemberButton(FormatActorListText(storedIndex, actor), _selected == actor, () => SelectMember(actor), actor);
-			storedIndex++;
+			AddHeader(LocaleText.T("party.dead"));
+			int deadIndex = 1;
+			foreach (SimpleActor actor in deadCompanions)
+			{
+				AddMemberButton(FormatActorListText(deadIndex, actor), _selected == actor, () => SelectMember(actor), actor);
+				deadIndex++;
+			}
 		}
 
 		if (!IsSelectedValid())
@@ -244,6 +249,12 @@ public partial class PartyPanel : PanelContainer
 
 	private static string FormatActorListText(int index, SimpleActor actor)
 	{
+		if (actor.IsDefeated)
+		{
+			string state = LocaleText.T(actor.IsAwaitingRecovery ? "party.state.fallen_field" : "party.state.dead");
+			return $"[{index}]: {actor.LocalizedDisplayName} · {state}";
+		}
+
 		return $"[{index}]: {actor.LocalizedDisplayName} {actor.CurrentHealth}/{actor.EffectiveMaxHealth}";
 	}
 
@@ -601,6 +612,26 @@ public partial class PartyPanel : PanelContainer
 		foreach (SimpleActor actor in _player.ActiveParty)
 		{
 			if (IsInstanceValid(actor) && actor.IsCaptured && !actor.IsAwaitingRecovery)
+			{
+				companions.Add(actor);
+			}
+		}
+
+		return companions;
+	}
+
+	// 已死亡（含倒在野外待回收）的夥伴，顯示在 U 面板的「已死亡」區。
+	private List<SimpleActor> GetDeadCompanions()
+	{
+		var companions = new List<SimpleActor>();
+		if (_player == null)
+		{
+			return companions;
+		}
+
+		foreach (SimpleActor actor in _player.CapturedCollection)
+		{
+			if (IsInstanceValid(actor) && actor.IsCaptured && actor.IsDefeated)
 			{
 				companions.Add(actor);
 			}

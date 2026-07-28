@@ -489,6 +489,13 @@ public partial class PlayerController
 			return false;
 		}
 
+		// 收藏上限 20（含已死亡的夥伴）；額滿就無法再撿取。
+		if (_capturedCollection.Count >= ActivePartyLimit)
+		{
+			PostSystemMessage(LocaleText.F("system.capture.collection_full", ActivePartyLimit), new Color(1.0f, 0.72f, 0.5f), GameMessageChannel.Party);
+			return false;
+		}
+
 		_capturedCollection.Add(actor);
 		actor.Capture(this);
 		PostSystemMessage(LocaleText.F("system.capture.success", actor.LocalizedDisplayName), new Color(0.62f, 0.90f, 1.0f), GameMessageChannel.Party);

@@ -64,14 +64,14 @@ public partial class PlayerController
 		};
 		vfx.AddChild(column);
 
-		// 地面光環（平躺）
+		// 地面光環：TorusMesh 預設就平躺在 XZ 平面（水平），千萬不要再旋轉，否則會變垂直。
 		var ring = new MeshInstance3D
 		{
 			Name = "ReviveRing",
 			Mesh = new TorusMesh { InnerRadius = 1.4f, OuterRadius = 2.1f },
 			MaterialOverride = MakeCastGlow(FountainReviveColor, 0.42f, 2.6f),
 			Position = new Vector3(0.0f, 0.35f, 0.0f),
-			RotationDegrees = new Vector3(90.0f, 0.0f, 0.0f),
+			RotationDegrees = Vector3.Zero,
 		};
 		vfx.AddChild(ring);
 
@@ -137,6 +137,8 @@ public partial class PlayerController
 			if (IsInstanceValid(actor) && actor.ReviveFromCaretaker(this))
 			{
 				revived++;
+				// 水池復活的夥伴直接出戰（隊伍上限 20，通常有空位）。
+				DeployCompanion(actor, false);
 			}
 		}
 
