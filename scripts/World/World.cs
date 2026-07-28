@@ -753,7 +753,38 @@ public partial class World : Node3D
 		CreateCityMarket(center);
 		CreateCityGardens(center);
 
+		// 訓練場稻草人：放在原傭兵公會（150°）方向的空地上。
+		Vector3 dummyOffset = RingOffset(150.0f, 15.0f);
+		CreateTrainingDummy(center + dummyOffset, YawFacingCenter(dummyOffset));
+
 		_obstaclePositions.Add(center);
+	}
+
+	private void CreateTrainingDummy(Vector3 position, float yawDegrees)
+	{
+		// 用一般怪物 actor 當受擊本體（沿用近戰／投射物的命中判定與傷害數字），
+		// 但標記為訓練稻草人：被動、不主動攻擊、受擊只顯示數字不扣血。
+		SimpleActor dummy = CreateActor(true, "city", "name.training_dummy", "Tank", 1, 1);
+		dummy.Name = "TrainingDummy";
+		dummy.IsTrainingDummy = true;
+		dummy.SetPassive(true);
+		dummy.WanderRadius = 0.0f;
+		dummy.MoveSpeed = 0.0f;
+		// 防禦 0 → 顯示接近原始傷害；血量很高但反正永不扣血。
+		dummy.ConfigureStats("name.training_dummy", 1, 999999, 0, 0, 0, 0);
+		dummy.ConfigureCombatProfile("Tank", "personality.calm", "ability.none", 0);
+		dummy.Position = position;
+		dummy.HomePosition = position;
+		dummy.RotationDegrees = new Vector3(0.0f, yawDegrees, 0.0f);
+		_actorsRoot.AddChild(dummy);
+
+		// 簡單的木架裝飾，讓它看起來像訓練場的標靶。
+		var frame = new Node3D { Name = "TrainingDummyFrame", Position = position, RotationDegrees = new Vector3(0.0f, yawDegrees, 0.0f) };
+		_propsRoot.AddChild(frame);
+		AddMesh(frame, "DummyBase", BoxMeshFor(new Vector3(1.4f, 0.24f, 1.4f)), new Vector3(0.0f, 0.12f, 0.0f), Vector3.Zero, Vector3.One, _matCobblestone);
+		AddMesh(frame, "DummyPostL", BoxMeshFor(new Vector3(0.14f, 2.1f, 0.14f)), new Vector3(-0.9f, 1.05f, 0.7f), Vector3.Zero, Vector3.One, _matWood);
+		AddMesh(frame, "DummyPostR", BoxMeshFor(new Vector3(0.14f, 2.1f, 0.14f)), new Vector3(0.9f, 1.05f, 0.7f), Vector3.Zero, Vector3.One, _matWood);
+		AddMesh(frame, "DummyCrossbar", BoxMeshFor(new Vector3(2.0f, 0.14f, 0.14f)), new Vector3(0.0f, 2.05f, 0.7f), Vector3.Zero, Vector3.One, _matWood);
 	}
 
 	private void CreateCityRoad(string name, Vector3 center, Vector2 size)

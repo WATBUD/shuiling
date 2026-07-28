@@ -305,7 +305,10 @@ public partial class SimpleActor : CharacterBody3D
 	private const float PassiveProvokeSeconds = 8.0f;
 	public void SetPassive(bool passive) => _isPassive = passive;
 
-	public bool CanBeCaptured => ActorKind == "monster" && !IsBoss && !_isCaptured && !_isDefeated && !_isNetworkPuppet;
+	// 訓練場稻草人：受擊只顯示傷害數字與特效，不扣血、不死亡、不可被捕捉。
+	[Export] public bool IsTrainingDummy { get; set; }
+
+	public bool CanBeCaptured => ActorKind == "monster" && !IsBoss && !_isCaptured && !_isDefeated && !_isNetworkPuppet && !IsTrainingDummy;
 	public bool IsNetworkPuppet => _isNetworkPuppet;
 
 	// ── Behaviour gates: SINGLE SOURCE OF TRUTH ────────────────────────────────
@@ -1929,6 +1932,14 @@ public partial class SimpleActor : CharacterBody3D
 			: ElementChart.GetMultiplier(attacker.CurrentBuildStats.DamageElementId, CurrentBuildStats.DamageElementId);
 		int elementalDamage = Mathf.Max(Mathf.RoundToInt(rawDamage * elementMultiplier * CurrentBuildStats.IncomingDamageMultiplier), 1);
 		int mitigatedDamage = Mathf.Max(elementalDamage - Mathf.RoundToInt(EffectiveDefense * 0.35f), 1);
+		if (IsTrainingDummy)
+		{
+			// 稻草人：顯示傷害數字與命中特效，但永遠不扣血、不會死亡、也不會反擊。
+			SpawnCombatEffect(mitigatedDamage, attacker?.GetAttackColor() ?? new Color(1.0f, 0.5f, 0.22f, 0.92f));
+			RefreshNameplate();
+			return mitigatedDamage;
+		}
+
 		if (CurrentBuildStats.HasShieldSkill)
 		{
 			mitigatedDamage = Mathf.Max(Mathf.RoundToInt(mitigatedDamage * 0.78f), 1);
