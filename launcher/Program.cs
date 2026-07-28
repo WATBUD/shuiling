@@ -18,7 +18,7 @@ internal static class Program
 {
 	private const string ManifestAsset = "version.json";
 	private const string PackageAsset = "game.zip";
-	private const string LauncherVersion = "2.1.0";
+	private const string LauncherVersion = "2.1.1";
 	private const uint DetachedProcess = 0x00000008;
 	private const uint CreateNewProcessGroup = 0x00000200;
 	private static readonly HttpClient Http = CreateHttpClient();
@@ -415,7 +415,14 @@ internal static class Program
 
 	private static async Task LaunchGameAndCloseAsync(string gamePath, string appDir)
 	{
-		Log("啟動遊戲…");
+		Log("完成，將於 3 秒後啟動遊戲並自動關閉更新器。");
+		await Task.Delay(TimeSpan.FromSeconds(3));
+		Console.Out.Flush();
+		if (OperatingSystem.IsWindows())
+		{
+			FreeConsole();
+		}
+
 		if (OperatingSystem.IsWindows())
 		{
 			var startupInfo = new StartupInfo { Size = Marshal.SizeOf<StartupInfo>() };
@@ -450,13 +457,6 @@ internal static class Program
 			});
 		}
 
-		Log("完成，更新器將於 3 秒後自動關閉。");
-		await Task.Delay(TimeSpan.FromSeconds(3));
-		Console.Out.Flush();
-		if (OperatingSystem.IsWindows())
-		{
-			FreeConsole();
-		}
 		Environment.Exit(0);
 	}
 
