@@ -62,10 +62,11 @@ powershell -ExecutionPolicy Bypass -File tools\build_launcher.ps1
 
 ## 4. 每次要發新測試版（已自動化）
 
-平常只需把完成的修改 commit 並 push 到 `main`：
+平常開發照常 commit 並 push 到 `main`，不會發布遊戲。確認版本可交付後，
+才把完成內容推送到 `release`：
 
 ```bash
-git push origin main
+git push origin main:release
 ```
 
 `.github/workflows/release-game.yml` 會在 GitHub 的 Windows runner：
@@ -76,7 +77,7 @@ git push origin main
 - 產生 `game.zip`、SHA-256 與 `version.json`；
 - 建立 GitHub Release。
 
-朋友下次開 `ShuilingLauncher.exe` 就會自動更新。只修改 Markdown、`docs/`
+只有 `release` 分支會觸發發布。朋友下次開 `ShuilingLauncher.exe` 就會自動更新。只修改 Markdown、`docs/`
 或 `launcher/` 不會發布整個遊戲，避免無意義下載。
 
 若需要指定大版本，可到 GitHub → Actions → **Build and publish game update** →

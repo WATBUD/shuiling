@@ -3,10 +3,11 @@ name: Build and publish game update
 on:
   push:
     branches:
-      - main
+      - release
     paths-ignore:
       - "docs/**"
       - "launcher/**"
+      - ".github/**"
       - "**/*.md"
   workflow_dispatch:
     inputs:
@@ -86,7 +87,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           New-Item -ItemType Directory -Path ".\export" -Force | Out-Null
-          & "$env:GODOT_EXE" --headless --editor --path "$env:GITHUB_WORKSPACE" --quit-after 30
+          & "$env:GODOT_EXE" --headless --path "$env:GITHUB_WORKSPACE" --import
           if ($LASTEXITCODE -ne 0) {
             throw "Godot project import failed."
           }

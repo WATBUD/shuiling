@@ -57,10 +57,10 @@ powershell -ExecutionPolicy Bypass -File tools\build_launcher.ps1
 
 ## 每次要發新測試版
 
-把完成的修改 push 到 `main` 即可：
+一般開發內容 push 到 `main` 不會發布。確認版本完成後，推送到 `release`：
 
 ```bash
-git push origin main
+git push origin main:release
 ```
 
 GitHub Actions 會自動安裝 Godot Mono、編譯、匯出 Windows、遞增版本號並建立
