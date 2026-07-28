@@ -307,6 +307,12 @@ public partial class PlayerController : CharacterBody3D
 				CallDeferred(nameof(GrantStarterBunny));
 			}
 
+			// 測試用：贈送已死亡的夥伴（測水池復活 / U 面板已死亡顯示）。
+			if (DevConfig.DeadTestPets > 0)
+			{
+				CallDeferred(nameof(GrantDeadTestPets));
+			}
+
 			GrantStarterTownPortalScrolls();
 		}
 		InitializeCaptureNetAmmo();

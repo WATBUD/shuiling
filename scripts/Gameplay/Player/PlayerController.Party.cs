@@ -325,6 +325,43 @@ public partial class PlayerController
 		EquipFullCoreShowcase(bunny);
 	}
 
+	// 測試用：生成數隻「已死亡（已回收）」的夥伴，直接進收藏並標記為已死亡，
+	// 供測試水池復活與 U 面板「已死亡」顯示。數量由 dev_config.cfg 的 dead_test_pets 控制。
+	private void GrantDeadTestPets()
+	{
+		if (GetParent() is not World world)
+		{
+			return;
+		}
+
+		int count = Mathf.Clamp(DevConfig.DeadTestPets, 0, ActivePartyLimit);
+		string[] species = { "name.monster.rat", "name.monster.bunny", "name.monster.fox", "name.monster.crab" };
+		int granted = 0;
+		for (int index = 0; index < count; index++)
+		{
+			if (_capturedCollection.Count >= ActivePartyLimit)
+			{
+				break;
+			}
+
+			string nameKey = species[index % species.Length];
+			SimpleActor pet = world.SpawnPurchasedPet(nameKey, 1, 120, 16, 9);
+			if (!_capturedCollection.Contains(pet))
+			{
+				_capturedCollection.Add(pet);
+			}
+
+			pet.Capture(this);
+			pet.MarkDefeatedForTest();
+			granted++;
+		}
+
+		if (granted > 0)
+		{
+			_partyPanel.RefreshParty();
+		}
+	}
+
 	private static void EquipFullCoreShowcase(SimpleActor actor)
 	{
 		if (!IsInstanceValid(actor))

@@ -1097,6 +1097,24 @@ public partial class SimpleActor : CharacterBody3D
 		return true;
 	}
 
+	// 開發測試用：把一隻已捕捉的夥伴直接設為「已死亡且已回收」狀態
+	// （等同倒地後已被撿回），使其顯示在 U 面板「已死亡」區並可於水池復活。
+	public void MarkDefeatedForTest()
+	{
+		_isCaptured = true;
+		_isDefeated = true;
+		_isAwaitingRecovery = false;
+		_isInActiveParty = false;
+		_fallenMapId = string.Empty;
+		CurrentHealth = 0;
+		Velocity = Vector3.Zero;
+		CollisionLayer = 0;
+		CollisionMask = 0;
+		Visible = false;
+		SetPhysicsProcess(false);
+		RefreshNameplate();
+	}
+
 	public void UpdateFallenMapVisibility(string activeMapId)
 	{
 		if (_isCaptured && _isDefeated && _isAwaitingRecovery)
