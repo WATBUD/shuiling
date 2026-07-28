@@ -98,7 +98,7 @@ internal static class Program
 		{
 			using HttpResponseMessage response = await Http.GetAsync(url);
 			response.EnsureSuccessStatusCode();
-			string json = await response.Content.ReadAsStringAsync();
+			string json = (await response.Content.ReadAsStringAsync()).TrimStart('\uFEFF');
 			using JsonDocument document = JsonDocument.Parse(json);
 			JsonElement root = document.RootElement;
 			string version = root.TryGetProperty("version", out JsonElement versionNode)

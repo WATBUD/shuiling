@@ -28,16 +28,22 @@ try {
     $versionJson = Join-Path $work "version.json"
     $package = Get-Item -LiteralPath $gameZip
     $hash = (Get-FileHash -LiteralPath $gameZip -Algorithm SHA256).Hash.ToLowerInvariant()
-    [ordered]@{
+    $manifestJson = [ordered]@{
         version = $Version
         sha256 = $hash
         size = $package.Length
-    } | ConvertTo-Json | Set-Content -LiteralPath $versionJson -Encoding utf8
+    } | ConvertTo-Json
+    $utf8WithoutBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($versionJson, $manifestJson, $utf8WithoutBom)
 
     $tag = "v$Version"
     Write-Host "[Release] Uploading $tag to GitHub Releases..."
-    & gh release view $tag *> $null
-    if ($LASTEXITCODE -eq 0) {
+    $savedErrorPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & gh release view $tag 2>$null | Out-Null
+    $releaseExists = $LASTEXITCODE -eq 0
+    $ErrorActionPreference = $savedErrorPreference
+    if ($releaseExists) {
         & gh release upload $tag $gameZip $versionJson --clobber
     } else {
         & gh release create $tag $gameZip $versionJson --title "Shuiling Test Build $Version" --notes "Automatic game update $Version"
