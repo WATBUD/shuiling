@@ -36,10 +36,10 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up .NET 8
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "8.0.x"
 
@@ -116,7 +116,10 @@ jobs:
               $version = "0.1.0"
             }
           }
-          if (gh release view "v$version" --repo "$env:GITHUB_REPOSITORY" 2>$null) {
+          gh release view "v$version" --repo "$env:GITHUB_REPOSITORY" *> $null
+          $releaseExists = $LASTEXITCODE -eq 0
+          $global:LASTEXITCODE = 0
+          if ($releaseExists) {
             throw "Release v$version already exists."
           }
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
