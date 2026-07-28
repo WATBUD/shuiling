@@ -62,7 +62,7 @@ internal static class Program
 			UpdateManifest? remote = await TryGetManifestAsync($"{releaseBase}/{ManifestAsset}");
 			if (remote == null)
 			{
-				return LaunchInstalledOrFail(gamePath, appDir, "暫時無法連線到更新伺服器");
+				return await LaunchInstalledOrFailAsync(gamePath, appDir, "暫時無法連線到更新伺服器");
 			}
 
 			bool needsInstall = !File.Exists(gamePath)
@@ -83,12 +83,12 @@ internal static class Program
 				return Fail($"更新完成但找不到遊戲：{cfg.AppDir}\\{cfg.GameExe}");
 			}
 
-			LaunchGame(gamePath, appDir);
+			await LaunchGameAndCloseAsync(gamePath, appDir);
 			return 0;
 		}
 		catch (Exception ex)
 		{
-			return LaunchInstalledOrFail(gamePath, appDir, $"更新失敗：{ex.Message}");
+			return await LaunchInstalledOrFailAsync(gamePath, appDir, $"更新失敗：{ex.Message}");
 		}
 	}
 
@@ -277,7 +277,7 @@ internal static class Program
 		DeleteDirectoryIfPresent(Path.Combine(baseDir, ".update"));
 	}
 
-	private static int LaunchInstalledOrFail(string gamePath, string appDir, string reason)
+	private static async Task<int> LaunchInstalledOrFailAsync(string gamePath, string appDir, string reason)
 	{
 		Log(reason + "。");
 		if (!File.Exists(gamePath))
@@ -286,7 +286,7 @@ internal static class Program
 		}
 
 		Log("將啟動目前已安裝的版本。");
-		LaunchGame(gamePath, appDir);
+		await LaunchGameAndCloseAsync(gamePath, appDir);
 		return 0;
 	}
 
@@ -352,15 +352,18 @@ internal static class Program
 		return directories.Length == 1 && files.Length == 0 ? directories[0] : stageDir;
 	}
 
-	private static void LaunchGame(string gamePath, string appDir)
+	private static async Task LaunchGameAndCloseAsync(string gamePath, string appDir)
 	{
 		Log("啟動遊戲…");
 		Process.Start(new ProcessStartInfo
 		{
 			FileName = gamePath,
 			WorkingDirectory = appDir,
+			Arguments = "--quiet",
 			UseShellExecute = true,
 		});
+		Log("完成，更新器將於 3 秒後自動關閉。");
+		await Task.Delay(TimeSpan.FromSeconds(3));
 	}
 
 	private static HttpClient CreateHttpClient()
