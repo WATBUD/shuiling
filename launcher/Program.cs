@@ -1,10 +1,13 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,7 +18,59 @@ internal static class Program
 {
 	private const string ManifestAsset = "version.json";
 	private const string PackageAsset = "game.zip";
+	private const uint DetachedProcess = 0x00000008;
+	private const uint CreateNewProcessGroup = 0x00000200;
 	private static readonly HttpClient Http = CreateHttpClient();
+
+	[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+	private struct StartupInfo
+	{
+		public int Size;
+		public string? Reserved;
+		public string? Desktop;
+		public string? Title;
+		public int X;
+		public int Y;
+		public int XSize;
+		public int YSize;
+		public int XCountChars;
+		public int YCountChars;
+		public int FillAttribute;
+		public int Flags;
+		public short ShowWindow;
+		public short Reserved2;
+		public IntPtr Reserved2Pointer;
+		public IntPtr StandardInput;
+		public IntPtr StandardOutput;
+		public IntPtr StandardError;
+	}
+
+	[StructLayout(LayoutKind.Sequential)]
+	private struct ProcessInformation
+	{
+		public IntPtr Process;
+		public IntPtr Thread;
+		public int ProcessId;
+		public int ThreadId;
+	}
+
+	[DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool CreateProcess(
+		string applicationName,
+		StringBuilder commandLine,
+		IntPtr processAttributes,
+		IntPtr threadAttributes,
+		[MarshalAs(UnmanagedType.Bool)] bool inheritHandles,
+		uint creationFlags,
+		IntPtr environment,
+		string currentDirectory,
+		ref StartupInfo startupInfo,
+		out ProcessInformation processInformation);
+
+	[DllImport("kernel32.dll", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool CloseHandle(IntPtr handle);
 
 	private sealed class LauncherConfig
 	{
@@ -355,13 +410,40 @@ internal static class Program
 	private static async Task LaunchGameAndCloseAsync(string gamePath, string appDir)
 	{
 		Log("啟動遊戲…");
-		Process.Start(new ProcessStartInfo
+		if (OperatingSystem.IsWindows())
 		{
-			FileName = gamePath,
-			WorkingDirectory = appDir,
-			Arguments = "--quiet",
-			UseShellExecute = true,
-		});
+			var startupInfo = new StartupInfo { Size = Marshal.SizeOf<StartupInfo>() };
+			var commandLine = new StringBuilder($"\"{gamePath}\" --quiet");
+			bool started = CreateProcess(
+				gamePath,
+				commandLine,
+				IntPtr.Zero,
+				IntPtr.Zero,
+				false,
+				DetachedProcess | CreateNewProcessGroup,
+				IntPtr.Zero,
+				appDir,
+				ref startupInfo,
+				out ProcessInformation processInformation);
+			if (!started)
+			{
+				throw new Win32Exception(Marshal.GetLastWin32Error(), "無法以獨立程序啟動遊戲。");
+			}
+
+			CloseHandle(processInformation.Thread);
+			CloseHandle(processInformation.Process);
+		}
+		else
+		{
+			Process.Start(new ProcessStartInfo
+			{
+				FileName = gamePath,
+				WorkingDirectory = appDir,
+				Arguments = "--quiet",
+				UseShellExecute = true,
+			});
+		}
+
 		Log("完成，更新器將於 3 秒後自動關閉。");
 		await Task.Delay(TimeSpan.FromSeconds(3));
 	}
