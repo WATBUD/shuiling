@@ -178,6 +178,24 @@ public partial class SkillAttackVfx : Node3D
 				AddSlashStar(6, Radius * 1.18f, Radius * 0.045f, new Color(0.64f, 0.94f, 1.0f, 0.96f));
 				AddParticles("LaserIons", new Color(0.28f, 0.84f, 1.0f, 0.94f), 22, 0.30f, 4.0f, 9.0f, 180.0f, Vector3.Zero, Radius * 0.045f);
 				break;
+			case "gem.skill.rocket":
+				// 火箭：熾熱核心 + 火花噴發 + 上升煙塵。
+				AddFxMesh("RocketCore", new SphereMesh { Radius = Radius * 0.28f, Height = Radius * 0.56f }, Vector3.Up * Radius * 0.10f, Vector3.Zero, new Color(1.0f, 0.62f, 0.10f, 0.92f));
+				AddParticles("RocketBlast", new Color(1.0f, 0.34f, 0.05f, 0.95f), 40, 0.48f, 3.4f, 9.0f, 180.0f, new Vector3(0.0f, -3.0f, 0.0f), Radius * 0.08f);
+				AddParticles("RocketSmoke", new Color(0.26f, 0.22f, 0.20f, 0.6f), 14, 0.7f, 0.8f, 2.4f, 120.0f, new Vector3(0.0f, 1.6f, 0.0f), Radius * 0.14f);
+				break;
+			case "gem.skill.ice_shard":
+				// 冰箭：淡藍冰晶碎片 + 霜霧。
+				AddSlashStar(7, Radius * 1.0f, Radius * 0.06f, new Color(0.66f, 0.9f, 1.0f, 0.96f));
+				AddFxMesh("IceCore", new SphereMesh { Radius = Radius * 0.18f, Height = Radius * 0.36f }, Vector3.Up * Radius * 0.10f, Vector3.Zero, new Color(0.82f, 0.96f, 1.0f, 0.9f));
+				AddParticles("FrostMotes", new Color(0.72f, 0.92f, 1.0f, 0.92f), 26, 0.5f, 1.6f, 5.0f, 150.0f, new Vector3(0.0f, -1.0f, 0.0f), Radius * 0.05f);
+				break;
+			case "gem.skill.lightning":
+				// 雷擊：黃白電弧 + 火花。
+				AddSlashStar(6, Radius * 1.25f, Radius * 0.035f, new Color(1.0f, 0.96f, 0.55f, 0.98f));
+				AddDirectionalStreak("Bolt", Vector3.Up, Vector3.Zero, Radius * 1.6f, Radius * 0.04f, new Color(1.0f, 0.98f, 0.7f, 0.98f));
+				AddParticles("Sparks", new Color(1.0f, 0.92f, 0.4f, 0.95f), 24, 0.26f, 4.5f, 10.0f, 180.0f, Vector3.Zero, Radius * 0.04f);
+				break;
 			case "gem.skill.whirlwind":
 				AddSlashStar(7, Radius * 1.12f, Radius * 0.075f, bright);
 				AddParticles("SlashFragments", bright, 24, 0.32f, 2.8f, 7.0f, 48.0f, new Vector3(0.0f, -2.0f, 0.0f), Radius * 0.05f);

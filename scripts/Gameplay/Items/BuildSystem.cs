@@ -478,6 +478,9 @@ public static class BuildCatalog
 		new SkillGemDefinition { Id = "gem.skill.meteor", NameKey = "gem.skill.meteor", SummaryKey = "gem.skill.summary.meteor", AttackBonus = 12, AttackRangeBonus = 1.2f, AttackCooldownReduction = -0.08f, IsRangedActiveSkill = true },
 		new SkillGemDefinition { Id = "gem.skill.dash", NameKey = "gem.skill.dash", SummaryKey = "gem.skill.summary.dash", MoveSpeedBonus = 0.18f, AttackCooldownReduction = 0.08f },
 		new SkillGemDefinition { Id = "gem.skill.laser", NameKey = "gem.skill.laser", SummaryKey = "gem.skill.summary.laser", AttackBonus = 6, AttackRangeBonus = 3.2f, DetectionRadiusBonus = 2.0f, IsRangedActiveSkill = true },
+		new SkillGemDefinition { Id = "gem.skill.rocket", NameKey = "gem.skill.rocket", SummaryKey = "gem.skill.summary.rocket", AttackBonus = 9, AttackRangeBonus = 2.6f, AttackCooldownReduction = -0.05f, IsRangedActiveSkill = true },
+		new SkillGemDefinition { Id = "gem.skill.ice_shard", NameKey = "gem.skill.ice_shard", SummaryKey = "gem.skill.summary.ice_shard", AttackBonus = 5, AttackRangeBonus = 2.4f, IsRangedActiveSkill = true },
+		new SkillGemDefinition { Id = "gem.skill.lightning", NameKey = "gem.skill.lightning", SummaryKey = "gem.skill.summary.lightning", AttackBonus = 6, AttackRangeBonus = 2.8f, DetectionRadiusBonus = 1.6f, IsRangedActiveSkill = true },
 		new SkillGemDefinition { Id = "gem.skill.chain", NameKey = "gem.skill.chain", SummaryKey = "gem.skill.summary.chain", AttackBonus = 3, DetectionRadiusBonus = 2.0f, BehaviorId = ProjectileBehavior.Chain, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.water_core" },
 		new SkillGemDefinition { Id = "gem.skill.explosion", NameKey = "gem.skill.explosion", SummaryKey = "gem.skill.summary.explosion", AttackBonus = 7, AttackCooldownReduction = -0.04f, BehaviorId = ProjectileBehavior.Explosion, BehaviorRadius = 3.0f, UpgradeMaterialId = "loot.red_horn" },
 		new SkillGemDefinition { Id = "gem.skill.piercing", NameKey = "gem.skill.piercing", SummaryKey = "gem.skill.summary.piercing", AttackBonus = 2, AttackRangeBonus = 2.0f, BehaviorId = ProjectileBehavior.Pierce, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.small_bone" },
@@ -838,12 +841,20 @@ public static class BuildCatalog
 
 	public static List<string> GetStarterInventoryItemIds()
 	{
+		// 初始只給裝備；寶石不再固定贈送（改由掉落/商店取得，或測試模式一次給齊）。
 		var ids = new List<string>();
 		foreach (EquipmentDefinition equipment in Equipment)
 		{
 			ids.Add(equipment.Id);
 		}
 
+		return ids;
+	}
+
+	// 所有非免費的寶石（屬性 + 技能）id，供測試模式一次發齊。
+	public static List<string> GetAllGemItemIds()
+	{
+		var ids = new List<string>();
 		foreach (AttributeGemDefinition gem in AttributeGems)
 		{
 			if (!IsFreeItem(gem.Id))

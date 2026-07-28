@@ -313,6 +313,15 @@ public partial class PlayerController : CharacterBody3D
 				CallDeferred(nameof(GrantDeadTestPets));
 			}
 
+			// 測試用：一次贈送所有種類寶石各一顆（正式模式寶石只從掉落/商店取得）。
+			if (DevConfig.GrantAllGems)
+			{
+				foreach (string gemId in BuildCatalog.GetAllGemItemIds())
+				{
+					AddInventoryItem(gemId);
+				}
+			}
+
 			GrantStarterTownPortalScrolls();
 		}
 		InitializeCaptureNetAmmo();
