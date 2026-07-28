@@ -242,7 +242,7 @@ public partial class CardAlbumPanel : PanelContainer
 
 		var camera = new Camera3D { Position = new Vector3(0.0f, 1.05f, 3.1f) };
 		viewport.AddChild(camera);
-		camera.LookAt(new Vector3(0.0f, 0.95f, 0.0f), Vector3.Up);
+		camera.LookAtFromPosition(camera.Position, new Vector3(0.0f, 0.95f, 0.0f), Vector3.Up);
 	}
 
 	private void ClearGrid()
