@@ -18,6 +18,7 @@ internal static class Program
 {
 	private const string ManifestAsset = "version.json";
 	private const string PackageAsset = "game.zip";
+	private const string LauncherVersion = "2.1.0";
 	private const uint DetachedProcess = 0x00000008;
 	private const uint CreateNewProcessGroup = 0x00000200;
 	private static readonly HttpClient Http = CreateHttpClient();
@@ -72,6 +73,10 @@ internal static class Program
 	[return: MarshalAs(UnmanagedType.Bool)]
 	private static extern bool CloseHandle(IntPtr handle);
 
+	[DllImport("kernel32.dll", SetLastError = true)]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static extern bool FreeConsole();
+
 	private sealed class LauncherConfig
 	{
 		public string Owner = "WATBUD";
@@ -86,7 +91,8 @@ internal static class Program
 	private static async Task<int> Main()
 	{
 		Console.OutputEncoding = System.Text.Encoding.UTF8;
-		Console.Title = "水靈更新器";
+		Console.Title = $"水靈更新器 v{LauncherVersion}";
+		Log($"Launcher v{LauncherVersion}");
 
 		using var singleInstance = new Mutex(true, "ShuilingLauncher.UpdateLock", out bool ownsMutex);
 		if (!ownsMutex)
@@ -446,6 +452,12 @@ internal static class Program
 
 		Log("完成，更新器將於 3 秒後自動關閉。");
 		await Task.Delay(TimeSpan.FromSeconds(3));
+		Console.Out.Flush();
+		if (OperatingSystem.IsWindows())
+		{
+			FreeConsole();
+		}
+		Environment.Exit(0);
 	}
 
 	private static HttpClient CreateHttpClient()
