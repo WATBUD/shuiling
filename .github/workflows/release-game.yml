@@ -87,10 +87,6 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           New-Item -ItemType Directory -Path ".\export" -Force | Out-Null
-          & "$env:GODOT_EXE" --headless --path "$env:GITHUB_WORKSPACE" --import
-          if ($LASTEXITCODE -ne 0) {
-            throw "Godot project import failed."
-          }
           & "$env:GODOT_EXE" --headless --path "$env:GITHUB_WORKSPACE" --export-release "$env:EXPORT_PRESET" "$env:GITHUB_WORKSPACE\export\$env:GAME_EXE"
           if ($LASTEXITCODE -ne 0) {
             throw "Godot Windows export failed."
