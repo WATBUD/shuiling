@@ -209,15 +209,16 @@ public partial class CompanionInfoCard : PanelContainer
 		_experienceBar.MaxValue = Mathf.Max(_player.ExperienceToNextLevel, 1);
 		_experienceBar.Value = Mathf.Clamp(_player.Experience, 0, _player.ExperienceToNextLevel);
 		_experienceBar.Visible = true;
+		BuildStats playerStats = _player.CurrentBuildStats;
 		_stats.Text = string.Join("\n",
-			$"HP {_player.CurrentHealth} / {_player.MaxHealth}",
-			$"{LocaleText.T("stat.attack")} {_player.Attack}",
-			$"{LocaleText.T("stat.defense")} {_player.Defense}",
-			$"{LocaleText.T("stat.move_speed")} {_player.WalkSpeed:0.0}",
-			LocaleText.F("stat.attack_speed_value", GetAttackSpeed(_player.AttackCooldown).ToString("0.00")),
-			$"{LocaleText.T("tooltip.attack_range")} {_player.AttackRange:0.0}",
+			$"HP {_player.CurrentHealth} / {_player.EffectiveMaxHealth}",
+			$"{LocaleText.T("stat.attack")} {playerStats.Attack}",
+			$"{LocaleText.T("stat.defense")} {_player.EffectiveDefense}",
+			$"{LocaleText.T("stat.move_speed")} {_player.WalkSpeed * playerStats.MoveSpeedMultiplier:0.0}",
+			LocaleText.F("stat.attack_speed_value", GetAttackSpeed(_player.AttackCooldown * playerStats.AttackCooldownMultiplier).ToString("0.00")),
+			$"{LocaleText.T("tooltip.attack_range")} {_player.AttackRange + playerStats.AttackRangeBonus:0.0}",
 			$"{LocaleText.T("tooltip.detection_radius")} {_player.DetectionRadius:0.0}",
-			$"{LocaleText.T("tooltip.crit_chance")} {_player.CritChance * 100.0f:0.#}%",
+			$"{LocaleText.T("tooltip.crit_chance")} {playerStats.CritChance * 100.0f:0.#}%",
 			$"{LocaleText.T("stat.state")} {LocaleText.T("party.playable")}");
 		_meta.Text = string.Join("\n",
 			$"Player / {LocaleText.T("combat.range.melee")} / {LocaleText.T("personality.brave")}",
@@ -229,7 +230,8 @@ public partial class CompanionInfoCard : PanelContainer
 		_traitsTitle.Text = LocaleText.T("build.traits");
 		_equipmentTitle.Text = LocaleText.T("build.equipment");
 		_skillGemsTitle.Text = LocaleText.T("build.skill_gems");
-		string playerSignature = $"player|{_player.Level}|{_player.Attack}|{_player.Defense}|{_player.WalkSpeed}|{_player.SprintSpeed}|{_player.AttackCooldown}|{_player.CaptureNetCapacity}|{_player.CaptureNetRechargeSeconds}";
+		CompanionBuildLoadout loadout = _player.BuildLoadout;
+		string playerSignature = $"player|{_player.Level}|{loadout.HelmetId}|{loadout.WeaponId}|{loadout.ArmorId}|{loadout.BootsId}|{loadout.AccessoryId}|{string.Join(",", loadout.SkillGemIds)}|{string.Join(",", loadout.SkillGemLevels)}";
 		if (_detailSignature != playerSignature)
 		{
 			_detailSignature = playerSignature;
@@ -244,18 +246,24 @@ public partial class CompanionInfoCard : PanelContainer
 		ClearFlow(_skillGemFlow);
 		if (_player == null) return;
 
-		AddTerm(_traitFlow, LocaleText.T("player.trait.runner"), () =>
-			(LocaleText.T("player.trait.runner"), $"{LocaleText.T("stat.move_speed")} {_player.WalkSpeed:0.0} -> {_player.SprintSpeed:0.0}"));
-		AddTerm(_traitFlow, LocaleText.T("player.trait.resilience"), () =>
-			(LocaleText.T("player.trait.resilience"), $"HP {_player.MaxHealth}\n{LocaleText.T("stat.defense")} {_player.Defense}"));
-		AddTerm(_equipmentFlow, LocaleText.T("player.equipment.sword"), () =>
-			(LocaleText.T("player.equipment.sword"), $"{LocaleText.T("stat.attack")} {_player.Attack}\n{LocaleText.T("tooltip.attack_range")} {_player.AttackRange:0.0}"));
-		AddTerm(_equipmentFlow, LocaleText.T("player.equipment.shield"), () =>
-			(LocaleText.T("player.equipment.shield"), $"{LocaleText.T("stat.defense")} {_player.Defense}\nHP {_player.MaxHealth}"));
-		AddTerm(_skillGemFlow, LocaleText.T("player.skill.capture"), () =>
-			(LocaleText.T("player.skill.capture"), $"Capacity {_player.CaptureNetCapacity}\nRecharge {_player.CaptureNetRechargeSeconds:0.0}s"));
-		AddTerm(_skillGemFlow, LocaleText.T("player.skill.sprint"), () =>
-			(LocaleText.T("player.skill.sprint"), $"{LocaleText.T("stat.move_speed")} {_player.WalkSpeed:0.0} -> {_player.SprintSpeed:0.0}\nJump {_player.JumpVelocity:0.0}"));
+		CompanionBuildLoadout loadout = _player.BuildLoadout;
+		foreach (EquipmentSlot slot in new[] { EquipmentSlot.Helmet, EquipmentSlot.Weapon, EquipmentSlot.Armor, EquipmentSlot.Boots, EquipmentSlot.Accessory })
+		{
+			EquipmentDefinition equipment = BuildCatalog.GetEquipment(loadout.GetEquipmentId(slot));
+			string name = LocaleText.T(equipment.NameKey);
+			AddTerm(_equipmentFlow, name, () => (name, LocaleText.T(equipment.SummaryKey)));
+		}
+
+		for (int index = 0; index < loadout.SkillGemIds.Length; index++)
+		{
+			SkillGemDefinition gem = BuildCatalog.GetSkillGem(loadout.GetSkillGemId(index));
+			string gemName = LocaleText.T(gem.NameKey);
+			int gemLevel = loadout.GetSkillGemLevel(index);
+			string displayedName = BuildCatalog.IsUpgradeableSkillGem(gem.Id)
+				? LocaleText.F("inventory.gem_level", gemName, gemLevel)
+				: gemName;
+			AddTerm(_skillGemFlow, displayedName, () => (displayedName, LocaleText.T(gem.SummaryKey)));
+		}
 	}
 
 	private void SetPetSectionsVisible(bool visible)
@@ -328,15 +336,12 @@ public partial class CompanionInfoCard : PanelContainer
 			(loadout.ArmorId, LocaleText.T("build.slot.armor")),
 			(loadout.BootsId, LocaleText.T("build.slot.boots")),
 			(loadout.AccessoryId, LocaleText.T("build.slot.accessory")),
-			(loadout.AttributeGemId, LocaleText.T("build.slot.attribute")),
 		};
 		foreach ((string id, string slot) in equipmentItems)
 		{
 			string capturedId = id;
 			string capturedSlot = slot;
-			string name = BuildCatalog.GetItemKind(id) == InventoryItemKind.AttributeGem
-				? LocaleText.T(BuildCatalog.GetAttributeGem(id).NameKey)
-				: LocaleText.T(BuildCatalog.GetEquipment(id).NameKey) + BuildCatalog.GetStarSuffix(id);
+			string name = LocaleText.T(BuildCatalog.GetEquipment(id).NameKey) + BuildCatalog.GetStarSuffix(id);
 			AddTerm(_equipmentFlow, name, () => (name, InventoryPanel.BuildItemTooltipBody(capturedId, capturedSlot)));
 		}
 
@@ -371,7 +376,6 @@ public partial class CompanionInfoCard : PanelContainer
 			loadout.ArmorId,
 			loadout.BootsId,
 			loadout.AccessoryId,
-			loadout.AttributeGemId,
 			string.Join(",", loadout.SkillGemIds),
 			string.Join(",", loadout.SkillGemLevels));
 	}
@@ -484,12 +488,11 @@ public partial class CompanionInfoCard : PanelContainer
 			(loadout.ArmorId, LocaleText.T("build.slot.armor")),
 			(loadout.BootsId, LocaleText.T("build.slot.boots")),
 			(loadout.AccessoryId, LocaleText.T("build.slot.accessory")),
-			(loadout.AttributeGemId, LocaleText.T("build.slot.attribute")),
 		};
 		var blocks = new List<string>();
 		foreach ((string id, string slot) in items)
 		{
-			string name = BuildCatalog.GetItemKind(id) == InventoryItemKind.AttributeGem ? LocaleText.T(BuildCatalog.GetAttributeGem(id).NameKey) : LocaleText.T(BuildCatalog.GetEquipment(id).NameKey);
+			string name = LocaleText.T(BuildCatalog.GetEquipment(id).NameKey);
 			blocks.Add($"[{slot}] {name}\n{InventoryPanel.BuildItemTooltipBody(id, slot)}");
 		}
 		return (LocaleText.T("build.equipment"), string.Join("\n\n", blocks));

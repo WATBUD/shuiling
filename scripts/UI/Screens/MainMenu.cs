@@ -90,6 +90,7 @@ public partial class MainMenu : Control
 			AnchorBottom = 1.0f,
 		};
 		AddChild(background);
+		AddGameVersionLabel();
 
 		var root = new VBoxContainer
 		{
@@ -137,6 +138,64 @@ public partial class MainMenu : Control
 		BuildJoinDialog();
 		BuildSettingsPanel();
 		StartMenuMusic();
+	}
+
+	private void AddGameVersionLabel()
+	{
+		var versionLabel = new Label
+		{
+			Text = LocaleText.F("main_menu.version", ResolveGameVersion()),
+			AnchorLeft = 0.0f,
+			AnchorTop = 1.0f,
+			AnchorRight = 0.0f,
+			AnchorBottom = 1.0f,
+			OffsetLeft = 18.0f,
+			OffsetTop = -42.0f,
+			OffsetRight = 280.0f,
+			OffsetBottom = -14.0f,
+			MouseFilter = MouseFilterEnum.Ignore,
+			HorizontalAlignment = HorizontalAlignment.Left,
+			VerticalAlignment = VerticalAlignment.Bottom,
+		};
+		versionLabel.AddThemeFontSizeOverride("font_size", 14);
+		versionLabel.AddThemeColorOverride("font_color", new Color(0.68f, 0.75f, 0.82f, 0.90f));
+		versionLabel.AddThemeColorOverride("font_outline_color", new Color(0.01f, 0.015f, 0.02f, 0.90f));
+		versionLabel.AddThemeConstantOverride("outline_size", 3);
+		AddChild(versionLabel);
+	}
+
+	private static string ResolveGameVersion()
+	{
+		// The updater writes the installed release version next to the executable.
+		// Prefer it in exported builds so the menu always matches the actual GitHub
+		// release; editor runs fall back to the version tracked in project.godot.
+		if (!OS.HasFeature("editor"))
+		{
+			try
+			{
+				string executableDirectory = System.IO.Path.GetDirectoryName(OS.GetExecutablePath()) ?? string.Empty;
+				string installedVersionPath = System.IO.Path.Combine(executableDirectory, "installed_version.txt");
+				if (System.IO.File.Exists(installedVersionPath))
+				{
+					string installedVersion = System.IO.File.ReadAllText(installedVersionPath).Trim().TrimStart('v', 'V');
+					if (!string.IsNullOrWhiteSpace(installedVersion))
+					{
+						return installedVersion;
+					}
+				}
+			}
+			catch (System.Exception exception)
+			{
+				GD.PushWarning($"Unable to read installed game version: {exception.Message}");
+			}
+		}
+
+		string configuredVersion = ProjectSettings
+			.GetSetting("application/config/version", "0.1.0")
+			.AsString()
+			.Trim()
+			.TrimStart('v', 'V');
+		return string.IsNullOrWhiteSpace(configuredVersion) ? "0.1.0" : configuredVersion;
 	}
 
 	private void BuildSettingsPanel()
@@ -951,6 +1010,7 @@ public partial class MainMenu : Control
 			AnchorBottom = 1.0f,
 		};
 		AddChild(background);
+		AddGameVersionLabel();
 
 		var root = new VBoxContainer
 		{

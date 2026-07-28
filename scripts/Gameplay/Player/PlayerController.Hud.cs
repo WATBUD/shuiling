@@ -3,6 +3,110 @@ using System.Collections.Generic;
 
 public partial class PlayerController
 {
+	private void CreatePlayerHealthHud()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "PlayerHealthHudLayer",
+			Layer = 23,
+		};
+		AddChild(layer);
+
+		_playerHealthHudPanel = new PanelContainer
+		{
+			Name = "PlayerHealthHud",
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			AnchorLeft = 0.0f,
+			AnchorRight = 0.0f,
+			AnchorTop = 0.0f,
+			AnchorBottom = 0.0f,
+			OffsetLeft = 18.0f,
+			OffsetRight = 328.0f,
+			OffsetTop = 18.0f,
+			OffsetBottom = 100.0f,
+		};
+		var panelStyle = new StyleBoxFlat
+		{
+			BgColor = new Color(0.025f, 0.030f, 0.038f, 0.86f),
+			BorderColor = new Color(0.62f, 0.24f, 0.26f, 0.78f),
+		};
+		panelStyle.SetBorderWidthAll(1);
+		panelStyle.SetCornerRadiusAll(7);
+		_playerHealthHudPanel.AddThemeStyleboxOverride("panel", panelStyle);
+		layer.AddChild(_playerHealthHudPanel);
+
+		var margin = new MarginContainer();
+		margin.AddThemeConstantOverride("margin_left", 13);
+		margin.AddThemeConstantOverride("margin_right", 13);
+		margin.AddThemeConstantOverride("margin_top", 9);
+		margin.AddThemeConstantOverride("margin_bottom", 10);
+		_playerHealthHudPanel.AddChild(margin);
+
+		var rows = new VBoxContainer();
+		rows.AddThemeConstantOverride("separation", 7);
+		margin.AddChild(rows);
+
+		var titleRow = new HBoxContainer();
+		titleRow.AddThemeConstantOverride("separation", 10);
+		rows.AddChild(titleRow);
+
+		_playerHealthHudNameLabel = MakeHudLabel(LocalizedPlayerName, 17, new Color(1.0f, 0.94f, 0.84f));
+		_playerHealthHudNameLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		titleRow.AddChild(_playerHealthHudNameLabel);
+
+		_playerHealthHudValueLabel = MakeHudLabel(string.Empty, 15, new Color(1.0f, 0.86f, 0.84f));
+		_playerHealthHudValueLabel.HorizontalAlignment = HorizontalAlignment.Right;
+		titleRow.AddChild(_playerHealthHudValueLabel);
+
+		_playerHealthHudBar = new ProgressBar
+		{
+			MinValue = 0.0,
+			MaxValue = 100.0,
+			ShowPercentage = false,
+			CustomMinimumSize = new Vector2(0.0f, 18.0f),
+		};
+		var barBackground = new StyleBoxFlat
+		{
+			BgColor = new Color(0.12f, 0.035f, 0.045f, 0.94f),
+			BorderColor = new Color(0.34f, 0.11f, 0.13f, 0.95f),
+		};
+		barBackground.SetBorderWidthAll(1);
+		barBackground.SetCornerRadiusAll(5);
+		var barFill = new StyleBoxFlat
+		{
+			BgColor = new Color(0.86f, 0.13f, 0.18f, 0.98f),
+		};
+		barFill.SetCornerRadiusAll(5);
+		_playerHealthHudBar.AddThemeStyleboxOverride("background", barBackground);
+		_playerHealthHudBar.AddThemeStyleboxOverride("fill", barFill);
+		rows.AddChild(_playerHealthHudBar);
+		UpdatePlayerHealthHud();
+	}
+
+	private void UpdatePlayerHealthHud()
+	{
+		if (_playerHealthHudBar == null || !IsInstanceValid(_playerHealthHudBar))
+		{
+			return;
+		}
+
+		int maximum = Mathf.Max(EffectiveMaxHealth, 1);
+		int current = Mathf.Clamp(CurrentHealth, 0, maximum);
+		_playerHealthHudNameLabel.Text = LocalizedPlayerName;
+		_playerHealthHudValueLabel.Text = $"HP  {current:N0} / {maximum:N0}";
+		_playerHealthHudBar.Value = current / (double)maximum * 100.0;
+
+		float ratio = current / (float)maximum;
+		Color fillColor = ratio <= 0.25f
+			? new Color(1.0f, 0.12f, 0.08f, 0.98f)
+			: ratio <= 0.55f
+				? new Color(0.96f, 0.34f, 0.10f, 0.98f)
+				: new Color(0.86f, 0.13f, 0.18f, 0.98f);
+		if (_playerHealthHudBar.GetThemeStylebox("fill") is StyleBoxFlat fill)
+		{
+			fill.BgColor = fillColor;
+		}
+	}
 
 	private void CreateCaptureAmmoHud()
 	{
@@ -21,56 +125,78 @@ public partial class PlayerController
 			AnchorRight = 1.0f,
 			AnchorTop = 1.0f,
 			AnchorBottom = 1.0f,
-			OffsetLeft = -224.0f,
-			OffsetRight = -28.0f,
-			OffsetTop = -112.0f,
-			OffsetBottom = -28.0f,
+			OffsetLeft = -238.0f,
+			OffsetRight = -174.0f,
+			OffsetTop = -94.0f,
+			OffsetBottom = -30.0f,
 		};
 		var panelStyle = new StyleBoxFlat
 		{
-			BgColor = new Color(0.035f, 0.041f, 0.050f, 0.78f),
-			BorderColor = new Color(0.62f, 0.72f, 0.82f, 0.58f),
+			BgColor = new Color(0.035f, 0.041f, 0.050f, 0.88f),
+			BorderColor = new Color(0.55f, 0.65f, 0.76f, 0.72f),
 		};
 		panelStyle.SetBorderWidthAll(1);
-		panelStyle.SetCornerRadiusAll(4);
+		panelStyle.SetCornerRadiusAll(6);
 		_captureAmmoPanel.AddThemeStyleboxOverride("panel", panelStyle);
 		layer.AddChild(_captureAmmoPanel);
 
-		var margin = new MarginContainer();
-		margin.AddThemeConstantOverride("margin_left", 12);
-		margin.AddThemeConstantOverride("margin_right", 12);
-		margin.AddThemeConstantOverride("margin_top", 8);
-		margin.AddThemeConstantOverride("margin_bottom", 8);
-		_captureAmmoPanel.AddChild(margin);
+		var content = new Control { CustomMinimumSize = new Vector2(64.0f, 64.0f), MouseFilter = Control.MouseFilterEnum.Ignore };
+		_captureAmmoPanel.AddChild(content);
 
-		var rows = new VBoxContainer();
-		rows.AddThemeConstantOverride("separation", 4);
-		margin.AddChild(rows);
+		var netIcon = new TextureRect
+		{
+			Name = "CaptureNetIcon",
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			AnchorRight = 1.0f,
+			AnchorBottom = 1.0f,
+			OffsetLeft = 6.0f,
+			OffsetRight = -6.0f,
+			OffsetTop = 5.0f,
+			OffsetBottom = -7.0f,
+			ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+			StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+		};
+		const string captureNetIconPath = "res://assets/ui/hud/capture_net.png";
+		if (ResourceLoader.Exists(captureNetIconPath))
+		{
+			netIcon.Texture = ResourceLoader.Load<Texture2D>(captureNetIconPath);
+		}
+		content.AddChild(netIcon);
 
-		var titleRow = new HBoxContainer();
-		titleRow.AddThemeConstantOverride("separation", 8);
-		rows.AddChild(titleRow);
+		_captureAmmoCaptionLabel = MakeHudLabel(string.Empty, 1, Colors.Transparent);
+		_captureAmmoCaptionLabel.Visible = false;
+		content.AddChild(_captureAmmoCaptionLabel);
 
-		var netLabel = MakeHudLabel(LocaleText.T("hud.net"), 13, new Color(0.68f, 0.80f, 0.90f));
-		titleRow.AddChild(netLabel);
-
-		_captureAmmoCaptionLabel = MakeHudLabel(LocaleText.T("hud.capture_net_key"), 13, new Color(0.86f, 0.92f, 0.96f));
-		_captureAmmoCaptionLabel.HorizontalAlignment = HorizontalAlignment.Right;
-		_captureAmmoCaptionLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-		titleRow.AddChild(_captureAmmoCaptionLabel);
-
-		_captureAmmoCountLabel = MakeHudLabel($"6 / {CaptureNetCapacity}", 31, new Color(1.0f, 1.0f, 1.0f));
+		_captureAmmoCountLabel = MakeHudLabel($"6/{CaptureNetCapacity}", 14, new Color(1.0f, 1.0f, 1.0f));
 		_captureAmmoCountLabel.HorizontalAlignment = HorizontalAlignment.Right;
-		rows.AddChild(_captureAmmoCountLabel);
+		_captureAmmoCountLabel.VerticalAlignment = VerticalAlignment.Bottom;
+		_captureAmmoCountLabel.AnchorLeft = 0.0f;
+		_captureAmmoCountLabel.AnchorRight = 1.0f;
+		_captureAmmoCountLabel.AnchorTop = 0.0f;
+		_captureAmmoCountLabel.AnchorBottom = 1.0f;
+		_captureAmmoCountLabel.OffsetLeft = 3.0f;
+		_captureAmmoCountLabel.OffsetRight = -4.0f;
+		_captureAmmoCountLabel.OffsetTop = 2.0f;
+		_captureAmmoCountLabel.OffsetBottom = -4.0f;
+		_captureAmmoCountLabel.AddThemeConstantOverride("outline_size", 4);
+		_captureAmmoCountLabel.AddThemeColorOverride("font_outline_color", new Color(0.02f, 0.025f, 0.035f, 0.96f));
+		content.AddChild(_captureAmmoCountLabel);
 
 		_captureAmmoRechargeBar = new ProgressBar
 		{
 			MinValue = 0.0,
 			MaxValue = 100.0,
 			ShowPercentage = false,
-			CustomMinimumSize = new Vector2(0.0f, 7.0f),
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			AnchorRight = 1.0f,
+			AnchorTop = 1.0f,
+			AnchorBottom = 1.0f,
+			OffsetLeft = 4.0f,
+			OffsetRight = -4.0f,
+			OffsetTop = -5.0f,
+			OffsetBottom = -2.0f,
 		};
-		rows.AddChild(_captureAmmoRechargeBar);
+		content.AddChild(_captureAmmoRechargeBar);
 		UpdateCaptureAmmoHud();
 	}
 
@@ -93,10 +219,10 @@ public partial class PlayerController
 			AnchorRight = 1.0f,
 			AnchorTop = 1.0f,
 			AnchorBottom = 1.0f,
-			OffsetLeft = -86.0f,
+			OffsetLeft = -94.0f,
 			OffsetRight = -30.0f,
-			OffsetTop = -178.0f,
-			OffsetBottom = -122.0f,
+			OffsetTop = -94.0f,
+			OffsetBottom = -30.0f,
 		};
 		_mailboxHudButton.AddThemeFontSizeOverride("font_size", 26);
 		_mailboxHudButton.Pressed += () => SetMailboxPanelVisible(!_mailboxPanel.Visible);
@@ -167,10 +293,10 @@ public partial class PlayerController
 			AnchorRight = 1.0f,
 			AnchorTop = 1.0f,
 			AnchorBottom = 1.0f,
-			OffsetLeft = -86.0f,
-			OffsetRight = -30.0f,
-			OffsetTop = -244.0f,
-			OffsetBottom = -188.0f,
+			OffsetLeft = -166.0f,
+			OffsetRight = -102.0f,
+			OffsetTop = -94.0f,
+			OffsetBottom = -30.0f,
 		};
 		_cardAlbumHudButton.AddThemeFontSizeOverride("font_size", 24);
 		_cardAlbumHudButton.Pressed += () => SetCardAlbumPanelVisible(!_cardAlbumPanel.Visible);
@@ -740,7 +866,7 @@ public partial class PlayerController
 
 		int capacity = Mathf.Max(CaptureNetCapacity, 1);
 		float rechargeSeconds = Mathf.Max(CaptureNetRechargeSeconds, 0.05f);
-		_captureAmmoCountLabel.Text = $"{_captureNetCharges} / {capacity}";
+		_captureAmmoCountLabel.Text = $"{_captureNetCharges}/{capacity}";
 
 		if (_captureNetCharges <= 0)
 		{

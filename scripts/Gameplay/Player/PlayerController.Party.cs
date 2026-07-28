@@ -83,7 +83,7 @@ public partial class PlayerController
 
 	public bool DeployCompanion(SimpleActor actor, bool replaceLastIfFull)
 	{
-		if (!_capturedCollection.Contains(actor) || actor.IsDefeated || actor.IsAwaitingRecovery)
+		if (!_capturedCollection.Contains(actor) || actor.IsDefeated || actor.IsAwaitingRecovery || actor.IsInWarehouseCollection)
 		{
 			return false;
 		}
@@ -110,6 +110,41 @@ public partial class PlayerController
 		RecalculateFormationBonuses();
 		_partyPanel.RefreshParty();
 		_formationPanel.RefreshAll();
+		return true;
+	}
+
+	public bool WarehouseDepositCompanion(SimpleActor actor)
+	{
+		if (!IsInstanceValid(actor)
+			|| !_capturedCollection.Contains(actor)
+			|| actor.IsDefeated
+			|| actor.IsAwaitingRecovery
+			|| actor.IsInWarehouseCollection
+			|| IsMountedCompanion(actor))
+		{
+			return false;
+		}
+
+		StoreCompanion(actor);
+		actor.SetWarehouseCollectionState(true);
+		_partyPanel.RefreshParty();
+		_warehousePanel.RefreshAll();
+		return true;
+	}
+
+	public bool WarehouseWithdrawCompanion(SimpleActor actor)
+	{
+		if (!IsInstanceValid(actor)
+			|| !_capturedCollection.Contains(actor)
+			|| !actor.IsInWarehouseCollection)
+		{
+			return false;
+		}
+
+		actor.SetWarehouseCollectionState(false);
+		actor.StoreInCollection();
+		_partyPanel.RefreshParty();
+		_warehousePanel.RefreshAll();
 		return true;
 	}
 
@@ -369,10 +404,8 @@ public partial class PlayerController
 			return;
 		}
 
-		// Main core (attack element).
-		actor.EquipAttributeGem("gem.attribute.fire");
-
-		// Support core chain (max 6). The ranged active skill (fireball) must go first so
+		// Core chain (one active core plus support cores). The ranged active skill
+		// (fireball) carries its own fire element and must go first so
 		// the projectile-support cores that follow are accepted.
 		string[] supportCores =
 		{

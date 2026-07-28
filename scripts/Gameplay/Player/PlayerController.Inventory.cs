@@ -40,7 +40,9 @@ public partial class PlayerController
 
 	public void AddInventoryItem(string itemId, int amount = 1)
 	{
-		if (BuildCatalog.IsFreeItem(itemId))
+		if (BuildCatalog.IsFreeItem(itemId)
+			|| BuildCatalog.IsRetiredSkillCore(itemId)
+			|| BuildCatalog.IsRetiredAttributeGem(itemId))
 		{
 			return;
 		}
@@ -70,7 +72,9 @@ public partial class PlayerController
 
 	public void ReturnInventoryItemFromUnequip(string itemId)
 	{
-		if (BuildCatalog.IsFreeItem(itemId))
+		if (BuildCatalog.IsFreeItem(itemId)
+			|| BuildCatalog.IsRetiredSkillCore(itemId)
+			|| BuildCatalog.IsRetiredAttributeGem(itemId))
 		{
 			return;
 		}
@@ -211,6 +215,15 @@ public partial class PlayerController
 		return BuildCatalog.GetSkillGemUpgradeCost(actor.BuildLoadout.SkillGemIds[slot], actor.GetSkillGemLevel(slot));
 	}
 
+	public SkillGemUpgradeCost? GetPlayerSkillGemUpgradeCost(int slot)
+	{
+		if (slot < 0 || slot >= BuildLoadout.SkillGemIds.Length)
+		{
+			return null;
+		}
+		return BuildCatalog.GetSkillGemUpgradeCost(BuildLoadout.GetSkillGemId(slot), BuildLoadout.GetSkillGemLevel(slot));
+	}
+
 	public bool CanAffordSkillGemUpgrade(SkillGemUpgradeCost cost)
 	{
 		return Gold >= cost.Gold && GetInventoryCount(cost.MaterialId) >= cost.MaterialCount;
@@ -239,6 +252,28 @@ public partial class PlayerController
 		TryConsumeInventoryItem(cost.MaterialId, cost.MaterialCount);
 		int newLevel = actor.RaiseSkillGemLevel(slot);
 		string gemName = LocaleText.T(BuildCatalog.GetSkillGem(actor.BuildLoadout.SkillGemIds[slot]).NameKey);
+		PostSystemMessage(LocaleText.F("system.gem.upgraded", gemName, newLevel), new Color(0.62f, 1.0f, 0.68f), GameMessageChannel.Loot);
+		_inventoryPanel?.RefreshAll();
+		return true;
+	}
+
+	public bool TryUpgradePlayerSkillGem(int slot)
+	{
+		if (GetPlayerSkillGemUpgradeCost(slot) is not SkillGemUpgradeCost cost)
+		{
+			return false;
+		}
+		if (!CanAffordSkillGemUpgrade(cost))
+		{
+			PostSystemMessage(
+				LocaleText.F("system.gem.upgrade_not_enough", cost.Gold, cost.MaterialCount, GetInventoryItemDisplayName(cost.MaterialId)),
+				new Color(1.0f, 0.62f, 0.48f), GameMessageChannel.Loot);
+			return false;
+		}
+		Gold -= cost.Gold;
+		TryConsumeInventoryItem(cost.MaterialId, cost.MaterialCount);
+		int newLevel = RaiseSkillGemLevel(slot);
+		string gemName = LocaleText.T(BuildCatalog.GetSkillGem(BuildLoadout.GetSkillGemId(slot)).NameKey);
 		PostSystemMessage(LocaleText.F("system.gem.upgraded", gemName, newLevel), new Color(0.62f, 1.0f, 0.68f), GameMessageChannel.Loot);
 		_inventoryPanel?.RefreshAll();
 		return true;
@@ -278,7 +313,7 @@ public partial class PlayerController
 			return;
 		}
 
-		_worldDropCollectRefreshRemaining = WorldDropCollectRefreshSeconds;
+		_worldDropCollectRefreshRemaining = WorldDropConfig.CollectionRefreshSeconds;
 		CollectNearbyWorldDrops();
 		CollectNearbyFallenCompanions();
 	}
@@ -302,9 +337,20 @@ public partial class PlayerController
 
 	private void InitializeStarterInventory()
 	{
-		foreach (string itemId in BuildCatalog.GetStarterInventoryItemIds())
+		if (!DevConfig.TestMode)
 		{
-			AddInventoryItem(itemId);
+			return;
+		}
+
+		// Test worlds receive exactly one of every distinct equipment id. HashSet
+		// protects against catalogue aliases or future duplicate definitions.
+		var grantedEquipment = new HashSet<string>();
+		foreach (string itemId in BuildCatalog.GetAllEquipmentItemIds())
+		{
+			if (!string.IsNullOrWhiteSpace(itemId) && grantedEquipment.Add(itemId))
+			{
+				AddInventoryItem(itemId, 1);
+			}
 		}
 	}
 

@@ -77,6 +77,7 @@ public partial class InventoryPanel : PanelContainer
 
 	private PlayerController? _player;
 	private SimpleActor? _selectedActor;
+	private bool _selectingPlayer;
 	private EquipTarget _selectedTarget = EquipTarget.Weapon;
 	private int _selectedSupportIndex;
 	private InventoryCategory _selectedCategory = InventoryCategory.All;
@@ -85,6 +86,7 @@ public partial class InventoryPanel : PanelContainer
 	private string _selectedItemId = string.Empty;
 	private readonly Dictionary<InventoryCategory, Button> _categoryButtons = new();
 	private VBoxContainer _companionList = null!;
+	private ScrollContainer _itemScroll = null!;
 	private GridContainer _itemGrid = null!;
 	private Label _titleLabel = null!;
 	private Label _goldLabel = null!;
@@ -164,6 +166,14 @@ public partial class InventoryPanel : PanelContainer
 		}
 
 		_selectedActor = actor;
+		_selectingPlayer = false;
+		RefreshAll();
+	}
+
+	private void SelectPlayer()
+	{
+		_selectedActor = null;
+		_selectingPlayer = true;
 		RefreshAll();
 	}
 
@@ -334,22 +344,24 @@ public partial class InventoryPanel : PanelContainer
 		_bagCountLabel = MakeLabel(13, new Color(0.72f, 0.80f, 0.86f));
 		itemSection.AddChild(_bagCountLabel);
 
-		var itemScroll = new ScrollContainer
+		_itemScroll = new ScrollContainer
 		{
 			HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
 			SizeFlagsVertical = Control.SizeFlags.ExpandFill,
 			CustomMinimumSize = new Vector2(0.0f, 270.0f),
 		};
-		itemSection.AddChild(itemScroll);
+		itemSection.AddChild(_itemScroll);
 
 		_itemGrid = new GridContainer
 		{
-			Columns = 5,
-			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+			Columns = 1,
+			SizeFlagsHorizontal = Control.SizeFlags.ShrinkBegin,
 		};
-		_itemGrid.AddThemeConstantOverride("h_separation", 6);
-		_itemGrid.AddThemeConstantOverride("v_separation", 6);
-		itemScroll.AddChild(_itemGrid);
+		_itemGrid.AddThemeConstantOverride("h_separation", ItemIconLibrary.InventoryGridGap);
+		_itemGrid.AddThemeConstantOverride("v_separation", ItemIconLibrary.InventoryGridGap);
+		_itemScroll.AddChild(_itemGrid);
+		_itemScroll.Resized += UpdateResponsiveItemColumns;
+		UpdateResponsiveItemColumns();
 
 		var detailPanel = MakeInfoPanel(new Vector2(0.0f, 145.0f));
 		itemSection.AddChild(detailPanel);
@@ -526,12 +538,13 @@ public partial class InventoryPanel : PanelContainer
 
 	private void ShowSupportTooltip(int index)
 	{
-		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
+		CompanionBuildLoadout? loadout = GetSelectedLoadout();
+		if (loadout == null)
 		{
 			return;
 		}
 
-		ShowItemTooltip(_selectedActor.BuildLoadout.GetSkillGemId(index), SupportSlotName(index));
+		ShowItemTooltip(loadout.GetSkillGemId(index), SupportSlotName(index));
 	}
 
 	// Skill-core slot 0 is the single core-skill slot; the rest are support cores.
@@ -544,7 +557,7 @@ public partial class InventoryPanel : PanelContainer
 
 	private void EquipSupportCore(string itemId, int index)
 	{
-		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor)
+		if (_player == null || GetSelectedLoadout() == null
 			|| !_player.HasInventoryItem(itemId) || !IsSupportCoreCompatible(itemId, index))
 		{
 			return;
@@ -557,12 +570,13 @@ public partial class InventoryPanel : PanelContainer
 
 	private void UnequipSupportSlot(int index)
 	{
-		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
+		CompanionBuildLoadout? loadout = GetSelectedLoadout();
+		if (loadout == null)
 		{
 			return;
 		}
 
-		string displaced = _selectedActor.BuildLoadout.GetSkillGemId(index);
+		string displaced = loadout.GetSkillGemId(index);
 		if (displaced == "gem.skill.none")
 		{
 			return;
@@ -571,10 +585,17 @@ public partial class InventoryPanel : PanelContainer
 		// Slot 0 is always the core-skill slot, regardless of the core's skill type.
 		// Removing it must leave an empty main slot; support cores never promote into it.
 		bool isPrimary = index == 0;
-		_selectedActor.ClearSkillGemSlot(index);
-		if (!isPrimary)
+		if (_selectingPlayer)
 		{
-			_selectedActor.CompactSupportCores();
+			_player?.ClearSkillGemSlot(index);
+		}
+		else
+		{
+			_selectedActor!.ClearSkillGemSlot(index);
+			if (!isPrimary)
+			{
+				_selectedActor.CompactSupportCores();
+			}
 		}
 
 		_player?.ReturnInventoryItemFromUnequip(displaced);
@@ -584,6 +605,10 @@ public partial class InventoryPanel : PanelContainer
 
 	private bool IsSupportSlotUnlocked(int index)
 	{
+		if (_selectingPlayer)
+		{
+			return BuildCatalog.GetUnlockedSupportCoreCount(_player?.Level ?? 1) > index;
+		}
 		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
 		{
 			return true;
@@ -609,19 +634,19 @@ public partial class InventoryPanel : PanelContainer
 			return BuildCatalog.IsMainAttackCore(itemId);
 		}
 
+		CompanionBuildLoadout? loadout = GetSelectedLoadout();
 		return BuildCatalog.IsSupportCore(itemId)
-			&& _selectedActor != null
-			&& IsInstanceValid(_selectedActor)
-			&& BuildCatalog.HasMainAttackCore(_selectedActor.BuildLoadout)
+			&& loadout != null
+			&& BuildCatalog.HasMainAttackCore(loadout)
 			&& !(BuildCatalog.IsProjectileSupportGem(itemId)
-				&& (_selectedActor == null || !IsInstanceValid(_selectedActor) || !BuildCatalog.HasRangedActiveSkill(_selectedActor.BuildLoadout)));
+				&& !BuildCatalog.HasRangedActiveSkill(loadout));
 	}
 
 	// Double-clicking an equipped slot takes the item off and returns it to the bag
 	// (equipping consumed it, so unequipping must give it back).
 	private void UnequipSlot(EquipTarget target)
 	{
-		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
+		if (GetSelectedLoadout() == null)
 		{
 			return;
 		}
@@ -635,13 +660,16 @@ public partial class InventoryPanel : PanelContainer
 			case EquipTarget.Boots:
 			case EquipTarget.Accessory:
 				EquipmentSlot slot = ToEquipmentSlot(target);
-				_selectedActor.EquipBuildEquipment(slot, GetEmptyEquipmentId(slot));
+				if (_selectingPlayer) _player?.EquipBuildEquipment(slot, GetEmptyEquipmentId(slot));
+				else _selectedActor!.EquipBuildEquipment(slot, GetEmptyEquipmentId(slot));
 				break;
 			case EquipTarget.AttributeGem:
-				_selectedActor.EquipAttributeGem("gem.attribute.none");
+				if (_selectingPlayer) _player?.EquipAttributeGem("gem.attribute.none");
+				else _selectedActor!.EquipAttributeGem("gem.attribute.none");
 				break;
 			case EquipTarget.SupportCore:
-				_selectedActor.EquipSkillGem(_selectedSupportIndex, "gem.skill.none");
+				if (_selectingPlayer) _player?.ClearSkillGemSlot(_selectedSupportIndex);
+				else _selectedActor!.EquipSkillGem(_selectedSupportIndex, "gem.skill.none");
 				break;
 		}
 
@@ -669,7 +697,7 @@ public partial class InventoryPanel : PanelContainer
 			return;
 		}
 
-		if (_selectedActor != null && IsInstanceValid(_selectedActor) && _selectedActor.IsCaptured && !_selectedActor.IsAwaitingRecovery)
+		if (_selectingPlayer || (_selectedActor != null && IsInstanceValid(_selectedActor) && _selectedActor.IsCaptured && !_selectedActor.IsAwaitingRecovery))
 		{
 			return;
 		}
@@ -724,6 +752,13 @@ public partial class InventoryPanel : PanelContainer
 			return;
 		}
 
+		var playerButton = MakeButton($"玩家  {_player.PlayerName}");
+		playerButton.Alignment = HorizontalAlignment.Left;
+		playerButton.CustomMinimumSize = new Vector2(0.0f, 42.0f);
+		playerButton.AddThemeColorOverride("font_color", _selectingPlayer ? new Color(1.0f, 0.94f, 0.62f) : new Color(0.92f, 0.96f, 1.0f));
+		playerButton.Pressed += SelectPlayer;
+		_companionList.AddChild(playerButton);
+
 		foreach (SimpleActor actor in _player.ActiveParty)
 		{
 			if (IsInstanceValid(actor) && actor.IsCaptured && !actor.IsAwaitingRecovery)
@@ -760,6 +795,40 @@ public partial class InventoryPanel : PanelContainer
 
 	private void RefreshSlotButtons()
 	{
+		if (_selectingPlayer && _player != null)
+		{
+			CompanionBuildLoadout playerLoadout = _player.BuildLoadout;
+			_helmetButton.Visible = true;
+			_weaponButton.Visible = true;
+			_armorButton.Visible = true;
+			_bootsButton.Visible = true;
+			_accessoryButton.Visible = true;
+			_attributeButton.Visible = true;
+			SetSlotsDisabled(false);
+			SetSlotButton(_helmetButton, EquipTarget.Helmet, playerLoadout.HelmetId, BuildCatalog.GetEquipment(playerLoadout.HelmetId).NameKey);
+			SetSlotButton(_weaponButton, EquipTarget.Weapon, playerLoadout.WeaponId, BuildCatalog.GetEquipment(playerLoadout.WeaponId).NameKey);
+			SetSlotButton(_armorButton, EquipTarget.Armor, playerLoadout.ArmorId, BuildCatalog.GetEquipment(playerLoadout.ArmorId).NameKey);
+			SetSlotButton(_bootsButton, EquipTarget.Boots, playerLoadout.BootsId, BuildCatalog.GetEquipment(playerLoadout.BootsId).NameKey);
+			SetSlotButton(_accessoryButton, EquipTarget.Accessory, playerLoadout.AccessoryId, BuildCatalog.GetEquipment(playerLoadout.AccessoryId).NameKey);
+			SetSlotButton(_attributeButton, EquipTarget.AttributeGem, playerLoadout.AttributeGemId, BuildCatalog.GetAttributeGem(playerLoadout.AttributeGemId).NameKey);
+			int unlocked = BuildCatalog.GetUnlockedSupportCoreCount(_player.Level);
+			int playerVisibleSupport = Mathf.Min(Mathf.Max(unlocked + 1, 2), _supportButtons.Count);
+			for (int index = 0; index < _supportButtons.Count; index++)
+			{
+				_supportButtons[index].Visible = index < playerVisibleSupport;
+				if (_supportButtons[index].Visible)
+				{
+					SetSupportSlotButton(_supportButtons[index], index, playerLoadout);
+				}
+			}
+			return;
+		}
+
+		_helmetButton.Visible = true;
+		_weaponButton.Visible = true;
+		_armorButton.Visible = true;
+		_bootsButton.Visible = true;
+		_accessoryButton.Visible = true;
 		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
 		{
 			SetSlotsDisabled(true);
@@ -795,6 +864,14 @@ public partial class InventoryPanel : PanelContainer
 		{
 			_selectedTarget = EquipTarget.Weapon;
 		}
+	}
+
+	private void SetPlayerSupportSlotButton(Button button, int index, CompanionBuildLoadout loadout)
+	{
+		string itemId = loadout.GetSkillGemId(index);
+		button.Text = $"{SupportSlotName(index)}\n{LocaleText.T(BuildCatalog.GetSkillGem(itemId).NameKey)}";
+		ItemIconLibrary.Apply(button, itemId, 26);
+		button.Disabled = index >= BuildCatalog.GetUnlockedSupportCoreCount(_player?.Level ?? 1);
 	}
 
 	private void SetSlotButton(Button button, EquipTarget target, string itemId, string itemNameKey)
@@ -837,14 +914,9 @@ public partial class InventoryPanel : PanelContainer
 	// needs and cannot hold a core yet.
 	private bool IsSlotUnlocked(EquipTarget target)
 	{
-		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
-		{
-			return true;
-		}
-
 		return target switch
 		{
-			EquipTarget.AttributeGem => BuildCatalog.IsMainCoreUnlocked(_selectedActor.Level),
+			EquipTarget.AttributeGem => BuildCatalog.IsMainCoreUnlocked(GetSelectedLevel()),
 			EquipTarget.SupportCore => IsSupportSlotUnlocked(_selectedSupportIndex),
 			_ => true,
 		};
@@ -938,23 +1010,25 @@ public partial class InventoryPanel : PanelContainer
 	private void AddItemSlotButton(string itemId)
 	{
 		int count = _player?.GetInventoryCount(itemId) ?? 0;
-		string countText = BuildCatalog.IsFreeItem(itemId) ? string.Empty : $"x{count}";
 		var button = new InventoryItemDragButton
 		{
-			Text = countText,
+			Text = string.Empty,
 			DragItemId = BuildCatalog.GetItemKind(itemId) is InventoryItemKind.AttributeGem or InventoryItemKind.SkillGem
 				? itemId
 				: string.Empty,
 		};
 		ApplyButtonStyle(button);
-		button.CustomMinimumSize = new Vector2(64.0f, 72.0f);
-		button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		button.CustomMinimumSize = new Vector2(ItemIconLibrary.InventorySlotWidth, 58.0f);
+		button.SizeFlagsHorizontal = Control.SizeFlags.ShrinkBegin;
 		button.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin;
 		button.Alignment = HorizontalAlignment.Center;
 		button.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis;
-		button.AddThemeFontSizeOverride("font_size", 11);
-		ItemIconLibrary.Apply(button, itemId, 44);
-		button.AddThemeColorOverride("font_color", itemId == _selectedItemId ? new Color(1.0f, 0.92f, 0.50f) : new Color(0.92f, 0.96f, 1.0f));
+		ItemIconLibrary.Apply(button, itemId, 42);
+		button.IconAlignment = HorizontalAlignment.Center;
+		if (!BuildCatalog.IsFreeItem(itemId))
+		{
+			ItemIconLibrary.AddStackCountBadge(button, count);
+		}
 		// Bag items do not need a redundant "Bag Items" source label in their
 		// tooltip; the concrete item type is enough.
 		button.MouseEntered += () => ShowItemTooltip(itemId, string.Empty);
@@ -969,6 +1043,16 @@ public partial class InventoryPanel : PanelContainer
 			}
 		};
 		_itemGrid.AddChild(button);
+	}
+
+	private void UpdateResponsiveItemColumns()
+	{
+		if (_itemGrid == null || _itemScroll == null)
+		{
+			return;
+		}
+
+		ItemIconLibrary.UpdateResponsiveGridColumns(_itemGrid, _itemScroll);
 	}
 
 	// Double-clicking a bag item equips attack cores to slot 0 and extension cores to
@@ -989,7 +1073,7 @@ public partial class InventoryPanel : PanelContainer
 			return;
 		}
 
-		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
+		if (GetSelectedLoadout() == null)
 		{
 			return;
 		}
@@ -1011,7 +1095,8 @@ public partial class InventoryPanel : PanelContainer
 	private bool ResolveFirstValidTarget(string itemId, out string reasonKey)
 	{
 		reasonKey = "inventory.warn.not_equippable";
-		if (MonsterLootCatalog.IsMonsterLoot(itemId) || _selectedActor == null || !IsInstanceValid(_selectedActor))
+		CompanionBuildLoadout? selectedLoadout = GetSelectedLoadout();
+		if (MonsterLootCatalog.IsMonsterLoot(itemId) || selectedLoadout == null)
 		{
 			return false;
 		}
@@ -1022,7 +1107,7 @@ public partial class InventoryPanel : PanelContainer
 				_selectedTarget = EquipTargetForSlot(BuildCatalog.GetEquipment(itemId).Slot);
 				return true;
 			case InventoryItemKind.AttributeGem:
-				if (!BuildCatalog.IsMainCoreUnlocked(_selectedActor.Level))
+				if (!BuildCatalog.IsMainCoreUnlocked(GetSelectedLevel()))
 				{
 					reasonKey = "inventory.warn.core_locked";
 					return false;
@@ -1032,24 +1117,24 @@ public partial class InventoryPanel : PanelContainer
 				return true;
 			case InventoryItemKind.SkillGem:
 				bool isMainCore = BuildCatalog.IsMainAttackCore(itemId);
-				if (!isMainCore && !BuildCatalog.HasMainAttackCore(_selectedActor.BuildLoadout))
+				if (!isMainCore && !BuildCatalog.HasMainAttackCore(selectedLoadout))
 				{
 					reasonKey = "tooltip.requires_main_core";
 					return false;
 				}
-				if (BuildCatalog.IsProjectileSupportGem(itemId) && !BuildCatalog.HasRangedActiveSkill(_selectedActor.BuildLoadout))
+				if (BuildCatalog.IsProjectileSupportGem(itemId) && !BuildCatalog.HasRangedActiveSkill(selectedLoadout))
 				{
 					reasonKey = "tooltip.requires_ranged_skill";
 					return false;
 				}
 
-				if (BuildCatalog.GetUnlockedSupportCoreCount(_selectedActor.Level) <= 0)
+				if (BuildCatalog.GetUnlockedSupportCoreCount(GetSelectedLevel()) <= 0)
 				{
 					reasonKey = "inventory.warn.core_locked";
 					return false;
 				}
 
-				int open = isMainCore ? 0 : FindFirstOpenSupportSlot(_selectedActor.BuildLoadout);
+				int open = isMainCore ? 0 : FindFirstOpenSupportSlot(selectedLoadout);
 				if (open < 0)
 				{
 					reasonKey = "inventory.warn.not_equippable";
@@ -1091,9 +1176,7 @@ public partial class InventoryPanel : PanelContainer
 	// First empty support slot that is already unlocked for the selected creature.
 	private int FindFirstOpenSupportSlot(CompanionBuildLoadout loadout)
 	{
-		int unlocked = _selectedActor != null && IsInstanceValid(_selectedActor)
-			? BuildCatalog.GetUnlockedSupportCoreCount(_selectedActor.Level)
-			: 0;
+		int unlocked = BuildCatalog.GetUnlockedSupportCoreCount(GetSelectedLevel());
 		for (int index = 1; index < unlocked && index < loadout.SkillGemIds.Length; index++)
 		{
 			if (loadout.GetSkillGemId(index) == "gem.skill.none")
@@ -1183,13 +1266,14 @@ public partial class InventoryPanel : PanelContainer
 	private void RefreshUpgradeButton()
 	{
 		int slot = SelectedSkillSlotIndex();
-		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor) || slot < 0 || !IsSlotUnlocked(_selectedTarget))
+		if (_player == null || GetSelectedLoadout() == null || slot < 0 || !IsSlotUnlocked(_selectedTarget))
 		{
 			_upgradeSkillGemButton.Visible = false;
 			return;
 		}
 
-		string gemId = _selectedActor.BuildLoadout.SkillGemIds[slot];
+		CompanionBuildLoadout loadout = GetSelectedLoadout()!;
+		string gemId = loadout.GetSkillGemId(slot);
 		if (!BuildCatalog.IsUpgradeableSkillGem(gemId))
 		{
 			_upgradeSkillGemButton.Visible = false;
@@ -1197,9 +1281,12 @@ public partial class InventoryPanel : PanelContainer
 		}
 
 		_upgradeSkillGemButton.Visible = true;
-		if (_player.GetCompanionSkillGemUpgradeCost(_selectedActor, slot) is not SkillGemUpgradeCost cost)
+		SkillGemUpgradeCost? upgradeCost = _selectingPlayer
+			? _player.GetPlayerSkillGemUpgradeCost(slot)
+			: _player.GetCompanionSkillGemUpgradeCost(_selectedActor!, slot);
+		if (upgradeCost is not SkillGemUpgradeCost cost)
 		{
-			_upgradeSkillGemButton.Text = LocaleText.F("inventory.action.gem_maxed", _selectedActor.GetSkillGemLevel(slot));
+			_upgradeSkillGemButton.Text = LocaleText.F("inventory.action.gem_maxed", loadout.GetSkillGemLevel(slot));
 			_upgradeSkillGemButton.Disabled = true;
 			return;
 		}
@@ -1216,12 +1303,15 @@ public partial class InventoryPanel : PanelContainer
 	private void OnUpgradeSkillGemPressed()
 	{
 		int slot = SelectedSkillSlotIndex();
-		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor) || slot < 0)
+		if (_player == null || GetSelectedLoadout() == null || slot < 0)
 		{
 			return;
 		}
 
-		if (_player.TryUpgradeCompanionSkillGem(_selectedActor, slot))
+		bool upgraded = _selectingPlayer
+			? _player.TryUpgradePlayerSkillGem(slot)
+			: _player.TryUpgradeCompanionSkillGem(_selectedActor!, slot);
+		if (upgraded)
 		{
 			RefreshAll();
 		}
@@ -1249,8 +1339,7 @@ public partial class InventoryPanel : PanelContainer
 
 	private bool CanEquipSelectedItem()
 	{
-		return _selectedActor != null
-			&& IsInstanceValid(_selectedActor)
+		return GetSelectedLoadout() != null
 			&& !string.IsNullOrEmpty(_selectedItemId)
 			&& IsCompatibleItemForTarget(_selectedItemId, _selectedTarget);
 	}
@@ -1269,9 +1358,10 @@ public partial class InventoryPanel : PanelContainer
 		}
 
 		InventoryItemKind kind = BuildCatalog.GetItemKind(itemId);
+		CompanionBuildLoadout? loadout = GetSelectedLoadout();
 		if (kind == InventoryItemKind.SkillGem
 			&& BuildCatalog.IsProjectileSupportGem(itemId)
-			&& (_selectedActor == null || !IsInstanceValid(_selectedActor) || !BuildCatalog.HasRangedActiveSkill(_selectedActor.BuildLoadout)))
+			&& (loadout == null || !BuildCatalog.HasRangedActiveSkill(loadout)))
 		{
 			return false;
 		}
@@ -1435,7 +1525,7 @@ public partial class InventoryPanel : PanelContainer
 
 	private bool EquipItem(string itemId)
 	{
-		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor) || !_player.HasInventoryItem(itemId))
+		if (_player == null || GetSelectedLoadout() == null || !_player.HasInventoryItem(itemId))
 		{
 			return false;
 		}
@@ -1454,7 +1544,7 @@ public partial class InventoryPanel : PanelContainer
 	// slot already holds this exact item. Returns true if something was equipped.
 	private bool PerformEquip(string itemId)
 	{
-		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor))
+		if (_player == null || GetSelectedLoadout() == null)
 		{
 			return false;
 		}
@@ -1480,6 +1570,35 @@ public partial class InventoryPanel : PanelContainer
 
 	private void ApplyEquipToSelectedTarget(string itemId)
 	{
+		if (_selectingPlayer && _player != null)
+		{
+			switch (_selectedTarget)
+			{
+				case EquipTarget.Helmet:
+					_player.EquipBuildEquipment(EquipmentSlot.Helmet, itemId);
+					break;
+				case EquipTarget.Weapon:
+					_player.EquipBuildEquipment(EquipmentSlot.Weapon, itemId);
+					break;
+				case EquipTarget.Armor:
+					_player.EquipBuildEquipment(EquipmentSlot.Armor, itemId);
+					break;
+				case EquipTarget.Boots:
+					_player.EquipBuildEquipment(EquipmentSlot.Boots, itemId);
+					break;
+				case EquipTarget.Accessory:
+					_player.EquipBuildEquipment(EquipmentSlot.Accessory, itemId);
+					break;
+				case EquipTarget.AttributeGem:
+					_player.EquipAttributeGem(itemId);
+					break;
+				case EquipTarget.SupportCore:
+					_player.EquipSkillGem(_selectedSupportIndex, itemId);
+					break;
+			}
+			return;
+		}
+
 		switch (_selectedTarget)
 		{
 			case EquipTarget.Helmet:
@@ -1508,7 +1627,7 @@ public partial class InventoryPanel : PanelContainer
 
 	private void EquipItemToTarget(string itemId, EquipTarget target)
 	{
-		if (_player == null || _selectedActor == null || !IsInstanceValid(_selectedActor)
+		if (_player == null || GetSelectedLoadout() == null
 			|| !_player.HasInventoryItem(itemId) || !IsCompatibleItemForTarget(itemId, target))
 		{
 			return;
@@ -1516,6 +1635,20 @@ public partial class InventoryPanel : PanelContainer
 
 		_selectedTarget = target;
 		EquipItem(itemId);
+	}
+
+	private CompanionBuildLoadout? GetSelectedLoadout()
+	{
+		if (_selectingPlayer)
+		{
+			return _player?.BuildLoadout;
+		}
+		return _selectedActor != null && IsInstanceValid(_selectedActor) ? _selectedActor.BuildLoadout : null;
+	}
+
+	private int GetSelectedLevel()
+	{
+		return _selectingPlayer ? _player?.Level ?? 1 : _selectedActor?.Level ?? 1;
 	}
 
 	private void OnEquipSelectedPressed()
@@ -1556,6 +1689,14 @@ public partial class InventoryPanel : PanelContainer
 
 	private void RefreshDetails()
 	{
+		if (_selectingPlayer && _player != null)
+		{
+			_companionInfoCard.SetPlayer(_player);
+			_buildSummaryLabel.Text = LocaleText.F("build.core_chain", BuildCatalog.LocalizedSkillGems(_player.BuildLoadout));
+			_buildSummaryLabel.AddThemeColorOverride("font_color", new Color(0.74f, 0.83f, 0.90f));
+			return;
+		}
+
 		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
 		{
 			_companionInfoCard.SetActor(null);
@@ -1573,7 +1714,7 @@ public partial class InventoryPanel : PanelContainer
 
 	private void ShowTooltipForTarget(EquipTarget target)
 	{
-		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
+		if (GetSelectedLoadout() == null)
 		{
 			return;
 		}
@@ -1583,12 +1724,11 @@ public partial class InventoryPanel : PanelContainer
 
 	private string GetEquippedItemId(EquipTarget target)
 	{
-		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
+		CompanionBuildLoadout? loadout = GetSelectedLoadout();
+		if (loadout == null)
 		{
 			return string.Empty;
 		}
-
-		CompanionBuildLoadout loadout = _selectedActor.BuildLoadout;
 		return target switch
 		{
 			EquipTarget.Helmet => loadout.HelmetId,
@@ -1760,6 +1900,10 @@ public partial class InventoryPanel : PanelContainer
 	private static void AppendSkillGemTooltip(List<string> lines, SkillGemDefinition item)
 	{
 		AddSummaryLine(lines, item.SummaryKey);
+		if (!string.IsNullOrEmpty(item.DamageElementNameKey))
+		{
+			lines.Add(LocaleText.F("tooltip.element", LocaleText.T(item.DamageElementNameKey)));
+		}
 		if (BuildCatalog.IsProjectileSupportGem(item.Id))
 		{
 			lines.Add(LocaleText.T("tooltip.requires_ranged_skill"));
@@ -1768,14 +1912,15 @@ public partial class InventoryPanel : PanelContainer
 		AddStatLine(lines, "stat.attack", item.AttackBonus);
 		AddStatLine(lines, "stat.defense", item.DefenseBonus);
 		AddPercentLine(lines, "tooltip.move_speed", item.MoveSpeedBonus);
-		AddPercentLine(lines, "tooltip.attack_cooldown", item.AttackCooldownReduction);
+		AddPercentLine(lines, "stat.attack_speed", item.AttackCooldownReduction);
 		AddDecimalLine(lines, "tooltip.attack_range", item.AttackRangeBonus);
 		AddDecimalLine(lines, "tooltip.detection_radius", item.DetectionRadiusBonus);
 		AddPercentLine(lines, "tooltip.follow_distance", item.FollowDistanceMultiplier - 1.0f);
 		AddPercentLine(lines, "tooltip.crit_chance", item.CritChanceBonus);
 		AddPercentLine(lines, "tooltip.life_steal", item.LifeStealPercent);
-		AddFlagLine(lines, "tooltip.enable_heal", item.EnablesHeal);
-		AddFlagLine(lines, "tooltip.enable_shield", item.EnablesShield);
+		AddPercentLine(lines, "tooltip.damage_multiplier", item.DamageMultiplier - 1.0f);
+		AddPercentLine(lines, "tooltip.projectile_speed", item.ProjectileSpeedMultiplier - 1.0f);
+		AddPercentLine(lines, "tooltip.control_chance", item.ControlChanceBonus);
 	}
 
 	private static void AddSummaryLine(List<string> lines, string summaryKey)

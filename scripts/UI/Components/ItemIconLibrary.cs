@@ -4,6 +4,14 @@ using System.Collections.Generic;
 public static class ItemIconLibrary
 {
 	private const string Root = "res://assets/ui/item_icons/";
+	public const float InventorySlotWidth = 52.0f;
+	public const int InventoryGridGap = 4;
+	private static readonly FontVariation StackCountFont = new()
+	{
+		// Simulated bold works with the project's fallback font, including CJK and
+		// numeric glyphs, without adding a separate font asset.
+		VariationEmbolden = 1.0f,
+	};
 	private static readonly Dictionary<string, string> IconFiles = new()
 	{
 		["equip.helmet.traveler"] = "helmet_traveler.png",
@@ -29,20 +37,9 @@ public static class ItemIconLibrary
 		["equip.accessory.crit_charm"] = "accessory_magic.png",
 		["equip.accessory.turtle_amulet"] = "accessory_guard.png",
 		["equip.accessory.focus_lens"] = "accessory_magic.png",
-		["gem.attribute.fire"] = "gem_01.png",
-		["gem.attribute.water"] = "gem_02.png",
-		["gem.attribute.lightning"] = "gem_03.png",
-		["gem.attribute.ice"] = "gem_04.png",
-		["gem.attribute.poison"] = "gem_05.png",
-		["gem.attribute.wind"] = "gem_06.png",
-		["gem.attribute.dark"] = "gem_07.png",
-		["gem.attribute.light"] = "gem_03.png",
 		["gem.skill.fireball"] = "gem_01.png",
-		["gem.skill.heal"] = "gem_05.png",
-		["gem.skill.shield"] = "gem_02.png",
 		["gem.skill.whirlwind"] = "gem_06.png",
 		["gem.skill.meteor"] = "gem_01.png",
-		["gem.skill.dash"] = "gem_04.png",
 		["gem.skill.laser"] = "gem_03.png",
 		["gem.skill.rocket"] = "skill_rocket.png",
 		["gem.skill.ice_shard"] = "skill_ice_shard.png",
@@ -53,6 +50,11 @@ public static class ItemIconLibrary
 		["gem.skill.life_steal"] = "gem_07.png",
 		["gem.skill.split"] = "gem_04.png",
 		["gem.skill.multishot"] = "gem_06.png",
+		["gem.skill.faster_attacks"] = "gem_03.png",
+		["gem.skill.critical_strikes"] = "gem_05.png",
+		["gem.skill.swift_projectiles"] = "gem_04.png",
+		["gem.skill.brutality"] = "gem_01.png",
+		["gem.skill.ailment"] = "gem_07.png",
 		["loot.slime_mucus"] = "material_magic.png",
 		["loot.beast_hide"] = "material_wood.png",
 		["loot.sharp_claw"] = "material_bones.png",
@@ -91,7 +93,15 @@ public static class ItemIconLibrary
 			return generated;
 		}
 
-		Texture2D? texture = ResourceLoader.Load<Texture2D>(Root + fileName);
+		string resourcePath = Root + fileName;
+		// Never pass a missing path to Load(): Godot reports it as a red engine
+		// error even though a null texture can be handled safely by the UI.
+		if (!ResourceLoader.Exists(resourcePath, "Texture2D"))
+		{
+			return CreateProceduralIcon(itemId);
+		}
+
+		Texture2D? texture = ResourceLoader.Load<Texture2D>(resourcePath);
 		if (texture != null)
 		{
 			Cache[itemId] = texture;
@@ -214,5 +224,50 @@ public static class ItemIconLibrary
 			ClipContents = true,
 			MouseFilter = Control.MouseFilterEnum.Ignore,
 		};
+	}
+
+	// Common RPG stack-count treatment: the quantity is a bold overlay anchored
+	// inside the bottom-right corner, so it never consumes layout width or pushes
+	// the item icon away from the centre.
+	public static Label AddStackCountBadge(Control itemSlot, int count)
+	{
+		var badge = new Label
+		{
+			Text = Mathf.Max(count, 0).ToString(),
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			HorizontalAlignment = HorizontalAlignment.Right,
+			VerticalAlignment = VerticalAlignment.Bottom,
+			AutowrapMode = TextServer.AutowrapMode.Off,
+			ClipText = false,
+			AnchorLeft = 1.0f,
+			AnchorTop = 1.0f,
+			AnchorRight = 1.0f,
+			AnchorBottom = 1.0f,
+			// The standard inventory icon is 42 px and centred in a 52 px slot.
+			// Keep the label's entire rectangle inside that image boundary.
+			OffsetLeft = -47.0f,
+			OffsetTop = -29.0f,
+			OffsetRight = -5.0f,
+			OffsetBottom = -7.0f,
+		};
+		badge.AddThemeFontOverride("font", StackCountFont);
+		badge.AddThemeFontSizeOverride("font_size", 17);
+		badge.AddThemeColorOverride("font_color", new Color(1.0f, 0.97f, 0.84f));
+		badge.AddThemeColorOverride("font_outline_color", new Color(0.015f, 0.018f, 0.022f, 0.98f));
+		badge.AddThemeConstantOverride("outline_size", 4);
+		itemSlot.AddChild(badge);
+		return badge;
+	}
+
+	public static void UpdateResponsiveGridColumns(GridContainer grid, Control viewport)
+	{
+		float availableWidth = Mathf.Max(viewport.Size.X, InventorySlotWidth);
+		int columns = Mathf.Max(
+			Mathf.FloorToInt((availableWidth + InventoryGridGap) / (InventorySlotWidth + InventoryGridGap)),
+			1);
+		if (grid.Columns != columns)
+		{
+			grid.Columns = columns;
+		}
 	}
 }

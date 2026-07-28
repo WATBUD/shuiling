@@ -312,6 +312,7 @@ public partial class World : Node3D
 		UpdateMonsterRespawns(step);
 		UpdateWildBosses(step);
 		UpdateCaveRespawns(step);
+		UpdateRuntimeCleanup(step);
 	}
 
 	private void CreateMaterials()
@@ -753,8 +754,8 @@ public partial class World : Node3D
 		CreateCityMarket(center);
 		CreateCityGardens(center);
 
-		// 訓練場稻草人：放在原傭兵公會（150°）方向的空地上。
-		Vector3 dummyOffset = RingOffset(150.0f, 15.0f);
+		// 訓練場稻草人放在城鎮外圈，避免夥伴經過中央廣場時誤觸戰鬥。
+		Vector3 dummyOffset = RingOffset(150.0f, 35.0f);
 		CreateTrainingDummy(center + dummyOffset, YawFacingCenter(dummyOffset));
 
 		_obstaclePositions.Add(center);
@@ -773,18 +774,20 @@ public partial class World : Node3D
 		// 防禦 0 → 顯示接近原始傷害；血量很高但反正永不扣血。
 		dummy.ConfigureStats("name.training_dummy", 1, 999999, 0, 0, 0, 0);
 		dummy.ConfigureCombatProfile("Tank", "personality.calm", "ability.none", 0);
+		if (dummy.GetNodeOrNull<CollisionShape3D>("CollisionShape3D") is CollisionShape3D dummyCollision)
+		{
+			dummyCollision.Position = new Vector3(0.0f, 1.25f, 0.0f);
+			dummyCollision.Shape = new CapsuleShape3D { Radius = 0.62f, Height = 2.5f };
+		}
 		dummy.Position = position;
 		dummy.HomePosition = position;
 		dummy.RotationDegrees = new Vector3(0.0f, yawDegrees, 0.0f);
 		_actorsRoot.AddChild(dummy);
 
 		// 簡單的木架裝飾，讓它看起來像訓練場的標靶。
-		var frame = new Node3D { Name = "TrainingDummyFrame", Position = position, RotationDegrees = new Vector3(0.0f, yawDegrees, 0.0f) };
+		var frame = new Node3D { Name = "TrainingDummyPlatform", Position = position, RotationDegrees = new Vector3(0.0f, yawDegrees, 0.0f) };
 		_propsRoot.AddChild(frame);
-		AddMesh(frame, "DummyBase", BoxMeshFor(new Vector3(1.4f, 0.24f, 1.4f)), new Vector3(0.0f, 0.12f, 0.0f), Vector3.Zero, Vector3.One, _matCobblestone);
-		AddMesh(frame, "DummyPostL", BoxMeshFor(new Vector3(0.14f, 2.1f, 0.14f)), new Vector3(-0.9f, 1.05f, 0.7f), Vector3.Zero, Vector3.One, _matWood);
-		AddMesh(frame, "DummyPostR", BoxMeshFor(new Vector3(0.14f, 2.1f, 0.14f)), new Vector3(0.9f, 1.05f, 0.7f), Vector3.Zero, Vector3.One, _matWood);
-		AddMesh(frame, "DummyCrossbar", BoxMeshFor(new Vector3(2.0f, 0.14f, 0.14f)), new Vector3(0.0f, 2.05f, 0.7f), Vector3.Zero, Vector3.One, _matWood);
+		AddMesh(frame, "DummyBase", CylinderMeshFor(1.05f, 1.16f, 0.22f), new Vector3(0.0f, 0.11f, 0.0f), Vector3.Zero, Vector3.One, _matCobblestone);
 	}
 
 	private void CreateCityRoad(string name, Vector3 center, Vector2 size)
@@ -2170,6 +2173,11 @@ public partial class World : Node3D
 
 	private void BuildMonsterVisual(Node3D actor)
 	{
+		if (actor is SimpleActor trainingDummy && trainingDummy.DisplayName == "name.training_dummy")
+		{
+			BuildTrainingDummyVisual(actor);
+			return;
+		}
 		if (actor is SimpleActor caveMonster && TryBuildCaveMonsterVisual(caveMonster))
 		{
 			return;
@@ -2234,6 +2242,50 @@ public partial class World : Node3D
 		{
 			AddMonsterRoleDetails(actor, monster.CombatRole);
 		}
+	}
+
+	private void BuildTrainingDummyVisual(Node3D actor)
+	{
+		Material straw = MakeMaterial(new Color(0.84f, 0.65f, 0.24f));
+		Material strawLight = MakeMaterial(new Color(0.97f, 0.80f, 0.36f));
+		Material sack = MakeMaterial(new Color(0.58f, 0.40f, 0.20f));
+		Material cloth = MakeMaterial(new Color(0.62f, 0.16f, 0.12f));
+		Material rope = MakeMaterial(new Color(0.72f, 0.52f, 0.25f));
+
+		AddMesh(actor, "Stake", new CylinderMesh { TopRadius = 0.075f, BottomRadius = 0.10f, Height = 2.65f }, new Vector3(0.0f, 1.28f, 0.16f), Vector3.Zero, Vector3.One, _matWood);
+		AddMesh(actor, "ShoulderPole", new CylinderMesh { TopRadius = 0.065f, BottomRadius = 0.075f, Height = 2.25f }, new Vector3(0.0f, 1.52f, 0.05f), new Vector3(0.0f, 0.0f, 90.0f), Vector3.One, _matWood);
+
+		AddMesh(actor, "StrawTorso", new CapsuleMesh { Radius = 0.38f, Height = 1.12f }, new Vector3(0.0f, 1.20f, 0.0f), Vector3.Zero, new Vector3(1.10f, 1.0f, 0.78f), straw);
+		AddMesh(actor, "TunicFront", BoxMeshFor(new Vector3(0.70f, 0.78f, 0.07f)), new Vector3(0.0f, 1.18f, -0.32f), Vector3.Zero, Vector3.One, cloth);
+		AddMesh(actor, "Patch", BoxMeshFor(new Vector3(0.24f, 0.20f, 0.075f)), new Vector3(0.18f, 1.30f, -0.37f), new Vector3(0.0f, 0.0f, 8.0f), Vector3.One, sack);
+		AddMesh(actor, "RopeBelt", new CylinderMesh { TopRadius = 0.36f, BottomRadius = 0.36f, Height = 0.10f }, new Vector3(0.0f, 0.88f, 0.0f), Vector3.Zero, new Vector3(1.06f, 1.0f, 0.82f), rope);
+
+		AddMesh(actor, "SackHead", new SphereMesh { Radius = 0.39f, Height = 0.72f }, new Vector3(0.0f, 1.95f, -0.03f), Vector3.Zero, new Vector3(0.96f, 1.05f, 0.86f), sack);
+		AddMesh(actor, "ButtonEyeL", CylinderMeshFor(0.065f, 0.065f, 0.035f), new Vector3(-0.14f, 2.02f, -0.36f), new Vector3(90.0f, 0.0f, 0.0f), Vector3.One, _matActorDark);
+		AddMesh(actor, "ButtonEyeR", CylinderMeshFor(0.065f, 0.065f, 0.035f), new Vector3(0.14f, 2.02f, -0.36f), new Vector3(90.0f, 0.0f, 0.0f), Vector3.One, _matActorDark);
+		AddMesh(actor, "StitchedMouthL", BoxMeshFor(new Vector3(0.20f, 0.035f, 0.035f)), new Vector3(-0.09f, 1.84f, -0.37f), new Vector3(0.0f, 0.0f, -9.0f), Vector3.One, _matActorDark);
+		AddMesh(actor, "StitchedMouthR", BoxMeshFor(new Vector3(0.20f, 0.035f, 0.035f)), new Vector3(0.09f, 1.84f, -0.37f), new Vector3(0.0f, 0.0f, 9.0f), Vector3.One, _matActorDark);
+
+		AddMesh(actor, "LeftSleeve", new CapsuleMesh { Radius = 0.14f, Height = 0.78f }, new Vector3(-0.68f, 1.49f, 0.0f), new Vector3(0.0f, 0.0f, 90.0f), Vector3.One, cloth);
+		AddMesh(actor, "RightSleeve", new CapsuleMesh { Radius = 0.14f, Height = 0.78f }, new Vector3(0.68f, 1.49f, 0.0f), new Vector3(0.0f, 0.0f, 90.0f), Vector3.One, cloth);
+		for (int side = -1; side <= 1; side += 2)
+		{
+			for (int strand = -1; strand <= 1; strand++)
+			{
+				AddMesh(actor, $"WristStraw{side}_{strand}", new CylinderMesh { TopRadius = 0.0f, BottomRadius = 0.025f, Height = 0.34f },
+					new Vector3(side * 1.04f, 1.48f + strand * 0.055f, strand * 0.055f),
+					new Vector3(0.0f, 0.0f, side * (78.0f + strand * 7.0f)), Vector3.One, strawLight);
+			}
+		}
+		for (int strand = -2; strand <= 2; strand++)
+		{
+			AddMesh(actor, $"HemStraw{strand}", new CylinderMesh { TopRadius = 0.0f, BottomRadius = 0.025f, Height = 0.42f },
+				new Vector3(strand * 0.12f, 0.58f, 0.02f), new Vector3(0.0f, 0.0f, strand * 5.0f), Vector3.One, strawLight);
+		}
+
+		AddMesh(actor, "HatBrim", CylinderMeshFor(0.58f, 0.64f, 0.08f), new Vector3(0.0f, 2.27f, -0.01f), new Vector3(0.0f, 0.0f, -4.0f), Vector3.One, straw);
+		AddMesh(actor, "HatCrown", new CylinderMesh { TopRadius = 0.24f, BottomRadius = 0.39f, Height = 0.38f }, new Vector3(0.0f, 2.47f, 0.0f), new Vector3(0.0f, 0.0f, -4.0f), Vector3.One, strawLight);
+		AddMesh(actor, "HatBand", new CylinderMesh { TopRadius = 0.395f, BottomRadius = 0.395f, Height = 0.08f }, new Vector3(0.0f, 2.31f, -0.01f), new Vector3(0.0f, 0.0f, -4.0f), Vector3.One, cloth);
 	}
 
 	private void AddNpcRoleAccessory(Node3D actor, string combatRole)

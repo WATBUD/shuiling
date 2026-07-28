@@ -9,8 +9,6 @@ public partial class PlayerController
 	private readonly CardAlbum _cardAlbum = new();
 
 	// Affinity granted when a recruit NPC accepts the specific card it collects.
-	private const int NpcCardExchangeAffinityReward = 40;
-
 	// The single card a given recruit NPC will accept, chosen deterministically
 	// from the fixed named-card set so it's stable across sessions.
 	public string GetNpcWantedCardKey(SimpleActor npc)

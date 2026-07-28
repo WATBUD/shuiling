@@ -9,14 +9,12 @@ using System.Collections.Generic;
 public sealed class CardAlbum
 {
 	// +1% ATK / DEF / HP to every deployed companion per unique card owned.
-	private const float BonusPerCard = 0.01f;
-
 	private readonly HashSet<string> _owned = new();
 
 	public int Count => _owned.Count;
 
 	// 1.0 = no cards. Shown in the album panel and applied to companions.
-	public float CollectionMultiplier => 1.0f + _owned.Count * BonusPerCard;
+	public float CollectionMultiplier => 1.0f + _owned.Count * CardConfig.CollectionBonusPerUniqueCard;
 
 	public IReadOnlyCollection<string> Owned => _owned;
 

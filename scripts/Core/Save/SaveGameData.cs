@@ -46,10 +46,18 @@ public sealed class PlayerSaveData
 	public string PlayerModelPath { get; set; } = string.Empty;
 	public int Level { get; set; } = 1;
 	public int Experience { get; set; }
-	public int MaxHealth { get; set; } = 150;
-	public int CurrentHealth { get; set; } = 150;
+	public int MaxHealth { get; set; } = 1500;
+	public int CurrentHealth { get; set; } = 1500;
 	public int Attack { get; set; } = 16;
 	public int Defense { get; set; } = 10;
+	public CompanionBuildSaveData BuildLoadout { get; set; } = new()
+	{
+		HelmetId = "equip.helmet.none",
+		WeaponId = "equip.weapon.none",
+		ArmorId = "equip.armor.none",
+		BootsId = "equip.boots.none",
+		AccessoryId = "equip.accessory.none",
+	};
 	public int Gold { get; set; }
 	public string CameraMode { get; set; } = "god_view";
 	public float DamageTextScale { get; set; } = 1.0f;
@@ -100,6 +108,7 @@ public sealed class ActorSaveData
 	public int CurrentHealth { get; set; } = 100;
 	public bool IsDefeated { get; set; }
 	public bool IsAwaitingRecovery { get; set; }
+	public bool IsInWarehouseCollection { get; set; }
 	public string FallenMapId { get; set; } = string.Empty;
 	public SaveVector3 WorldPosition { get; set; } = new();
 	public int Attack { get; set; } = 10;

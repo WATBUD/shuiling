@@ -1,8 +1,8 @@
 using Godot;
 
-// Town Portal Scroll (回城卷): an emergency-retreat consumable. Usable in the
-// wild only when it's safe — not in a dungeon/cave, not during a boss fight,
-// not right after taking damage, and with no monsters bearing down on you.
+// Town Portal Scroll (回城卷): an emergency-retreat consumable. Usable outside
+// town, including caves, when it's safe — not during a boss fight and not
+// right after taking damage.
 // Returns the party to the city. New characters start with 5.
 public partial class PlayerController
 {
@@ -122,11 +122,11 @@ public partial class PlayerController
 		}
 
 		// Interrupted if we got hit since the channel began, a boss engaged, or
-		// we somehow left the wild (e.g. another travel).
+		// we already arrived in town through another travel.
 		bool damagedSinceStart = _lastCombatMsec >= _townPortalStartMsec;
 		bool bossEngaged = _bossHudCombatVisibleRemaining > 0.0f;
-		bool leftWild = GetParent() is not World world || world.ActiveMapId == "city" || world.ActiveMapId.Contains("_cave_");
-		if (damagedSinceStart || bossEngaged || leftWild)
+		bool alreadyInTown = GetParent() is not World world || world.ActiveMapId == "city";
+		if (damagedSinceStart || bossEngaged || alreadyInTown)
 		{
 			CancelTownPortalChannel();
 			return;
@@ -368,12 +368,6 @@ public partial class PlayerController
 		if (mapId == "city")
 		{
 			reasonKey = "item.town_portal.in_town";
-			return false;
-		}
-
-		if (mapId.Contains("_cave_"))
-		{
-			reasonKey = "item.town_portal.in_dungeon";
 			return false;
 		}
 

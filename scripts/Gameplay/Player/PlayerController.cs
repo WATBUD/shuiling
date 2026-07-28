@@ -3,6 +3,72 @@ using System.Collections.Generic;
 
 public partial class PlayerController : CharacterBody3D
 {
+	public CompanionBuildLoadout BuildLoadout { get; private set; } = CreateEmptyPlayerLoadout();
+	public BuildStats CurrentBuildStats => BuildCatalog.CalculatePlayerStats(this, BuildLoadout);
+	public int EffectiveMaxHealth => CurrentBuildStats.MaxHealth;
+	public int EffectiveDefense => CurrentBuildStats.Defense;
+
+	private static CompanionBuildLoadout CreateEmptyPlayerLoadout()
+	{
+		return new CompanionBuildLoadout
+		{
+			HelmetId = "equip.helmet.none",
+			WeaponId = "equip.weapon.none",
+			ArmorId = "equip.armor.none",
+			BootsId = "equip.boots.none",
+			AccessoryId = "equip.accessory.none",
+			AttributeGemId = "gem.attribute.none",
+			SkillGemIds = new[] { "gem.skill.none", "gem.skill.none", "gem.skill.none" },
+			SkillGemLevels = new[] { 1, 1, 1 },
+		};
+	}
+
+	public void EquipAttributeGem(string gemId)
+	{
+		BuildLoadout.AttributeGemId = BuildCatalog.GetAttributeGem(gemId).Id;
+	}
+
+	public void EquipBuildEquipment(EquipmentSlot slot, string equipmentId)
+	{
+		EquipmentDefinition equipment = BuildCatalog.GetEquipment(equipmentId);
+		if (equipment.Slot == slot)
+		{
+			BuildLoadout.SetEquipmentId(slot, equipment.Id);
+		}
+	}
+
+	public void EquipSkillGem(int slotIndex, string gemId)
+	{
+		BuildLoadout.EnsureSkillSlots();
+		int slot = Mathf.Clamp(slotIndex, 0, BuildLoadout.SkillGemIds.Length - 1);
+		string validated = BuildCatalog.GetSkillGem(gemId).Id;
+		if ((slot == 0 && !BuildCatalog.IsMainAttackCore(validated))
+			|| (slot > 0 && !BuildCatalog.IsSupportCore(validated))
+			|| (slot > 0 && !BuildCatalog.HasMainAttackCore(BuildLoadout))
+			|| (BuildCatalog.IsProjectileSupportGem(validated) && !BuildCatalog.HasRangedActiveSkill(BuildLoadout)))
+		{
+			return;
+		}
+		BuildLoadout.SkillGemIds[slot] = validated;
+		BuildLoadout.SkillGemLevels[slot] = 1;
+	}
+
+	public void ClearSkillGemSlot(int slot)
+	{
+		BuildLoadout.EnsureSkillSlots();
+		slot = Mathf.Clamp(slot, 0, BuildLoadout.SkillGemIds.Length - 1);
+		BuildLoadout.SkillGemIds[slot] = "gem.skill.none";
+		BuildLoadout.SkillGemLevels[slot] = 1;
+	}
+
+	public int RaiseSkillGemLevel(int slot)
+	{
+		BuildLoadout.EnsureSkillSlots();
+		slot = Mathf.Clamp(slot, 0, BuildLoadout.SkillGemLevels.Length - 1);
+		int level = Mathf.Min(BuildLoadout.GetSkillGemLevel(slot) + 1, BuildCatalog.MaxSkillGemLevel);
+		BuildLoadout.SkillGemLevels[slot] = level;
+		return level;
+	}
 
 	public enum CameraViewMode
 	{
@@ -48,7 +114,6 @@ public partial class PlayerController : CharacterBody3D
 	private const int PetShopStockCount = 4;
 	private const int PetReviveGoldCost = 40;
 	private const float InteractionPromptRefreshSeconds = 0.12f;
-	private const float WorldDropCollectRefreshSeconds = 0.10f;
 	private const float FallenCompanionPickupRadius = 1.85f;
 	private const string ThirdPersonCameraModeId = "third_person";
 	private const string GodViewCameraModeId = "god_view";
@@ -93,8 +158,8 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public string PlayerModelPath { get; set; } = string.Empty;
 	[Export] public int Level { get; set; } = 1;
 	[Export] public int Experience { get; set; }
-	[Export] public int MaxHealth { get; set; } = 3000;
-	[Export] public int CurrentHealth { get; set; } = 3000;
+	[Export] public int MaxHealth { get; set; } = 1500;
+	[Export] public int CurrentHealth { get; set; } = 1500;
 	[Export] public int Attack { get; set; } = 16;
 	[Export] public int Defense { get; set; } = 10;
 	[Export] public int Gold { get; set; } = 5000;
@@ -179,6 +244,10 @@ public partial class PlayerController : CharacterBody3D
 	private SettingsPanel _settingsPanel = null!;
 	private PanelContainer _pauseMenuPanel = null!;
 	private MinimapPanel _minimapPanel = null!;
+	private PanelContainer _playerHealthHudPanel = null!;
+	private Label _playerHealthHudNameLabel = null!;
+	private Label _playerHealthHudValueLabel = null!;
+	private ProgressBar _playerHealthHudBar = null!;
 	private CaptureRhythmPanel _captureRhythmPanel = null!;
 	private SystemLogPanel _systemLogPanel = null!;
 	private PanelContainer _bossAnnouncementPanel = null!;
@@ -264,7 +333,7 @@ public partial class PlayerController : CharacterBody3D
 	public float NameplateScale => SimpleActor.NameplateScale;
 	public bool BossAnnouncementsEnabled => _bossAnnouncementsEnabled;
 	public float BossAnnouncementOpacity => _bossAnnouncementOpacity;
-	public float HealthRatio => MaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)MaxHealth, 0.0f, 1.0f);
+	public float HealthRatio => EffectiveMaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)EffectiveMaxHealth, 0.0f, 1.0f);
 	public int ExperienceToNextLevel => ExperienceTable.ToNextLevel(Level);
 
 	public override void _Ready()
@@ -283,6 +352,7 @@ public partial class PlayerController : CharacterBody3D
 		CreatePlayerNameplate();
 		CreateTargetInfoPanel();
 		CreateMinimapPanel();
+		CreatePlayerHealthHud();
 		CreateCaptureRhythmPanel();
 		CreatePartyPanel();
 		CreatePartyInvitePanel();
@@ -301,6 +371,12 @@ public partial class PlayerController : CharacterBody3D
 		InitializeStarterInventory();
 		if (!GameLaunchOptions.LoadSaveOnWorldReady)
 		{
+			if (DevConfig.TestMode)
+			{
+				Level = 100;
+				Experience = 0;
+			}
+
 			// 初始寵物改為開發者測試旗標控制：僅在 dev_config.cfg 的 grant_starter_pet=true 時贈送。
 			if (DevConfig.GrantStarterPet)
 			{
@@ -364,6 +440,7 @@ public partial class PlayerController : CharacterBody3D
 		UpdateMeleeCooldown((float)delta);
 		UpdateAutoAttack((float)delta);
 		UpdateHealthRegen((float)delta);
+		UpdatePlayerHealthHud();
 		UpdateCamera();
 		UpdateTargetInfoPanel();
 		UpdateCaptureAmmoHud();
@@ -687,6 +764,7 @@ public partial class PlayerController : CharacterBody3D
 			direction = approachDirection;
 		}
 		float targetSpeed = Input.IsActionPressed("sprint") ? SprintSpeed : WalkSpeed;
+		targetSpeed *= CurrentBuildStats.MoveSpeedMultiplier;
 		if (MountedCompanion is SimpleActor mount)
 		{
 			targetSpeed = mount.EffectiveMoveSpeed;

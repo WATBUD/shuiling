@@ -6,6 +6,10 @@ public partial class PlayerController
 	private float _meleeCooldownRemaining;
 	private float _playerAttackAnimRemaining;
 	private const float PlayerAttackAnimationSeconds = 0.45f;
+	// Keep the player's whirlwind identical to companions: three full turns at
+	// twice the previous angular speed (2 turns / 0.55 s -> 3 turns / 0.4125 s).
+	private const float PlayerWhirlwindSpinSeconds = 0.4125f;
+	private const float PlayerWhirlwindSpinRadians = Mathf.Tau * 3.0f;
 
 	// Death: the player is downed on the spot while their pets grieve, and stays
 	// down (with a return prompt) until they choose to go back to town.
@@ -30,15 +34,24 @@ public partial class PlayerController
 			return;
 		}
 
-		_meleeCooldownRemaining = AttackCooldown;
-		PlayPlayerAttackAnimation();
+		BuildStats stats = CurrentBuildStats;
+		_meleeCooldownRemaining = AttackCooldown * stats.AttackCooldownMultiplier;
+		PlayPlayerAttackAnimation(BuildLoadout.GetSkillGemId(0) == "gem.skill.whirlwind");
 
 		Vector3 origin = GlobalPosition;
 		Vector3 forward = -GlobalTransform.Basis.Z;
 		forward.Y = 0.0f;
 		forward = forward.LengthSquared() < 0.0001f ? Vector3.Forward : forward.Normalized();
 
-		float reach = AttackRange + 0.8f;
+		float reach = AttackRange + stats.AttackRangeBonus + 0.8f;
+
+		if (BuildCatalog.HasMainAttackCore(BuildLoadout) && FocusedTarget is SimpleActor coreTarget
+			&& IsInstanceValid(coreTarget) && !coreTarget.IsDefeated)
+		{
+			LaunchPlayerCoreAttack(coreTarget, stats);
+			MarkRecentCombat();
+			return;
+		}
 
 		bool hitAny = false;
 		SimpleActor? focused = FocusedTarget;
@@ -66,7 +79,7 @@ public partial class PlayerController
 
 			// null attacker: for a client this forwards the hit to the host, which
 			// owns the monster's HP (same path companions/net use).
-			monster.ReceiveDamage(Attack, null);
+			monster.ReceiveDamage(stats.Attack, null);
 			SpawnImpactEffect(monster.GlobalPosition + Vector3.Up * 0.9f);
 			hitAny = true;
 		}
@@ -75,6 +88,91 @@ public partial class PlayerController
 		{
 			MarkRecentCombat();
 		}
+	}
+
+	private void LaunchPlayerCoreAttack(SimpleActor target, BuildStats stats)
+	{
+		Vector3 forward = target.GlobalPosition - GlobalPosition;
+		forward.Y = 0.0f;
+		forward = forward.LengthSquared() > 0.001f ? forward.Normalized() : -GlobalTransform.Basis.Z;
+		string skillId = BuildLoadout.GetSkillGemId(0);
+		bool isMelee = !BuildCatalog.HasRangedActiveSkill(BuildLoadout);
+		Node parent = GetTree().CurrentScene ?? GetParent();
+		SkillAttackVfx.SpawnCast(parent, GlobalPosition + Vector3.Up * 1.1f + forward * 0.35f, forward,
+			skillId, stats.DamageElementId, stats.AttackColor, stats.Behavior, stats.LifeStealPercent > 0.0f);
+
+		int count = skillId == "gem.skill.whirlwind" ? 3 : 1 + Mathf.Max(stats.Behavior.ExtraProjectiles, 0);
+		for (int index = 0; index < count; index++)
+		{
+			float angle = (index - (count - 1) / 2.0f) * Mathf.DegToRad(14.0f);
+			Vector3 direction = forward.Rotated(Vector3.Up, angle);
+			var projectile = new CombatProjectile
+			{
+				PlayerAttacker = this,
+				Damage = Mathf.Max(stats.Attack, 1),
+				EffectColor = stats.AttackColor,
+				IsMelee = isMelee,
+				VisualSkillId = skillId,
+				ElementId = stats.DamageElementId,
+				HasLifeSteal = stats.LifeStealPercent > 0.0f,
+				Speed = (isMelee ? 26.0f : 18.0f) * stats.ProjectileSpeedMultiplier,
+				MaxRange = isMelee ? 3.0f : Mathf.Max(AttackRange + stats.AttackRangeBonus, 9.0f) * 1.6f,
+				HitRadius = isMelee ? 1.35f : 1.0f,
+				InitialTarget = Mathf.Abs(angle) < 0.001f ? target : null,
+				LaunchDirection = direction,
+				SpawnOrigin = GlobalPosition + Vector3.Up * 1.2f + direction * 0.5f,
+				Behavior = stats.Behavior.Clone(),
+			};
+			parent.AddChild(projectile);
+		}
+	}
+
+	public List<SimpleActor> FindPlayerProjectileTargets(Vector3 center, float radius, ICollection<SimpleActor> exclude)
+	{
+		var results = new List<SimpleActor>();
+		center.Y = 0.0f;
+		float radiusSquared = radius * radius;
+		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
+		{
+			if (node is not SimpleActor actor || !IsInstanceValid(actor) || !actor.IsHostileToPlayer
+				|| actor.IsDefeated || (exclude != null && exclude.Contains(actor)))
+			{
+				continue;
+			}
+			Vector3 position = actor.GlobalPosition;
+			position.Y = 0.0f;
+			if (center.DistanceSquaredTo(position) <= radiusSquared)
+			{
+				results.Add(actor);
+			}
+		}
+		results.Sort((left, right) => center.DistanceSquaredTo(left.GlobalPosition).CompareTo(center.DistanceSquaredTo(right.GlobalPosition)));
+		return results;
+	}
+
+	public int ResolvePlayerProjectileHit(SimpleActor target, int baseDamage)
+	{
+		if (!IsInstanceValid(target) || target.IsDefeated)
+		{
+			return 0;
+		}
+		BuildStats stats = CurrentBuildStats;
+		int damage = Mathf.Max(baseDamage, 1);
+		if (GD.Randf() < stats.CritChance)
+		{
+			damage = Mathf.RoundToInt(damage * 1.55f);
+		}
+		int dealt = target.ReceiveDamage(damage, null);
+		if (dealt > 0 && GD.Randf() < stats.ControlChance)
+		{
+			target.ApplyElementStatusFromPlayer(stats.DamageElementId);
+		}
+		if (dealt > 0 && stats.LifeStealPercent > 0.0f)
+		{
+			ReceiveHealing(Mathf.RoundToInt(dealt * stats.LifeStealPercent));
+		}
+		MarkRecentCombat();
+		return dealt;
 	}
 
 	// Click-to-attack pathing: when a monster is focused and out of melee range,
@@ -96,7 +194,10 @@ public partial class PlayerController
 
 		Vector3 toTarget = focused.GlobalPosition - GlobalPosition;
 		toTarget.Y = 0.0f;
-		if (toTarget.Length() <= (AttackRange + 0.8f) * 0.9f)
+		float effectiveRange = BuildCatalog.HasRangedActiveSkill(BuildLoadout)
+			? Mathf.Max(AttackRange + CurrentBuildStats.AttackRangeBonus, 9.0f)
+			: AttackRange + CurrentBuildStats.AttackRangeBonus + 0.8f;
+		if (toTarget.Length() <= effectiveRange * 0.9f)
 		{
 			return false; // already in range
 		}
@@ -122,7 +223,10 @@ public partial class PlayerController
 
 		Vector3 toTarget = focused.GlobalPosition - GlobalPosition;
 		toTarget.Y = 0.0f;
-		if (toTarget.Length() > AttackRange + 0.8f)
+		float effectiveRange = BuildCatalog.HasRangedActiveSkill(BuildLoadout)
+			? Mathf.Max(AttackRange + CurrentBuildStats.AttackRangeBonus, 9.0f)
+			: AttackRange + CurrentBuildStats.AttackRangeBonus + 0.8f;
+		if (toTarget.Length() > effectiveRange)
 		{
 			return; // move closer to keep auto-attacking
 		}
@@ -140,7 +244,8 @@ public partial class PlayerController
 
 	private void UpdateHealthRegen(float step)
 	{
-		if (CurrentHealth <= 0 || CurrentHealth >= MaxHealth)
+		int effectiveMaxHealth = EffectiveMaxHealth;
+		if (CurrentHealth <= 0 || CurrentHealth >= effectiveMaxHealth)
 		{
 			_regenAccumulator = 0.0f;
 			return;
@@ -151,12 +256,12 @@ public partial class PlayerController
 			return;
 		}
 
-		_regenAccumulator += MaxHealth * RegenFractionPerSecond * step;
+		_regenAccumulator += effectiveMaxHealth * RegenFractionPerSecond * step;
 		if (_regenAccumulator >= 1.0f)
 		{
 			int amount = Mathf.FloorToInt(_regenAccumulator);
 			_regenAccumulator -= amount;
-			CurrentHealth = Mathf.Min(CurrentHealth + amount, MaxHealth);
+			CurrentHealth = Mathf.Min(CurrentHealth + amount, effectiveMaxHealth);
 		}
 	}
 
@@ -516,7 +621,7 @@ public partial class PlayerController
 
 	public int ReceiveDamage(int rawDamage, SimpleActor? attacker = null)
 	{
-		int mitigatedDamage = Mathf.Max(rawDamage - Mathf.RoundToInt(Defense * 0.35f), 1);
+		int mitigatedDamage = Mathf.Max(rawDamage - Mathf.RoundToInt(EffectiveDefense * 0.35f), 1);
 		CurrentHealth = Mathf.Max(CurrentHealth - mitigatedDamage, 0);
 		MarkRecentCombat();
 		Color hitColor = attacker?.AttackFxColor ?? new Color(1.0f, 0.18f, 0.14f, 0.92f);
@@ -538,7 +643,7 @@ public partial class PlayerController
 
 	public int ReceiveHealing(int rawHealing)
 	{
-		int missingHealth = Mathf.Max(MaxHealth - CurrentHealth, 0);
+		int missingHealth = Mathf.Max(EffectiveMaxHealth - CurrentHealth, 0);
 		int healing = Mathf.Min(Mathf.Max(rawHealing, 0), missingHealth);
 		if (healing <= 0)
 		{
@@ -701,7 +806,7 @@ public partial class PlayerController
 		}
 		Input.MouseMode = Input.MouseModeEnum.Captured;
 
-		CurrentHealth = MaxHealth;
+		CurrentHealth = EffectiveMaxHealth;
 		_lastCombatMsec = 0;
 
 		foreach (SimpleActor actor in _activeParty)

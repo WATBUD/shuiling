@@ -110,6 +110,18 @@ public partial class PartyPanel : PanelContainer
 			activeIndex++;
 		}
 
+		List<SimpleActor> inactiveCompanions = GetStoredCompanions();
+		if (inactiveCompanions.Count > 0)
+		{
+			AddHeader(LocaleText.T("party.inactive"));
+			int inactiveIndex = 1;
+			foreach (SimpleActor actor in inactiveCompanions)
+			{
+				AddMemberButton(FormatActorListText(inactiveIndex, actor), _selected == actor, () => SelectMember(actor), actor);
+				inactiveIndex++;
+			}
+		}
+
 		// 不再顯示「收藏」清單；改為列出已死亡的夥伴（供水池復活辨識）。
 		List<SimpleActor> deadCompanions = GetDeadCompanions();
 		if (deadCompanions.Count > 0)
@@ -410,7 +422,7 @@ public partial class PartyPanel : PanelContainer
 			return;
 		}
 
-		// Double-click quickly toggles deployment: stored → 出戰, active → 回到收藏.
+		// Double-click toggles between active and inactive; both remain in the party roster.
 		if (mouseButton is { ButtonIndex: MouseButton.Left, DoubleClick: true })
 		{
 			_selected = actor;
@@ -419,7 +431,7 @@ public partial class PartyPanel : PanelContainer
 		}
 	}
 
-	// Toggle a companion between the active party and the collection. Deploying
+	// Toggle a companion between active and inactive party states. Deploying
 	// into a full active party is refused with a tip message rather than silently
 	// bumping someone (use right-click "替換出戰" for a deliberate replacement).
 	private void ToggleDeployment(SimpleActor actor)
@@ -464,7 +476,7 @@ public partial class PartyPanel : PanelContainer
 
 		if (_player.IsInActiveParty(actor))
 		{
-			_memberContextMenu.AddItem(LocaleText.T("button.store"), 1);
+			_memberContextMenu.AddItem(LocaleText.T("button.set_inactive"), 1);
 			bool mounted = _player.IsMountedCompanion(actor);
 			_memberContextMenu.AddItem(mounted ? "解除騎乘" : LocaleText.F("button.ride", PlayerController.MountAffinityRequirement), 6);
 			// 騎乘需要親密度達 50 以上（已在騎乘者可隨時解除）。
@@ -474,7 +486,7 @@ public partial class PartyPanel : PanelContainer
 		{
 			string deployText = _player.ActiveParty.Count >= _player.ActivePartyLimit
 				? LocaleText.T("button.replace_deploy")
-				: LocaleText.T("button.add_deploy");
+				: LocaleText.T("button.set_active");
 			_memberContextMenu.AddItem(deployText, 2);
 			_memberContextMenu.SetItemDisabled(_memberContextMenu.GetItemIndex(2), actor.IsDefeated || actor.IsAwaitingRecovery);
 		}
@@ -631,7 +643,7 @@ public partial class PartyPanel : PanelContainer
 
 		foreach (SimpleActor actor in _player.CapturedCollection)
 		{
-			if (IsInstanceValid(actor) && actor.IsCaptured && actor.IsDefeated)
+			if (IsInstanceValid(actor) && actor.IsCaptured && actor.IsDefeated && !actor.IsInWarehouseCollection)
 			{
 				companions.Add(actor);
 			}
@@ -650,7 +662,7 @@ public partial class PartyPanel : PanelContainer
 
 		foreach (SimpleActor actor in _player.CapturedCollection)
 		{
-			if (IsInstanceValid(actor) && actor.IsCaptured && !actor.IsAwaitingRecovery && !_player.IsInActiveParty(actor))
+			if (IsInstanceValid(actor) && actor.IsCaptured && !actor.IsInWarehouseCollection && !actor.IsAwaitingRecovery && !_player.IsInActiveParty(actor))
 			{
 				companions.Add(actor);
 			}

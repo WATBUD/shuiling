@@ -235,8 +235,8 @@ public partial class PlayerController
 			if (!string.IsNullOrEmpty(wantedCard) && TryConsumeCard(wantedCard))
 			{
 				_completedNpcQuests.Add(actor);
-				actor.IncreaseAffinity(NpcCardExchangeAffinityReward);
-				SpawnWorldCombatEffect(LocaleText.F("effect.affinity_gain", NpcCardExchangeAffinityReward), new Color(0.62f, 1.0f, 0.78f, 0.92f), actor.GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 0.85f, 0.62f);
+				actor.IncreaseAffinity(CardConfig.NpcExchangeAffinityReward);
+				SpawnWorldCombatEffect(LocaleText.F("effect.affinity_gain", CardConfig.NpcExchangeAffinityReward), new Color(0.62f, 1.0f, 0.78f, 0.92f), actor.GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 0.85f, 0.62f);
 				PostSystemMessage(LocaleText.F("system.npc.card_accepted", ExternalModelLibrary.LocalizedCardName(wantedCard), actor.LocalizedDisplayName), new Color(0.72f, 0.92f, 1.0f), GameMessageChannel.Party);
 				if (actor.Affinity >= NpcRecruitAffinityRequirement)
 				{

@@ -16,6 +16,7 @@ public partial class PlayerController
 			CurrentHealth = CurrentHealth,
 			Attack = Attack,
 			Defense = Defense,
+			BuildLoadout = ExportPlayerBuildLoadout(),
 			Gold = Gold,
 			CameraMode = CameraModeToSaveId(_cameraMode),
 			DamageTextScale = DamageTextScale,
@@ -103,9 +104,10 @@ public partial class PlayerController
 		Level = Mathf.Max(data.Level, 1);
 		Experience = Mathf.Max(data.Experience, 0);
 		MaxHealth = Mathf.Max(data.MaxHealth, 1);
-		CurrentHealth = Mathf.Clamp(data.CurrentHealth, 1, MaxHealth);
 		Attack = Mathf.Max(data.Attack, 0);
 		Defense = Mathf.Max(data.Defense, 0);
+		RestorePlayerBuildLoadout(data.BuildLoadout);
+		CurrentHealth = Mathf.Clamp(data.CurrentHealth, 1, EffectiveMaxHealth);
 		Gold = Mathf.Max(data.Gold, 0);
 		SetDamageTextScale(data.DamageTextScale);
 		SetNameplateScale(data.NameplateScale);
@@ -118,7 +120,10 @@ public partial class PlayerController
 		_inventoryItems.Clear();
 		foreach (KeyValuePair<string, int> item in data.InventoryItems)
 		{
-			if (!BuildCatalog.IsFreeItem(item.Key) && item.Value > 0)
+			if (!BuildCatalog.IsFreeItem(item.Key)
+				&& !BuildCatalog.IsRetiredSkillCore(item.Key)
+				&& !BuildCatalog.IsRetiredAttributeGem(item.Key)
+				&& item.Value > 0)
 			{
 				_inventoryItems[item.Key] = item.Value;
 			}
@@ -127,7 +132,10 @@ public partial class PlayerController
 		_storageItems.Clear();
 		foreach (KeyValuePair<string, int> item in data.StorageItems)
 		{
-			if (!BuildCatalog.IsFreeItem(item.Key) && item.Value > 0)
+			if (!BuildCatalog.IsFreeItem(item.Key)
+				&& !BuildCatalog.IsRetiredSkillCore(item.Key)
+				&& !BuildCatalog.IsRetiredAttributeGem(item.Key)
+				&& item.Value > 0)
 			{
 				_storageItems[item.Key] = item.Value;
 			}
@@ -170,6 +178,50 @@ public partial class PlayerController
 		_formationPanel.RefreshAll();
 		_mercenaryShopPanel.RefreshAll();
 		_warehousePanel.RefreshAll();
+	}
+
+	private CompanionBuildSaveData ExportPlayerBuildLoadout()
+	{
+		BuildLoadout.EnsureSkillSlots();
+		return new CompanionBuildSaveData
+		{
+			HelmetId = BuildLoadout.HelmetId,
+			WeaponId = BuildLoadout.WeaponId,
+			ArmorId = BuildLoadout.ArmorId,
+			BootsId = BuildLoadout.BootsId,
+			AccessoryId = BuildLoadout.AccessoryId,
+			AttributeGemId = "gem.attribute.none",
+			SkillGemIds = (string[])BuildLoadout.SkillGemIds.Clone(),
+			SkillGemLevels = (int[])BuildLoadout.SkillGemLevels.Clone(),
+		};
+	}
+
+	private void RestorePlayerBuildLoadout(CompanionBuildSaveData? data)
+	{
+		data ??= new CompanionBuildSaveData();
+		BuildLoadout = new CompanionBuildLoadout
+		{
+			HelmetId = data.HelmetId,
+			WeaponId = data.WeaponId,
+			ArmorId = data.ArmorId,
+			BootsId = data.BootsId,
+			AccessoryId = data.AccessoryId,
+			// Pure attribute gems were retired; active cores now own their element.
+			AttributeGemId = "gem.attribute.none",
+			SkillGemIds = data.SkillGemIds is { Length: > 0 } ? (string[])data.SkillGemIds.Clone() : new[] { "gem.skill.none", "gem.skill.none", "gem.skill.none" },
+			SkillGemLevels = data.SkillGemLevels is { Length: > 0 } ? (int[])data.SkillGemLevels.Clone() : new[] { 1, 1, 1 },
+		};
+		BuildLoadout.EnsureSkillSlots();
+		for (int index = 0; index < BuildLoadout.SkillGemIds.Length; index++)
+		{
+			string id = BuildLoadout.SkillGemIds[index];
+			bool valid = index == 0 ? BuildCatalog.IsMainAttackCore(id) : BuildCatalog.IsSupportCore(id);
+			if (!valid || (BuildCatalog.IsProjectileSupportGem(id) && !BuildCatalog.HasRangedActiveSkill(BuildLoadout)))
+			{
+				BuildLoadout.SkillGemIds[index] = "gem.skill.none";
+				BuildLoadout.SkillGemLevels[index] = 1;
+			}
+		}
 	}
 
 	public void SetDamageTextScale(float scale)

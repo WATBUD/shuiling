@@ -56,10 +56,12 @@ public partial class PlayerController
 			{
 				SetPlayerExternalAnimationState("idle");
 				StabilizePlayerExternalModel();
+				UpdatePlayerWhirlwindSpin(step);
 				return;
 			}
 
 			ApplyMountedPose();
+			UpdatePlayerWhirlwindSpin(step);
 			return;
 		}
 
@@ -71,12 +73,14 @@ public partial class PlayerController
 			{
 				_playerAttackAnimRemaining -= step;
 				StabilizePlayerExternalModel();
+				UpdatePlayerWhirlwindSpin(step);
 				return;
 			}
 
 			string state = !isMoving ? "idle" : moveRatio > 0.72f ? "run" : "walk";
 			SetPlayerExternalAnimationState(state);
 			StabilizePlayerExternalModel();
+			UpdatePlayerWhirlwindSpin(step);
 			return;
 		}
 
@@ -116,6 +120,7 @@ public partial class PlayerController
 
 		SetVisualRotation("PlayerCape", new Vector3(-8.0f + Mathf.Abs(swing) * 7.0f * intensity, 0.0f, -swing * 2.5f * intensity));
 		SetVisualRotation("PlayerScarfTail", new Vector3(-12.0f - moveRatio * 12.0f, 0.0f, -12.0f + swing * 5.0f * intensity));
+		UpdatePlayerWhirlwindSpin(step);
 	}
 
 	private void ApplyMountedPose()
@@ -145,14 +150,22 @@ public partial class PlayerController
 	private Tween? _playerAttackPoseTween;
 	private Node3D? _playerAttackPoseTarget;
 	private Vector3 _playerAttackPoseBaseScale = Vector3.One;
+	private Node3D? _playerWhirlwindSpinTarget;
+	private float _playerWhirlwindSpinBaseYaw;
+	private float _playerWhirlwindSpinAngle;
+	private float _playerWhirlwindSpinRemaining;
 
 	// Melee swing feedback. Always plays the same squash-and-stretch "lunge" shake
 	// that wild monsters and companions use (works on every model), and ALSO holds
 	// the model's dedicated attack clip only when it actually has one — so a
 	// clip-less model reads as a real swing instead of freezing in an idle pose.
-	private void PlayPlayerAttackAnimation()
+	private void PlayPlayerAttackAnimation(bool usesWhirlwind)
 	{
 		AnimatePlayerAttackPose();
+		if (usesWhirlwind)
+		{
+			BeginPlayerWhirlwindSpin();
+		}
 
 		if (_playerExternalModel == null)
 		{
@@ -166,6 +179,62 @@ public partial class PlayerController
 			StabilizePlayerExternalModel();
 			_playerAttackAnimRemaining = PlayerAttackAnimationSeconds;
 		}
+	}
+
+	private void BeginPlayerWhirlwindSpin()
+	{
+		ResetPlayerWhirlwindSpin();
+		if (_playerVisualRoot == null || !IsInstanceValid(_playerVisualRoot))
+		{
+			return;
+		}
+
+		_playerWhirlwindSpinTarget = _playerVisualRoot;
+		_playerWhirlwindSpinBaseYaw = _playerVisualRoot.Rotation.Y;
+		_playerWhirlwindSpinAngle = 0.0f;
+		_playerWhirlwindSpinRemaining = PlayerWhirlwindSpinSeconds;
+	}
+
+	private void UpdatePlayerWhirlwindSpin(float step)
+	{
+		if (_playerWhirlwindSpinTarget == null || !IsInstanceValid(_playerWhirlwindSpinTarget))
+		{
+			_playerWhirlwindSpinTarget = null;
+			_playerWhirlwindSpinRemaining = 0.0f;
+			return;
+		}
+
+		if (_playerWhirlwindSpinRemaining <= 0.0f)
+		{
+			ResetPlayerWhirlwindSpin();
+			return;
+		}
+
+		float appliedStep = Mathf.Min(step, _playerWhirlwindSpinRemaining);
+		_playerWhirlwindSpinRemaining -= appliedStep;
+		_playerWhirlwindSpinAngle += PlayerWhirlwindSpinRadians * appliedStep / PlayerWhirlwindSpinSeconds;
+		Vector3 rotation = _playerWhirlwindSpinTarget.Rotation;
+		rotation.Y = _playerWhirlwindSpinBaseYaw + _playerWhirlwindSpinAngle;
+		_playerWhirlwindSpinTarget.Rotation = rotation;
+
+		if (_playerWhirlwindSpinRemaining <= 0.0f)
+		{
+			ResetPlayerWhirlwindSpin();
+		}
+	}
+
+	private void ResetPlayerWhirlwindSpin()
+	{
+		if (_playerWhirlwindSpinTarget != null && IsInstanceValid(_playerWhirlwindSpinTarget))
+		{
+			Vector3 rotation = _playerWhirlwindSpinTarget.Rotation;
+			rotation.Y = _playerWhirlwindSpinBaseYaw;
+			_playerWhirlwindSpinTarget.Rotation = rotation;
+		}
+
+		_playerWhirlwindSpinTarget = null;
+		_playerWhirlwindSpinAngle = 0.0f;
+		_playerWhirlwindSpinRemaining = 0.0f;
 	}
 
 	// Squash-and-stretch scale pop on the player's visual root (never the physics

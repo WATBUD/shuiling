@@ -59,8 +59,8 @@ public partial class WorldDrop : Node3D
 	[Export] public int Amount { get; set; } = 1;
 	[Export] public int GoldAmount { get; set; }
 	[Export] public string CardKey { get; set; } = string.Empty;
-	[Export] public float PickupRadius { get; set; } = 1.65f;
-	[Export] public float LifetimeSeconds { get; set; } = 90.0f;
+	[Export] public float PickupRadius { get; set; } = WorldDropConfig.PickupRadius;
+	[Export] public float LifetimeSeconds { get; set; } = WorldDropConfig.LifetimeSeconds;
 
 	private float _age;
 	private float _bobPhase;
@@ -69,6 +69,7 @@ public partial class WorldDrop : Node3D
 	public bool IsGoldDrop => GoldAmount > 0;
 	public bool IsCardDrop => !string.IsNullOrEmpty(CardKey);
 	public bool IsCollected { get; private set; }
+	public float AgeSeconds => _age;
 
 	public override void _Ready()
 	{

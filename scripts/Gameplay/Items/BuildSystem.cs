@@ -77,6 +77,9 @@ public sealed class SkillGemDefinition
 	public string Id { get; set; } = string.Empty;
 	public string NameKey { get; set; } = string.Empty;
 	public string SummaryKey { get; set; } = string.Empty;
+	public string DamageElementId { get; set; } = string.Empty;
+	public string DamageElementNameKey { get; set; } = string.Empty;
+	public Color AttackColor { get; set; } = new(1.0f, 0.54f, 0.24f, 0.92f);
 	public int MaxHealthBonus { get; set; }
 	public int AttackBonus { get; set; }
 	public int DefenseBonus { get; set; }
@@ -90,6 +93,11 @@ public sealed class SkillGemDefinition
 	public bool EnablesHeal { get; set; }
 	public bool EnablesShield { get; set; }
 	public bool IsRangedActiveSkill { get; set; }
+	public bool IsSupportEffect { get; set; }
+	public bool RequiresProjectile { get; set; }
+	public float DamageMultiplier { get; set; } = 1.0f;
+	public float ProjectileSpeedMultiplier { get; set; } = 1.0f;
+	public float ControlChanceBonus { get; set; }
 
 	// PoE-style attack behavior. A gem either just tweaks stats (BehaviorId == None)
 	// or attaches a projectile behavior that shapes how the base attack plays out.
@@ -169,6 +177,8 @@ public sealed class BuildStats
 	public float LifeStealPercent { get; set; }
 	public float KnockbackForce { get; set; }
 	public float ControlChance { get; set; }
+	public float DamageMultiplier { get; set; } = 1.0f;
+	public float ProjectileSpeedMultiplier { get; set; } = 1.0f;
 	public float IncomingDamageMultiplier { get; set; } = 1.0f;
 	public int EquipmentSocketCount { get; set; }
 	public bool HasHealSkill { get; set; }
@@ -458,35 +468,29 @@ public static class BuildCatalog
 	private static readonly List<AttributeGemDefinition> AttributeGems = new()
 	{
 		new AttributeGemDefinition { Id = "gem.attribute.none", NameKey = "gem.attribute.none", SummaryKey = "gem.summary.none", ElementId = "physical", ElementNameKey = "element.physical", AttackColor = new Color(1.0f, 0.54f, 0.24f, 0.92f) },
-		new AttributeGemDefinition { Id = "gem.attribute.fire", NameKey = "gem.attribute.fire", SummaryKey = "gem.summary.fire", ElementId = "fire", ElementNameKey = "element.fire", AttackBonus = 5, ControlChance = 0.18f, AttackColor = new Color(1.0f, 0.28f, 0.08f, 0.94f) },
-		new AttributeGemDefinition { Id = "gem.attribute.water", NameKey = "gem.attribute.water", SummaryKey = "gem.summary.water", ElementId = "water", ElementNameKey = "element.water", AttackBonus = 2, AttackRangeBonus = 0.8f, AttackColor = new Color(0.20f, 0.70f, 1.0f, 0.94f) },
-		new AttributeGemDefinition { Id = "gem.attribute.lightning", NameKey = "gem.attribute.lightning", SummaryKey = "gem.summary.lightning", ElementId = "lightning", ElementNameKey = "element.lightning", AttackBonus = 3, CritChanceBonus = 0.06f, ControlChance = 0.16f, AttackColor = new Color(0.95f, 0.88f, 0.20f, 0.95f) },
-		new AttributeGemDefinition { Id = "gem.attribute.ice", NameKey = "gem.attribute.ice", SummaryKey = "gem.summary.ice", ElementId = "ice", ElementNameKey = "element.ice", DefenseBonus = 3, ControlChance = 0.18f, AttackColor = new Color(0.58f, 0.88f, 1.0f, 0.95f) },
-		new AttributeGemDefinition { Id = "gem.attribute.poison", NameKey = "gem.attribute.poison", SummaryKey = "gem.summary.poison", ElementId = "poison", ElementNameKey = "element.poison", AttackBonus = 2, ControlChance = 0.22f, AttackColor = new Color(0.45f, 0.95f, 0.28f, 0.94f) },
-		new AttributeGemDefinition { Id = "gem.attribute.wind", NameKey = "gem.attribute.wind", SummaryKey = "gem.summary.wind", ElementId = "wind", ElementNameKey = "element.wind", MoveSpeedBonus = 0.08f, KnockbackForce = 2.8f, AttackColor = new Color(0.72f, 1.0f, 0.76f, 0.94f) },
-		new AttributeGemDefinition { Id = "gem.attribute.dark", NameKey = "gem.attribute.dark", SummaryKey = "gem.summary.dark", ElementId = "dark", ElementNameKey = "element.dark", AttackBonus = 4, LifeStealPercent = 0.10f, AttackColor = new Color(0.72f, 0.34f, 1.0f, 0.94f) },
-		new AttributeGemDefinition { Id = "gem.attribute.light", NameKey = "gem.attribute.light", SummaryKey = "gem.summary.light", ElementId = "light", ElementNameKey = "element.light", DefenseBonus = 2, AttackRangeBonus = 0.5f, AttackColor = new Color(1.0f, 0.95f, 0.58f, 0.94f) },
 	};
 
 	private static readonly List<SkillGemDefinition> SkillGems = new()
 	{
 		new SkillGemDefinition { Id = "gem.skill.none", NameKey = "gem.skill.none", SummaryKey = "gem.skill.summary.none" },
-		new SkillGemDefinition { Id = "gem.skill.fireball", NameKey = "gem.skill.fireball", SummaryKey = "gem.skill.summary.fireball", AttackBonus = 5, AttackRangeBonus = 2.0f, IsRangedActiveSkill = true },
-		new SkillGemDefinition { Id = "gem.skill.heal", NameKey = "gem.skill.heal", SummaryKey = "gem.skill.summary.heal", DefenseBonus = 3, EnablesHeal = true },
-		new SkillGemDefinition { Id = "gem.skill.shield", NameKey = "gem.skill.shield", SummaryKey = "gem.skill.summary.shield", MaxHealthBonus = 20, DefenseBonus = 10, EnablesShield = true },
-		new SkillGemDefinition { Id = "gem.skill.whirlwind", NameKey = "gem.skill.whirlwind", SummaryKey = "gem.skill.summary.whirlwind", AttackBonus = 4, DefenseBonus = 2, AttackCooldownReduction = 0.04f },
-		new SkillGemDefinition { Id = "gem.skill.meteor", NameKey = "gem.skill.meteor", SummaryKey = "gem.skill.summary.meteor", AttackBonus = 12, AttackRangeBonus = 1.2f, AttackCooldownReduction = -0.08f, IsRangedActiveSkill = true },
-		new SkillGemDefinition { Id = "gem.skill.dash", NameKey = "gem.skill.dash", SummaryKey = "gem.skill.summary.dash", MoveSpeedBonus = 0.18f, AttackCooldownReduction = 0.08f },
-		new SkillGemDefinition { Id = "gem.skill.laser", NameKey = "gem.skill.laser", SummaryKey = "gem.skill.summary.laser", AttackBonus = 6, AttackRangeBonus = 3.2f, DetectionRadiusBonus = 2.0f, IsRangedActiveSkill = true },
-		new SkillGemDefinition { Id = "gem.skill.rocket", NameKey = "gem.skill.rocket", SummaryKey = "gem.skill.summary.rocket", AttackBonus = 9, AttackRangeBonus = 2.6f, AttackCooldownReduction = -0.05f, IsRangedActiveSkill = true },
-		new SkillGemDefinition { Id = "gem.skill.ice_shard", NameKey = "gem.skill.ice_shard", SummaryKey = "gem.skill.summary.ice_shard", AttackBonus = 5, AttackRangeBonus = 2.4f, IsRangedActiveSkill = true },
-		new SkillGemDefinition { Id = "gem.skill.lightning", NameKey = "gem.skill.lightning", SummaryKey = "gem.skill.summary.lightning", AttackBonus = 6, AttackRangeBonus = 2.8f, DetectionRadiusBonus = 1.6f, IsRangedActiveSkill = true },
-		new SkillGemDefinition { Id = "gem.skill.chain", NameKey = "gem.skill.chain", SummaryKey = "gem.skill.summary.chain", AttackBonus = 3, DetectionRadiusBonus = 2.0f, BehaviorId = ProjectileBehavior.Chain, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.water_core" },
-		new SkillGemDefinition { Id = "gem.skill.explosion", NameKey = "gem.skill.explosion", SummaryKey = "gem.skill.summary.explosion", AttackBonus = 7, AttackCooldownReduction = -0.04f, BehaviorId = ProjectileBehavior.Explosion, BehaviorRadius = 3.0f, UpgradeMaterialId = "loot.red_horn" },
-		new SkillGemDefinition { Id = "gem.skill.piercing", NameKey = "gem.skill.piercing", SummaryKey = "gem.skill.summary.piercing", AttackBonus = 2, AttackRangeBonus = 2.0f, BehaviorId = ProjectileBehavior.Pierce, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.small_bone" },
-		new SkillGemDefinition { Id = "gem.skill.life_steal", NameKey = "gem.skill.life_steal", SummaryKey = "gem.skill.summary.life_steal", LifeStealPercent = 0.08f, DefenseBonus = 2 },
-		new SkillGemDefinition { Id = "gem.skill.split", NameKey = "gem.skill.split", SummaryKey = "gem.skill.summary.split", AttackBonus = 2, BehaviorId = ProjectileBehavior.Split, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.sharp_claw" },
-		new SkillGemDefinition { Id = "gem.skill.multishot", NameKey = "gem.skill.multishot", SummaryKey = "gem.skill.summary.multishot", AttackBonus = 1, AttackCooldownReduction = -0.03f, BehaviorId = ProjectileBehavior.Multi, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.insect_wing" },
+		new SkillGemDefinition { Id = "gem.skill.fireball", NameKey = "gem.skill.fireball", SummaryKey = "gem.skill.summary.fireball", DamageElementId = "fire", DamageElementNameKey = "element.fire", AttackColor = new Color(1.0f, 0.28f, 0.08f, 0.94f), AttackBonus = 5, AttackRangeBonus = 2.0f, IsRangedActiveSkill = true },
+		new SkillGemDefinition { Id = "gem.skill.whirlwind", NameKey = "gem.skill.whirlwind", SummaryKey = "gem.skill.summary.whirlwind", DamageElementId = "physical", DamageElementNameKey = "element.physical", AttackColor = new Color(1.0f, 0.70f, 0.32f, 0.92f), AttackBonus = 4, DefenseBonus = 2, AttackCooldownReduction = 0.04f },
+		new SkillGemDefinition { Id = "gem.skill.meteor", NameKey = "gem.skill.meteor", SummaryKey = "gem.skill.summary.meteor", DamageElementId = "fire", DamageElementNameKey = "element.fire", AttackColor = new Color(1.0f, 0.20f, 0.05f, 0.96f), AttackBonus = 12, AttackRangeBonus = 1.2f, AttackCooldownReduction = -0.08f, IsRangedActiveSkill = true },
+		new SkillGemDefinition { Id = "gem.skill.laser", NameKey = "gem.skill.laser", SummaryKey = "gem.skill.summary.laser", DamageElementId = "light", DamageElementNameKey = "element.light", AttackColor = new Color(1.0f, 0.95f, 0.58f, 0.95f), AttackBonus = 6, AttackRangeBonus = 3.2f, DetectionRadiusBonus = 2.0f, IsRangedActiveSkill = true },
+		new SkillGemDefinition { Id = "gem.skill.rocket", NameKey = "gem.skill.rocket", SummaryKey = "gem.skill.summary.rocket", DamageElementId = "fire", DamageElementNameKey = "element.fire", AttackColor = new Color(1.0f, 0.34f, 0.08f, 0.95f), AttackBonus = 9, AttackRangeBonus = 2.6f, AttackCooldownReduction = -0.05f, IsRangedActiveSkill = true },
+		new SkillGemDefinition { Id = "gem.skill.ice_shard", NameKey = "gem.skill.ice_shard", SummaryKey = "gem.skill.summary.ice_shard", DamageElementId = "ice", DamageElementNameKey = "element.ice", AttackColor = new Color(0.58f, 0.88f, 1.0f, 0.95f), AttackBonus = 5, AttackRangeBonus = 2.4f, IsRangedActiveSkill = true },
+		new SkillGemDefinition { Id = "gem.skill.lightning", NameKey = "gem.skill.lightning", SummaryKey = "gem.skill.summary.lightning", DamageElementId = "lightning", DamageElementNameKey = "element.lightning", AttackColor = new Color(0.95f, 0.88f, 0.20f, 0.95f), AttackBonus = 6, AttackRangeBonus = 2.8f, DetectionRadiusBonus = 1.6f, IsRangedActiveSkill = true },
+		new SkillGemDefinition { Id = "gem.skill.chain", NameKey = "gem.skill.chain", SummaryKey = "gem.skill.summary.chain", IsSupportEffect = true, RequiresProjectile = true, DamageMultiplier = 0.88f, DetectionRadiusBonus = 2.0f, BehaviorId = ProjectileBehavior.Chain, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.water_core" },
+		new SkillGemDefinition { Id = "gem.skill.explosion", NameKey = "gem.skill.explosion", SummaryKey = "gem.skill.summary.explosion", IsSupportEffect = true, RequiresProjectile = true, DamageMultiplier = 0.92f, AttackCooldownReduction = -0.04f, BehaviorId = ProjectileBehavior.Explosion, BehaviorRadius = 3.0f, UpgradeMaterialId = "loot.red_horn" },
+		new SkillGemDefinition { Id = "gem.skill.piercing", NameKey = "gem.skill.piercing", SummaryKey = "gem.skill.summary.piercing", IsSupportEffect = true, RequiresProjectile = true, DamageMultiplier = 0.94f, AttackRangeBonus = 2.0f, BehaviorId = ProjectileBehavior.Pierce, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.small_bone" },
+		new SkillGemDefinition { Id = "gem.skill.life_steal", NameKey = "gem.skill.life_steal", SummaryKey = "gem.skill.summary.life_steal", IsSupportEffect = true, LifeStealPercent = 0.08f, DamageMultiplier = 0.94f },
+		new SkillGemDefinition { Id = "gem.skill.split", NameKey = "gem.skill.split", SummaryKey = "gem.skill.summary.split", IsSupportEffect = true, RequiresProjectile = true, DamageMultiplier = 0.86f, BehaviorId = ProjectileBehavior.Split, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.sharp_claw" },
+		new SkillGemDefinition { Id = "gem.skill.multishot", NameKey = "gem.skill.multishot", SummaryKey = "gem.skill.summary.multishot", IsSupportEffect = true, RequiresProjectile = true, DamageMultiplier = 0.78f, AttackCooldownReduction = -0.03f, BehaviorId = ProjectileBehavior.Multi, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.insect_wing" },
+		new SkillGemDefinition { Id = "gem.skill.faster_attacks", NameKey = "gem.skill.faster_attacks", SummaryKey = "gem.skill.summary.faster_attacks", IsSupportEffect = true, DamageMultiplier = 0.90f, AttackCooldownReduction = 0.16f },
+		new SkillGemDefinition { Id = "gem.skill.critical_strikes", NameKey = "gem.skill.critical_strikes", SummaryKey = "gem.skill.summary.critical_strikes", IsSupportEffect = true, DamageMultiplier = 0.92f, CritChanceBonus = 0.16f },
+		new SkillGemDefinition { Id = "gem.skill.swift_projectiles", NameKey = "gem.skill.swift_projectiles", SummaryKey = "gem.skill.summary.swift_projectiles", IsSupportEffect = true, RequiresProjectile = true, DamageMultiplier = 0.95f, ProjectileSpeedMultiplier = 1.40f, AttackRangeBonus = 2.5f },
+		new SkillGemDefinition { Id = "gem.skill.brutality", NameKey = "gem.skill.brutality", SummaryKey = "gem.skill.summary.brutality", IsSupportEffect = true, DamageMultiplier = 1.30f, AttackCooldownReduction = -0.12f },
+		new SkillGemDefinition { Id = "gem.skill.ailment", NameKey = "gem.skill.ailment", SummaryKey = "gem.skill.summary.ailment", IsSupportEffect = true, DamageMultiplier = 0.92f, ControlChanceBonus = 0.18f },
 	};
 
 	private static readonly List<AttackModeDefinition> AttackModes = new()
@@ -522,7 +526,7 @@ public static class BuildCatalog
 	// 回傳寵物的屬性 id（如 fire / water / physical）。
 	public static string GetElementId(SimpleActor actor)
 	{
-		return GetAttributeGem(actor.BuildLoadout.AttributeGemId).ElementId;
+		return actor.CurrentBuildStats.DamageElementId;
 	}
 
 	public static CompanionBuildLoadout CreateStarterLoadout(SimpleActor actor)
@@ -534,8 +538,7 @@ public static class BuildCatalog
 		{
 			loadout.WeaponId = "equip.weapon.staff";
 			loadout.ArmorId = "equip.armor.spirit_robe";
-			loadout.AttributeGemId = "gem.attribute.light";
-			loadout.SkillGemIds = new[] { "gem.skill.heal", "gem.skill.shield", "gem.skill.none" };
+			loadout.SkillGemIds = new[] { "gem.skill.ice_shard", "gem.skill.ailment", "gem.skill.life_steal" };
 		}
 		else if (actor.CombatRole == "Tank")
 		{
@@ -543,8 +546,7 @@ public static class BuildCatalog
 			loadout.WeaponId = "equip.weapon.great_axe";
 			loadout.ArmorId = "equip.armor.plate";
 			loadout.AccessoryId = "equip.accessory.turtle_amulet";
-			loadout.AttributeGemId = "gem.attribute.ice";
-			loadout.SkillGemIds = new[] { "gem.skill.shield", "gem.skill.whirlwind", "gem.skill.none" };
+			loadout.SkillGemIds = new[] { "gem.skill.whirlwind", "gem.skill.brutality", "gem.skill.life_steal" };
 		}
 		else if (actor.CombatRole == "Ranged")
 		{
@@ -552,48 +554,31 @@ public static class BuildCatalog
 			loadout.WeaponId = "equip.weapon.staff";
 			loadout.ArmorId = "equip.armor.spirit_robe";
 			loadout.AccessoryId = "equip.accessory.focus_lens";
-			loadout.AttributeGemId = "gem.attribute.lightning";
 			loadout.SkillGemIds = new[] { "gem.skill.laser", "gem.skill.chain", "gem.skill.none" };
 		}
 		else if (identityId == "identity.wolf")
 		{
 			loadout.WeaponId = "equip.weapon.claws";
 			loadout.AccessoryId = "equip.accessory.crit_charm";
-			loadout.AttributeGemId = "gem.attribute.lightning";
-			loadout.SkillGemIds = new[] { "gem.skill.dash", "gem.skill.chain", "gem.skill.none" };
+			loadout.SkillGemIds = new[] { "gem.skill.whirlwind", "gem.skill.faster_attacks", "gem.skill.critical_strikes" };
 		}
 		else if (identityId == "identity.dragon")
 		{
 			loadout.HelmetId = "equip.helmet.guardian";
 			loadout.WeaponId = "equip.weapon.great_axe";
 			loadout.ArmorId = "equip.armor.plate";
-			loadout.AttributeGemId = "gem.attribute.fire";
 			loadout.SkillGemIds = new[] { "gem.skill.meteor", "gem.skill.explosion", "gem.skill.none" };
 		}
 		else if (identityId == "identity.water_spirit")
 		{
 			loadout.WeaponId = "equip.weapon.staff";
 			loadout.ArmorId = "equip.armor.spirit_robe";
-			loadout.AttributeGemId = "gem.attribute.ice";
-			loadout.SkillGemIds = new[] { "gem.skill.heal", "gem.skill.piercing", "gem.skill.none" };
+			loadout.SkillGemIds = new[] { "gem.skill.ice_shard", "gem.skill.piercing", "gem.skill.ailment" };
 		}
 		else if (identityId == "identity.venom_imp")
 		{
 			loadout.WeaponId = "equip.weapon.claws";
-			loadout.AttributeGemId = "gem.attribute.poison";
-			loadout.SkillGemIds = new[] { "gem.skill.life_steal", "gem.skill.dash", "gem.skill.none" };
-		}
-
-		if (actor.ActorKind == "monster")
-		{
-			loadout.AttributeGemId = actor.MapId switch
-			{
-				"wild_marsh" => "gem.attribute.water",
-				"wild_badlands" => "gem.attribute.fire",
-				"wild_forest" => "gem.attribute.wind",
-				"wild_snow" => "gem.attribute.ice",
-				_ => loadout.AttributeGemId,
-			};
+			loadout.SkillGemIds = new[] { "gem.skill.whirlwind", "gem.skill.life_steal", "gem.skill.ailment" };
 		}
 
 		return loadout;
@@ -623,25 +608,8 @@ public static class BuildCatalog
 		ApplyEquipment(stats, GetEquipment(loadout.BootsId), GetEquipmentStarMultiplier(loadout.BootsId));
 		ApplyEquipment(stats, GetEquipment(loadout.AccessoryId), GetEquipmentStarMultiplier(loadout.AccessoryId));
 
-		// Main core (attack core) only takes effect once unlocked; before that the
-		// creature attacks with the default physical core.
-		if (IsMainCoreUnlocked(actor.Level))
-		{
-			AttributeGemDefinition attributeGem = GetAttributeGem(loadout.AttributeGemId);
-			stats.DamageElementId = attributeGem.ElementId;
-			stats.DamageElementNameKey = attributeGem.ElementNameKey;
-			stats.AttackColor = attributeGem.AttackColor;
-			stats.Attack += attributeGem.AttackBonus;
-			stats.Defense += attributeGem.DefenseBonus;
-			stats.MoveSpeedMultiplier += attributeGem.MoveSpeedBonus;
-			stats.AttackRangeBonus += attributeGem.AttackRangeBonus;
-			stats.CritChance += attributeGem.CritChanceBonus;
-			stats.LifeStealPercent += attributeGem.LifeStealPercent;
-			stats.ControlChance += attributeGem.ControlChance;
-			stats.KnockbackForce += attributeGem.KnockbackForce;
-		}
-
-		// Support cores only contribute up to the number of unlocked support slots.
+		// The active core owns its damage type; support cores only alter compatible
+		// behavior and stats up to the number of unlocked support slots.
 		int unlockedSupportCores = GetUnlockedSupportCoreCount(actor.Level);
 		bool hasRangedActiveSkill = HasRangedActiveSkill(loadout);
 		bool hasMainAttackCore = HasMainAttackCore(loadout);
@@ -680,13 +648,62 @@ public static class BuildCatalog
 			stats.Attack = Mathf.RoundToInt(stats.Attack * identity.ElementAffinityDamageMultiplier);
 		}
 
+		stats.Attack = Mathf.Max(Mathf.RoundToInt(stats.Attack * stats.DamageMultiplier), 1);
 		stats.MoveSpeedMultiplier = Mathf.Clamp(stats.MoveSpeedMultiplier, 0.55f, 2.4f);
 		stats.AttackCooldownMultiplier = Mathf.Clamp(stats.AttackCooldownMultiplier, 0.42f, 1.85f);
 		stats.CritChance = Mathf.Clamp(stats.CritChance, 0.0f, 0.75f);
 		stats.LifeStealPercent = Mathf.Clamp(stats.LifeStealPercent, 0.0f, 0.45f);
+		stats.ControlChance = Mathf.Clamp(stats.ControlChance, 0.0f, 0.75f);
+		stats.ProjectileSpeedMultiplier = Mathf.Clamp(stats.ProjectileSpeedMultiplier, 0.65f, 2.5f);
 		stats.MaxHealth = Mathf.Max(stats.MaxHealth, 1);
 		stats.Attack = Mathf.Max(stats.Attack, 1);
 		stats.Defense = Mathf.Max(stats.Defense, 0);
+		return stats;
+	}
+
+	public static BuildStats CalculatePlayerStats(PlayerController player, CompanionBuildLoadout loadout)
+	{
+		loadout.EnsureSkillSlots();
+		var stats = new BuildStats
+		{
+			MaxHealth = Mathf.Max(player.MaxHealth, 1),
+			Attack = Mathf.Max(player.Attack, 1),
+			Defense = Mathf.Max(player.Defense, 0),
+			CritChance = player.CritChance,
+		};
+
+		ApplyEquipment(stats, GetEquipment(loadout.HelmetId), GetEquipmentStarMultiplier(loadout.HelmetId));
+		ApplyEquipment(stats, GetEquipment(loadout.WeaponId), GetEquipmentStarMultiplier(loadout.WeaponId));
+		ApplyEquipment(stats, GetEquipment(loadout.ArmorId), GetEquipmentStarMultiplier(loadout.ArmorId));
+		ApplyEquipment(stats, GetEquipment(loadout.BootsId), GetEquipmentStarMultiplier(loadout.BootsId));
+		ApplyEquipment(stats, GetEquipment(loadout.AccessoryId), GetEquipmentStarMultiplier(loadout.AccessoryId));
+
+		int unlocked = GetUnlockedSupportCoreCount(player.Level);
+		bool hasRanged = HasRangedActiveSkill(loadout);
+		bool hasMain = HasMainAttackCore(loadout);
+		for (int slot = 0; slot < loadout.SkillGemIds.Length && slot < unlocked; slot++)
+		{
+			SkillGemDefinition gem = GetSkillGem(loadout.SkillGemIds[slot]);
+			if ((slot == 0 && !IsMainAttackCore(gem.Id)) || (slot > 0 && !IsSupportCore(gem.Id))
+				|| (slot > 0 && !hasMain) || (IsProjectileSupportGem(gem.Id) && !hasRanged))
+			{
+				continue;
+			}
+			if (gem.IsRangedActiveSkill && string.IsNullOrEmpty(stats.ActiveRangedSkillId))
+			{
+				stats.ActiveRangedSkillId = gem.Id;
+			}
+			ApplySkillGem(stats, gem);
+			AccumulateBehavior(stats.Behavior, gem, loadout.GetSkillGemLevel(slot));
+		}
+
+		stats.Attack = Mathf.Max(Mathf.RoundToInt(stats.Attack * stats.DamageMultiplier), 1);
+		stats.MoveSpeedMultiplier = Mathf.Clamp(stats.MoveSpeedMultiplier, 0.55f, 2.4f);
+		stats.AttackCooldownMultiplier = Mathf.Clamp(stats.AttackCooldownMultiplier, 0.42f, 1.85f);
+		stats.CritChance = Mathf.Clamp(stats.CritChance, 0.0f, 0.75f);
+		stats.LifeStealPercent = Mathf.Clamp(stats.LifeStealPercent, 0.0f, 0.45f);
+		stats.ControlChance = Mathf.Clamp(stats.ControlChance, 0.0f, 0.75f);
+		stats.ProjectileSpeedMultiplier = Mathf.Clamp(stats.ProjectileSpeedMultiplier, 0.65f, 2.5f);
 		return stats;
 	}
 
@@ -700,8 +717,8 @@ public static class BuildCatalog
 	// ── 精煉星等（Refinement stars）──────────────────────────────────────────
 	// 星等直接編碼在物品 id 尾端（例如 "equip.weapon.sword#3" = 3★），因此背包堆疊、
 	// 已裝備欄位、以及存檔全是字串就能自動保存，不需改資料結構。0★ 維持原本純 id。
-	public const int MaxEquipmentStars = 10;
-	public const float EquipmentStarBonusPerStar = 0.08f; // 每星 +8% 該裝備自身加成
+	public const int MaxEquipmentStars = EquipmentConfig.MaxStars;
+	public const float EquipmentStarBonusPerStar = EquipmentConfig.StarBonusPerStar;
 	private const char EquipmentStarSeparator = '#';
 
 	public static int GetEquipmentStars(string id)
@@ -839,9 +856,10 @@ public static class BuildCatalog
 		return new List<AttackModeDefinition>(AttackModes);
 	}
 
-	public static List<string> GetStarterInventoryItemIds()
+	public static List<string> GetAllEquipmentItemIds()
 	{
-		// 初始只給裝備；寶石不再固定贈送（改由掉落/商店取得，或測試模式一次給齊）。
+		// Complete equipment catalogue for developer test worlds. Normal new games
+		// intentionally start without free equipment in the bag.
 		var ids = new List<string>();
 		foreach (EquipmentDefinition equipment in Equipment)
 		{
@@ -851,7 +869,7 @@ public static class BuildCatalog
 		return ids;
 	}
 
-	// 所有非免費的寶石（屬性 + 技能）id，供測試模式一次發齊。
+	// All non-free active/support cores, used by test mode.
 	public static List<string> GetAllGemItemIds()
 	{
 		var ids = new List<string>();
@@ -878,6 +896,17 @@ public static class BuildCatalog
 	{
 		return id is "gem.attribute.none" or "gem.skill.none"
 			|| id.EndsWith(".none", System.StringComparison.Ordinal);
+	}
+
+	public static bool IsRetiredSkillCore(string id)
+	{
+		return id is "gem.skill.heal" or "gem.skill.shield" or "gem.skill.dash";
+	}
+
+	public static bool IsRetiredAttributeGem(string id)
+	{
+		return id.StartsWith("gem.attribute.", System.StringComparison.Ordinal)
+			&& id != "gem.attribute.none";
 	}
 
 	// Consumables (usable bag items). Town Portal Scroll returns the player to
@@ -1003,19 +1032,17 @@ public static class BuildCatalog
 	public const int MaxSkillGemLevel = 5;
 
 	// --- Core slots (level-gated) ---
-	// The core-skill slot holds the attack core (attribute gem, decides attack element).
-	// Support core slots hold support/trait cores (skill gems). Both unlock as the
-	// creature grows, per the Core System design: 0 cores at low level, then main, then
-	// support slots one by one.
-	public const int MainCoreUnlockLevel = 3;
+	// Index 0 holds the active attack core, which also defines its damage element.
+	// Indices 1..6 hold behavior/stat support cores.
+	public const int MainCoreUnlockLevel = CoreConfig.MainCoreUnlockLevel;
 
 	// One fixed main attack core (index 0) plus six extension support cores (1..6).
 	// The historical name is retained because this value is serialized as the skill
 	// core array length throughout the existing save system.
-	public const int SupportCoreSlotCount = 7;
+	public const int SupportCoreSlotCount = CoreConfig.SupportCoreSlotCount;
 
 	// Unlock levels for the core skill, then support cores 1 through 6.
-	private static readonly int[] SupportCoreUnlockLevels = { 6, 10, 15, 21, 28, 36, 45 };
+	private static readonly int[] SupportCoreUnlockLevels = CoreConfig.SupportCoreUnlockLevels;
 
 	public static bool IsMainCoreUnlocked(int level)
 	{
@@ -1053,7 +1080,7 @@ public static class BuildCatalog
 
 	public static bool IsRangedActiveSkillGem(string gemId) => GetSkillGem(gemId).IsRangedActiveSkill;
 
-	public static bool IsProjectileSupportGem(string gemId) => GetSkillGem(gemId).BehaviorId != ProjectileBehavior.None;
+	public static bool IsProjectileSupportGem(string gemId) => GetSkillGem(gemId).RequiresProjectile;
 
 	public static bool IsMainAttackCore(string gemId)
 	{
@@ -1062,7 +1089,7 @@ public static class BuildCatalog
 
 	public static bool IsSupportCore(string gemId)
 	{
-		return gemId != "gem.skill.none" && !IsMainAttackCore(gemId);
+		return GetSkillGem(gemId).IsSupportEffect;
 	}
 
 	public static bool HasMainAttackCore(CompanionBuildLoadout loadout)
@@ -1073,7 +1100,7 @@ public static class BuildCatalog
 	public static string GetSkillGemCategoryKey(string gemId)
 	{
 		SkillGemDefinition gem = GetSkillGem(gemId);
-		if (IsProjectileSupportGem(gemId))
+		if (IsSupportCore(gemId))
 		{
 			return "tooltip.gem_category.support";
 		}
@@ -1197,6 +1224,13 @@ public static class BuildCatalog
 
 	private static void ApplySkillGem(BuildStats stats, SkillGemDefinition gem)
 	{
+		if (!string.IsNullOrEmpty(gem.DamageElementId))
+		{
+			stats.DamageElementId = gem.DamageElementId;
+			stats.DamageElementNameKey = gem.DamageElementNameKey;
+			stats.AttackColor = gem.AttackColor;
+		}
+
 		stats.MaxHealth += gem.MaxHealthBonus;
 		stats.Attack += gem.AttackBonus;
 		stats.Defense += gem.DefenseBonus;
@@ -1206,6 +1240,9 @@ public static class BuildCatalog
 		stats.DetectionRadiusBonus += gem.DetectionRadiusBonus;
 		stats.CritChance += gem.CritChanceBonus;
 		stats.LifeStealPercent += gem.LifeStealPercent;
+		stats.ControlChance += gem.ControlChanceBonus;
+		stats.DamageMultiplier *= gem.DamageMultiplier;
+		stats.ProjectileSpeedMultiplier *= gem.ProjectileSpeedMultiplier;
 		stats.HasHealSkill |= gem.EnablesHeal;
 		stats.HasShieldSkill |= gem.EnablesShield;
 	}

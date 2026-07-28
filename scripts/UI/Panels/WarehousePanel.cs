@@ -13,6 +13,7 @@ public partial class WarehousePanel : PanelContainer
 		Gems,
 		Materials,
 		Consumables,
+		Companions,
 	}
 
 	private PlayerController? _player;
@@ -20,6 +21,10 @@ public partial class WarehousePanel : PanelContainer
 	private Label _hintLabel = null!;
 	private GridContainer _bagGrid = null!;
 	private GridContainer _storageGrid = null!;
+	private HBoxContainer _itemColumns = null!;
+	private HBoxContainer _companionColumns = null!;
+	private VBoxContainer _partyCompanionList = null!;
+	private VBoxContainer _collectionCompanionList = null!;
 	private HBoxContainer _categoryTabs = null!;
 	private readonly Dictionary<ItemCategory, Button> _categoryButtons = new();
 	private ItemCategory _selectedCategory = ItemCategory.All;
@@ -107,16 +112,47 @@ public partial class WarehousePanel : PanelContainer
 		AddCategoryButton(ItemCategory.Gems, "inventory.tab.gems");
 		AddCategoryButton(ItemCategory.Materials, "inventory.tab.materials");
 		AddCategoryButton(ItemCategory.Consumables, "inventory.tab.consumables");
+		AddCategoryButton(ItemCategory.Companions, "warehouse.companions");
 
-		var columns = new HBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
-		columns.AddThemeConstantOverride("separation", 14);
-		root.AddChild(columns);
-		_bagGrid = CreateColumn(columns, "warehouse.bag");
-		_storageGrid = CreateColumn(columns, "warehouse.storage");
+		_itemColumns = new HBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
+		_itemColumns.AddThemeConstantOverride("separation", 14);
+		root.AddChild(_itemColumns);
+		_bagGrid = CreateColumn(_itemColumns, "warehouse.bag");
+		_storageGrid = CreateColumn(_itemColumns, "warehouse.storage");
+
+		_companionColumns = new HBoxContainer { SizeFlagsVertical = SizeFlags.ExpandFill, Visible = false };
+		_companionColumns.AddThemeConstantOverride("separation", 14);
+		root.AddChild(_companionColumns);
+		_partyCompanionList = CreateCompanionColumn(_companionColumns, "warehouse.party_companions");
+		_collectionCompanionList = CreateCompanionColumn(_companionColumns, "warehouse.collection");
 
 		var closeButton = new Button { Text = LocaleText.T("dialog.button.close"), CustomMinimumSize = new Vector2(0.0f, 40.0f) };
 		closeButton.Pressed += () => CloseRequested?.Invoke();
 		root.AddChild(closeButton);
+	}
+
+	private VBoxContainer CreateCompanionColumn(HBoxContainer parent, string titleKey)
+	{
+		var column = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
+		column.AddThemeConstantOverride("separation", 6);
+		parent.AddChild(column);
+
+		var header = new Label { Text = LocaleText.T(titleKey), HorizontalAlignment = HorizontalAlignment.Center };
+		header.AddThemeFontSizeOverride("font_size", 18);
+		header.AddThemeColorOverride("font_color", new Color(0.72f, 0.92f, 1.0f));
+		column.AddChild(header);
+
+		var scroll = new ScrollContainer
+		{
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			SizeFlagsVertical = SizeFlags.ExpandFill,
+			CustomMinimumSize = new Vector2(340.0f, 380.0f),
+		};
+		column.AddChild(scroll);
+		var list = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		list.AddThemeConstantOverride("separation", 7);
+		scroll.AddChild(list);
+		return list;
 	}
 
 	private GridContainer CreateColumn(HBoxContainer parent, string titleKey)
@@ -138,10 +174,12 @@ public partial class WarehousePanel : PanelContainer
 		};
 		column.AddChild(scroll);
 
-		var grid = new GridContainer { Columns = 5, SizeFlagsHorizontal = SizeFlags.ExpandFill };
-		grid.AddThemeConstantOverride("h_separation", 4);
-		grid.AddThemeConstantOverride("v_separation", 4);
+		var grid = new GridContainer { Columns = 1, SizeFlagsHorizontal = SizeFlags.ShrinkBegin };
+		grid.AddThemeConstantOverride("h_separation", ItemIconLibrary.InventoryGridGap);
+		grid.AddThemeConstantOverride("v_separation", ItemIconLibrary.InventoryGridGap);
 		scroll.AddChild(grid);
+		scroll.Resized += () => ItemIconLibrary.UpdateResponsiveGridColumns(grid, scroll);
+		ItemIconLibrary.UpdateResponsiveGridColumns(grid, scroll);
 		return grid;
 	}
 
@@ -172,7 +210,10 @@ public partial class WarehousePanel : PanelContainer
 		}
 
 		_titleLabel.Text = LocaleText.T("warehouse.title");
-		_hintLabel.Text = LocaleText.T("warehouse.hint");
+		bool companionMode = _selectedCategory == ItemCategory.Companions;
+		_hintLabel.Text = LocaleText.T(companionMode ? "warehouse.companion_hint" : "warehouse.hint");
+		_itemColumns.Visible = !companionMode;
+		_companionColumns.Visible = companionMode;
 		foreach (KeyValuePair<ItemCategory, Button> pair in _categoryButtons)
 		{
 			pair.Value.ButtonPressed = pair.Key == _selectedCategory;
@@ -180,8 +221,16 @@ public partial class WarehousePanel : PanelContainer
 
 		ClearChildren(_bagGrid);
 		ClearChildren(_storageGrid);
+		ClearChildren(_partyCompanionList);
+		ClearChildren(_collectionCompanionList);
 		if (_player == null)
 		{
+			return;
+		}
+
+		if (companionMode)
+		{
+			RefreshCompanions();
 			return;
 		}
 
@@ -194,6 +243,101 @@ public partial class WarehousePanel : PanelContainer
 		{
 			_storageGrid.AddChild(MakeItemButton(itemId, _player.GetStorageCount(itemId), false));
 		}
+	}
+
+	private void RefreshCompanions()
+	{
+		if (_player == null)
+		{
+			return;
+		}
+
+		int partyCount = 0;
+		int collectionCount = 0;
+		foreach (SimpleActor actor in _player.CapturedCollection)
+		{
+			if (!IsInstanceValid(actor) || !actor.IsCaptured)
+			{
+				continue;
+			}
+
+			if (actor.IsInWarehouseCollection)
+			{
+				_collectionCompanionList.AddChild(MakeCompanionRow(actor, false));
+				collectionCount++;
+			}
+			else if (!actor.IsDefeated && !actor.IsAwaitingRecovery)
+			{
+				_partyCompanionList.AddChild(MakeCompanionRow(actor, true));
+				partyCount++;
+			}
+		}
+
+		if (partyCount == 0)
+		{
+			_partyCompanionList.AddChild(MakeEmptyLabel("warehouse.no_party_companions"));
+		}
+		if (collectionCount == 0)
+		{
+			_collectionCompanionList.AddChild(MakeEmptyLabel("warehouse.no_collection_companions"));
+		}
+	}
+
+	private Control MakeCompanionRow(SimpleActor actor, bool deposit)
+	{
+		var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		row.AddThemeConstantOverride("separation", 8);
+		string status = _player != null && _player.IsInActiveParty(actor)
+			? LocaleText.T("actor.state.active")
+			: LocaleText.T("actor.state.stored");
+		var info = new Label
+		{
+			Text = $"{actor.LocalizedDisplayName}  Lv.{actor.Level}\n{LocaleText.F("stat.health_value", actor.CurrentHealth, actor.EffectiveMaxHealth)} · {status}",
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		info.AddThemeFontSizeOverride("font_size", 15);
+		info.AddThemeColorOverride("font_color", new Color(0.9f, 0.94f, 1.0f));
+		row.AddChild(info);
+
+		bool blocked = deposit && (_player == null || _player.IsMountedCompanion(actor));
+		var action = new Button
+		{
+			Text = LocaleText.T(deposit ? "warehouse.deposit_companion" : "warehouse.withdraw_companion"),
+			CustomMinimumSize = new Vector2(92.0f, 44.0f),
+			Disabled = blocked,
+			TooltipText = blocked ? LocaleText.T("warehouse.mounted_blocked") : string.Empty,
+		};
+		action.Pressed += () =>
+		{
+			if (_player == null)
+			{
+				return;
+			}
+			if (deposit)
+			{
+				_player.WarehouseDepositCompanion(actor);
+			}
+			else
+			{
+				_player.WarehouseWithdrawCompanion(actor);
+			}
+			RefreshAll();
+		};
+		row.AddChild(action);
+		return row;
+	}
+
+	private static Label MakeEmptyLabel(string key)
+	{
+		var label = new Label
+		{
+			Text = LocaleText.T(key),
+			HorizontalAlignment = HorizontalAlignment.Center,
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		label.AddThemeFontSizeOverride("font_size", 14);
+		label.AddThemeColorOverride("font_color", new Color(0.58f, 0.66f, 0.76f));
+		return label;
 	}
 
 	private List<string> SortedFiltered(IReadOnlyDictionary<string, int> source)
@@ -236,13 +380,14 @@ public partial class WarehousePanel : PanelContainer
 	{
 		var button = new Button
 		{
-			Text = count > 1 ? $"x{count}" : string.Empty,
-			CustomMinimumSize = new Vector2(64.0f, 68.0f),
+			Text = string.Empty,
+			CustomMinimumSize = new Vector2(ItemIconLibrary.InventorySlotWidth, 58.0f),
 			ClipText = true,
 			TooltipText = count > 1 ? $"{GetItemName(itemId)} x{count}" : GetItemName(itemId),
 		};
-		button.AddThemeFontSizeOverride("font_size", 12);
-		ItemIconLibrary.Apply(button, itemId, 44);
+		ItemIconLibrary.Apply(button, itemId, 42);
+		button.IconAlignment = HorizontalAlignment.Center;
+		ItemIconLibrary.AddStackCountBadge(button, count);
 
 		// Double-click or middle-click transfers one across.
 		button.GuiInput += inputEvent =>

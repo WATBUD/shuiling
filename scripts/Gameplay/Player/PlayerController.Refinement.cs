@@ -122,7 +122,9 @@ public partial class PlayerController
 	// 靜默加入背包（不跳「撿到」訊息），用於精煉產出的結果堆疊。
 	private void AddInventoryItemSilently(string itemId, int amount)
 	{
-		if (BuildCatalog.IsFreeItem(itemId))
+		if (BuildCatalog.IsFreeItem(itemId)
+			|| BuildCatalog.IsRetiredSkillCore(itemId)
+			|| BuildCatalog.IsRetiredAttributeGem(itemId))
 		{
 			return;
 		}

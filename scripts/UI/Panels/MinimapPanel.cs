@@ -61,12 +61,12 @@ public partial class MinimapPanel : PanelContainer
 	{
 		Name = "MinimapPanel";
 		MouseFilter = MouseFilterEnum.Ignore;
-		AnchorLeft = 0.0f;
-		AnchorRight = 0.0f;
+		AnchorLeft = 1.0f;
+		AnchorRight = 1.0f;
 		AnchorTop = 0.0f;
 		AnchorBottom = 0.0f;
-		OffsetLeft = 18.0f;
-		OffsetRight = 238.0f;
+		OffsetLeft = -238.0f;
+		OffsetRight = -18.0f;
 		OffsetTop = 18.0f;
 		OffsetBottom = 282.0f;
 		CustomMinimumSize = new Vector2(220.0f, 264.0f);

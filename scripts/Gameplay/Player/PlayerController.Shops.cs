@@ -134,14 +134,6 @@ public partial class PlayerController
 		}
 		else
 		{
-			foreach (AttributeGemDefinition gem in BuildCatalog.GetAttributeGemDefinitions())
-			{
-				if (!BuildCatalog.IsFreeItem(gem.Id))
-				{
-					entries.Add(new ShopTradeEntry(gem.Id, LocaleText.T(gem.NameKey), LocaleText.T(gem.SummaryKey), GetShopBuyPrice(gem.Id)));
-				}
-			}
-
 			foreach (SkillGemDefinition gem in BuildCatalog.GetSkillGemDefinitions())
 			{
 				if (!BuildCatalog.IsFreeItem(gem.Id))
@@ -192,6 +184,14 @@ public partial class PlayerController
 			return false;
 		}
 
+		// Blacksmith offers are individual stock entries, not an infinite catalog.
+		// Validate at transaction time as well as in the UI so rapid repeated clicks
+		// cannot purchase an item after its offer has already been consumed.
+		if (shopKind == MerchantShopKind.Blacksmith && !_blacksmithStockItemIds.Contains(itemId))
+		{
+			return false;
+		}
+
 		if (Gold < safePrice)
 		{
 			PostSystemMessage(LocaleText.F("system.shop.not_enough_gold", safePrice, Gold), new Color(1.0f, 0.62f, 0.48f));
@@ -213,6 +213,10 @@ public partial class PlayerController
 		}
 
 		AddInventoryItem(itemId);
+		if (shopKind == MerchantShopKind.Blacksmith)
+		{
+			_blacksmithStockItemIds.Remove(itemId);
+		}
 		PostSystemMessage(LocaleText.F("system.shop.bought", GetInventoryItemDisplayName(itemId), safePrice, Gold), new Color(1.0f, 0.86f, 0.46f), GameMessageChannel.Loot);
 		_merchantShopPanel.RefreshAll();
 		return true;

@@ -14,15 +14,15 @@ public static class MonsterRarity
 	public static int Roll(RandomNumberGenerator rng)
 	{
 		float roll = rng.Randf();
-		if (roll < 0.01f)
+		if (roll < MonsterConfig.AlphaSpawnChance)
 		{
 			return Alpha;   // 1%
 		}
-		if (roll < 0.05f)
+		if (roll < MonsterConfig.EliteOrBetterSpawnChance)
 		{
 			return Elite;   // 4%
 		}
-		if (roll < 0.18f)
+		if (roll < MonsterConfig.RareOrBetterSpawnChance)
 		{
 			return Rare;    // 13%
 		}
@@ -32,25 +32,25 @@ public static class MonsterRarity
 
 	public static float StatMultiplier(int rarity) => rarity switch
 	{
-		Rare => 1.25f,
-		Elite => 1.6f,
-		Alpha => 2.2f,
+		Rare => MonsterConfig.RareStatMultiplier,
+		Elite => MonsterConfig.EliteStatMultiplier,
+		Alpha => MonsterConfig.AlphaStatMultiplier,
 		_ => 1.0f,
 	};
 
 	public static float RewardMultiplier(int rarity) => rarity switch
 	{
-		Rare => 1.4f,
-		Elite => 2.0f,
-		Alpha => 3.5f,
+		Rare => MonsterConfig.RareRewardMultiplier,
+		Elite => MonsterConfig.EliteRewardMultiplier,
+		Alpha => MonsterConfig.AlphaRewardMultiplier,
 		_ => 1.0f,
 	};
 
 	public static float VisualScale(int rarity) => rarity switch
 	{
-		Rare => 1.05f,
-		Elite => 1.16f,
-		Alpha => 1.32f,
+		Rare => MonsterConfig.RareVisualScale,
+		Elite => MonsterConfig.EliteVisualScale,
+		Alpha => MonsterConfig.AlphaVisualScale,
 		_ => 1.0f,
 	};
 

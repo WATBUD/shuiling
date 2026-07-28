@@ -65,6 +65,7 @@ public partial class SimpleActor : CharacterBody3D
 	private float _netTargetYaw;
 	private bool _isCaptured;
 	private bool _isInActiveParty;
+	private bool _isInWarehouseCollection;
 	private bool _isMountedByPlayer;
 	private bool _isDefeated;
 	private bool _isAwaitingRecovery;
@@ -90,6 +91,13 @@ public partial class SimpleActor : CharacterBody3D
 	private Tween? _attackPoseTween;
 	private Node3D? _attackPoseTarget;
 	private Vector3 _attackPoseBaseScale = Vector3.One;
+	// Three complete turns at twice the former angular speed:
+	// old speed = 2 turns / 0.55 s, so 3 turns take 0.4125 s.
+	private const float WhirlwindSpinSeconds = 0.4125f;
+	private const float WhirlwindSpinRadians = Mathf.Tau * 3.0f;
+	private float _whirlwindSpinBaseYaw;
+	private float _whirlwindSpinAngle;
+	private float _whirlwindSpinRemaining;
 	private SimpleActor? _combatTarget;
 	private SimpleActor? _retaliationTarget;
 	private Node3D? _cachedPlayerNode;
@@ -571,6 +579,7 @@ public partial class SimpleActor : CharacterBody3D
 	public bool CanJoinByAffinity => IsNpcRecruitCandidate && Affinity >= 80;
 	public bool IsCaptured => _isCaptured;
 	public bool IsInActiveParty => _isInActiveParty;
+	public bool IsInWarehouseCollection => _isInWarehouseCollection;
 	public float MountSeatHeight => Mathf.Max(GetVisualTopY(this) + 0.16f, 0.9f);
 	public void SetMountedByPlayer(bool mounted) => _isMountedByPlayer = mounted;
 	public bool IsDefeated => _isDefeated;
@@ -681,7 +690,6 @@ public partial class SimpleActor : CharacterBody3D
 	public string[] TraitKeys => GetTraitKeys();
 	public string BuildEquipmentSummary => BuildCatalog.LocalizedEquipmentSet(BuildLoadout);
 	public string BuildSkillSummary => BuildCatalog.LocalizedSkillGems(BuildLoadout);
-	public string BuildAttributeGemName => LocaleText.T(BuildCatalog.GetAttributeGem(BuildLoadout.AttributeGemId).NameKey);
 	public string AttackModeName => LocaleText.T(BuildCatalog.GetAttackMode(AttackModeId).NameKey);
 	public string FormationBonusSummary => _formationBonusSummary;
 
@@ -848,6 +856,7 @@ public partial class SimpleActor : CharacterBody3D
 		_specialControlCooldownRemaining = Mathf.Max(_specialControlCooldownRemaining - step, 0.0f);
 		_combatTargetSearchRemaining = Mathf.Max(_combatTargetSearchRemaining - step, 0.0f);
 		_provokeRemaining = Mathf.Max(_provokeRemaining - step, 0.0f);
+		UpdateWhirlwindSpin(step);
 	}
 
 	private void StopInPlace(Vector3 velocity, float step)
@@ -1048,6 +1057,7 @@ public partial class SimpleActor : CharacterBody3D
 	{
 		_followTarget = followTarget;
 		_followSlot = followSlot;
+		_isInWarehouseCollection = false;
 		_isInActiveParty = true;
 		Visible = true;
 		SetPhysicsProcess(!_isDefeated);
@@ -1074,6 +1084,15 @@ public partial class SimpleActor : CharacterBody3D
 		Visible = false;
 		SetPhysicsProcess(false);
 		RefreshNameplate();
+	}
+
+	public void SetWarehouseCollectionState(bool stored)
+	{
+		_isInWarehouseCollection = stored;
+		if (stored)
+		{
+			StoreInCollection();
+		}
 	}
 
 	public bool TryRecoverFallenCompanion(PlayerController followTarget, float pickupRadius)
@@ -1531,6 +1550,7 @@ public partial class SimpleActor : CharacterBody3D
 			CurrentHealth = CurrentHealth,
 			IsDefeated = _isDefeated,
 			IsAwaitingRecovery = _isAwaitingRecovery,
+			IsInWarehouseCollection = _isInWarehouseCollection,
 			FallenMapId = _fallenMapId,
 			WorldPosition = new SaveVector3 { X = GlobalPosition.X, Y = GlobalPosition.Y, Z = GlobalPosition.Z },
 			Attack = Attack,
@@ -1555,7 +1575,7 @@ public partial class SimpleActor : CharacterBody3D
 				ArmorId = loadout.ArmorId,
 				BootsId = loadout.BootsId,
 				AccessoryId = loadout.AccessoryId,
-				AttributeGemId = loadout.AttributeGemId,
+				AttributeGemId = "gem.attribute.none",
 				SkillGemIds = MakeSkillGemIdArray(loadout),
 				SkillGemLevels = MakeSkillGemLevelArray(loadout),
 			},
@@ -1576,6 +1596,7 @@ public partial class SimpleActor : CharacterBody3D
 		MaxHealth = Mathf.Max(data.MaxHealth, 1);
 		_isDefeated = data.IsDefeated || data.CurrentHealth <= 0;
 		_isAwaitingRecovery = _isDefeated && data.IsAwaitingRecovery;
+		_isInWarehouseCollection = data.IsInWarehouseCollection;
 		_fallenMapId = data.FallenMapId;
 		CurrentHealth = _isDefeated ? 0 : Mathf.Clamp(data.CurrentHealth, 1, MaxHealth);
 		Attack = Mathf.Max(data.Attack, 0);
@@ -1622,7 +1643,8 @@ public partial class SimpleActor : CharacterBody3D
 			ArmorId = data.BuildLoadout.ArmorId,
 			BootsId = string.IsNullOrWhiteSpace(data.BuildLoadout.BootsId) ? "equip.boots.traveler" : data.BuildLoadout.BootsId,
 			AccessoryId = data.BuildLoadout.AccessoryId,
-			AttributeGemId = data.BuildLoadout.AttributeGemId,
+			// Migrate legacy elemental gems to the element carried by the active core.
+			AttributeGemId = "gem.attribute.none",
 			SkillGemIds = data.BuildLoadout.SkillGemIds is { Length: > 0 } savedIds
 				? (string[])savedIds.Clone()
 				: new[] { "gem.skill.none", "gem.skill.none", "gem.skill.none" },
@@ -2118,7 +2140,7 @@ public partial class SimpleActor : CharacterBody3D
 		_nameplate.Text = IsBoss
 			? LocaleText.F("boss.nameplate", Level, LocalizedDisplayName, capturedText)
 			: $"{rarityPrefix}{LocaleText.T("actor.level_prefix")}{Level} {LocalizedDisplayName}{rebirthSuffix}{captureTag}{capturedText}";
-		_nameplate.FontSize = Mathf.RoundToInt((IsBoss ? 28 : 20) * NameplateScale);
+		_nameplate.FontSize = Mathf.RoundToInt((IsTrainingDummy ? 40 : IsBoss ? 28 : 20) * NameplateScale);
 		Color markerColor = GetNameplateStatusColor();
 		_nameplate.Modulate = markerColor;
 		_nameplate.OutlineModulate = new Color(0.02f, 0.025f, 0.03f, 0.96f);
@@ -2884,7 +2906,11 @@ public partial class SimpleActor : CharacterBody3D
 			return null;
 		}
 
-		if (_combatTarget != null && IsValidCommandTarget(_combatTarget) && _combatTarget.IsHostileToPlayer && GlobalPosition.DistanceTo(_combatTarget.GlobalPosition) <= EffectiveDetectionRadius * 1.35f)
+		if (_combatTarget != null
+			&& IsValidCommandTarget(_combatTarget)
+			&& _combatTarget.IsHostileToPlayer
+			&& (!_combatTarget.IsTrainingDummy || IsPlayerFocusedTarget(_combatTarget))
+			&& GlobalPosition.DistanceTo(_combatTarget.GlobalPosition) <= EffectiveDetectionRadius * 1.35f)
 		{
 			return _combatTarget;
 		}
@@ -2902,7 +2928,7 @@ public partial class SimpleActor : CharacterBody3D
 		float bestDistance = float.MaxValue;
 		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
 		{
-			if (node is not SimpleActor actor || !actor.IsHostileToPlayer)
+			if (node is not SimpleActor actor || !actor.IsHostileToPlayer || actor.IsTrainingDummy)
 			{
 				continue;
 			}
@@ -2919,6 +2945,13 @@ public partial class SimpleActor : CharacterBody3D
 
 		_combatTarget = selected;
 		return selected;
+	}
+
+	private bool IsPlayerFocusedTarget(SimpleActor actor)
+	{
+		return _followTarget != null
+			&& IsInstanceValid(_followTarget)
+			&& _followTarget.FocusedTarget == actor;
 	}
 
 	private bool IsValidCommandTarget(SimpleActor? actor)
@@ -3012,6 +3045,10 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		bool usesWhirlwind = isMelee && BuildLoadout.HasSkill("gem.skill.whirlwind");
+		if (usesWhirlwind)
+		{
+			BeginWhirlwindSpin();
+		}
 		int projectileCount = usesWhirlwind ? 3 : 1 + Mathf.Max(stats.Behavior.ExtraProjectiles, 0);
 		float spreadStep = Mathf.DegToRad(usesWhirlwind ? 32.0f : 14.0f);
 		for (int index = 0; index < projectileCount; index++)
@@ -3043,7 +3080,7 @@ public partial class SimpleActor : CharacterBody3D
 				: stats.ActiveRangedSkillId,
 			ElementId = stats.DamageElementId,
 			HasLifeSteal = stats.LifeStealPercent > 0.0f,
-			Speed = isMelee ? 26.0f : 17.0f,
+			Speed = (isMelee ? 26.0f : 17.0f) * stats.ProjectileSpeedMultiplier,
 			MaxRange = Mathf.Max(EffectiveAttackRange * 1.6f, isMelee ? 3.0f : 9.0f),
 			HitRadius = isMelee ? 1.35f : 1.0f,
 			InitialTarget = homingTarget,
@@ -3114,7 +3151,12 @@ public partial class SimpleActor : CharacterBody3D
 		return results;
 	}
 
-	private void ApplyElementStatus(string elementId, SimpleActor source)
+	public void ApplyElementStatusFromPlayer(string elementId)
+	{
+		ApplyElementStatus(elementId, null);
+	}
+
+	private void ApplyElementStatus(string elementId, SimpleActor? source)
 	{
 		_statusSource = source;
 		switch (elementId)
@@ -3433,6 +3475,11 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			FindOwningWorld()?.OnNetworkMonsterDefeated(this);
 		}
+
+		// Wild enemies are not recoverable corpses. They used to remain as invisible
+		// CharacterBody3D nodes forever while the respawner kept creating replacements,
+		// eventually making long sessions progressively slower.
+		CallDeferred(Node.MethodName.QueueFree);
 	}
 
 	private World? FindOwningWorld()
@@ -3484,40 +3531,40 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		Vector3 origin = GlobalPosition;
-		int goldAmount = Mathf.Max(GoldReward + _rng.RandiRange(1, Mathf.Max(Level + 2, 3)), 1);
+		int goldAmount = Mathf.Max(
+			GoldReward + _rng.RandiRange(
+				MonsterConfig.GoldRandomMinimum,
+				Mathf.Max(Level + MonsterConfig.GoldRandomLevelOffset, MonsterConfig.GoldRandomMinimumMaximum)),
+			1);
 		SpawnWorldDrop(origin + RandomDropOffset(0.45f), string.Empty, 1, goldAmount);
 		string primaryLootId = MonsterLootCatalog.PickPrimaryDropForMonster(DisplayName, IsRangedCombatant, Level);
-		int primaryAmount = Level >= 6 && _rng.Randf() < 0.42f ? 2 : 1;
+		int primaryAmount = Level >= MonsterConfig.BonusPrimaryLootMinimumLevel
+			&& _rng.Randf() < MonsterConfig.BonusPrimaryLootChance ? 2 : 1;
 		SpawnWorldDrop(origin + RandomDropOffset(0.78f), primaryLootId, primaryAmount, 0);
 
 		// 所有怪物都會掉一顆對應自身世界階級的強化水晶（精煉材料）。
 		string crystalId = MonsterLootCatalog.GetEnhanceCrystalId(WorldTierCatalog.ClampTier(WorldTier));
-		SpawnWorldDrop(origin + RandomDropOffset(0.62f), crystalId, 1, 0);
+		SpawnWorldDrop(origin + RandomDropOffset(0.62f), crystalId, MonsterConfig.GuaranteedCrystalAmount, 0);
 
-		if (_rng.Randf() < 0.34f)
+		if (_rng.Randf() < MonsterConfig.SecondaryLootChance)
 		{
 			string secondaryLootId = MonsterLootCatalog.PickSecondaryDropForMonster(primaryLootId, Level);
 			SpawnWorldDrop(origin + RandomDropOffset(0.95f), secondaryLootId, 1, 0);
 		}
 
-		if (_rng.Randf() < 0.36f)
+		if (_rng.Randf() < EquipmentConfig.MonsterDropChance)
 		{
 			SpawnWorldDrop(origin + RandomDropOffset(1.18f), PickEquipmentDropId(), 1, 0);
 		}
 
-		if (_rng.Randf() < 0.22f)
+		if (_rng.Randf() < CoreConfig.MainSkillMonsterDropChance)
 		{
-			SpawnWorldDrop(origin + RandomDropOffset(1.32f), PickGemDropId(), 1, 0);
+			SpawnWorldDrop(origin + RandomDropOffset(1.32f), PickSkillCoreDropId(false), 1, 0);
 		}
 
-		// Rare+ monsters drop guaranteed bonus loot (their reward for hunting).
-		if (Rarity >= MonsterRarity.Rare)
+		if (_rng.Randf() < CoreConfig.SupportMonsterDropChance)
 		{
-			SpawnWorldDrop(origin + RandomDropOffset(1.05f), PickEquipmentDropId(), 1, 0);
-		}
-		if (Rarity >= MonsterRarity.Elite)
-		{
-			SpawnWorldDrop(origin + RandomDropOffset(1.45f), PickGemDropId(), 1, 0);
+			SpawnWorldDrop(origin + RandomDropOffset(1.45f), PickSkillCoreDropId(true), 1, 0);
 		}
 
 		player.PostSystemMessage(LocaleText.F("system.drop.loot", LocalizedDisplayName, LocaleText.T(MonsterLootCatalog.GetNameKey(primaryLootId))), new Color(1.0f, 0.86f, 0.48f), GameMessageChannel.Loot);
@@ -3525,8 +3572,6 @@ public partial class SimpleActor : CharacterBody3D
 
 	// Chance for a defeated monster to drop its exclusive name card as a physical
 	// card-shaped pickup. Skipped when the player already owns the card.
-	private const float CardDropChance = 0.05f;
-
 	private void MaybeDropMonsterCard(PlayerController player)
 	{
 		if (player == null || !IsInstanceValid(player))
@@ -3540,7 +3585,8 @@ public partial class SimpleActor : CharacterBody3D
 			return;
 		}
 
-		if (_rng.Randf() >= CardDropChance)
+		float dropChance = IsBoss ? CardConfig.BossDropChance : CardConfig.NormalMonsterDropChance;
+		if (_rng.Randf() >= dropChance)
 		{
 			return;
 		}
@@ -3555,25 +3601,34 @@ public partial class SimpleActor : CharacterBody3D
 	private void DropBossLoot(PlayerController player)
 	{
 		Vector3 origin = GlobalPosition;
-		int goldAmount = Mathf.Max(GoldReward + _rng.RandiRange(Level * 4, Level * 8), 1);
+		int goldAmount = Mathf.Max(
+			GoldReward + _rng.RandiRange(
+				Level * BossConfig.GoldLevelMultiplierMinimum,
+				Level * BossConfig.GoldLevelMultiplierMaximum),
+			1);
 		SpawnWorldDrop(origin + RandomDropOffset(0.55f), string.Empty, 1, goldAmount);
 
 		string primaryLootId = string.IsNullOrWhiteSpace(BossPrimaryLootId)
 			? MonsterLootCatalog.PickPrimaryDropForMonster(DisplayName, IsRangedCombatant, Level)
 			: BossPrimaryLootId;
-		SpawnWorldDrop(origin + RandomDropOffset(0.85f), primaryLootId, _rng.RandiRange(4, 6), 0);
-		string secondaryLootId = MonsterLootCatalog.PickSecondaryDropForMonster(primaryLootId, Level + 5);
-		SpawnWorldDrop(origin + RandomDropOffset(1.05f), secondaryLootId, _rng.RandiRange(2, 3), 0);
+		SpawnWorldDrop(origin + RandomDropOffset(0.85f), primaryLootId, _rng.RandiRange(BossConfig.PrimaryLootMinimum, BossConfig.PrimaryLootMaximum), 0);
+		string secondaryLootId = MonsterLootCatalog.PickSecondaryDropForMonster(primaryLootId, Level + BossConfig.SecondaryLootLevelBonus);
+		SpawnWorldDrop(origin + RandomDropOffset(1.05f), secondaryLootId, _rng.RandiRange(BossConfig.SecondaryLootMinimum, BossConfig.SecondaryLootMaximum), 0);
 
 		// Boss 掉多顆對應階級的強化水晶。
 		string bossCrystalId = MonsterLootCatalog.GetEnhanceCrystalId(WorldTierCatalog.ClampTier(WorldTier));
-		SpawnWorldDrop(origin + RandomDropOffset(0.95f), bossCrystalId, _rng.RandiRange(2, 4), 0);
+		SpawnWorldDrop(origin + RandomDropOffset(0.95f), bossCrystalId, _rng.RandiRange(BossConfig.CrystalMinimum, BossConfig.CrystalMaximum), 0);
 
 		// Bosses always drop two high-value equipment pieces and at least one core.
-		SpawnWorldDrop(origin + RandomDropOffset(1.25f), PickBossEquipmentDropId(), 1, 0);
-		SpawnWorldDrop(origin + RandomDropOffset(1.48f), PickBossEquipmentDropId(), 1, 0);
-		SpawnWorldDrop(origin + RandomDropOffset(1.68f), PickNonFreeSkillGem(BuildCatalog.GetSkillGemDefinitions()), 1, 0);
-		if (_rng.Randf() < 0.65f)
+		for (int index = 0; index < EquipmentConfig.BossGuaranteedDropCount; index++)
+		{
+			SpawnWorldDrop(origin + RandomDropOffset(1.25f + index * 0.23f), PickBossEquipmentDropId(), 1, 0);
+		}
+		for (int index = 0; index < CoreConfig.BossGuaranteedCoreCount; index++)
+		{
+			SpawnWorldDrop(origin + RandomDropOffset(1.68f + index * 0.20f), PickNonFreeSkillGem(BuildCatalog.GetSkillGemDefinitions()), 1, 0);
+		}
+		if (_rng.Randf() < CoreConfig.BossAdditionalCoreChance)
 		{
 			SpawnWorldDrop(origin + RandomDropOffset(1.88f), PickNonFreeSkillGem(BuildCatalog.GetSkillGemDefinitions()), 1, 0);
 		}
@@ -3638,13 +3693,13 @@ public partial class SimpleActor : CharacterBody3D
 			}
 
 			float score = item.MaxHealthBonus
-				+ item.AttackBonus * 3.0f
-				+ item.DefenseBonus * 2.0f
-				+ item.MoveSpeedBonus * 120.0f
-				+ item.AttackCooldownReduction * 150.0f
-				+ item.AttackRangeBonus * 12.0f
-				+ item.CritChanceBonus * 180.0f
-				+ item.SocketCount * 10.0f;
+				+ item.AttackBonus * EquipmentConfig.AttackScoreWeight
+				+ item.DefenseBonus * EquipmentConfig.DefenseScoreWeight
+				+ item.MoveSpeedBonus * EquipmentConfig.MoveSpeedScoreWeight
+				+ item.AttackCooldownReduction * EquipmentConfig.AttackCooldownScoreWeight
+				+ item.AttackRangeBonus * EquipmentConfig.AttackRangeScoreWeight
+				+ item.CritChanceBonus * EquipmentConfig.CriticalChanceScoreWeight
+				+ item.SocketCount * EquipmentConfig.SocketScoreWeight;
 			if (score > bestScore)
 			{
 				bestScore = score;
@@ -3655,36 +3710,33 @@ public partial class SimpleActor : CharacterBody3D
 		return best?.Id ?? PickEquipmentDropId();
 	}
 
-	private string PickGemDropId()
+	private string PickSkillCoreDropId(bool supportCore)
 	{
-		int kind = _rng.RandiRange(0, 1);
-		if (kind == 0)
+		var candidates = new System.Collections.Generic.List<SkillGemDefinition>();
+		foreach (SkillGemDefinition gem in BuildCatalog.GetSkillGemDefinitions())
 		{
-			var gems = BuildCatalog.GetAttributeGemDefinitions();
-			return PickNonFreeAttributeGem(gems);
+			if (BuildCatalog.IsFreeItem(gem.Id))
+			{
+				continue;
+			}
+
+			bool isRequestedType = supportCore
+				? BuildCatalog.IsSupportCore(gem.Id)
+				: BuildCatalog.IsMainAttackCore(gem.Id);
+			if (isRequestedType)
+			{
+				candidates.Add(gem);
+			}
 		}
 
-		var skillGems = BuildCatalog.GetSkillGemDefinitions();
-		return PickNonFreeSkillGem(skillGems);
+		return candidates.Count > 0
+			? candidates[_rng.RandiRange(0, candidates.Count - 1)].Id
+			: "gem.skill.none";
 	}
 
 	private int PickValidGemIndex(int count)
 	{
 		return Mathf.Clamp(_rng.RandiRange(1, Mathf.Max(count - 1, 1)), 0, Mathf.Max(count - 1, 0));
-	}
-
-	private string PickNonFreeAttributeGem(System.Collections.Generic.List<AttributeGemDefinition> gems)
-	{
-		for (int attempt = 0; attempt < 12; attempt++)
-		{
-			string id = gems[PickValidGemIndex(gems.Count)].Id;
-			if (!BuildCatalog.IsFreeItem(id))
-			{
-				return id;
-			}
-		}
-
-		return "gem.attribute.fire";
 	}
 
 	private string PickNonFreeSkillGem(System.Collections.Generic.List<SkillGemDefinition> gems)
@@ -3787,6 +3839,51 @@ public partial class SimpleActor : CharacterBody3D
 		_attackPoseTween.TweenProperty(visualTarget, "scale", _attackPoseBaseScale * new Vector3(1.12f, 0.90f, 1.20f), 0.075f);
 		_attackPoseTween.TweenProperty(visualTarget, "scale", _attackPoseBaseScale * new Vector3(0.94f, 1.08f, 0.92f), 0.085f);
 		_attackPoseTween.TweenProperty(visualTarget, "scale", _attackPoseBaseScale, 0.13f);
+	}
+
+	private void BeginWhirlwindSpin()
+	{
+		if (_whirlwindSpinRemaining > 0.0f)
+		{
+			Vector3 previousRotation = Rotation;
+			previousRotation.Y = _whirlwindSpinBaseYaw;
+			Rotation = previousRotation;
+		}
+
+		_whirlwindSpinBaseYaw = Rotation.Y;
+		_whirlwindSpinAngle = 0.0f;
+		_whirlwindSpinRemaining = WhirlwindSpinSeconds;
+	}
+
+	private void UpdateWhirlwindSpin(float step)
+	{
+		if (_whirlwindSpinRemaining <= 0.0f)
+		{
+			return;
+		}
+
+		float appliedStep = Mathf.Min(step, _whirlwindSpinRemaining);
+		_whirlwindSpinRemaining -= appliedStep;
+		_whirlwindSpinAngle += WhirlwindSpinRadians * appliedStep / WhirlwindSpinSeconds;
+	}
+
+	private void ApplyWhirlwindSpinRotation()
+	{
+		if (_whirlwindSpinRemaining > 0.0f)
+		{
+			Vector3 rotation = Rotation;
+			rotation.Y = _whirlwindSpinBaseYaw + _whirlwindSpinAngle;
+			Rotation = rotation;
+			return;
+		}
+
+		if (_whirlwindSpinAngle > 0.0f)
+		{
+			Vector3 rotation = Rotation;
+			rotation.Y = _whirlwindSpinBaseYaw;
+			Rotation = rotation;
+			_whirlwindSpinAngle = 0.0f;
+		}
 	}
 
 	private Node3D? GetAttackVisualTarget()
@@ -3987,6 +4084,7 @@ public partial class SimpleActor : CharacterBody3D
 		UpdateMovementEffects(step);
 		UpdateMovementAnimation(step);
 		StabilizeExternalModelRootMotion();
+		ApplyWhirlwindSpinRotation();
 	}
 
 	private void UpdateMovementEffects(float step)

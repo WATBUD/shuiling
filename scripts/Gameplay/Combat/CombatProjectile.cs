@@ -16,6 +16,7 @@ public partial class CombatProjectile : Node3D
 	private const float SafetyLifetime = 3.2f;
 
 	public SimpleActor? Attacker { get; set; }
+	public PlayerController? PlayerAttacker { get; set; }
 	public int Damage { get; set; } = 1;
 	public Color EffectColor { get; set; } = new(1.0f, 0.5f, 0.18f, 0.92f);
 	public bool IsMelee { get; set; }
@@ -58,7 +59,7 @@ public partial class CombatProjectile : Node3D
 
 		float step = (float)delta;
 		_age += step;
-		if (_age >= SafetyLifetime || Attacker == null || !IsInstanceValid(Attacker))
+		if (_age >= SafetyLifetime || !HasValidAttacker())
 		{
 			Finish(false);
 			return;
@@ -102,7 +103,7 @@ public partial class CombatProjectile : Node3D
 
 	private SimpleActor? FindImpact(Vector3 from, Vector3 to)
 	{
-		if (Attacker == null)
+		if (!HasValidAttacker())
 		{
 			return null;
 		}
@@ -115,7 +116,7 @@ public partial class CombatProjectile : Node3D
 		float segmentLengthSquared = segment.LengthSquared();
 		Vector3 midpoint = (flatFrom + flatTo) * 0.5f;
 		float searchRadius = HitRadius + Mathf.Sqrt(segmentLengthSquared) * 0.5f;
-		foreach (SimpleActor candidate in Attacker.FindProjectileTargets(midpoint, searchRadius, _alreadyHit))
+		foreach (SimpleActor candidate in FindTargets(midpoint, searchRadius))
 		{
 			Vector3 targetPosition = candidate.GlobalPosition;
 			targetPosition.Y = 0.0f;
@@ -135,14 +136,14 @@ public partial class CombatProjectile : Node3D
 
 	private void ResolveHit(SimpleActor target)
 	{
-		if (Attacker == null || !IsInstanceValid(Attacker))
+		if (!HasValidAttacker())
 		{
 			Finish(false);
 			return;
 		}
 
 		_alreadyHit.Add(target);
-		Attacker.ResolveProjectileHit(target, Damage);
+		ResolveProjectileHit(target, Damage);
 		SpawnImpactPulse(target.GlobalPosition, IsMelee ? HitRadius * 1.3f : HitRadius * 1.55f);
 
 		if (Behavior.ExplosionRadius > 0.0f)
@@ -175,16 +176,16 @@ public partial class CombatProjectile : Node3D
 
 	private void DetonateExplosion(Vector3 center)
 	{
-		if (Attacker == null)
+		if (!HasValidAttacker())
 		{
 			return;
 		}
 
 		int splashDamage = Mathf.Max(Mathf.RoundToInt(Damage * ExplosionDamageScale), 1);
-		foreach (SimpleActor victim in Attacker.FindProjectileTargets(center, Behavior.ExplosionRadius, _alreadyHit))
+		foreach (SimpleActor victim in FindTargets(center, Behavior.ExplosionRadius))
 		{
 			_alreadyHit.Add(victim);
-			Attacker.ResolveProjectileHit(victim, splashDamage);
+			ResolveProjectileHit(victim, splashDamage);
 		}
 
 		SpawnSpecialEffect(SkillAttackVfx.ExplosionEvent, center, _direction, Behavior.ExplosionRadius);
@@ -192,14 +193,14 @@ public partial class CombatProjectile : Node3D
 
 	private void SpawnSplitChildren(Vector3 origin)
 	{
-		if (Attacker == null)
+		if (!HasValidAttacker())
 		{
 			return;
 		}
 
 		int childDamage = Mathf.Max(Mathf.RoundToInt(Damage * SplitDamageScale), 1);
 		SpawnSpecialEffect(SkillAttackVfx.SplitEvent, origin, _direction, HitRadius * 1.8f);
-		List<SimpleActor> nearby = Attacker.FindProjectileTargets(origin, ChainSearchRadius, _alreadyHit);
+		List<SimpleActor> nearby = FindTargets(origin, ChainSearchRadius);
 		for (int index = 0; index < Behavior.SplitCount; index++)
 		{
 			Vector3 direction;
@@ -218,6 +219,7 @@ public partial class CombatProjectile : Node3D
 			var child = new CombatProjectile
 			{
 				Attacker = Attacker,
+				PlayerAttacker = PlayerAttacker,
 				Damage = childDamage,
 				EffectColor = EffectColor,
 				IsMelee = false,
@@ -245,14 +247,14 @@ public partial class CombatProjectile : Node3D
 
 	private bool TryChain(Vector3 fromPosition)
 	{
-		if (Attacker == null)
+		if (!HasValidAttacker())
 		{
 			return false;
 		}
 
 		SimpleActor? next = null;
 		float bestDistanceSq = ChainSearchRadius * ChainSearchRadius;
-		foreach (SimpleActor candidate in Attacker.FindProjectileTargets(fromPosition, ChainSearchRadius, _alreadyHit))
+		foreach (SimpleActor candidate in FindTargets(fromPosition, ChainSearchRadius))
 		{
 			float distanceSq = fromPosition.DistanceSquaredTo(candidate.GlobalPosition);
 			if (distanceSq <= bestDistanceSq)
@@ -292,6 +294,30 @@ public partial class CombatProjectile : Node3D
 		}
 
 		QueueFree();
+	}
+
+	private bool HasValidAttacker()
+	{
+		return (Attacker != null && IsInstanceValid(Attacker))
+			|| (PlayerAttacker != null && IsInstanceValid(PlayerAttacker) && !PlayerAttacker.IsPlayerDead);
+	}
+
+	private List<SimpleActor> FindTargets(Vector3 center, float radius)
+	{
+		if (Attacker != null && IsInstanceValid(Attacker))
+		{
+			return Attacker.FindProjectileTargets(center, radius, _alreadyHit);
+		}
+		return PlayerAttacker?.FindPlayerProjectileTargets(center, radius, _alreadyHit) ?? new List<SimpleActor>();
+	}
+
+	private int ResolveProjectileHit(SimpleActor target, int damage)
+	{
+		if (Attacker != null && IsInstanceValid(Attacker))
+		{
+			return Attacker.ResolveProjectileHit(target, damage);
+		}
+		return PlayerAttacker?.ResolvePlayerProjectileHit(target, damage) ?? 0;
 	}
 
 	private void SpawnImpactPulse(Vector3 position, float radius)
