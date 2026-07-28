@@ -83,8 +83,6 @@ git push origin main:release
 若需要指定大版本，可到 GitHub → Actions → **Build and publish game update** →
 **Run workflow**，輸入例如 `0.2.0`；留空則仍會自動加一。
 
-`tools\publish_release.ps1` 保留作為 GitHub Actions 暫時無法使用時的手動備援。
-
 ---
 
 ## 5. 運作原理（簡述）

@@ -66,8 +66,6 @@ git push origin main:release
 GitHub Actions 會自動安裝 Godot Mono、編譯、匯出 Windows、遞增版本號並建立
 Release。朋友下次開 `ShuilingLauncher.exe` 就會更新。
 
-`tools\publish_release.ps1` 與 `tools\publish_release.sh` 僅保留為手動備援。
-
 ---
 
 ## 版本比對規則
