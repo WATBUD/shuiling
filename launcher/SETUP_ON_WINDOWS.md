@@ -17,40 +17,35 @@
 
 ## 1. 設定 launcher.cfg（一次）
 
-打開 `launcher/launcher.cfg`，改成你的資料：
+`launcher/launcher.cfg` 已經設定為目前專案：
 
 ```
-owner=你的GitHub帳號
+owner=WATBUD
 repo=shuiling
-gameExe=shuiling.exe      ← 改成 Godot 匯出的實際 exe 檔名
+gameExe=shuiling.exe
 appDir=app
 ```
 
-> `gameExe` 要跟 Godot「匯出設定」裡的檔名一致。
+如果日後更改 GitHub repo 或 Godot 匯出的 exe 名稱，再修改這個檔案即可。
 
 ---
 
 ## 2. 編譯更新器 → 產生 ShuilingLauncher.exe（一次）
 
-在 `launcher/` 資料夾開 PowerShell：
+在 repo 根目錄執行：
 
 ```powershell
-dotnet publish -c Release -r win-x64 -p:PublishSingleFile=true --self-contained true
+powershell -ExecutionPolicy Bypass -File tools\build_launcher.ps1
 ```
 
-產物：`launcher\bin\Release\net8.0\win-x64\publish\ShuilingLauncher.exe`
-（自帶 .NET，朋友電腦不用另外安裝任何東西。）
+產物：`dist\ShuilingLauncher-win-x64.zip`。
+壓縮包內已包含 `ShuilingLauncher.exe` 與 `launcher.cfg`，自帶 .NET，朋友電腦不用安裝 SDK。
 
 ---
 
 ## 3. 做「初始安裝包」寄給朋友（只需一次）
 
-新建一個資料夾，放入：
-
-- `ShuilingLauncher.exe`（上一步的產物）
-- `launcher.cfg`（你改好的那份）
-
-壓成 zip 寄給朋友。之後**再也不用寄檔**。
+直接把 `dist\ShuilingLauncher-win-x64.zip` 寄給朋友一次。之後**再也不用寄新版遊戲檔**。
 
 朋友的資料夾第一次啟動後會變成：
 
@@ -75,7 +70,8 @@ dotnet publish -c Release -r win-x64 -p:PublishSingleFile=true --self-contained 
 powershell -ExecutionPolicy Bypass -File tools\publish_release.ps1 -Version 0.2.0 -ExportDir C:\exports\shuiling-windows
 ```
 
-腳本會自動：產生 `version.json` → 壓成 `game.zip` → 建立 GitHub Release `v0.2.0` 並上傳。
+腳本會自動：壓縮 `game.zip` → 計算 SHA-256 與檔案大小 → 產生
+`version.json` → 建立 GitHub Release `v0.2.0` 並上傳。
 
 3. 朋友下次開 `ShuilingLauncher.exe`：偵測到新版 → 下載覆蓋 `app/` → 啟動遊戲。
 
@@ -87,12 +83,16 @@ powershell -ExecutionPolicy Bypass -File tools\publish_release.ps1 -Version 0.2.
 
 - 更新器讀取 GitHub 的 `https://github.com/OWNER/REPO/releases/latest/download/version.json`
   （`latest/download` 永遠指向最新發佈，免 API token、不會被限流）。
-- 和本機 `app/installed_version.txt` 比對，不同就抓 `game.zip` 覆蓋。
+- 和本機 `app/installed_version.txt` 比對，不同就抓 `game.zip`。
+- 下載完成後先驗證檔案大小及 SHA-256，再解壓到 `.update/` 暫存區。
+- 驗證遊戲主程式存在後才切換版本；若安裝失敗，會自動還原上一版。
 - 更新器與遊戲是兩個獨立程式，覆蓋 `app/`（含 C# 的 dll）時不會被鎖檔。
 
 ## 6. 安全性
 
 - **朋友端零帳密**：只做「下載公開檔案」，程式裡沒有任何 token/密碼。
+- **更新包完整性**：發布時產生 SHA-256，朋友端驗證一致才會安裝。
+- **失敗可回復**：下載中斷、壓縮包損壞或替換失敗都不會刪掉可用舊版。
 - 你的 GitHub 授權由 `gh` 管理，token 只存在你 Windows 本機（系統憑證管理員），不進 repo、不外流。
 - 代價：公開 repo 的 Release 任何人有網址都可下載測試包（封測通常可接受）。要非公開再另談私有載點。
 

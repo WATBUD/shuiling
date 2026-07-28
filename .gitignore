@@ -8,3 +8,6 @@
 # Keep curated runtime assets under assets/models/ in Git.
 assets/_downloads/
 .git-rewrite/
+launcher/bin/
+launcher/obj/
+dist/

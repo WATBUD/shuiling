@@ -2,72 +2,85 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
-// 水靈 遊戲更新器（Launcher）
-// -----------------------------------------------------------------------------
-// 放在遊戲資料夾外層，朋友執行「這個」而不是遊戲本體。開機流程：
-//   1. 讀取 launcher.cfg 取得 GitHub owner/repo 與遊戲執行檔名。
-//   2. 抓 GitHub Releases 最新版的 version.json，比對本機已安裝版本。
-//   3. 有新版 → 下載 game.zip、解壓到暫存、覆蓋 app/ 資料夾、寫入版本號。
-//   4. 啟動 app/ 內的遊戲主程式後結束。
-// GitHub 的 /releases/latest/download/<asset> 會永遠指向最新發佈，故不需 API token。
+// 水靈 Windows 自動更新器
+// 下載永遠先進暫存區，驗證完成後才替換 app；安裝失敗會還原上一版。
 internal static class Program
 {
+	private const string ManifestAsset = "version.json";
+	private const string PackageAsset = "game.zip";
+	private static readonly HttpClient Http = CreateHttpClient();
+
 	private sealed class LauncherConfig
 	{
-		public string Owner = "YOUR_GITHUB_ACCOUNT";
+		public string Owner = "WATBUD";
 		public string Repo = "shuiling";
 		public string GameExe = "shuiling.exe";
 		public string AppDir = "app";
+		public string BaseUrl = string.Empty;
 	}
+
+	private sealed record UpdateManifest(string Version, string Sha256, long Size);
 
 	private static async Task<int> Main()
 	{
-		Console.Title = "水靈 更新器";
+		Console.OutputEncoding = System.Text.Encoding.UTF8;
+		Console.Title = "水靈更新器";
+
+		using var singleInstance = new Mutex(true, "ShuilingLauncher.UpdateLock", out bool ownsMutex);
+		if (!ownsMutex)
+		{
+			return Fail("更新器已經在執行中。");
+		}
+
 		string baseDir = AppContext.BaseDirectory;
 		LauncherConfig cfg = LoadConfig(Path.Combine(baseDir, "launcher.cfg"));
-		string appDir = Path.Combine(baseDir, cfg.AppDir);
-		string gamePath = Path.Combine(appDir, cfg.GameExe);
-		string versionUrl = $"https://github.com/{cfg.Owner}/{cfg.Repo}/releases/latest/download/version.json";
-		string zipUrl = $"https://github.com/{cfg.Owner}/{cfg.Repo}/releases/latest/download/game.zip";
+		if (!IsSafeRelativePath(cfg.AppDir) || !IsSafeRelativePath(cfg.GameExe))
+		{
+			return Fail("launcher.cfg 的 appDir 或 gameExe 不可使用絕對路徑或 '..'。");
+		}
+
+		string appDir = Path.GetFullPath(Path.Combine(baseDir, cfg.AppDir));
+		string gamePath = Path.GetFullPath(Path.Combine(appDir, cfg.GameExe));
+		string releaseBase = cfg.BaseUrl.Length > 0
+			? cfg.BaseUrl.TrimEnd('/')
+			: $"https://github.com/{Uri.EscapeDataString(cfg.Owner)}/{Uri.EscapeDataString(cfg.Repo)}/releases/latest/download";
 
 		try
 		{
+			CleanupInterruptedUpdate(baseDir, appDir);
 			string localVersion = ReadLocalVersion(appDir);
-			Log($"目前版本：{(string.IsNullOrEmpty(localVersion) ? "(未安裝)" : localVersion)}");
-			Log("檢查更新中…");
+			Log($"目前版本：{(localVersion.Length == 0 ? "尚未安裝" : localVersion)}");
+			Log("正在檢查更新…");
 
-			string? remoteVersion = await TryGetRemoteVersionAsync(versionUrl);
-			if (remoteVersion == null)
+			UpdateManifest? remote = await TryGetManifestAsync($"{releaseBase}/{ManifestAsset}");
+			if (remote == null)
 			{
-				Log("無法連線到更新伺服器。");
-				if (File.Exists(gamePath))
-				{
-					Log("改用目前已安裝的版本啟動。");
-					LaunchGame(gamePath, appDir);
-					return 0;
-				}
-
-				return Fail("尚未安裝遊戲且無法連線，請確認網路後重試。");
+				return LaunchInstalledOrFail(gamePath, appDir, "暫時無法連線到更新伺服器");
 			}
 
-			if (remoteVersion != localVersion)
+			bool needsInstall = !File.Exists(gamePath)
+				|| !string.Equals(remote.Version, localVersion, StringComparison.OrdinalIgnoreCase);
+			if (needsInstall)
 			{
-				Log($"發現新版本：{remoteVersion}，開始更新…");
-				await DownloadAndInstallAsync(zipUrl, appDir, remoteVersion, baseDir);
-				Log("更新完成！");
+				Log($"發現版本 {remote.Version}，準備更新。");
+				await DownloadAndInstallAsync($"{releaseBase}/{PackageAsset}", appDir, cfg.GameExe, remote, baseDir);
+				Log("更新完成。");
 			}
 			else
 			{
-				Log("已是最新版本。");
+				Log("目前已是最新版本。");
 			}
 
 			if (!File.Exists(gamePath))
 			{
-				return Fail($"找不到遊戲主程式：{gamePath}（請確認 launcher.cfg 的 GameExe 設定）。");
+				return Fail($"更新完成但找不到遊戲：{cfg.AppDir}\\{cfg.GameExe}");
 			}
 
 			LaunchGame(gamePath, appDir);
@@ -75,8 +88,206 @@ internal static class Program
 		}
 		catch (Exception ex)
 		{
-			return Fail("更新發生錯誤：" + ex.Message);
+			return LaunchInstalledOrFail(gamePath, appDir, $"更新失敗：{ex.Message}");
 		}
+	}
+
+	private static async Task<UpdateManifest?> TryGetManifestAsync(string url)
+	{
+		try
+		{
+			using HttpResponseMessage response = await Http.GetAsync(url);
+			response.EnsureSuccessStatusCode();
+			string json = await response.Content.ReadAsStringAsync();
+			using JsonDocument document = JsonDocument.Parse(json);
+			JsonElement root = document.RootElement;
+			string version = root.TryGetProperty("version", out JsonElement versionNode)
+				? versionNode.GetString()?.Trim() ?? string.Empty
+				: string.Empty;
+			string sha256 = root.TryGetProperty("sha256", out JsonElement hashNode)
+				? hashNode.GetString()?.Trim().ToLowerInvariant() ?? string.Empty
+				: string.Empty;
+			long size = root.TryGetProperty("size", out JsonElement sizeNode) && sizeNode.TryGetInt64(out long parsedSize)
+				? parsedSize
+				: 0;
+			return version.Length == 0 ? null : new UpdateManifest(version, sha256, size);
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	private static async Task DownloadAndInstallAsync(
+		string packageUrl,
+		string appDir,
+		string gameExe,
+		UpdateManifest manifest,
+		string baseDir)
+	{
+		string updateRoot = Path.Combine(baseDir, ".update");
+		string packagePath = Path.Combine(updateRoot, PackageAsset + ".download");
+		string stageDir = Path.Combine(updateRoot, "stage");
+		string backupDir = Path.Combine(baseDir, ".app_backup");
+
+		DeleteDirectoryRequired(stageDir);
+		Directory.CreateDirectory(updateRoot);
+		Log("下載更新包…");
+		await DownloadFileAsync(packageUrl, packagePath, manifest.Size);
+
+		if (manifest.Size > 0 && new FileInfo(packagePath).Length != manifest.Size)
+		{
+			throw new InvalidDataException("下載大小與發布資訊不符。");
+		}
+
+		if (manifest.Sha256.Length > 0)
+		{
+			Log("驗證更新檔…");
+			string actualHash = await ComputeSha256Async(packagePath);
+			if (!string.Equals(actualHash, manifest.Sha256, StringComparison.OrdinalIgnoreCase))
+			{
+				throw new InvalidDataException("SHA-256 驗證失敗，更新包可能不完整。");
+			}
+		}
+
+		Log("解壓縮更新…");
+		Directory.CreateDirectory(stageDir);
+		ExtractZipSafely(packagePath, stageDir);
+		string sourceRoot = ResolveExtractedRoot(stageDir);
+		if (!File.Exists(Path.Combine(sourceRoot, gameExe)))
+		{
+			throw new InvalidDataException($"更新包內找不到 {gameExe}。");
+		}
+
+		File.WriteAllText(Path.Combine(sourceRoot, "installed_version.txt"), manifest.Version);
+		Log("套用更新…");
+		DeleteDirectoryRequired(backupDir);
+		bool oldVersionMoved = false;
+		try
+		{
+			if (Directory.Exists(appDir))
+			{
+				Directory.Move(appDir, backupDir);
+				oldVersionMoved = true;
+			}
+
+			Directory.Move(sourceRoot, appDir);
+			DeleteDirectoryIfPresent(backupDir);
+		}
+		catch
+		{
+			if (oldVersionMoved)
+			{
+				DeleteDirectoryRequired(appDir);
+				if (Directory.Exists(backupDir))
+				{
+					Directory.Move(backupDir, appDir);
+				}
+			}
+
+			throw;
+		}
+		finally
+		{
+			TryDelete(packagePath);
+			DeleteDirectoryIfPresent(updateRoot);
+		}
+	}
+
+	private static async Task DownloadFileAsync(string url, string destination, long expectedSize)
+	{
+		using HttpResponseMessage response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+		response.EnsureSuccessStatusCode();
+		long total = expectedSize > 0 ? expectedSize : response.Content.Headers.ContentLength ?? 0;
+		await using Stream input = await response.Content.ReadAsStreamAsync();
+		await using FileStream output = new(destination, FileMode.Create, FileAccess.Write, FileShare.None);
+		byte[] buffer = new byte[128 * 1024];
+		long received = 0;
+		int lastPercent = -1;
+		while (true)
+		{
+			int read = await input.ReadAsync(buffer);
+			if (read == 0)
+			{
+				break;
+			}
+
+			await output.WriteAsync(buffer.AsMemory(0, read));
+			received += read;
+			if (total > 0)
+			{
+				int percent = (int)Math.Min(100, received * 100 / total);
+				if (percent >= lastPercent + 5 || percent == 100)
+				{
+					Console.Write($"\r[更新器] 下載進度：{percent,3}%");
+					lastPercent = percent;
+				}
+			}
+		}
+
+		if (total > 0)
+		{
+			Console.WriteLine();
+		}
+	}
+
+	private static void ExtractZipSafely(string zipPath, string destination)
+	{
+		string destinationRoot = Path.GetFullPath(destination) + Path.DirectorySeparatorChar;
+		using ZipArchive archive = ZipFile.OpenRead(zipPath);
+		foreach (ZipArchiveEntry entry in archive.Entries)
+		{
+			string target = Path.GetFullPath(Path.Combine(destination, entry.FullName));
+			if (!target.StartsWith(destinationRoot, StringComparison.OrdinalIgnoreCase))
+			{
+				throw new InvalidDataException("更新包包含不安全的路徑。");
+			}
+
+			if (entry.FullName.EndsWith("/", StringComparison.Ordinal)
+				|| entry.FullName.EndsWith("\\", StringComparison.Ordinal))
+			{
+				Directory.CreateDirectory(target);
+				continue;
+			}
+
+			Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+			entry.ExtractToFile(target, true);
+		}
+	}
+
+	private static async Task<string> ComputeSha256Async(string path)
+	{
+		await using FileStream stream = File.OpenRead(path);
+		byte[] hash = await SHA256.HashDataAsync(stream);
+		return Convert.ToHexString(hash).ToLowerInvariant();
+	}
+
+	private static void CleanupInterruptedUpdate(string baseDir, string appDir)
+	{
+		string backupDir = Path.Combine(baseDir, ".app_backup");
+		if (!Directory.Exists(appDir) && Directory.Exists(backupDir))
+		{
+			Directory.Move(backupDir, appDir);
+		}
+		else
+		{
+			DeleteDirectoryIfPresent(backupDir);
+		}
+
+		DeleteDirectoryIfPresent(Path.Combine(baseDir, ".update"));
+	}
+
+	private static int LaunchInstalledOrFail(string gamePath, string appDir, string reason)
+	{
+		Log(reason + "。");
+		if (!File.Exists(gamePath))
+		{
+			return Fail("本機尚未安裝可離線啟動的遊戲，請確認網路後重試。");
+		}
+
+		Log("將啟動目前已安裝的版本。");
+		LaunchGame(gamePath, appDir);
+		return 0;
 	}
 
 	private static LauncherConfig LoadConfig(string path)
@@ -90,125 +301,97 @@ internal static class Program
 		foreach (string raw in File.ReadAllLines(path))
 		{
 			string line = raw.Trim();
-			if (line.Length == 0 || line.StartsWith("#") || line.StartsWith(";") || !line.Contains('='))
+			if (line.Length == 0 || line.StartsWith('#') || line.StartsWith(';'))
 			{
 				continue;
 			}
 
-			int eq = line.IndexOf('=');
-			string key = line.Substring(0, eq).Trim().ToLowerInvariant();
-			string value = line.Substring(eq + 1).Trim();
+			int equals = line.IndexOf('=');
+			if (equals <= 0)
+			{
+				continue;
+			}
+
+			string key = line[..equals].Trim().ToLowerInvariant();
+			string value = line[(equals + 1)..].Trim();
+			if (value.Length == 0)
+			{
+				continue;
+			}
+
 			switch (key)
 			{
 				case "owner": cfg.Owner = value; break;
 				case "repo": cfg.Repo = value; break;
 				case "gameexe": cfg.GameExe = value; break;
 				case "appdir": cfg.AppDir = value; break;
+				case "baseurl": cfg.BaseUrl = value; break;
 			}
 		}
 
 		return cfg;
 	}
 
+	private static bool IsSafeRelativePath(string path)
+	{
+		return path.Length > 0
+			&& !Path.IsPathRooted(path)
+			&& !path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Contains("..");
+	}
+
 	private static string ReadLocalVersion(string appDir)
 	{
-		string versionFile = Path.Combine(appDir, "installed_version.txt");
-		return File.Exists(versionFile) ? File.ReadAllText(versionFile).Trim() : string.Empty;
-	}
-
-	private static async Task<string?> TryGetRemoteVersionAsync(string versionUrl)
-	{
-		try
-		{
-			using var http = CreateHttpClient();
-			string json = await http.GetStringAsync(versionUrl);
-			using JsonDocument doc = JsonDocument.Parse(json);
-			return doc.RootElement.TryGetProperty("version", out JsonElement v) ? v.GetString()?.Trim() : null;
-		}
-		catch
-		{
-			return null;
-		}
-	}
-
-	private static async Task DownloadAndInstallAsync(string zipUrl, string appDir, string remoteVersion, string baseDir)
-	{
-		string tempZip = Path.Combine(baseDir, "update_download.zip");
-		string stageDir = Path.Combine(baseDir, "update_stage");
-
-		Log("下載更新包…");
-		using (var http = CreateHttpClient())
-		using (HttpResponseMessage resp = await http.GetAsync(zipUrl, HttpCompletionOption.ResponseHeadersRead))
-		{
-			resp.EnsureSuccessStatusCode();
-			await using FileStream fs = File.Create(tempZip);
-			await resp.Content.CopyToAsync(fs);
-		}
-
-		Log("解壓縮…");
-		if (Directory.Exists(stageDir))
-		{
-			Directory.Delete(stageDir, true);
-		}
-
-		ZipFile.ExtractToDirectory(tempZip, stageDir);
-
-		// 若 zip 內含單一頂層資料夾，將其視為根（避免多一層）。
-		string sourceRoot = ResolveExtractedRoot(stageDir);
-
-		Log("套用更新…");
-		if (Directory.Exists(appDir))
-		{
-			Directory.Delete(appDir, true);
-		}
-
-		Directory.Move(sourceRoot, appDir);
-		File.WriteAllText(Path.Combine(appDir, "installed_version.txt"), remoteVersion);
-
-		// 清理暫存。
-		TryDelete(tempZip);
-		if (Directory.Exists(stageDir))
-		{
-			try { Directory.Delete(stageDir, true); } catch { /* ignore */ }
-		}
+		string path = Path.Combine(appDir, "installed_version.txt");
+		return File.Exists(path) ? File.ReadAllText(path).Trim() : string.Empty;
 	}
 
 	private static string ResolveExtractedRoot(string stageDir)
 	{
-		string[] dirs = Directory.GetDirectories(stageDir);
+		string[] directories = Directory.GetDirectories(stageDir);
 		string[] files = Directory.GetFiles(stageDir);
-		return dirs.Length == 1 && files.Length == 0 ? dirs[0] : stageDir;
+		return directories.Length == 1 && files.Length == 0 ? directories[0] : stageDir;
 	}
 
 	private static void LaunchGame(string gamePath, string appDir)
 	{
 		Log("啟動遊戲…");
-		var psi = new ProcessStartInfo
+		Process.Start(new ProcessStartInfo
 		{
 			FileName = gamePath,
 			WorkingDirectory = appDir,
 			UseShellExecute = true,
-		};
-		Process.Start(psi);
+		});
 	}
 
 	private static HttpClient CreateHttpClient()
 	{
-		var http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
-		// GitHub 需要 User-Agent，否則部分請求會被拒。
-		http.DefaultRequestHeaders.UserAgent.ParseAdd("shuiling-launcher/1.0");
-		return http;
+		var client = new HttpClient { Timeout = TimeSpan.FromMinutes(30) };
+		client.DefaultRequestHeaders.UserAgent.ParseAdd("shuiling-launcher/2.0");
+		return client;
+	}
+
+	private static void DeleteDirectoryIfPresent(string path)
+	{
+		if (Directory.Exists(path))
+		{
+			try { Directory.Delete(path, true); } catch { /* 下一步會回報實際占用錯誤 */ }
+		}
+	}
+
+	private static void DeleteDirectoryRequired(string path)
+	{
+		if (Directory.Exists(path))
+		{
+			Directory.Delete(path, true);
+		}
 	}
 
 	private static void TryDelete(string path)
 	{
-		try { if (File.Exists(path)) File.Delete(path); } catch { /* ignore */ }
+		try { if (File.Exists(path)) File.Delete(path); } catch { }
 	}
 
-	private static void Log(string message)
-	{
-		Console.WriteLine($"[更新器] {message}");
-	}
+	private static void Log(string message) => Console.WriteLine($"[更新器] {message}");
 
 	private static int Fail(string message)
 	{

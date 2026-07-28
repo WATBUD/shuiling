@@ -1,7 +1,8 @@
 # 水靈 遊戲更新器（Launcher）
 
 讓朋友「按一下就拿到最新測試版」，你不用每次重新打包寄檔。
-更新檔案託管在 **GitHub Releases**，更新器抓 `releases/latest/download/...`（永遠指向最新發佈，免 token、免 API 限制）。
+更新檔案託管在 **GitHub Releases**，更新器抓 `releases/latest/download/...`。
+下載後會驗證 SHA-256，並使用暫存安裝與失敗回復，避免更新中斷破壞現有遊戲。
 
 ---
 
@@ -28,31 +29,27 @@
 ## 一次性設定
 
 ### 1. 填 `launcher.cfg`
-把 `owner` 改成你的 GitHub 帳號、`repo` 改成這個專案的 repo 名、`gameExe` 改成 Godot 匯出的執行檔名：
+目前專案已設定完成：
 
 ```
-owner=你的GitHub帳號
+owner=WATBUD
 repo=shuiling
 gameExe=shuiling.exe
 appDir=app
 ```
 
 ### 2. 編譯更新器（產生 Windows 單一執行檔）
-在 Windows 的 `launcher/` 資料夾執行（原生 win-x64）：
+在 repo 根目錄執行：
 
 ```powershell
-dotnet publish -c Release -r win-x64 -p:PublishSingleFile=true --self-contained true
+powershell -ExecutionPolicy Bypass -File tools\build_launcher.ps1
 ```
 
-產物在 `bin\Release\net8.0\win-x64\publish\ShuilingLauncher.exe`。
-（在 Mac 開發時也能用同一行跨平台編出 Windows exe，但你既然在 Windows 打包，直接在 Windows 編最單純。）
+產物在 `dist\ShuilingLauncher-win-x64.zip`。
 
 ### 3. 打包「初始安裝包」寄給朋友（只需一次）
-把以下放進一個資料夾壓成 zip 給朋友：
-- `ShuilingLauncher.exe`
-- `launcher.cfg`
-
-（`app/` 會在第一次啟動更新器時自動下載建立。）
+直接把 `dist\ShuilingLauncher-win-x64.zip` 給朋友一次。
+`app/` 會在第一次啟動更新器時自動下載建立。
 
 之後**再也不用寄檔**——朋友重開更新器就會自動更新。
 
@@ -75,14 +72,16 @@ dotnet publish -c Release -r win-x64 -p:PublishSingleFile=true --self-contained 
    tools/publish_release.sh 0.2.0 ~/exports/shuiling-windows
    ```
 
-   腳本會：產生 `version.json` → 壓成 `game.zip` → 建立 GitHub Release `v0.2.0` 並上傳 `game.zip` + `version.json`。
+   腳本會：壓縮 `game.zip` → 計算 SHA-256 → 產生 `version.json` →
+   建立 GitHub Release `v0.2.0` 並上傳。
 
 3. 朋友下次開 `ShuilingLauncher.exe` → 偵測到新版 → 自動下載 `app/` 覆蓋 → 啟動遊戲。
 
 ---
 
 ## 版本比對規則
-更新器把遠端 `version.json` 的 `version` 字串和本機 `app/installed_version.txt` 做**字串比對**：不一樣就更新。所以版本號規則你自訂即可（`0.2.0`、`2024-06-01a`…都行），只要每次發佈都改動它。
+更新器把遠端 `version.json` 的 `version` 和本機 `app/installed_version.txt`
+比對，不一樣就更新。更新包的 `size` 與 `sha256` 也必須驗證成功才會安裝。
 
 ## 之後想換掉 GitHub
 更新機制是你自己的：把 `launcher.cfg` 或 `Program.cs` 裡的下載網址改成你自己的伺服器 base URL 即可，朋友端不用換更新器（除非 exe 本身要改）。

@@ -1,57 +1,52 @@
-<#
-  一鍵發佈新測試版到 GitHub Releases（在 Windows PowerShell 執行）。
-
-  用法:
-    powershell -ExecutionPolicy Bypass -File tools\publish_release.ps1 -Version 0.2.0 -ExportDir C:\exports\shuiling-windows
-
-  需求:
-    - 已安裝 GitHub CLI (gh) 並登入:  winget install GitHub.cli  然後  gh auth login
-    - -ExportDir 內是 Godot 匯出的 Windows 完整檔案（含 shuiling.exe、.pck、dll…）
-
-  動作:
-    1. 產生 version.json（內含版本號）
-    2. 把匯出資料夾壓成 game.zip
-    3. 用 gh 建立標籤為 v<版本號> 的 Release，並上傳 game.zip + version.json
-  之後朋友的更新器會自動抓到最新版。
-#>
-
 param(
     [Parameter(Mandatory = $true)][string]$Version,
-    [Parameter(Mandatory = $true)][string]$ExportDir
+    [Parameter(Mandatory = $true)][string]$ExportDir,
+    [string]$GameExe = "shuiling.exe"
 )
 
 $ErrorActionPreference = "Stop"
 
 if (-not (Test-Path -LiteralPath $ExportDir -PathType Container)) {
-    Write-Error "找不到匯出資料夾: $ExportDir"
-    exit 1
+    throw "Export directory does not exist: $ExportDir"
+}
+if (-not (Test-Path -LiteralPath (Join-Path $ExportDir $GameExe) -PathType Leaf)) {
+    throw "Game executable was not found: $(Join-Path $ExportDir $GameExe)"
+}
+if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+    throw "GitHub CLI was not found. Install it with: winget install GitHub.cli"
 }
 
 $work = Join-Path $env:TEMP ("shuiling_release_" + [Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $work | Out-Null
 try {
-    Write-Host "[發佈] 版本 $Version"
+    Write-Host "[Release] Building version $Version"
 
-    # 1) version.json
-    $versionJson = Join-Path $work "version.json"
-    "{`n  `"version`": `"$Version`"`n}" | Set-Content -LiteralPath $versionJson -Encoding utf8
-
-    # 2) game.zip（把匯出資料夾內容壓進 zip 頂層）
     $gameZip = Join-Path $work "game.zip"
-    Write-Host "[發佈] 壓縮遊戲檔案…"
+    Write-Host "[Release] Compressing the exported game..."
     Compress-Archive -Path (Join-Path $ExportDir "*") -DestinationPath $gameZip -Force
 
-    # 3) 建立 Release 並上傳資產
+    $versionJson = Join-Path $work "version.json"
+    $package = Get-Item -LiteralPath $gameZip
+    $hash = (Get-FileHash -LiteralPath $gameZip -Algorithm SHA256).Hash.ToLowerInvariant()
+    [ordered]@{
+        version = $Version
+        sha256 = $hash
+        size = $package.Length
+    } | ConvertTo-Json | Set-Content -LiteralPath $versionJson -Encoding utf8
+
     $tag = "v$Version"
-    Write-Host "[發佈] 建立 GitHub Release $tag 並上傳…"
+    Write-Host "[Release] Uploading $tag to GitHub Releases..."
     & gh release view $tag *> $null
     if ($LASTEXITCODE -eq 0) {
         & gh release upload $tag $gameZip $versionJson --clobber
     } else {
-        & gh release create $tag $gameZip $versionJson --title "水靈 測試版 $Version" --notes "自動發佈的測試版 $Version"
+        & gh release create $tag $gameZip $versionJson --title "Shuiling Test Build $Version" --notes "Automatic game update $Version"
+    }
+    if ($LASTEXITCODE -ne 0) {
+        throw "GitHub Release upload failed."
     }
 
-    Write-Host "[完成] 已發佈 $Version。朋友下次開更新器就會自動更新。"
+    Write-Host "[Release] Version $Version is live. Launchers will install it automatically."
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
