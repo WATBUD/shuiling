@@ -68,8 +68,7 @@ jobs:
           }
           Copy-Item (Join-Path $templateSource.FullName "*") $templateDir -Recurse -Force
 
-          $godotExe = Get-ChildItem "$env:RUNNER_TEMP\godot" -Recurse -Filter "*mono_win64*.exe" |
-            Where-Object { $_.Name -notlike "*console*" } |
+          $godotExe = Get-ChildItem "$env:RUNNER_TEMP\godot" -Recurse -Filter "*mono_win64_console.exe" |
             Select-Object -First 1
           if (-not $godotExe) {
             throw "Godot Mono editor executable was not found."
