@@ -1801,6 +1801,7 @@ public partial class SimpleActor : CharacterBody3D
 			return;
 		}
 
+		int levelBefore = Level;
 		Experience += Mathf.Max(amount, 0);
 		while (Experience >= ExperienceToNextLevel)
 		{
@@ -1813,7 +1814,26 @@ public partial class SimpleActor : CharacterBody3D
 			}
 		}
 
+		if (Level > levelBefore)
+		{
+			ShowLevelUpFeedback();
+		}
+
 		RefreshNameplate();
+	}
+
+	// 升等文字提示 + 金色特效（每次獲得經驗只顯示一次，顯示最終等級）。
+	private void ShowLevelUpFeedback()
+	{
+		SpawnCombatEffect(LocaleText.F("effect.level_up", Level), new Color(1.0f, 0.9f, 0.42f, 0.95f), GlobalPosition + new Vector3(0.0f, 1.75f, 0.0f), 0.95f, 1.1f);
+
+		var effect = new LevelUpEffect();
+		Node parent = GetTree().CurrentScene ?? GetParent();
+		if (parent != null)
+		{
+			parent.AddChild(effect);
+			effect.GlobalPosition = new Vector3(GlobalPosition.X, GlobalPosition.Y + 0.05f, GlobalPosition.Z);
+		}
 	}
 
 	// Reset to level 1 and bank a permanent +5 to every base stat (stackable).

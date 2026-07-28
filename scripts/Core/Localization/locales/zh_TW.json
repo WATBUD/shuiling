@@ -319,6 +319,7 @@
 	"quest.button.accept": "接受",
 	"quest.button.decline": "拒絕",
 	"effect.affinity_gain": "親密度 +{0}",
+	"effect.level_up": "升等！Lv.{0}",
 	"effect.affinity_loss": "親密度 -{0}",
 	"minimap.title": "小地圖",
 	"minimap.player": "玩家",

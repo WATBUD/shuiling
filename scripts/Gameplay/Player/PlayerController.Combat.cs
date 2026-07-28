@@ -561,6 +561,7 @@ public partial class PlayerController
 		// The player and each companion scale the reward by their OWN level gap to
 		// the defeated monster — over-leveled earners gain almost nothing.
 		int playerXp = ExperienceTable.ScaleReward(amountBase, Level, sourceLevel);
+		int playerLevelBefore = Level;
 		Experience += playerXp;
 		while (Experience >= ExperienceToNextLevel)
 		{
@@ -570,6 +571,11 @@ public partial class PlayerController
 			CurrentHealth = Mathf.Min(CurrentHealth + 12, MaxHealth);
 			Attack += 2;
 			Defense += 1;
+		}
+
+		if (Level > playerLevelBefore)
+		{
+			ShowPlayerLevelUpFeedback();
 		}
 
 		foreach (SimpleActor actor in _activeParty)
@@ -746,6 +752,20 @@ public partial class PlayerController
 		};
 		parent.AddChild(effect);
 		effect.GlobalPosition = position;
+	}
+
+	// 玩家升等文字提示 + 金色特效（每次獲得經驗只顯示一次，顯示最終等級）。
+	private void ShowPlayerLevelUpFeedback()
+	{
+		SpawnWorldCombatEffect(LocaleText.F("effect.level_up", Level), new Color(1.0f, 0.9f, 0.42f, 0.95f), GlobalPosition + new Vector3(0.0f, 1.9f, 0.0f), 1.1f, 0.9f);
+
+		var effect = new LevelUpEffect();
+		Node parent = GetTree().CurrentScene ?? GetParent();
+		if (parent != null)
+		{
+			parent.AddChild(effect);
+			effect.GlobalPosition = new Vector3(GlobalPosition.X, GlobalPosition.Y + 0.05f, GlobalPosition.Z);
+		}
 	}
 
 	private void InitializeCaptureNetAmmo()

@@ -319,6 +319,7 @@
 	"quest.button.accept": "Accept",
 	"quest.button.decline": "Decline",
 	"effect.affinity_gain": "Affinity +{0}",
+	"effect.level_up": "Level Up! Lv.{0}",
 	"effect.affinity_loss": "Affinity -{0}",
 	"minimap.title": "Minimap",
 	"minimap.player": "Player",
