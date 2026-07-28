@@ -60,22 +60,29 @@ powershell -ExecutionPolicy Bypass -File tools\build_launcher.ps1
 
 ---
 
-## 4. 每次要發新測試版（重點循環）
+## 4. 每次要發新測試版（已自動化）
 
-1. Godot → 匯出 **Windows** 版到一個資料夾，例如 `C:\exports\shuiling-windows`
-   （裡面要有 `shuiling.exe`、`.pck`、`.dll` 等完整檔案）
-2. 在 repo 根目錄開 PowerShell 跑：
+平常只需把完成的修改 commit 並 push 到 `main`：
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\publish_release.ps1 -Version 0.2.0 -ExportDir C:\exports\shuiling-windows
+```bash
+git push origin main
 ```
 
-腳本會自動：壓縮 `game.zip` → 計算 SHA-256 與檔案大小 → 產生
-`version.json` → 建立 GitHub Release `v0.2.0` 並上傳。
+`.github/workflows/release-game.yml` 會在 GitHub 的 Windows runner：
 
-3. 朋友下次開 `ShuilingLauncher.exe`：偵測到新版 → 下載覆蓋 `app/` → 啟動遊戲。
+- 安裝 Godot 4.7 Mono 與匯出模板；
+- 編譯 C# 並匯出 Windows 遊戲；
+- 將最新版號自動加一；
+- 產生 `game.zip`、SHA-256 與 `version.json`；
+- 建立 GitHub Release。
 
-> 版本號自己定（`0.2.0`、`0.2.1`…），只要每次都改動即可，更新器用字串比對判斷是否更新。
+朋友下次開 `ShuilingLauncher.exe` 就會自動更新。只修改 Markdown、`docs/`
+或 `launcher/` 不會發布整個遊戲，避免無意義下載。
+
+若需要指定大版本，可到 GitHub → Actions → **Build and publish game update** →
+**Run workflow**，輸入例如 `0.2.0`；留空則仍會自動加一。
+
+`tools\publish_release.ps1` 保留作為 GitHub Actions 暫時無法使用時的手動備援。
 
 ---
 

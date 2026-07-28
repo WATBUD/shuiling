@@ -1,0 +1,170 @@
+name: Build and publish game update
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "docs/**"
+      - "launcher/**"
+      - "**/*.md"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Optional version (for example 0.2.0); leave empty to auto-increment"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: shuiling-game-release
+  cancel-in-progress: false
+
+env:
+  GODOT_VERSION: "4.7"
+  GODOT_STATUS: "stable"
+  EXPORT_PRESET: "Windows Desktop"
+  GAME_EXE: "shuiling.exe"
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Download Godot Mono and export templates
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = "$env:GODOT_VERSION-$env:GODOT_STATUS"
+          $assetBase = "https://github.com/godotengine/godot-builds/releases/download/$tag"
+          $editorZip = "Godot_v$tag`_mono_win64.zip"
+          $templatesFile = "Godot_v$tag`_mono_export_templates.tpz"
+
+          New-Item -ItemType Directory -Path "$env:RUNNER_TEMP\godot" -Force | Out-Null
+          Invoke-WebRequest "$assetBase/$editorZip" -OutFile "$env:RUNNER_TEMP\$editorZip"
+          Invoke-WebRequest "$assetBase/$templatesFile" -OutFile "$env:RUNNER_TEMP\$templatesFile"
+          Expand-Archive "$env:RUNNER_TEMP\$editorZip" "$env:RUNNER_TEMP\godot" -Force
+
+          $templateDir = Join-Path $env:APPDATA "Godot\export_templates\$env:GODOT_VERSION.$env:GODOT_STATUS.mono"
+          New-Item -ItemType Directory -Path $templateDir -Force | Out-Null
+          Expand-Archive "$env:RUNNER_TEMP\$templatesFile" "$env:RUNNER_TEMP\templates" -Force
+          $templateSource = Get-ChildItem "$env:RUNNER_TEMP\templates" -Directory |
+            Where-Object { Test-Path (Join-Path $_.FullName "windows_release_x86_64.exe") } |
+            Select-Object -First 1
+          if (-not $templateSource) {
+            throw "Godot Mono export templates were not found after extraction."
+          }
+          Copy-Item (Join-Path $templateSource.FullName "*") $templateDir -Recurse -Force
+
+          $godotExe = Get-ChildItem "$env:RUNNER_TEMP\godot" -Recurse -Filter "*mono_win64*.exe" |
+            Where-Object { $_.Name -notlike "*console*" } |
+            Select-Object -First 1
+          if (-not $godotExe) {
+            throw "Godot Mono editor executable was not found."
+          }
+          "GODOT_EXE=$($godotExe.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Restore and compile C# project
+        shell: pwsh
+        run: |
+          dotnet restore ".\新遊戲專案.csproj"
+          dotnet build ".\新遊戲專案.csproj" -c Release --no-restore
+
+      - name: Import project and export Windows game
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Path ".\export" -Force | Out-Null
+          & "$env:GODOT_EXE" --headless --editor --path "$env:GITHUB_WORKSPACE" --quit-after 30
+          if ($LASTEXITCODE -ne 0) {
+            throw "Godot project import failed."
+          }
+          & "$env:GODOT_EXE" --headless --path "$env:GITHUB_WORKSPACE" --export-release "$env:EXPORT_PRESET" "$env:GITHUB_WORKSPACE\export\$env:GAME_EXE"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Godot Windows export failed."
+          }
+          if (-not (Test-Path ".\export\$env:GAME_EXE")) {
+            throw "Export completed without producing $env:GAME_EXE."
+          }
+
+      - name: Choose release version
+        id: version
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $version = $env:REQUESTED_VERSION.Trim()
+          if ($version) {
+            $version = $version.TrimStart("v")
+            if ($version -notmatch '^\d+\.\d+\.\d+$') {
+              throw "Manual version must use the format 0.2.0."
+            }
+          } else {
+            $latest = gh release list --repo "$env:GITHUB_REPOSITORY" --limit 1 --json tagName --jq '.[0].tagName'
+            if ($latest -match '^v(\d+)\.(\d+)\.(\d+)$') {
+              $version = "$($Matches[1]).$($Matches[2]).$([int]$Matches[3] + 1)"
+            } else {
+              $version = "0.1.0"
+            }
+          }
+          if (gh release view "v$version" --repo "$env:GITHUB_REPOSITORY" 2>$null) {
+            throw "Release v$version already exists."
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Publishing v$version"
+
+      - name: Package and verify update assets
+        id: package
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          Compress-Archive -Path ".\export\*" -DestinationPath ".\game.zip" -Force
+          $package = Get-Item ".\game.zip"
+          $sha256 = (Get-FileHash ".\game.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          $manifest = [ordered]@{
+            version = $env:VERSION
+            sha256 = $sha256
+            size = $package.Length
+          } | ConvertTo-Json
+          [System.IO.File]::WriteAllText(
+            (Join-Path $env:GITHUB_WORKSPACE "version.json"),
+            $manifest,
+            [System.Text.UTF8Encoding]::new($false)
+          )
+          Get-Content ".\version.json"
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "v$env:VERSION" ".\game.zip" ".\version.json" `
+            --repo "$env:GITHUB_REPOSITORY" `
+            --title "水靈測試版 $env:VERSION" `
+            --notes "由 GitHub Actions 自動建置，來源提交：$env:GITHUB_SHA" `
+            --latest
+
+      - name: Keep a downloadable workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shuiling-windows-${{ steps.version.outputs.version }}
+          path: |
+            game.zip
+            version.json
+          retention-days: 7

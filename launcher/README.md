@@ -57,25 +57,16 @@ powershell -ExecutionPolicy Bypass -File tools\build_launcher.ps1
 
 ## 每次要發新測試版
 
-1. 在 Godot 匯出 **Windows** 版到某個資料夾（例如 `C:\exports\shuiling-windows`，內含 `shuiling.exe`、`.pck`、`.dll` 等）。
-2. 執行發佈腳本：
+把完成的修改 push 到 `main` 即可：
 
-   **Windows（你的打包環境，推薦）** — 需先 `winget install GitHub.cli` 然後 `gh auth login`：
+```bash
+git push origin main
+```
 
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File tools\publish_release.ps1 -Version 0.2.0 -ExportDir C:\exports\shuiling-windows
-   ```
+GitHub Actions 會自動安裝 Godot Mono、編譯、匯出 Windows、遞增版本號並建立
+Release。朋友下次開 `ShuilingLauncher.exe` 就會更新。
 
-   **Mac/Linux（備用）** — 需先 `brew install gh && gh auth login`：
-
-   ```bash
-   tools/publish_release.sh 0.2.0 ~/exports/shuiling-windows
-   ```
-
-   腳本會：壓縮 `game.zip` → 計算 SHA-256 → 產生 `version.json` →
-   建立 GitHub Release `v0.2.0` 並上傳。
-
-3. 朋友下次開 `ShuilingLauncher.exe` → 偵測到新版 → 自動下載 `app/` 覆蓋 → 啟動遊戲。
+`tools\publish_release.ps1` 與 `tools\publish_release.sh` 僅保留為手動備援。
 
 ---
 
