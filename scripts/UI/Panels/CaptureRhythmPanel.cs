@@ -148,8 +148,8 @@ public partial class CaptureRhythmPanel : Control
 		_pendingResult = null;
 		_acceptingInput = false;
 		_readyRemaining = ReadyDelaySeconds;
-		int commandCount = Mathf.Clamp(4 + Mathf.Max(actor.Level - 1, 0) / 2, 4, 18);
-		_timeLimit = Mathf.Clamp(4.5f + commandCount * 0.55f, 6.5f, 12.5f);
+		int commandCount = CaptureConfig.GetRhythmCommandCount(actor.Level);
+		_timeLimit = CaptureConfig.GetRhythmTimeLimit(commandCount);
 		_timeRemaining = _timeLimit;
 		GenerateSequence(commandCount);
 		BuildCommandTiles();

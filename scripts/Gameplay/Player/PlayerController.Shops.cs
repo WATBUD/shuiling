@@ -456,9 +456,9 @@ public partial class PlayerController
 
 		SimpleActor? nearest = null;
 		float bestDistance = MerchantInteractRange;
-		foreach (Node node in GetTree().GetNodesInGroup("npcs"))
+		foreach (SimpleActor actor in SimpleActor.ActiveActors)
 		{
-			if (node is not SimpleActor actor || !TryGetMerchantShopKind(actor, out MerchantShopKind candidateKind) || !actor.IsActiveWorldTarget)
+			if (!TryGetMerchantShopKind(actor, out MerchantShopKind candidateKind) || !actor.IsActiveWorldTarget)
 			{
 				continue;
 			}

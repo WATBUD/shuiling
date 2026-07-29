@@ -73,6 +73,14 @@ public static class MonsterRarity
 		_ => string.Empty,
 	};
 
+	public static string ColorNameKey(int rarity) => rarity switch
+	{
+		Rare => "rarity.color.blue",
+		Elite => "rarity.color.purple",
+		Alpha => "rarity.color.orange",
+		_ => "rarity.color.white",
+	};
+
 	// Star prefix for the nameplate (font-safe ★ / ✦).
 	public static string StarPrefix(int rarity) => rarity switch
 	{

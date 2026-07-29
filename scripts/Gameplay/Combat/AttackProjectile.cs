@@ -59,14 +59,13 @@ public partial class AttackProjectile : Node3D
 	{
 		if (IsMelee)
 		{
-			AddFxMesh(
+			MeshInstance3D slash = AddFxSprite(
 				"SlashBlade",
-				new BoxMesh { Size = new Vector3(Radius * 3.1f, 0.055f, Radius * 0.42f) },
+				"slash_03.png",
 				Vector3.Zero,
-				new Vector3(0.0f, 0.0f, 24.0f),
-				Vector3.One,
-				new Color(1.0f, 0.92f, 0.58f, 0.92f)
-			);
+				new Vector2(Radius * 3.5f, Radius * 2.2f),
+				new Color(1.0f, 0.92f, 0.58f, 0.92f));
+			slash.RotationDegrees = new Vector3(0.0f, 0.0f, 24.0f);
 			return;
 		}
 
@@ -96,33 +95,46 @@ public partial class AttackProjectile : Node3D
 				Vector3.One,
 				new Color(0.96f, 0.78f, 0.28f, 0.92f)
 			);
+			AddChild(KenneyParticleVfx.CreateBurst(
+				"ArrowTrace",
+				"trace_03.png",
+				new Color(1.0f, 0.82f, 0.34f, 0.72f),
+				8,
+				Mathf.Max(Lifetime * 0.85f, 0.16f),
+				0.25f,
+				0.85f,
+				24.0f,
+				Vector3.Zero,
+				Radius * 0.18f,
+				Radius * 0.85f,
+				Radius * 0.15f,
+				true,
+				Vector3.Back));
 			return;
 		}
 
-		AddFxMesh(
+		AddFxSprite(
 			IsHealing ? "HealOrb" : "AttackOrb",
-			new SphereMesh { Radius = Radius, Height = Radius * 2.0f },
+			IsHealing ? "magic_05.png" : "magic_03.png",
 			Vector3.Zero,
-			Vector3.Zero,
-			new Vector3(1.0f, 0.82f, 1.0f),
+			Vector2.One * Radius * 2.7f,
 			EffectColor
 		);
-		AddFxMesh(
-			"Trail",
-			new CapsuleMesh { Radius = Radius * 0.24f, Height = Radius * 3.1f },
-			_direction * -Radius * 1.55f,
-			new Vector3(90.0f, 0.0f, 0.0f),
-			Vector3.One,
-			new Color(EffectColor.R, EffectColor.G, EffectColor.B, EffectColor.A * 0.52f)
-		);
-		AddFxMesh(
-			"Spark",
-			new BoxMesh { Size = new Vector3(Radius * 1.15f, Radius * 0.12f, Radius * 0.12f) },
-			_direction * Radius * 0.42f,
-			new Vector3(0.0f, 35.0f, 18.0f),
-			Vector3.One,
-			new Color(1.0f, 0.96f, 0.72f, 0.86f)
-		);
+		AddChild(KenneyParticleVfx.CreateBurst(
+			IsHealing ? "HealTrail" : "MagicTrail",
+			IsHealing ? "magic_05.png" : "light_02.png",
+			new Color(EffectColor.R, EffectColor.G, EffectColor.B, EffectColor.A * 0.72f),
+			12,
+			Mathf.Max(Lifetime * 0.88f, 0.16f),
+			0.25f,
+			1.1f,
+			32.0f,
+			Vector3.Zero,
+			Radius * 0.25f,
+			Radius * 0.65f,
+			Radius * 0.18f,
+			true,
+			Vector3.Back));
 	}
 
 	private void SpawnArrivalPulse()
@@ -151,6 +163,10 @@ public partial class AttackProjectile : Node3D
 			AlbedoColor = color,
 			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
 			Roughness = 0.18f,
+			EmissionEnabled = true,
+			Emission = new Color(color.R, color.G, color.B),
+			EmissionEnergyMultiplier = 3.8f,
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
 		};
 		_materials.Add(material);
 
@@ -164,5 +180,17 @@ public partial class AttackProjectile : Node3D
 		};
 		meshInstance.SetSurfaceOverrideMaterial(0, material);
 		AddChild(meshInstance);
+	}
+
+	private MeshInstance3D AddFxSprite(string nodeName, string texture, Vector3 position, Vector2 size, Color color)
+	{
+		MeshInstance3D sprite = KenneyParticleVfx.CreateSprite(nodeName, texture, color, size);
+		sprite.Position = position;
+		if (sprite.Mesh?.SurfaceGetMaterial(0) is StandardMaterial3D material)
+		{
+			_materials.Add(material);
+		}
+		AddChild(sprite);
+		return sprite;
 	}
 }

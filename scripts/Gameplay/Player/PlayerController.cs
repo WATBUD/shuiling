@@ -4,9 +4,28 @@ using System.Collections.Generic;
 public partial class PlayerController : CharacterBody3D
 {
 	public CompanionBuildLoadout BuildLoadout { get; private set; } = CreateEmptyPlayerLoadout();
-	public BuildStats CurrentBuildStats => BuildCatalog.CalculatePlayerStats(this, BuildLoadout);
+	private BuildStats _cachedPlayerBuildStats = new();
+	private bool _playerBuildStatsDirty = true;
+	public BuildStats CurrentBuildStats
+	{
+		get
+		{
+			if (_playerBuildStatsDirty)
+			{
+				_cachedPlayerBuildStats = BuildCatalog.CalculatePlayerStats(this, BuildLoadout);
+				_playerBuildStatsDirty = false;
+			}
+
+			return _cachedPlayerBuildStats;
+		}
+	}
 	public int EffectiveMaxHealth => CurrentBuildStats.MaxHealth;
 	public int EffectiveDefense => CurrentBuildStats.Defense;
+
+	private void MarkPlayerBuildStatsDirty()
+	{
+		_playerBuildStatsDirty = true;
+	}
 
 	private static CompanionBuildLoadout CreateEmptyPlayerLoadout()
 	{
@@ -26,6 +45,7 @@ public partial class PlayerController : CharacterBody3D
 	public void EquipAttributeGem(string gemId)
 	{
 		BuildLoadout.AttributeGemId = BuildCatalog.GetAttributeGem(gemId).Id;
+		MarkPlayerBuildStatsDirty();
 	}
 
 	public void EquipBuildEquipment(EquipmentSlot slot, string equipmentId)
@@ -34,6 +54,7 @@ public partial class PlayerController : CharacterBody3D
 		if (equipment.Slot == slot)
 		{
 			BuildLoadout.SetEquipmentId(slot, equipment.Id);
+			MarkPlayerBuildStatsDirty();
 		}
 	}
 
@@ -45,12 +66,24 @@ public partial class PlayerController : CharacterBody3D
 		if ((slot == 0 && !BuildCatalog.IsMainAttackCore(validated))
 			|| (slot > 0 && !BuildCatalog.IsSupportCore(validated))
 			|| (slot > 0 && !BuildCatalog.HasMainAttackCore(BuildLoadout))
-			|| (BuildCatalog.IsProjectileSupportGem(validated) && !BuildCatalog.HasRangedActiveSkill(BuildLoadout)))
+			|| (BuildCatalog.IsProjectileSupportGem(validated) && !BuildCatalog.HasProjectileActiveSkill(BuildLoadout)))
 		{
 			return;
 		}
 		BuildLoadout.SkillGemIds[slot] = validated;
 		BuildLoadout.SkillGemLevels[slot] = 1;
+		if (slot == 0 && !BuildCatalog.HasProjectileActiveSkill(BuildLoadout))
+		{
+			for (int index = 1; index < BuildLoadout.SkillGemIds.Length; index++)
+			{
+				if (BuildCatalog.IsProjectileSupportGem(BuildLoadout.SkillGemIds[index]))
+				{
+					BuildLoadout.SkillGemIds[index] = "gem.skill.none";
+					BuildLoadout.SkillGemLevels[index] = 1;
+				}
+			}
+		}
+		MarkPlayerBuildStatsDirty();
 	}
 
 	public void ClearSkillGemSlot(int slot)
@@ -59,6 +92,7 @@ public partial class PlayerController : CharacterBody3D
 		slot = Mathf.Clamp(slot, 0, BuildLoadout.SkillGemIds.Length - 1);
 		BuildLoadout.SkillGemIds[slot] = "gem.skill.none";
 		BuildLoadout.SkillGemLevels[slot] = 1;
+		MarkPlayerBuildStatsDirty();
 	}
 
 	public int RaiseSkillGemLevel(int slot)
@@ -67,6 +101,7 @@ public partial class PlayerController : CharacterBody3D
 		slot = Mathf.Clamp(slot, 0, BuildLoadout.SkillGemLevels.Length - 1);
 		int level = Mathf.Min(BuildLoadout.GetSkillGemLevel(slot) + 1, BuildCatalog.MaxSkillGemLevel);
 		BuildLoadout.SkillGemLevels[slot] = level;
+		MarkPlayerBuildStatsDirty();
 		return level;
 	}
 
@@ -216,6 +251,8 @@ public partial class PlayerController : CharacterBody3D
 	private const float CaptureProtectionSeconds = 8.0f;
 	private float _interactionPromptRefreshRemaining;
 	private float _worldDropCollectRefreshRemaining;
+	private float _hudRefreshRemaining;
+	private float _backgroundSystemsRefreshRemaining;
 	private int _captureNetCharges;
 	private float _captureNetRechargeRemaining;
 	private Node3D _cameraPivot = null!;
@@ -294,6 +331,10 @@ public partial class PlayerController : CharacterBody3D
 	private float _movementAnimationPhase;
 	private SimpleActor? _activeBoss;
 	private float _bossHudCombatVisibleRemaining;
+	private SimpleActor? _bossHudRenderedActor;
+	private int _bossHudRenderedHealth = -1;
+	private int _bossHudRenderedMaxHealth = -1;
+	private bool _bossHudRenderedEnraged;
 	private Tween? _bossAnnouncementTween;
 	private Tween? _bossWorldStatusTween;
 	private float _bossWorldStatusRefreshRemaining;
@@ -371,6 +412,7 @@ public partial class PlayerController : CharacterBody3D
 			{
 				Level = 100;
 				Experience = 0;
+				MarkPlayerBuildStatsDirty();
 			}
 
 			// 初始寵物改為開發者測試旗標控制：僅在 dev_config.cfg 的 grant_starter_pet=true 時贈送。
@@ -383,15 +425,6 @@ public partial class PlayerController : CharacterBody3D
 			if (DevConfig.DeadTestPets > 0)
 			{
 				CallDeferred(nameof(GrantDeadTestPets));
-			}
-
-			// 測試用：一次贈送所有種類寶石各一顆（正式模式寶石只從掉落/商店取得）。
-			if (DevConfig.GrantAllGems)
-			{
-				foreach (string gemId in BuildCatalog.GetAllGemItemIds())
-				{
-					AddInventoryItem(gemId);
-				}
 			}
 
 			GrantStarterTownPortalScrolls();
@@ -419,6 +452,7 @@ public partial class PlayerController : CharacterBody3D
 
 	public override void _Process(double delta)
 	{
+		float step = (float)delta;
 		if (_mountedCompanion != null && !IsMountedCompanionValid())
 		{
 			if (IsInstanceValid(_mountedCompanion))
@@ -432,24 +466,34 @@ public partial class PlayerController : CharacterBody3D
 		{
 			UpdateMountedVisualOffset();
 		}
-		UpdateCaptureNetRecharge((float)delta);
-		UpdateMeleeCooldown((float)delta);
-		UpdateAutoAttack((float)delta);
-		UpdateHealthRegen((float)delta);
-		UpdatePlayerHealthHud();
+		UpdateCaptureNetRecharge(step);
+		UpdateMeleeCooldown(step);
+		UpdateAutoAttack(step);
+		UpdateHealthRegen(step);
+		_hudRefreshRemaining -= step;
+		if (_hudRefreshRemaining <= 0.0f)
+		{
+			_hudRefreshRemaining = PerformanceConfig.HudRefreshIntervalSeconds;
+			UpdatePlayerHealthHud();
+			UpdateTargetInfoPanel();
+			UpdateCaptureAmmoHud();
+		}
 		UpdateCamera();
-		UpdateTargetInfoPanel();
-		UpdateCaptureAmmoHud();
-		UpdateDamageFlash((float)delta);
-		UpdateMovementAnimation((float)delta);
-		UpdateFocusedTargetMarker((float)delta);
-		UpdateMercenaryOfferRefresh();
-		UpdateCompanionRecruitRefresh();
-		UpdateMerchantStockRefresh();
-		UpdateInteractionPrompt((float)delta);
-		UpdateBossHud((float)delta);
-		UpdateBossWorldStatusHud((float)delta);
-		UpdateTownPortalChannel((float)delta);
+		UpdateDamageFlash(step);
+		UpdateMovementAnimation(step);
+		UpdateFocusedTargetMarker(step);
+		_backgroundSystemsRefreshRemaining -= step;
+		if (_backgroundSystemsRefreshRemaining <= 0.0f)
+		{
+			_backgroundSystemsRefreshRemaining = PerformanceConfig.BackgroundSystemsRefreshIntervalSeconds;
+			UpdateMercenaryOfferRefresh();
+			UpdateCompanionRecruitRefresh();
+			UpdateMerchantStockRefresh();
+		}
+		UpdateInteractionPrompt(step);
+		UpdateBossHud(step);
+		UpdateBossWorldStatusHud(step);
+		UpdateTownPortalChannel(step);
 	}
 
 	public override void _UnhandledInput(InputEvent @event)
@@ -746,7 +790,7 @@ public partial class PlayerController : CharacterBody3D
 
 		if (Input.IsActionJustPressed("jump") && IsOnFloor())
 		{
-			velocity.Y = JumpVelocity;
+			velocity.Y = JumpVelocity * CurrentBuildStats.JumpPower / EquipmentConfig.BaseJumpPower;
 		}
 
 		Vector2 inputDirection = Input.GetVector("move_left", "move_right", "move_forward", "move_back");

@@ -1,6 +1,8 @@
 // Equipment acquisition and progression balance.
 public static class EquipmentConfig
 {
+	public const int BaseJumpPower = 100;
+
 	public const float MonsterDropChance = 0.05f;
 	public const int BossGuaranteedDropCount = 2;
 	public const int MaxStars = 10;

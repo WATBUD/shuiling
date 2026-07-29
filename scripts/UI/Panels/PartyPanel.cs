@@ -23,6 +23,7 @@ public partial class PartyPanel : PanelContainer
 	private Label _skillGemsLabel = null!;
 	private Label _attackModeLabel = null!;
 	private CompanionInfoCard _companionInfoCard = null!;
+	private float _detailsRefreshRemaining;
 	private Button _helmetButton = null!;
 	private Button _weaponButton = null!;
 	private Button _armorButton = null!;
@@ -61,6 +62,13 @@ public partial class PartyPanel : PanelContainer
 			return;
 		}
 
+		_detailsRefreshRemaining -= (float)delta;
+		if (_detailsRefreshRemaining > 0.0f)
+		{
+			return;
+		}
+
+		_detailsRefreshRemaining = PerformanceConfig.PartyDetailsRefreshIntervalSeconds;
 		UpdateDetails();
 	}
 
@@ -81,6 +89,7 @@ public partial class PartyPanel : PanelContainer
 		Visible = visible;
 		if (visible)
 		{
+			_detailsRefreshRemaining = PerformanceConfig.PartyDetailsRefreshIntervalSeconds;
 			RefreshParty();
 			UpdateDetails();
 		}

@@ -3,6 +3,9 @@ using System.Collections.Generic;
 
 public partial class WorldDrop : Node3D
 {
+	private static readonly List<WorldDrop> ActiveDropRegistry = new();
+	public static IReadOnlyList<WorldDrop> ActiveDrops => ActiveDropRegistry;
+
 	// Drop visuals reuse a handful of colours, so cache their materials and
 	// meshes instead of allocating fresh ones per drop. A defeated monster can
 	// spit out 5+ drops (a boss ~8) in a single frame; building unique
@@ -14,7 +17,9 @@ public partial class WorldDrop : Node3D
 	private static Mesh? _sharedItemMesh;
 	private static Mesh? _sharedGlowMesh;
 	private static Mesh? _sharedCardFrameMesh;
-	private static Mesh? _sharedCardFaceMesh;
+	private static PackedScene? _cardDropScene;
+	private static SphereMesh? _cardParticleMesh;
+	private const string CardDropScenePath = "res://assets/scenes/props/Card.tscn";
 
 	private static StandardMaterial3D GetBodyMaterial(Color color, bool isGold)
 	{
@@ -64,6 +69,7 @@ public partial class WorldDrop : Node3D
 
 	private float _age;
 	private float _bobPhase;
+	private float _visualUpdateAccumulator;
 	private Label3D? _label;
 
 	public bool IsGoldDrop => GoldAmount > 0;
@@ -73,9 +79,19 @@ public partial class WorldDrop : Node3D
 
 	public override void _Ready()
 	{
+		if (!ActiveDropRegistry.Contains(this))
+		{
+			ActiveDropRegistry.Add(this);
+		}
+
 		AddToGroup("world_drops");
 		_bobPhase = (float)GD.RandRange(0.0, Mathf.Tau);
 		BuildVisual();
+	}
+
+	public override void _ExitTree()
+	{
+		ActiveDropRegistry.Remove(this);
 	}
 
 	public override void _Process(double delta)
@@ -88,8 +104,16 @@ public partial class WorldDrop : Node3D
 			return;
 		}
 
-		_bobPhase += step * 3.4f;
-		RotationDegrees = new Vector3(0.0f, RotationDegrees.Y + step * 65.0f, 0.0f);
+		_visualUpdateAccumulator += step;
+		if (_visualUpdateAccumulator < PerformanceConfig.WorldDropVisualRefreshIntervalSeconds)
+		{
+			return;
+		}
+
+		float visualStep = _visualUpdateAccumulator;
+		_visualUpdateAccumulator = 0.0f;
+		_bobPhase += visualStep * 3.4f;
+		RotationDegrees = new Vector3(0.0f, RotationDegrees.Y + visualStep * 65.0f, 0.0f);
 		if (_label != null)
 		{
 			_label.Position = new Vector3(0.0f, 0.92f + Mathf.Sin(_bobPhase) * 0.08f, 0.0f);
@@ -182,40 +206,35 @@ public partial class WorldDrop : Node3D
 		AddChild(_label);
 	}
 
-	// A monster name card renders as an upright, glowing collectible card: a gold
-	// frame around a bright face, floating and spinning like other drops.
+	// Monster cards use the editor-authored Card.tscn so artists can adjust the
+	// drop model without changing code.
 	private void BuildCardVisual()
 	{
 		var frameColor = new Color(1.0f, 0.82f, 0.34f, 1.0f);
-		var faceColor = new Color(0.16f, 0.24f, 0.42f, 1.0f);
-
-		var frame = new MeshInstance3D
+		_cardDropScene ??= ResourceLoader.Exists(CardDropScenePath)
+			? ResourceLoader.Load<PackedScene>(CardDropScenePath)
+			: null;
+		if (_cardDropScene?.Instantiate() is Node3D cardModel)
 		{
-			Name = "CardFrame",
-			Mesh = _sharedCardFrameMesh ??= new BoxMesh { Size = new Vector3(0.40f, 0.56f, 0.035f) },
-			Position = new Vector3(0.0f, 0.42f, 0.0f),
-		};
-		frame.SetSurfaceOverrideMaterial(0, GetCardMaterial(frameColor, true));
-		AddChild(frame);
-
-		var face = new MeshInstance3D
+			cardModel.Name = "CardDropModel";
+			cardModel.Position = Vector3.Zero;
+			AddChild(cardModel);
+		}
+		else
 		{
-			Name = "CardFace",
-			Mesh = _sharedCardFaceMesh ??= new BoxMesh { Size = new Vector3(0.32f, 0.46f, 0.05f) },
-			Position = new Vector3(0.0f, 0.42f, 0.0f),
-		};
-		face.SetSurfaceOverrideMaterial(0, GetCardMaterial(faceColor, false));
-		AddChild(face);
+			// Keep a visible fallback if an editor move/rename temporarily makes
+			// the authored scene unavailable.
+			var fallback = new MeshInstance3D
+			{
+				Name = "CardDropFallback",
+				Mesh = _sharedCardFrameMesh ??= new BoxMesh { Size = new Vector3(0.40f, 0.56f, 0.035f) },
+				Position = new Vector3(0.0f, 0.42f, 0.0f),
+			};
+			fallback.SetSurfaceOverrideMaterial(0, GetCardMaterial(frameColor, true));
+			AddChild(fallback);
+		}
 
-		var glow = new MeshInstance3D
-		{
-			Name = "CardGlow",
-			Mesh = _sharedGlowMesh ??= new SphereMesh { Radius = 0.32f, Height = 0.42f },
-			Position = new Vector3(0.0f, 0.42f, 0.0f),
-			Scale = new Vector3(1.15f, 1.5f, 1.15f),
-		};
-		glow.SetSurfaceOverrideMaterial(0, GetGlowMaterial(frameColor));
-		AddChild(glow);
+		AddCardRisingParticles(frameColor);
 
 		_label = new Label3D
 		{
@@ -232,6 +251,63 @@ public partial class WorldDrop : Node3D
 		_label.OutlineModulate = new Color(0.02f, 0.02f, 0.018f, 0.96f);
 		_label.Modulate = frameColor.Lightened(0.2f);
 		AddChild(_label);
+	}
+
+	private void AddCardRisingParticles(Color color)
+	{
+		if (_cardParticleMesh == null)
+		{
+			var particleMaterial = new StandardMaterial3D
+			{
+				AlbedoColor = new Color(color.R, color.G, color.B, 0.88f),
+				Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+				ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+				EmissionEnabled = true,
+				Emission = color * 3.2f,
+			};
+			_cardParticleMesh = new SphereMesh
+			{
+				Radius = 0.045f,
+				Height = 0.09f,
+				RadialSegments = 10,
+				Rings = 5,
+			};
+			_cardParticleMesh.SurfaceSetMaterial(0, particleMaterial);
+		}
+
+		// Keep the process material instance-local. Sharing one live GPU particle
+		// material across drops can race uniform-set creation on Godot 4.7 D3D12.
+		var processMaterial = new ParticleProcessMaterial
+		{
+			EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere,
+			EmissionSphereRadius = 0.34f,
+			Direction = Vector3.Up,
+			Spread = 32.0f,
+			Gravity = new Vector3(0.0f, 0.28f, 0.0f),
+			InitialVelocityMin = 0.48f,
+			InitialVelocityMax = 1.35f,
+			ScaleMin = 0.55f,
+			ScaleMax = 1.35f,
+			Color = new Color(color.R, color.G, color.B, 0.92f),
+		};
+
+		var particles = new GpuParticles3D
+		{
+			Name = "CardRisingParticles",
+			Amount = 30,
+			Lifetime = 1.65f,
+			Preprocess = 0.0f,
+			Randomness = 0.72f,
+			VisibilityAabb = new Aabb(new Vector3(-1.2f, -0.1f, -1.2f), new Vector3(2.4f, 3.2f, 2.4f)),
+			ProcessMaterial = processMaterial,
+			DrawPass1 = _cardParticleMesh,
+			Emitting = false,
+			Position = new Vector3(0.0f, 0.04f, 0.0f),
+		};
+		AddChild(particles);
+		// Start only after RenderingServer has registered the new material and
+		// draw-pass resources, avoiding a draw in the construction frame.
+		particles.SetDeferred("emitting", true);
 	}
 
 	private static StandardMaterial3D GetCardMaterial(Color color, bool isFrame)

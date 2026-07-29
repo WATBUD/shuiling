@@ -26,8 +26,11 @@ public sealed class DefaultMonsterSpeciesCatalog : IMonsterSpeciesCatalog
 	private static readonly string[] MarshMap = { "wild_marsh" };
 	private static readonly string[] BadlandsMap = { "wild_badlands" };
 	private static readonly string[] SnowMap = { "wild_snow" };
+	private static readonly string[] SkeletonMap = { "wild_skeleton" };
 	private static readonly string[] ForestSnowMaps = { "wild_forest", "wild_snow" };
 	private static readonly string[] CaveMaps = { "cave" };
+	private const string KayKitSkeletonRoot =
+		"res://assets/models/monsters/kaykit_skeletons/";
 
 	public static DefaultMonsterSpeciesCatalog Instance { get; } = new();
 
@@ -38,6 +41,22 @@ public sealed class DefaultMonsterSpeciesCatalog : IMonsterSpeciesCatalog
 			"res://assets/models/monsters/slime_enemy_poly_pizza.glb",
 			"res://assets/models/monsters/slime.gltf",
 		}, MarshMap),
+		new("name.monster.skeleton_warrior", "Tank", "loot.small_bone", new Color(0.82f, 0.86f, 0.90f, 0.96f), new[]
+		{
+			KayKitSkeletonRoot + "Skeleton_Warrior.glb",
+		}, SkeletonMap),
+		new("name.monster.skeleton_rogue", "DPS", "loot.small_bone", new Color(0.66f, 0.82f, 0.72f, 0.96f), new[]
+		{
+			KayKitSkeletonRoot + "Skeleton_Rogue.glb",
+		}, SkeletonMap),
+		new("name.monster.skeleton_mage", "Ranged", "loot.cracked_core", new Color(0.62f, 0.58f, 1.0f, 0.96f), new[]
+		{
+			KayKitSkeletonRoot + "Skeleton_Mage.glb",
+		}, SkeletonMap),
+		new("name.monster.skeleton_minion", "DPS", "loot.small_bone", new Color(0.76f, 0.78f, 0.72f, 0.96f), new[]
+		{
+			KayKitSkeletonRoot + "Skeleton_Minion.glb",
+		}, SkeletonMap),
 		new("name.monster.water_spirit", "Ranged", "loot.water_core", new Color(0.32f, 0.76f, 1.0f, 0.94f), System.Array.Empty<string>(), MarshMap),
 		new("name.monster.redhorn", "Tank", "loot.red_horn", new Color(1.0f, 0.34f, 0.26f, 0.94f), System.Array.Empty<string>(), BadlandsMap),
 		new("name.monster.hunter", "DPS", "loot.beast_hide", new Color(1.0f, 0.34f, 0.26f, 0.94f), System.Array.Empty<string>(), ForestMap),

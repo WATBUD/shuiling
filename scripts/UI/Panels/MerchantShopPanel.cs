@@ -33,6 +33,7 @@ public partial class MerchantShopPanel : PanelContainer
 	private readonly Dictionary<ItemCategory, Button> _categoryButtons = new();
 	private ItemCategory _selectedCategory = ItemCategory.Materials;
 	private bool _showSellList;
+	private float _countdownRefreshRemaining;
 
 	public override void _UnhandledInput(InputEvent @event)
 	{
@@ -57,8 +58,13 @@ public partial class MerchantShopPanel : PanelContainer
 			_tooltip.PositionNearMouse(this);
 		}
 
-		if (Visible && _player != null && _player.IsMerchantShopRefreshable(_shopKind))
+		_countdownRefreshRemaining -= (float)delta;
+		if (Visible
+			&& _countdownRefreshRemaining <= 0.0f
+			&& _player != null
+			&& _player.IsMerchantShopRefreshable(_shopKind))
 		{
+			_countdownRefreshRemaining = PerformanceConfig.BackgroundSystemsRefreshIntervalSeconds;
 			_refreshLabel.Text = _player.GetMerchantRefreshCountdownText();
 		}
 	}
@@ -93,6 +99,7 @@ public partial class MerchantShopPanel : PanelContainer
 	public void SetPanelVisible(bool visible)
 	{
 		Visible = visible;
+		_countdownRefreshRemaining = 0.0f;
 		if (visible)
 		{
 			RefreshAll();

@@ -5,16 +5,16 @@ using System.Collections.Generic;
 public partial class World
 {
 	private float _runtimeCleanupRemaining = WorldDropConfig.CleanupIntervalSeconds;
-	private float _generationZeroGcRemaining = WorldDropConfig.GenerationZeroGcIntervalSeconds;
-	private float _fullGcRemaining = WorldDropConfig.FullGcIntervalSeconds;
-	private int _nodesQueuedSinceLastGc;
+	private float _memoryPressureCheckRemaining = PerformanceConfig.MemoryPressureCheckIntervalSeconds;
+	private float _emergencyFullGcCooldownRemaining;
+	private long _managedMemoryBaselineBytes = GC.GetTotalMemory(false);
 	private readonly List<WorldDrop> _runtimeDropScratch = new();
 
 	private void UpdateRuntimeCleanup(float step)
 	{
 		_runtimeCleanupRemaining -= step;
-		_generationZeroGcRemaining -= step;
-		_fullGcRemaining -= step;
+		_memoryPressureCheckRemaining -= step;
+		_emergencyFullGcCooldownRemaining = Mathf.Max(_emergencyFullGcCooldownRemaining - step, 0.0f);
 
 		if (_runtimeCleanupRemaining <= 0.0f)
 		{
@@ -22,33 +22,39 @@ public partial class World
 			SweepWorldDrops();
 		}
 
-		// Collect only the young managed generation during normal play. This is cheap
-		// and clears wrappers left behind by freed short-lived effects/projectiles.
-		if (_generationZeroGcRemaining <= 0.0f)
+		if (_memoryPressureCheckRemaining <= 0.0f)
 		{
-			_generationZeroGcRemaining = WorldDropConfig.GenerationZeroGcIntervalSeconds;
-			if (_nodesQueuedSinceLastGc > 0)
-			{
-				GC.Collect(0, GCCollectionMode.Optimized, false, false);
-				_nodesQueuedSinceLastGc = 0;
-			}
-		}
+			_memoryPressureCheckRemaining = PerformanceConfig.MemoryPressureCheckIntervalSeconds;
+			long managedBytes = GC.GetTotalMemory(false);
+			long growthBytes = managedBytes - _managedMemoryBaselineBytes;
 
-		// A full collection is deliberately rare so cleanup cannot become a recurring
-		// combat hitch during effect-heavy encounters.
-		if (_fullGcRemaining <= 0.0f)
-		{
-			_fullGcRemaining = WorldDropConfig.FullGcIntervalSeconds;
-			GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, false, false);
+			// Never force collections on a timer during ordinary play. The CLR's
+			// generational collector handles short-lived wrappers efficiently. This
+			// non-blocking emergency request only runs after sustained, substantial
+			// growth above the configured safety threshold.
+			if (_emergencyFullGcCooldownRemaining <= 0.0f
+				&& managedBytes >= PerformanceConfig.ManagedMemoryPressureBytes
+				&& growthBytes >= PerformanceConfig.ManagedMemoryGrowthBytes)
+			{
+				GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized, false, false);
+				_managedMemoryBaselineBytes = GC.GetTotalMemory(false);
+				_emergencyFullGcCooldownRemaining = PerformanceConfig.EmergencyFullGcCooldownSeconds;
+			}
+			else if (managedBytes < _managedMemoryBaselineBytes)
+			{
+				_managedMemoryBaselineBytes = managedBytes;
+			}
 		}
 	}
 
 	private void SweepWorldDrops()
 	{
 		_runtimeDropScratch.Clear();
-		foreach (Node node in GetTree().GetNodesInGroup("world_drops"))
+		IReadOnlyList<WorldDrop> drops = WorldDrop.ActiveDrops;
+		for (int index = 0; index < drops.Count; index++)
 		{
-			if (node is not WorldDrop drop || !IsInstanceValid(drop) || drop.IsQueuedForDeletion())
+			WorldDrop drop = drops[index];
+			if (!IsInstanceValid(drop) || drop.IsQueuedForDeletion())
 			{
 				continue;
 			}
@@ -57,7 +63,6 @@ public partial class World
 			if (drop.AgeSeconds >= Mathf.Max(drop.LifetimeSeconds, 1.0f))
 			{
 				drop.QueueFree();
-				_nodesQueuedSinceLastGc++;
 				continue;
 			}
 
@@ -78,7 +83,6 @@ public partial class World
 			if (IsInstanceValid(drop) && !drop.IsQueuedForDeletion())
 			{
 				drop.QueueFree();
-				_nodesQueuedSinceLastGc++;
 			}
 		}
 	}

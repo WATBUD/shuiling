@@ -296,9 +296,11 @@ public partial class PlayerController
 
 	private void CollectNearbyWorldDrops()
 	{
-		foreach (Node node in GetTree().GetNodesInGroup("world_drops"))
+		IReadOnlyList<WorldDrop> drops = WorldDrop.ActiveDrops;
+		for (int index = drops.Count - 1; index >= 0; index--)
 		{
-			if (node is WorldDrop drop && IsInstanceValid(drop))
+			WorldDrop drop = drops[index];
+			if (IsInstanceValid(drop) && !drop.IsQueuedForDeletion())
 			{
 				drop.TryCollect(this);
 			}
@@ -337,19 +339,42 @@ public partial class PlayerController
 
 	private void InitializeStarterInventory()
 	{
+		EnsureTestModeCatalogUnlocks();
+	}
+
+	private void EnsureTestModeCatalogUnlocks()
+	{
 		if (!DevConfig.TestMode)
 		{
 			return;
 		}
 
-		// Test worlds receive exactly one of every distinct equipment id. HashSet
-		// protects against catalogue aliases or future duplicate definitions.
-		var grantedEquipment = new HashSet<string>();
-		foreach (string itemId in BuildCatalog.GetAllEquipmentItemIds())
+		// Fill missing catalogue entries directly and silently. This method is
+		// intentionally idempotent: it also runs after loading an older test save,
+		// so newly introduced IDs appear without multiplying existing stacks.
+		foreach (string itemId in BuildCatalog.GetAllInventoryItemIds())
 		{
-			if (!string.IsNullOrWhiteSpace(itemId) && grantedEquipment.Add(itemId))
+			if (string.IsNullOrWhiteSpace(itemId))
 			{
-				AddInventoryItem(itemId, 1);
+				continue;
+			}
+
+			int requiredAmount = MonsterLootCatalog.IsMonsterLoot(itemId) || BuildCatalog.IsConsumable(itemId) ? 99 : 1;
+			_inventoryItems.TryGetValue(itemId, out int currentAmount);
+			_inventoryItems[itemId] = Mathf.Max(currentAmount, requiredAmount);
+		}
+
+		if (DevConfig.GrantAllCards)
+		{
+			bool cardsChanged = false;
+			foreach (string cardKey in ExternalModelLibrary.KnownCardKeys)
+			{
+				cardsChanged |= _cardAlbum.Add(cardKey);
+			}
+
+			if (cardsChanged)
+			{
+				OnCardCollectionChanged(refreshHiddenPanel: true);
 			}
 		}
 	}

@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="KenneyParticleVfxPreset" format=3 uid="uid://xrknf1x8mhhr"]
+
+[ext_resource type="Script" uid="uid://dui7p3d5cpni3" path="res://scripts/Effects/KenneyParticleVfxPreset.cs" id="1_preset"]
+
+[resource]
+script = ExtResource("1_preset")
+ParticleTextureScale = 2.05
+SpriteTextureScale = 3.2
+BrightEmissionEnergy = 15.0
+SoftEmissionEnergy = 10.0

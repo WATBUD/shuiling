@@ -8,9 +8,9 @@ public partial class PlayerController
 	{
 		_acceptedNpcQuests.Clear();
 		_completedNpcQuests.Clear();
-		foreach (Node node in GetTree().GetNodesInGroup("npcs"))
+		foreach (SimpleActor actor in SimpleActor.ActiveActors)
 		{
-			if (node is not SimpleActor actor || !IsInstanceValid(actor))
+			if (!IsInstanceValid(actor) || actor.ActorKind == "monster" || actor.IsCaptured)
 			{
 				continue;
 			}
@@ -450,9 +450,9 @@ public partial class PlayerController
 
 		SimpleActor? nearest = null;
 		float bestDistance = NpcRecruitInteractRange;
-		foreach (Node node in GetTree().GetNodesInGroup("npcs"))
+		foreach (SimpleActor actor in SimpleActor.ActiveActors)
 		{
-			if (node is not SimpleActor actor || !CanInteractWithRecruitNpc(actor))
+			if (!CanInteractWithRecruitNpc(actor))
 			{
 				continue;
 			}
@@ -495,9 +495,9 @@ public partial class PlayerController
 
 		SimpleActor? nearest = null;
 		float nearestDistance = MerchantInteractRange;
-		foreach (Node node in GetTree().GetNodesInGroup("npcs"))
+		foreach (SimpleActor actor in SimpleActor.ActiveActors)
 		{
-			if (node is not SimpleActor actor || !IsWarehouseKeeper(actor) || !actor.IsActiveWorldTarget)
+			if (!IsWarehouseKeeper(actor) || !actor.IsActiveWorldTarget)
 			{
 				continue;
 			}
@@ -527,9 +527,9 @@ public partial class PlayerController
 
 		SimpleActor? nearest = null;
 		float nearestDistance = MerchantInteractRange;
-		foreach (Node node in GetTree().GetNodesInGroup("npcs"))
+		foreach (SimpleActor actor in SimpleActor.ActiveActors)
 		{
-			if (node is not SimpleActor actor || !IsRefiner(actor) || !actor.IsActiveWorldTarget)
+			if (!IsRefiner(actor) || !actor.IsActiveWorldTarget)
 			{
 				continue;
 			}

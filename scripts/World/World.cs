@@ -63,8 +63,8 @@ public partial class World : Node3D
 	[Export] public float MapSize { get; set; } = 150.0f;
 	[Export] public int PropCount { get; set; } = 110;
 	// Total initial monster population shared evenly by all wild maps.
-	// Four maps currently receive 18 monsters each (72 total).
-	[Export] public int ActorCount { get; set; } = 72;
+	// Five maps receive 18 monsters each (90 total).
+	[Export] public int ActorCount { get; set; } = 90;
 	[Export] public int CityNpcCount { get; set; } = 28;
 	[Export] public float MonsterRespawnInterval { get; set; } = 14.0f;
 	[Export] public float MonsterRespawnThresholdRatio { get; set; } = 0.55f;
@@ -162,6 +162,7 @@ public partial class World : Node3D
 		new("wild_marsh", "map.wild.marsh", "WildMarshMap", new Color(0.18f, 0.38f, 0.34f)),
 		new("wild_badlands", "map.wild.badlands", "WildBadlandsMap", new Color(0.42f, 0.30f, 0.20f)),
 		new("wild_snow", "map.wild.snow", "WildSnowMap", new Color(0.76f, 0.84f, 0.90f)),
+		new("wild_skeleton", "map.wild.skeleton", "WildSkeletonMap", new Color(0.22f, 0.20f, 0.27f)),
 	};
 
 	private static readonly BossDefinition[] WildBosses =
@@ -170,6 +171,7 @@ public partial class World : Node3D
 		new("wild_marsh", "boss.marsh.name", "name.monster.slime", "Support", "loot.water_core", 14, 1750, 58, 34, 230, 150, 3.05f, new Color(0.24f, 0.88f, 0.82f, 0.94f)),
 		new("wild_badlands", "boss.badlands.name", "name.monster.lion", "DPS", "loot.red_horn", 17, 2250, 76, 40, 310, 210, 2.92f, new Color(1.0f, 0.32f, 0.06f, 0.96f)),
 		new("wild_snow", "boss.snow.name", "name.monster.bear", "Tank", "loot.dragon_scale", 19, 2750, 72, 55, 380, 260, 3.15f, new Color(0.54f, 0.86f, 1.0f, 0.96f)),
+		new("wild_skeleton", "boss.skeleton.name", "name.monster.skeleton_warrior", "Tank", "loot.cracked_core", 22, 3450, 88, 68, 470, 330, 3.55f, new Color(0.68f, 0.42f, 1.0f, 0.96f)),
 	};
 
 	private readonly record struct WildMapDefinition(string Id, string NameKey, string RootName, Color GroundColor);
@@ -476,13 +478,14 @@ public partial class World : Node3D
 		_wildGroundPalette = BuildWildGroundPalette(wildMap.Id);
 		BeginVegetationBatch(_propsRoot);
 		CreateStaticBox(_mapRoot, "Ground", new Vector3(0.0f, -0.5f, 0.0f), new Vector3(MapSize, 1.0f, MapSize), _wildGroundPalette.Base);
+		CreatePrototypeGround(wildMap.Id);
 		CreateBoundaries();
-		CreateWildTerrainDressing();
 		CreateLandmarks();
 		CreateSpawnCamp();
 		CreateRuinSite();
 		CreateMonsterDen();
 		CreateWildMapThemeDressing(wildMap.Id);
+		CreatePrototypeArchitecture(wildMap.Id);
 		CreateWildernessCaveEntrance(wildMap.Id);
 		CreateMapPortal("ReturnToCityPortal", _wildSpawnPosition + new Vector3(0.0f, 0.0f, 5.0f), "city", "portal.return_city");
 		ScatterProps();
@@ -512,13 +515,14 @@ public partial class World : Node3D
 
 		BeginVegetationBatch(_propsRoot);
 		CreateStaticBox(_mapRoot, "CityGround", new Vector3(0.0f, -0.5f, 0.0f), new Vector3(MapSize, 1.0f, MapSize), _matGround);
+		CreatePrototypeGround("city");
 		CreateBoundaries();
-		CreateCityTerrainDressing();
 		CreateMesh(_mapRoot, "CityMainRoadEdge", BoxMeshFor(new Vector3(10.8f, 0.075f, 48.0f)), _mainCityCenter + new Vector3(0.0f, 0.048f, 8.0f), _matRoadEdge);
 		CreateMesh(_mapRoot, "CityMainRoad", BoxMeshFor(new Vector3(8.6f, 0.08f, 46.0f)), _mainCityCenter + new Vector3(0.0f, 0.055f, 8.0f), _matCobblestone);
 		CreateMesh(_mapRoot, "CityOuterPlazaEdge", CylinderMeshFor(11.4f, 11.4f, 0.09f), _citySpawnPosition + new Vector3(0.0f, 0.07f, 0.0f), _matRoadEdge);
 		CreateMesh(_mapRoot, "CityOuterPlaza", CylinderMeshFor(9.8f, 9.8f, 0.10f), _citySpawnPosition + new Vector3(0.0f, 0.085f, 0.0f), _matCobblestone);
 		CreateMainCity();
+		CreatePrototypeArchitecture("city");
 		CreateCityScenicEdges();
 		CreateMapPortal("WildMapGate", CityPortalPosition, "wild_select", "portal.travel_wild");
 		EndVegetationBatch();
@@ -1361,12 +1365,8 @@ public partial class World : Node3D
 	private void CreateRuinSite()
 	{
 		Vector3 center = new(-45.0f, 0.0f, -34.0f);
-		CreateMesh(_mapRoot, "RuinFloor", CylinderMeshFor(8.0f, 8.0f, 0.10f), center + new Vector3(0.0f, 0.09f, 0.0f), _matWall);
-		CreateStaticBox(_propsRoot, "RuinPillar", center + new Vector3(-3.6f, 1.55f, -1.2f), new Vector3(1.0f, 3.1f, 1.0f), _matWall);
-		CreateStaticBox(_propsRoot, "RuinPillar", center + new Vector3(3.6f, 1.15f, -1.1f), new Vector3(1.0f, 2.3f, 1.0f), _matWall);
-		CreateStaticBox(_propsRoot, "RuinLintel", center + new Vector3(0.0f, 3.28f, -1.15f), new Vector3(8.2f, 0.75f, 1.05f), _matWall);
-		CreateStaticBox(_propsRoot, "BrokenWall", center + new Vector3(-5.0f, 0.7f, 4.0f), new Vector3(4.0f, 1.4f, 0.7f), _matWall);
-		CreateStaticBox(_propsRoot, "BrokenWall", center + new Vector3(4.8f, 0.5f, 4.2f), new Vector3(3.2f, 1.0f, 0.7f), _matWall);
+		// Structural floor, walls, columns and stairs are supplied by the Kenney
+		// Prototype Kit in CreatePrototypeArchitecture.
 		CreateCrystalCluster(center + new Vector3(0.0f, 0.0f, 2.8f), 1.25f, _matRune);
 		CreateTorch(center + new Vector3(-6.5f, 0.0f, -3.0f));
 		CreateTorch(center + new Vector3(6.5f, 0.0f, -3.0f));
@@ -1906,61 +1906,12 @@ public partial class World : Node3D
 
 	private static void AddBossAura(SimpleActor boss, Color auraColor, float visualScale)
 	{
-		var auraRoot = new Node3D
+		boss.AddChild(new BossMagicCircleVfx
 		{
 			Name = "BossAura",
 			Position = new Vector3(0.0f, 0.08f, 0.0f),
-		};
-		boss.AddChild(auraRoot);
-
-		var moteMaterial = new StandardMaterial3D
-		{
-			AlbedoColor = auraColor,
-			EmissionEnabled = true,
-			Emission = new Color(auraColor.R, auraColor.G, auraColor.B),
-			EmissionEnergyMultiplier = 3.2f,
-			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-			BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled,
-		};
-		var processMaterial = new ParticleProcessMaterial
-		{
-			EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere,
-			EmissionSphereRadius = 0.74f * visualScale,
-			Direction = Vector3.Up,
-			Spread = 32.0f,
-			InitialVelocityMin = 0.42f,
-			InitialVelocityMax = 1.24f,
-			Gravity = new Vector3(0.0f, 0.32f, 0.0f),
-			ScaleMin = 0.45f,
-			ScaleMax = 1.28f,
-			Color = auraColor,
-		};
-		auraRoot.AddChild(new GpuParticles3D
-		{
-			Name = "BossAuraMotes",
-			Amount = 46,
-			Lifetime = 1.75f,
-			Preprocess = 1.75f,
-			Randomness = 0.62f,
-			VisibilityAabb = new Aabb(new Vector3(-5.0f, -0.5f, -5.0f), new Vector3(10.0f, 7.0f, 10.0f)),
-			ProcessMaterial = processMaterial,
-			DrawPass1 = new QuadMesh
-			{
-				Size = new Vector2(0.085f * visualScale, 0.28f * visualScale),
-				Material = moteMaterial,
-			},
-			Emitting = true,
-		});
-
-		auraRoot.AddChild(new OmniLight3D
-		{
-			Name = "BossAuraLight",
-			Position = new Vector3(0.0f, 1.15f * visualScale, 0.0f),
-			LightColor = new Color(auraColor.R, auraColor.G, auraColor.B),
-			LightEnergy = 1.65f,
-			OmniRange = 4.2f * visualScale,
-			ShadowEnabled = false,
+			AuraColor = auraColor,
+			EffectRadius = Mathf.Clamp(1.18f * visualScale, 1.75f, 4.2f),
 		});
 	}
 
@@ -1990,7 +1941,7 @@ public partial class World : Node3D
 		// Functional shop NPCs (always present).
 		foreach (CityNpcStation station in stations)
 		{
-			SpawnCityNpc(station, string.Empty);
+			SpawnCityNpc(station, CityNpcConfig.GetShopModel(station.NameKey));
 		}
 
 		// Quest / recruit NPCs: exactly ONE per distinct NPC model, so no model
@@ -2964,17 +2915,18 @@ public partial class World : Node3D
 	private void UpdateActorMapActivity()
 	{
 		bool cityActive = _activeMapId == "city";
-		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
+		foreach (SimpleActor actor in SimpleActor.ActiveActors)
 		{
-			if (node is SimpleActor actor && IsInstanceValid(actor))
+			if (!IsInstanceValid(actor) || actor.IsCaptured)
+			{
+				continue;
+			}
+
+			if (actor.ActorKind == "monster")
 			{
 				ApplyActorInstanceState(actor);
 			}
-		}
-
-		foreach (Node node in GetTree().GetNodesInGroup("npcs"))
-		{
-			if (node is SimpleActor actor && IsInstanceValid(actor))
+			else
 			{
 				actor.SetWorldMapActive(cityActive);
 			}
@@ -3164,10 +3116,10 @@ public partial class World : Node3D
 	private int CountLivingMonsters(string mapId, bool includeBosses = true)
 	{
 		int count = 0;
-		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
+		foreach (SimpleActor actor in SimpleActor.ActiveActors)
 		{
-			if (node is SimpleActor actor
-				&& IsInstanceValid(actor)
+			if (IsInstanceValid(actor)
+				&& actor.ActorKind == "monster"
 				&& actor.MapId == mapId
 				&& !actor.IsDefeated
 				&& !actor.IsCaptured
@@ -3183,10 +3135,10 @@ public partial class World : Node3D
 	private int CountLivingMonstersInInstance(string mapId, int tier, int groupId, bool includeBosses = true)
 	{
 		int count = 0;
-		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
+		foreach (SimpleActor actor in SimpleActor.ActiveActors)
 		{
-			if (node is SimpleActor actor
-				&& IsInstanceValid(actor)
+			if (IsInstanceValid(actor)
+				&& actor.ActorKind == "monster"
 				&& actor.MapId == mapId
 				&& actor.WorldTier == tier
 				&& actor.GroupId == groupId
@@ -3409,10 +3361,10 @@ public partial class World : Node3D
 			_spawnedWildInstancesByKey.Remove(instanceKey);
 			_wildBossesByInstance.Remove(instanceKey);
 			_wildBossRespawnRemainingByInstance.Remove(instanceKey);
-			foreach (Node node in GetTree().GetNodesInGroup("monsters"))
+			foreach (SimpleActor actor in SimpleActor.ActiveActors)
 			{
-				if (node is SimpleActor actor
-					&& IsInstanceValid(actor)
+				if (IsInstanceValid(actor)
+					&& actor.ActorKind == "monster"
 					&& actor.MapId == mapId
 					&& actor.WorldTier == tier
 					&& actor.GroupId == groupId

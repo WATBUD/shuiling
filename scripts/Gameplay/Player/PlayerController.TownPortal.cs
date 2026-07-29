@@ -31,6 +31,11 @@ public partial class PlayerController
 
 	private void GrantStarterTownPortalScrolls()
 	{
+		if (DevConfig.TestMode)
+		{
+			return;
+		}
+
 		AddInventoryItem(BuildCatalog.TownPortalScrollId, StarterTownPortalScrolls);
 	}
 

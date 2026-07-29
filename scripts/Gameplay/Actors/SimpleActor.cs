@@ -6,6 +6,12 @@ public partial class SimpleActor : CharacterBody3D
 	private const float MinimumCompanionFormationDistance = 3.6f;
 	private const float ExternalRootMotionStabilizeSeconds = 0.12f;
 	private const int RearCompanionDustStartSlot = 4;
+	private static readonly List<SimpleActor> ActiveActorRegistry = new();
+
+	// Allocation-free actor lookup for hot gameplay paths. SceneTree group queries
+	// construct a Godot array wrapper on every call and were used by every companion
+	// several times per second.
+	public static IReadOnlyList<SimpleActor> ActiveActors => ActiveActorRegistry;
 
 	private enum SquadActivity
 	{
@@ -754,6 +760,11 @@ public partial class SimpleActor : CharacterBody3D
 
 	public override void _Ready()
 	{
+		if (!ActiveActorRegistry.Contains(this))
+		{
+			ActiveActorRegistry.Add(this);
+		}
+
 		_gravity = ProjectSettings.GetSetting("physics/3d/default_gravity").AsSingle();
 		_rng.Seed = Time.GetTicksUsec() + GetInstanceId();
 		_defaultCollisionLayer = CollisionLayer;
@@ -775,6 +786,7 @@ public partial class SimpleActor : CharacterBody3D
 
 	public override void _ExitTree()
 	{
+		ActiveActorRegistry.Remove(this);
 		LocaleText.LanguageChanged -= RefreshNameplate;
 	}
 
@@ -1305,14 +1317,14 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			return;
 		}
-		if (BuildCatalog.IsProjectileSupportGem(validatedGemId) && !BuildCatalog.HasRangedActiveSkill(BuildLoadout))
+		if (BuildCatalog.IsProjectileSupportGem(validatedGemId) && !BuildCatalog.HasProjectileActiveSkill(BuildLoadout))
 		{
 			return;
 		}
 
 		BuildLoadout.SkillGemIds[safeSlot] = validatedGemId;
 		BuildLoadout.SkillGemLevels[safeSlot] = 1;
-		if (!BuildCatalog.HasRangedActiveSkill(BuildLoadout))
+		if (!BuildCatalog.HasProjectileActiveSkill(BuildLoadout))
 		{
 			for (int index = 0; index < BuildLoadout.SkillGemIds.Length; index++)
 			{
@@ -1933,7 +1945,7 @@ public partial class SimpleActor : CharacterBody3D
 		RefreshNameplate();
 	}
 
-	public int ReceiveDamage(int rawDamage, SimpleActor? attacker)
+	public int ReceiveDamage(int rawDamage, SimpleActor? attacker, PlayerController? playerAttacker = null)
 	{
 		if (IsInvulnerable)
 		{
@@ -1987,6 +1999,10 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			attacker._followTarget.NotifyBossCombat(this);
 		}
+		else if (IsBoss && playerAttacker != null && IsInstanceValid(playerAttacker))
+		{
+			playerAttacker.NotifyBossCombat(this);
+		}
 		else if (attacker?.IsBoss == true && _followTarget != null && IsInstanceValid(_followTarget))
 		{
 			_followTarget.NotifyBossCombat(attacker);
@@ -1998,7 +2014,7 @@ public partial class SimpleActor : CharacterBody3D
 
 		if (CurrentHealth <= 0)
 		{
-			Defeat(attacker);
+			Defeat(attacker, playerAttacker);
 		}
 
 		RefreshNameplate();
@@ -2129,17 +2145,19 @@ public partial class SimpleActor : CharacterBody3D
 			: _isCaptured
 			? _isInActiveParty ? LocaleText.T("actor.nameplate.active") : LocaleText.T("actor.nameplate.stored")
 			: string.Empty;
-		// Wild rare+ monsters get a star prefix so their rarity reads at a glance.
-		string rarityPrefix = ActorKind == "monster" && !_isCaptured && Rarity > MonsterRarity.Common
-			? MonsterRarity.StarPrefix(Rarity)
-			: string.Empty;
 		// Rebirth count (轉生) shown as ✦xN next to a companion's level.
 		string rebirthSuffix = _isCaptured && RebirthCount > 0 ? $" ✦x{RebirthCount}" : string.Empty;
 		// Wild monster ready to be netted (weakened or staggered) gets a tag.
 		string captureTag = CaptureReady ? " " + LocaleText.T(IsStaggered ? "mob.capture_stagger" : "mob.capture_ready") : string.Empty;
-		_nameplate.Text = IsBoss
-			? LocaleText.F("boss.nameplate", Level, LocalizedDisplayName, capturedText)
-			: $"{rarityPrefix}{LocaleText.T("actor.level_prefix")}{Level} {LocalizedDisplayName}{rebirthSuffix}{captureTag}{capturedText}";
+		if (ActorKind == "monster")
+		{
+			string colorName = LocaleText.T(IsBoss ? "rarity.color.gold" : MonsterRarity.ColorNameKey(Rarity));
+			_nameplate.Text = $"[{colorName}][LV{Level}][{LocalizedDisplayName}]{rebirthSuffix}{captureTag}{capturedText}";
+		}
+		else
+		{
+			_nameplate.Text = $"{LocaleText.T("actor.level_prefix")}{Level} {LocalizedDisplayName}{rebirthSuffix}{captureTag}{capturedText}";
+		}
 		_nameplate.FontSize = Mathf.RoundToInt((IsTrainingDummy ? 40 : IsBoss ? 28 : 20) * NameplateScale);
 		Color markerColor = GetNameplateStatusColor();
 		_nameplate.Modulate = markerColor;
@@ -2196,13 +2214,6 @@ public partial class SimpleActor : CharacterBody3D
 			return new Color(0.62f, 0.66f, 0.70f, 0.88f);
 		}
 
-		if (_isCaptured)
-		{
-			return _isInActiveParty
-				? new Color(0.28f, 1.0f, 0.74f, 0.96f)
-				: new Color(0.42f, 0.86f, 1.0f, 0.94f);
-		}
-
 		if (ActorKind != "monster")
 		{
 			return new Color(0.64f, 0.86f, 1.0f, 0.94f);
@@ -2215,13 +2226,10 @@ public partial class SimpleActor : CharacterBody3D
 				: new Color(1.0f, 0.76f, 0.18f, 0.98f);
 		}
 
-		// Wild rare+ monsters show their rarity colour in the field.
-		if (Rarity > MonsterRarity.Common)
-		{
-			return MonsterRarity.Color(Rarity);
-		}
-
-		return MonsterSpeciesCatalog.Current.GetMarkerColor(DisplayName);
+		// Every monster name uses the same colour represented by its rarity tag:
+		// [白], [藍], [紫], [橙]. Captured monsters retain their original rarity,
+		// while active/stored state remains explicit in the trailing text.
+		return MonsterRarity.Color(Rarity);
 	}
 
 	private static StandardMaterial3D MakeMarkerMaterial(Color color, float emissionEnergy)
@@ -2926,9 +2934,9 @@ public partial class SimpleActor : CharacterBody3D
 		float searchRadius = EffectiveDetectionRadius;
 		SimpleActor? selected = null;
 		float bestDistance = float.MaxValue;
-		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
+		foreach (SimpleActor actor in ActiveActorRegistry)
 		{
-			if (node is not SimpleActor actor || !actor.IsHostileToPlayer || actor.IsTrainingDummy)
+			if (!IsInstanceValid(actor) || !actor.IsHostileToPlayer || actor.IsTrainingDummy)
 			{
 				continue;
 			}
@@ -3044,6 +3052,12 @@ public partial class SimpleActor : CharacterBody3D
 				stats.LifeStealPercent > 0.0f);
 		}
 
+		if (visualSkillId is "gem.skill.lightning" or "gem.skill.meteor" or "gem.skill.laser")
+		{
+			ResolveTargetedCoreStrike(target, baseDamage, stats, visualSkillId);
+			return;
+		}
+
 		bool usesWhirlwind = isMelee && BuildLoadout.HasSkill("gem.skill.whirlwind");
 		if (usesWhirlwind)
 		{
@@ -3058,6 +3072,50 @@ public partial class SimpleActor : CharacterBody3D
 			SimpleActor? homing = Mathf.Abs(angle) < 0.001f ? target : null;
 			SpawnCombatProjectile(direction, homing, baseDamage, stats, isMelee);
 		}
+	}
+
+	private void ResolveTargetedCoreStrike(SimpleActor target, int damage, BuildStats stats, string skillId)
+	{
+		if (!IsInstanceValid(target) || !target.IsActiveWorldTarget)
+		{
+			return;
+		}
+
+		Node? parent = GetTree().CurrentScene ?? GetParent();
+		if (parent == null)
+		{
+			return;
+		}
+
+		Vector3 targetPosition = target.GlobalPosition + Vector3.Up * 0.08f;
+		if (skillId == "gem.skill.laser")
+		{
+			Vector3 beamOrigin = GlobalPosition + Vector3.Up * 1.05f;
+			SkillAttackVfx.SpawnSpecial(
+				parent,
+				SkillAttackVfx.ChainEvent,
+				beamOrigin,
+				targetPosition - beamOrigin,
+				skillId,
+				stats.DamageElementId,
+				GetAttackColor(),
+				0.9f,
+				new ProjectileBehaviorProfile(),
+				stats.LifeStealPercent > 0.0f);
+		}
+
+		float radius = skillId == "gem.skill.meteor" ? 1.65f : 1.15f;
+		SkillAttackVfx.SpawnImpact(
+			parent,
+			targetPosition,
+			Vector3.Down,
+			skillId,
+			stats.DamageElementId,
+			GetAttackColor(),
+			radius,
+			new ProjectileBehaviorProfile(),
+			stats.LifeStealPercent > 0.0f);
+		ResolveProjectileHit(target, Mathf.Max(damage, 1));
 	}
 
 	private void SpawnCombatProjectile(Vector3 direction, SimpleActor? homingTarget, int baseDamage, BuildStats stats, bool isMelee)
@@ -3123,14 +3181,14 @@ public partial class SimpleActor : CharacterBody3D
 
 	// Hostile actors within radius of a point, skipping any already struck by the
 	// projectile. Used for chain retargeting, split fan-out, and explosion splash.
-	public List<SimpleActor> FindProjectileTargets(Vector3 center, float radius, ICollection<SimpleActor> exclude)
+	public void FindProjectileTargets(Vector3 center, float radius, ICollection<SimpleActor> exclude, List<SimpleActor> results)
 	{
-		var results = new List<SimpleActor>();
+		results.Clear();
 		float radiusSquared = radius * radius;
 		center.Y = 0.0f;
-		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
+		foreach (SimpleActor actor in ActiveActorRegistry)
 		{
-			if (node is not SimpleActor actor || !actor.IsHostileToPlayer)
+			if (!IsInstanceValid(actor) || !actor.IsHostileToPlayer)
 			{
 				continue;
 			}
@@ -3147,8 +3205,6 @@ public partial class SimpleActor : CharacterBody3D
 				results.Add(actor);
 			}
 		}
-
-		return results;
 	}
 
 	public void ApplyElementStatusFromPlayer(string elementId)
@@ -3322,9 +3378,10 @@ public partial class SimpleActor : CharacterBody3D
 			new ProjectileBehaviorProfile { ExplosionRadius = novaRadius });
 
 		int splashDamage = Mathf.Max(Mathf.RoundToInt(EffectiveAttack * (_bossEnraged ? 0.68f : 0.52f)), 1);
-		foreach (Node node in GetTree().GetNodesInGroup("captured_actors"))
+		foreach (SimpleActor companion in ActiveActorRegistry)
 		{
-			if (node is SimpleActor companion
+			if (IsInstanceValid(companion)
+				&& companion.IsCaptured
 				&& companion != primaryTarget
 				&& companion.IsInActiveParty
 				&& !companion.IsDefeated
@@ -3402,7 +3459,7 @@ public partial class SimpleActor : CharacterBody3D
 		return actor.IsInActiveParty || actor.IsActiveWorldTarget;
 	}
 
-	private void Defeat(SimpleActor? attacker)
+	private void Defeat(SimpleActor? attacker, PlayerController? playerAttacker)
 	{
 		_isDefeated = true;
 		CurrentHealth = 0;
@@ -3439,20 +3496,26 @@ public partial class SimpleActor : CharacterBody3D
 		Visible = false;
 		SetPhysicsProcess(false);
 
-		if (attacker?._followTarget != null && IsInstanceValid(attacker._followTarget))
+		PlayerController? creditedPlayer = playerAttacker;
+		if (creditedPlayer == null && attacker?._followTarget != null && IsInstanceValid(attacker._followTarget))
 		{
-			attacker._followTarget.PostSystemMessage(LocaleText.F("system.combat.defeated", attacker.LocalizedDisplayName, LocalizedDisplayName), new Color(1.0f, 0.70f, 0.42f), GameMessageChannel.Combat);
-			attacker._followTarget.GrantCombatExperience(ExperienceReward, Level);
+			creditedPlayer = attacker._followTarget;
+		}
+		if (creditedPlayer != null && IsInstanceValid(creditedPlayer))
+		{
+			string attackerName = playerAttacker != null ? playerAttacker.LocalizedPlayerName : attacker!.LocalizedDisplayName;
+			creditedPlayer.PostSystemMessage(LocaleText.F("system.combat.defeated", attackerName, LocalizedDisplayName), new Color(1.0f, 0.70f, 0.42f), GameMessageChannel.Combat);
+			creditedPlayer.GrantCombatExperience(ExperienceReward, Level);
 			if (ActorKind == "monster")
 			{
-				DropMonsterLoot(attacker._followTarget);
+				DropMonsterLoot(creditedPlayer);
 				// A monster's exclusive name card is a rare physical drop (5%). We
 				// only bother rolling if the player doesn't already own it.
-				MaybeDropMonsterCard(attacker._followTarget);
+				MaybeDropMonsterCard(creditedPlayer);
 			}
 			if (IsBoss)
 			{
-				attacker._followTarget.ShowBossDefeated(this);
+				creditedPlayer.ShowBossDefeated(this);
 			}
 		}
 
@@ -3461,8 +3524,8 @@ public partial class SimpleActor : CharacterBody3D
 		// (World.ApplyNetworkMonsterDamage → ClientReceiveBossDefeat).
 		if (IsBoss
 			&& ActorKind == "monster"
-			&& attacker?._followTarget != null
-			&& IsInstanceValid(attacker._followTarget)
+			&& creditedPlayer != null
+			&& IsInstanceValid(creditedPlayer)
 			&& FindOwningWorld() is World bossWorld)
 		{
 			bossWorld.OnWildBossDefeated(this);
@@ -3580,7 +3643,7 @@ public partial class SimpleActor : CharacterBody3D
 		}
 
 		string cardKey = GetCardKey();
-		if (string.IsNullOrWhiteSpace(cardKey) || player.HasCard(cardKey))
+		if (!ExternalModelLibrary.IsValidCardKey(cardKey) || player.HasCard(cardKey))
 		{
 			return;
 		}

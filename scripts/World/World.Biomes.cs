@@ -129,6 +129,16 @@ public partial class World
 					Water: _matWater,
 					Shallow: _matShallowWater,
 					Ash: MakeMaterial(new Color(0.24f, 0.26f, 0.18f)));
+			case "wild_skeleton":
+				return new BiomeGroundPalette(
+					Base: MakeMaterial(new Color(0.18f, 0.17f, 0.22f)),
+					Meadow: MakeMaterial(new Color(0.23f, 0.21f, 0.27f)),
+					Field: MakeMaterial(new Color(0.15f, 0.14f, 0.18f)),
+					Path: MakeMaterial(new Color(0.27f, 0.24f, 0.29f)),
+					Bank: MakeMaterial(new Color(0.20f, 0.18f, 0.23f)),
+					Water: MakeMaterial(new Color(0.22f, 0.16f, 0.30f, 0.76f), 0.12f),
+					Shallow: MakeMaterial(new Color(0.32f, 0.22f, 0.40f, 0.66f), 0.12f),
+					Ash: MakeMaterial(new Color(0.13f, 0.12f, 0.16f)));
 			default: // wild_forest and any fallback keep the lush green set.
 				return new BiomeGroundPalette(
 					Base: MakeMaterial(new Color(0.24f, 0.46f, 0.29f)),
@@ -184,6 +194,11 @@ public partial class World
 				new Color(0.82f, 0.88f, 1.0f), 0.92f,
 				new Color(0.86f, 0.91f, 0.98f), 0.015f,
 				new Color(0.96f, 0.98f, 1.0f), 2.3f),
+			"wild_skeleton" => new BiomeAtmosphere(
+				new Color(0.07f, 0.055f, 0.11f), new Color(0.28f, 0.20f, 0.34f),
+				new Color(0.42f, 0.36f, 0.52f), 0.52f,
+				new Color(0.20f, 0.16f, 0.26f), 0.028f,
+				new Color(0.72f, 0.62f, 0.90f), 1.25f),
 			_ => DefaultAtmosphere,
 		};
 	}
@@ -238,6 +253,11 @@ public partial class World
 				if (roll < 0.62f) CreatePineTree(position);
 				else CreateSnowRock(position);
 				return;
+			case "wild_skeleton":
+				if (roll < 0.46f) CreateDeadTree(position);
+				else if (roll < 0.72f) CreateObsidianSpike(position);
+				else CreateRock(position);
+				return;
 			default:
 				if (roll < 0.70f) CreateTree(position);
 				else CreateRock(position);
@@ -269,6 +289,11 @@ public partial class World
 				else if (roll < 0.9f) CreateGrassPatch(position);
 				else CreateMushroom(position);
 				return;
+			case "wild_skeleton":
+				if (roll < 0.46f) CreateGravestone(position, false);
+				else if (roll < 0.72f) CreatePebbleCluster(position, _matObsidian);
+				else CreateObsidianSpike(position);
+				return;
 			default:
 				if (roll < 0.48f) CreateGrassPatch(position);
 				else if (roll < 0.76f) CreateFlowerPatch(position);
@@ -298,27 +323,14 @@ public partial class World
 			case "wild_snow":
 				DressSnow();
 				return;
+			case "wild_skeleton":
+				DressSkeletonWastes();
+				return;
 		}
 	}
 
 	private void DressForest()
 	{
-		// Sun-dappled clearings and a lily pond.
-		CreateTerrainPatch("ForestGladeA", new Vector3(20.0f, 0.0f, -46.0f), 11.0f, new Vector3(1.3f, 1.0f, 0.8f), 24.0f, _matGrassBright, 0.037f);
-		CreateTerrainPatch("ForestGladeB", new Vector3(-38.0f, 0.0f, 40.0f), 10.0f, new Vector3(1.2f, 1.0f, 0.76f), -30.0f, _matGrassBright, 0.037f);
-		CreateTerrainPatch("ForestPondBank", new Vector3(12.0f, 0.0f, 54.0f), 11.0f, new Vector3(1.3f, 1.0f, 0.72f), 14.0f, _matPondBank, 0.05f);
-		CreateTerrainPatch("ForestPond", new Vector3(12.0f, 0.0f, 54.0f), 8.5f, new Vector3(1.22f, 1.0f, 0.62f), 14.0f, _matWater, 0.064f);
-		for (int index = 0; index < 6; index++)
-		{
-			float angle = index / 6.0f * Mathf.Tau;
-			CreateLilyPad(new Vector3(12.0f, 0.0f, 54.0f) + new Vector3(Mathf.Cos(angle) * 4.2f, 0.0f, Mathf.Sin(angle) * 2.6f));
-		}
-		for (int index = 0; index < 7; index++)
-		{
-			float angle = 0.3f + index / 7.0f * Mathf.Tau;
-			CreateReedCluster(new Vector3(12.0f, 0.0f, 54.0f) + new Vector3(Mathf.Cos(angle) * 9.0f, 0.0f, Mathf.Sin(angle) * 6.0f));
-		}
-
 		// Ancient guardian tree.
 		var ancientTreePosition = new Vector3(48.0f, 0.0f, -52.0f);
 		CreateAncientTree(ancientTreePosition);
@@ -336,23 +348,14 @@ public partial class World
 	{
 		Vector3 poolA = new(28.0f, 0.0f, -28.0f);
 		Vector3 poolB = new(-22.0f, 0.0f, 44.0f);
-		CreateTerrainPatch("MarshMudA", poolA, 19.0f, new Vector3(1.3f, 1.0f, 0.68f), -18.0f, _matPondBank, 0.05f);
-		CreateTerrainPatch("MarshMudB", poolB, 16.0f, new Vector3(1.26f, 1.0f, 0.64f), 22.0f, _matPondBank, 0.05f);
-		CreateTerrainPatch("MarshMirrorWaterA", poolA, 16.0f, new Vector3(1.25f, 1.0f, 0.62f), -18.0f, _matShallowWater, 0.062f);
-		CreateTerrainPatch("MarshMirrorWaterB", poolB, 13.0f, new Vector3(1.2f, 1.0f, 0.58f), 22.0f, _matShallowWater, 0.062f);
 
-		// Drowned trees, lilies and reed banks make the pools feel alive.
+		// Keep the marsh vegetation and dead trees, without flat water overlays.
 		foreach ((Vector3 pool, float radius) in new[] { (poolA, 13.0f), (poolB, 10.0f) })
 		{
 			CreateDeadTree(pool + new Vector3(radius * 0.35f, 0.0f, -radius * 0.2f));
 			CreateDeadTree(pool + new Vector3(-radius * 0.4f, 0.0f, radius * 0.3f));
 			_obstaclePositions.Add(pool + new Vector3(radius * 0.35f, 0.0f, -radius * 0.2f));
 			_obstaclePositions.Add(pool + new Vector3(-radius * 0.4f, 0.0f, radius * 0.3f));
-			for (int index = 0; index < 6; index++)
-			{
-				float angle = index / 6.0f * Mathf.Tau;
-				CreateLilyPad(pool + new Vector3(Mathf.Cos(angle) * radius * 0.45f, 0.0f, Mathf.Sin(angle) * radius * 0.32f));
-			}
 			for (int index = 0; index < 9; index++)
 			{
 				float angle = 0.2f + index / 9.0f * Mathf.Tau;
@@ -374,11 +377,6 @@ public partial class World
 
 	private void DressBadlands()
 	{
-		CreateTerrainPatch("BadlandsAshFieldA", new Vector3(-30.0f, 0.0f, -28.0f), 18.0f, new Vector3(1.35f, 1.0f, 0.66f), 18.0f, _matNest, 0.04f);
-		CreateTerrainPatch("BadlandsAshFieldB", new Vector3(38.0f, 0.0f, 32.0f), 16.0f, new Vector3(1.25f, 1.0f, 0.62f), -28.0f, _matNest, 0.04f);
-		CreateTerrainPatch("BadlandsClayA", new Vector3(20.0f, 0.0f, -52.0f), 14.0f, new Vector3(1.4f, 1.0f, 0.6f), 30.0f, _matRedRockDark, 0.036f);
-		CreateTerrainPatch("BadlandsClayB", new Vector3(-52.0f, 0.0f, 26.0f), 13.0f, new Vector3(1.3f, 1.0f, 0.62f), -12.0f, _matRedRockDark, 0.036f);
-
 		// Mesa formations anchor the horizon.
 		var mesaA = new Vector3(-48.0f, 0.0f, 42.0f);
 		var mesaB = new Vector3(54.0f, 0.0f, -46.0f);
@@ -405,12 +403,9 @@ public partial class World
 
 	private void DressSnow()
 	{
-		CreateTerrainPatch("SnowFieldNorth", new Vector3(-24.0f, 0.0f, -32.0f), 34.0f, new Vector3(1.55f, 1.0f, 0.92f), 12.0f, _matSnowCover, 0.066f);
-		CreateTerrainPatch("SnowFieldSouth", new Vector3(28.0f, 0.0f, 34.0f), 35.0f, new Vector3(1.48f, 1.0f, 0.90f), -16.0f, _matSnowCover, 0.066f);
 		var lakeCenter = new Vector3(30.0f, 0.0f, -28.0f);
-		CreateTerrainPatch("FrozenLake", lakeCenter, 17.0f, new Vector3(1.25f, 1.0f, 0.62f), -18.0f, _matIceShard, 0.072f);
 
-		// Great ice shards erupt from the frozen lake.
+		// Great ice shards remain as a landmark on the tiled snow field.
 		CreateIceShardMonolith(lakeCenter);
 		_obstaclePositions.Add(lakeCenter);
 		for (int index = 0; index < 6; index++)
@@ -427,10 +422,54 @@ public partial class World
 			if (position.DistanceTo(Vector3.Zero) > 14.0f && IsPositionClear(position, 3.0f))
 			{
 				CreateSnowRock(position);
-				CreateTerrainPatch($"SnowDrift{index}", position, (float)_rng.RandfRange(3.5f, 7.0f), new Vector3(1.3f, 1.0f, 0.62f), index * 19.0f, _matSnowCover, 0.07f);
 				_obstaclePositions.Add(position);
 			}
 		}
+	}
+
+	private void DressSkeletonWastes()
+	{
+		// A readable graveyard landmark identifies the fifth map without adding
+		// unrelated buildings or reusing scenery from the four living biomes.
+		Vector3 graveyardCenter = new(34.0f, 0.0f, -32.0f);
+		for (int row = 0; row < 4; row++)
+		{
+			for (int column = 0; column < 5; column++)
+			{
+				Vector3 position = graveyardCenter + new Vector3((column - 2) * 3.1f, 0.0f, (row - 1.5f) * 3.4f);
+				CreateGravestone(position, (row + column) % 4 == 0);
+			}
+		}
+
+		for (int index = 0; index < 12; index++)
+		{
+			float angle = index / 12.0f * Mathf.Tau;
+			Vector3 position = new(Mathf.Cos(angle) * 52.0f, 0.0f, Mathf.Sin(angle) * 52.0f);
+			if (index % 3 == 0)
+			{
+				CreateDeadTree(position);
+				_obstaclePositions.Add(position);
+			}
+			else
+			{
+				CreateObsidianSpike(position);
+			}
+		}
+	}
+
+	private void CreateGravestone(Vector3 position, bool broken)
+	{
+		var grave = new Node3D
+		{
+			Name = broken ? "BrokenGravestone" : "Gravestone",
+			Position = position,
+			RotationDegrees = new Vector3(0.0f, (float)_rng.RandfRange(-18.0f, 18.0f), broken ? (float)_rng.RandfRange(-14.0f, 14.0f) : 0.0f),
+		};
+		_propsRoot.AddChild(grave);
+		Material graveMaterial = MakeMaterial(new Color(0.34f, 0.32f, 0.38f));
+		float height = broken ? 0.72f : 1.12f;
+		AddMesh(grave, "Stone", BoxMeshFor(new Vector3(0.72f, height, 0.22f)), new Vector3(0.0f, height * 0.5f, 0.0f), Vector3.Zero, Vector3.One, graveMaterial);
+		AddMesh(grave, "Base", BoxMeshFor(new Vector3(0.96f, 0.16f, 0.48f)), new Vector3(0.0f, 0.08f, 0.0f), Vector3.Zero, Vector3.One, _matObsidian);
 	}
 
 	// ---------------------------------------------------------------- marsh props

@@ -83,6 +83,7 @@ public partial class World
 			"wild_marsh" => new Vector3(50.0f, 0.0f, -48.0f),
 			"wild_badlands" => new Vector3(-51.0f, 0.0f, 47.0f),
 			"wild_snow" => new Vector3(49.0f, 0.0f, 47.0f),
+			"wild_skeleton" => new Vector3(0.0f, 0.0f, -55.0f),
 			_ => new Vector3(-51.0f, 0.0f, -48.0f),
 		};
 		_caveEntrancePositionsByWildMap[wildMapId] = position;
@@ -97,18 +98,34 @@ public partial class World
 		// Walk straight into the mouth to enter the cave — no key press.
 		AddWalkInTrigger(entrance, wildMapId, $"cave_enter|{wildMapId}", new Vector3(5.0f, 3.2f, 4.6f), new Vector3(0.0f, 1.6f, 0.0f));
 
-		Material dark = MakeMaterial(new Color(0.018f, 0.014f, 0.026f));
-		Material stone = MakeMaterial(new Color(0.16f, 0.17f, 0.20f));
-		AddMesh(entrance, "CaveMouth", new SphereMesh { Radius = 3.1f, Height = 5.0f }, new Vector3(0.0f, 2.1f, 0.65f), Vector3.Zero, new Vector3(1.28f, 1.0f, 0.42f), dark);
-		for (int index = 0; index < 9; index++)
+		Material doorwayBlack = MakeMaterial(new Color(0.025f, 0.025f, 0.03f), 0.98f);
+		Material voidBlack = MakeMaterial(new Color(0.001f, 0.001f, 0.002f), 1.0f);
+		Mesh? doorwayMesh = LoadPrototypeMesh("wall-doorway-round.glb");
+		if (doorwayMesh != null)
 		{
-			float angle = Mathf.Lerp(18.0f, 162.0f, index / 8.0f);
-			float radians = Mathf.DegToRad(angle);
-			Vector3 rockPosition = new(Mathf.Cos(radians) * 3.45f, 0.35f + Mathf.Sin(radians) * 3.0f, 0.0f);
-			AddMesh(entrance, $"ArchRock{index}", new SphereMesh { Radius = 0.85f, Height = 1.45f }, rockPosition, new Vector3(index * 13.0f, index * 21.0f, 0.0f), new Vector3(1.25f, 1.0f, 0.85f), stone);
+			AddMesh(
+				entrance,
+				"BlackRoundDoorway",
+				doorwayMesh,
+				Vector3.Zero,
+				new Vector3(0.0f, 90.0f, 0.0f),
+				new Vector3(5.2f, 4.8f, 2.0f),
+				doorwayBlack);
 		}
-		AddCaveEntranceCollision(entrance, new Vector3(-2.75f, 1.65f, 0.0f), new Vector3(1.6f, 3.3f, 2.0f));
-		AddCaveEntranceCollision(entrance, new Vector3(2.75f, 1.65f, 0.0f), new Vector3(1.6f, 3.3f, 2.0f));
+
+		// A flat, pure-black surface directly behind the doorway is the cave
+		// darkness. No procedural rocks, path pieces, or extra architecture.
+		AddMesh(
+			entrance,
+			"CaveVoid",
+			BoxMeshFor(new Vector3(3.2f, 3.8f, 0.12f)),
+			new Vector3(0.0f, 1.9f, -0.18f),
+			Vector3.Zero,
+			Vector3.One,
+			voidBlack);
+
+		AddCaveEntranceCollision(entrance, new Vector3(-2.35f, 1.8f, 0.0f), new Vector3(1.5f, 3.6f, 1.2f));
+		AddCaveEntranceCollision(entrance, new Vector3(2.35f, 1.8f, 0.0f), new Vector3(1.5f, 3.6f, 1.2f));
 
 		var label = new Label3D
 		{
@@ -116,10 +133,10 @@ public partial class World
 			Text = LocaleText.T("portal.enter_cave"),
 			Position = new Vector3(0.0f, 5.45f, 0.0f),
 			Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-			FontSize = 24,
-			PixelSize = 0.008f,
-			OutlineSize = 6,
-			Width = 320.0f,
+			FontSize = 48,
+			PixelSize = 0.016f,
+			OutlineSize = 8,
+			Width = 640.0f,
 			HorizontalAlignment = HorizontalAlignment.Center,
 			Modulate = new Color(0.84f, 0.76f, 1.0f),
 		};

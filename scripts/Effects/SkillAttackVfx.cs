@@ -6,6 +6,7 @@ using System.Collections.Generic;
 // same cast/impact vocabulary without adding one scene per gem.
 public partial class SkillAttackVfx : Node3D
 {
+	private static int _activeEffectCount;
 	public const string CastEvent = "cast";
 	public const string ImpactEvent = "impact";
 	public const string ExplosionEvent = "explosion";
@@ -27,6 +28,7 @@ public partial class SkillAttackVfx : Node3D
 	private readonly List<(StandardMaterial3D Material, Color BaseColor)> _materials = new();
 	private Node3D _visualRoot = null!;
 	private float _age;
+	private bool _registeredAsActive;
 
 	public static void SpawnCast(Node parent, Vector3 position, Vector3 direction, string skillId, string elementId, Color color, ProjectileBehaviorProfile behavior, bool hasLifeSteal)
 	{
@@ -78,15 +80,32 @@ public partial class SkillAttackVfx : Node3D
 
 	private static void Spawn(Node parent, Vector3 position, SkillAttackVfx effect)
 	{
+		if (_activeEffectCount >= PerformanceConfig.MaximumVisibleSkillEffects)
+		{
+			effect.Dispose();
+			return;
+		}
+
 		parent.AddChild(effect);
 		effect.GlobalPosition = position;
 	}
 
 	public override void _Ready()
 	{
+		_activeEffectCount++;
+		_registeredAsActive = true;
 		_visualRoot = new Node3D { Name = "SkillVfxVisuals" };
 		AddChild(_visualRoot);
 		BuildVisuals();
+	}
+
+	public override void _ExitTree()
+	{
+		if (_registeredAsActive)
+		{
+			_activeEffectCount = Mathf.Max(_activeEffectCount - 1, 0);
+			_registeredAsActive = false;
+		}
 	}
 
 	public override void _Process(double delta)
@@ -151,7 +170,8 @@ public partial class SkillAttackVfx : Node3D
 			return;
 		}
 
-		AddFxMesh("CastCore", new SphereMesh { Radius = Radius * 0.15f, Height = Radius * 0.30f }, Vector3.Zero, Vector3.Zero, EffectColor);
+		AddTextureSprite("CastCore", "magic_03.png", Vector3.Up * Radius * 0.08f, Radius * 0.58f, Lift(EffectColor, 0.18f));
+		AddGroundTexture("CastSigil", "symbol_02.png", Radius * 1.25f, new Color(EffectColor.R, EffectColor.G, EffectColor.B, 0.62f));
 		int count = 14 + Mathf.Min(Behavior.ExtraProjectiles, 5) * 3;
 		AddParticles("CastMotes", bright, count, 0.34f, 1.0f, 3.8f, SkillId == "gem.skill.laser" ? 24.0f : 150.0f, new Vector3(0.0f, 0.45f, 0.0f), Radius * 0.055f);
 		if (Behavior.ExtraProjectiles > 0)
@@ -166,34 +186,37 @@ public partial class SkillAttackVfx : Node3D
 		switch (SkillId)
 		{
 			case "gem.skill.fireball":
-				AddFxMesh("FireCore", new SphereMesh { Radius = Radius * 0.24f, Height = Radius * 0.48f }, Vector3.Up * Radius * 0.10f, Vector3.Zero, new Color(1.0f, 0.72f, 0.12f, 0.92f));
+				AddTextureSprite("FireCore", "fire_02.png", Vector3.Up * Radius * 0.12f, Radius * 1.10f, new Color(1.0f, 0.58f, 0.10f, 0.94f));
 				AddParticles("FireEmbers", new Color(1.0f, 0.24f, 0.035f, 0.94f), 30, 0.46f, 2.8f, 7.8f, 180.0f, new Vector3(0.0f, -2.2f, 0.0f), Radius * 0.065f);
 				break;
 			case "gem.skill.meteor":
-				AddFxMesh("MeteorFlash", new SphereMesh { Radius = Radius * 0.34f, Height = Radius * 0.68f }, Vector3.Up * Radius * 0.08f, Vector3.Zero, new Color(1.0f, 0.32f, 0.04f, 0.88f));
+				AddTextureSprite("MeteorFlash", "fire_01.png", Vector3.Up * Radius * 0.12f, Radius * 1.65f, new Color(1.0f, 0.28f, 0.04f, 0.92f));
+				AddGroundTexture("MeteorScorch", "scorch_02.png", Radius * 1.75f, new Color(1.0f, 0.24f, 0.04f, 0.58f), false);
 				AddParticles("MeteorFlame", new Color(1.0f, 0.18f, 0.025f, 0.94f), 44, 0.52f, 3.4f, 9.4f, 180.0f, new Vector3(0.0f, -5.4f, 0.0f), Radius * 0.085f);
 				AddParticles("MeteorSmoke", new Color(0.24f, 0.19f, 0.18f, 0.62f), 16, 0.72f, 0.8f, 2.6f, 110.0f, new Vector3(0.0f, 1.4f, 0.0f), Radius * 0.15f);
 				break;
 			case "gem.skill.laser":
+				AddTextureSprite("LaserFlash", "flare_01.png", Vector3.Up * Radius * 0.10f, Radius * 1.15f, new Color(0.50f, 0.92f, 1.0f, 0.94f));
 				AddSlashStar(6, Radius * 1.18f, Radius * 0.045f, new Color(0.64f, 0.94f, 1.0f, 0.96f));
 				AddParticles("LaserIons", new Color(0.28f, 0.84f, 1.0f, 0.94f), 22, 0.30f, 4.0f, 9.0f, 180.0f, Vector3.Zero, Radius * 0.045f);
 				break;
 			case "gem.skill.rocket":
 				// 火箭：熾熱核心 + 火花噴發 + 上升煙塵。
-				AddFxMesh("RocketCore", new SphereMesh { Radius = Radius * 0.28f, Height = Radius * 0.56f }, Vector3.Up * Radius * 0.10f, Vector3.Zero, new Color(1.0f, 0.62f, 0.10f, 0.92f));
+				AddTextureSprite("RocketCore", "muzzle_05.png", Vector3.Up * Radius * 0.12f, Radius * 1.35f, new Color(1.0f, 0.48f, 0.06f, 0.95f));
 				AddParticles("RocketBlast", new Color(1.0f, 0.34f, 0.05f, 0.95f), 40, 0.48f, 3.4f, 9.0f, 180.0f, new Vector3(0.0f, -3.0f, 0.0f), Radius * 0.08f);
 				AddParticles("RocketSmoke", new Color(0.26f, 0.22f, 0.20f, 0.6f), 14, 0.7f, 0.8f, 2.4f, 120.0f, new Vector3(0.0f, 1.6f, 0.0f), Radius * 0.14f);
 				break;
 			case "gem.skill.ice_shard":
 				// 冰箭：淡藍冰晶碎片 + 霜霧。
 				AddSlashStar(7, Radius * 1.0f, Radius * 0.06f, new Color(0.66f, 0.9f, 1.0f, 0.96f));
-				AddFxMesh("IceCore", new SphereMesh { Radius = Radius * 0.18f, Height = Radius * 0.36f }, Vector3.Up * Radius * 0.10f, Vector3.Zero, new Color(0.82f, 0.96f, 1.0f, 0.9f));
+				AddTextureSprite("IceCore", "star_08.png", Vector3.Up * Radius * 0.10f, Radius * 0.88f, new Color(0.72f, 0.92f, 1.0f, 0.96f));
 				AddParticles("FrostMotes", new Color(0.72f, 0.92f, 1.0f, 0.92f), 26, 0.5f, 1.6f, 5.0f, 150.0f, new Vector3(0.0f, -1.0f, 0.0f), Radius * 0.05f);
 				break;
 			case "gem.skill.lightning":
-				// 雷擊：黃白電弧 + 火花。
-				AddSlashStar(6, Radius * 1.25f, Radius * 0.035f, new Color(1.0f, 0.96f, 0.55f, 0.98f));
-				AddDirectionalStreak("Bolt", Vector3.Up, Vector3.Zero, Radius * 1.6f, Radius * 0.04f, new Color(1.0f, 0.98f, 0.7f, 0.98f));
+				// Targeted RPG lightning: a tall bolt descends from above the enemy
+				// and terminates in a bright ground-level flash.
+				AddLightningBolt(new Color(1.0f, 0.96f, 0.48f, 0.98f));
+				AddTextureSprite("LightningImpact", "flare_01.png", Vector3.Up * Radius * 0.12f, Radius * 0.82f, new Color(1.0f, 0.94f, 0.44f, 0.98f));
 				AddParticles("Sparks", new Color(1.0f, 0.92f, 0.4f, 0.95f), 24, 0.26f, 4.5f, 10.0f, 180.0f, Vector3.Zero, Radius * 0.04f);
 				break;
 			case "gem.skill.whirlwind":
@@ -214,7 +237,8 @@ public partial class SkillAttackVfx : Node3D
 
 	private void BuildExplosion()
 	{
-		AddFxMesh("BlastCore", new SphereMesh { Radius = Radius * 0.30f, Height = Radius * 0.60f }, Vector3.Up * Radius * 0.10f, Vector3.Zero, new Color(1.0f, 0.38f, 0.06f, 0.72f));
+		AddTextureSprite("BlastCore", "fire_01.png", Vector3.Up * Radius * 0.12f, Radius * 1.55f, new Color(1.0f, 0.34f, 0.05f, 0.88f));
+		AddGroundTexture("BlastScorch", "scorch_01.png", Radius * 1.35f, new Color(0.95f, 0.26f, 0.04f, 0.48f), false);
 		AddSlashStar(10, Radius * 0.88f, Mathf.Max(Radius * 0.025f, 0.035f), Lift(EffectColor, 0.28f));
 		AddParticles("ExplosionFragments", EffectColor, 52, 0.56f, Radius * 1.4f, Radius * 3.8f, 180.0f, new Vector3(0.0f, -4.8f, 0.0f), Mathf.Max(Radius * 0.025f, 0.04f));
 	}
@@ -249,26 +273,32 @@ public partial class SkillAttackVfx : Node3D
 
 	private void AddSlashStar(int count, float length, float width, Color color)
 	{
+		if (EventId == ImpactEvent)
+		{
+			length *= KenneyParticleVfx.ImpactFlashScale;
+		}
 		for (int index = 0; index < count; index++)
 		{
 			float angle = 360.0f * index / Mathf.Max(count, 1);
-			AddFxMesh(
+			MeshInstance3D slash = AddTextureSprite(
 				$"EnergySlash{index}",
-				new BoxMesh { Size = new Vector3(width, width * 0.55f, length) },
-				Vector3.Up * Radius * 0.10f,
-				new Vector3((index % 2 == 0 ? 1.0f : -1.0f) * 12.0f, angle, 0.0f),
+				index % 2 == 0 ? "slash_03.png" : "slash_04.png",
+				Vector3.Up * Radius * (0.08f + index * 0.008f),
+				Mathf.Max(length, width * 5.0f),
 				color);
+			slash.RotationDegrees = new Vector3(0.0f, angle, angle * 0.5f);
 		}
 	}
 
 	private void AddDirectionalStreak(string name, Vector3 direction, Vector3 offset, float length, float width, Color color)
 	{
+		Vector3 safeDirection = SafeDirection(direction);
 		var mesh = new MeshInstance3D
 		{
 			Name = name,
 			Mesh = new BoxMesh { Size = new Vector3(width, width, length) },
-			Position = offset + direction * length * 0.18f + Vector3.Up * Radius * 0.10f,
-			Basis = Basis.LookingAt(direction, Vector3.Up),
+			Position = offset + safeDirection * length * 0.18f + Vector3.Up * Radius * 0.10f,
+			Basis = Basis.LookingAt(safeDirection, SafeUp(safeDirection)),
 		};
 		mesh.SetSurfaceOverrideMaterial(0, CreateMaterial(color));
 		_visualRoot.AddChild(mesh);
@@ -277,61 +307,88 @@ public partial class SkillAttackVfx : Node3D
 	private void AddBeam(string name, Vector3 delta, float width, Color color)
 	{
 		float length = Mathf.Max(delta.Length(), 0.1f);
-		Vector3 direction = delta / length;
+		Vector3 direction = SafeDirection(delta);
 		var beam = new MeshInstance3D
 		{
 			Name = name,
 			Mesh = new BoxMesh { Size = new Vector3(width, width, length) },
 			Position = delta * 0.5f,
-			Basis = Basis.LookingAt(direction, Vector3.Up),
+			Basis = Basis.LookingAt(direction, SafeUp(direction)),
 		};
 		beam.SetSurfaceOverrideMaterial(0, CreateMaterial(color));
 		_visualRoot.AddChild(beam);
 	}
 
+	private static Vector3 SafeDirection(Vector3 direction)
+	{
+		return direction.LengthSquared() > 0.0001f ? direction.Normalized() : Vector3.Forward;
+	}
+
+	private static Vector3 SafeUp(Vector3 direction)
+	{
+		return Mathf.Abs(direction.Dot(Vector3.Up)) > 0.98f ? Vector3.Forward : Vector3.Up;
+	}
+
 	private void AddParticles(string name, Color color, int amount, float lifetime, float minimumSpeed, float maximumSpeed, float spread, Vector3 gravity, float size)
 	{
-		var particleMaterial = new StandardMaterial3D
+		string texture = KenneyParticleVfx.TextureFor(name, SkillId, ElementId);
+		AddChild(KenneyParticleVfx.CreateBurst(
+			name,
+			texture,
+			color,
+			amount,
+			lifetime,
+			minimumSpeed,
+			maximumSpeed,
+			spread,
+			gravity,
+			Mathf.Max(size * 1.7f, 0.04f),
+			Mathf.Max(size * 3.8f, 0.10f),
+			Mathf.Max(Radius * 0.10f, 0.08f)));
+	}
+
+	private MeshInstance3D AddTextureSprite(string name, string texture, Vector3 position, float size, Color color)
+	{
+		MeshInstance3D sprite = KenneyParticleVfx.CreateSprite(name, texture, color, Vector2.One * Mathf.Max(size, 0.08f));
+		sprite.Position = position;
+		if (sprite.Mesh?.SurfaceGetMaterial(0) is StandardMaterial3D material)
 		{
-			AlbedoColor = color,
-			EmissionEnabled = true,
-			Emission = new Color(color.R, color.G, color.B),
-			EmissionEnergyMultiplier = 3.0f,
-			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-			BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled,
-		};
-		var sparkMesh = new QuadMesh
+			_materials.Add((material, color));
+		}
+		_visualRoot.AddChild(sprite);
+		return sprite;
+	}
+
+	private void AddLightningBolt(Color color)
+	{
+		MeshInstance3D bolt = KenneyParticleVfx.CreateSprite(
+			"LightningBolt",
+			"spark_06.png",
+			color,
+			new Vector2(Mathf.Max(Radius * 0.52f, 0.18f), Mathf.Max(Radius * 3.2f, 1.2f)));
+		if (bolt.Mesh is QuadMesh quad)
 		{
-			Size = new Vector2(Mathf.Max(size, 0.022f), Mathf.Max(size * 3.8f, 0.09f)),
-			Material = particleMaterial,
-		};
-		var processMaterial = new ParticleProcessMaterial
+			// Anchor the bottom of the scaled billboard at the enemy instead of
+			// centering half of the lightning underneath the ground.
+			bolt.Position = Vector3.Up * quad.Size.Y * 0.48f;
+		}
+		if (bolt.Mesh?.SurfaceGetMaterial(0) is StandardMaterial3D material)
 		{
-			EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere,
-			EmissionSphereRadius = Mathf.Max(Radius * 0.10f, 0.08f),
-			Direction = Vector3.Up,
-			Spread = spread,
-			InitialVelocityMin = minimumSpeed,
-			InitialVelocityMax = maximumSpeed,
-			Gravity = gravity,
-			ScaleMin = 0.55f,
-			ScaleMax = 1.25f,
-			Color = color,
-		};
-		var particles = new GpuParticles3D
+			_materials.Add((material, color));
+		}
+		_visualRoot.AddChild(bolt);
+	}
+
+	private void AddGroundTexture(string name, string texture, float size, Color color, bool additive = true)
+	{
+		MeshInstance3D sprite = KenneyParticleVfx.CreateSprite(name, texture, color, Vector2.One * Mathf.Max(size, 0.10f), false, additive);
+		sprite.Position = new Vector3(0.0f, 0.025f, 0.0f);
+		sprite.RotationDegrees = new Vector3(-90.0f, 0.0f, 0.0f);
+		if (sprite.Mesh?.SurfaceGetMaterial(0) is StandardMaterial3D material)
 		{
-			Name = name,
-			Amount = Mathf.Max(amount, 1),
-			Lifetime = Mathf.Max(lifetime, 0.12f),
-			OneShot = true,
-			Explosiveness = 0.92f,
-			Randomness = 0.52f,
-			ProcessMaterial = processMaterial,
-			DrawPass1 = sparkMesh,
-			Emitting = true,
-		};
-		AddChild(particles);
+			_materials.Add((material, color));
+		}
+		_visualRoot.AddChild(sprite);
 	}
 
 	private void AddFxMesh(string name, Mesh mesh, Vector3 position, Vector3 rotationDegrees, Color color)
@@ -354,7 +411,7 @@ public partial class SkillAttackVfx : Node3D
 			AlbedoColor = color,
 			EmissionEnabled = true,
 			Emission = new Color(color.R, color.G, color.B),
-			EmissionEnergyMultiplier = 2.8f,
+			EmissionEnergyMultiplier = 5.0f,
 			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
 			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
 		};

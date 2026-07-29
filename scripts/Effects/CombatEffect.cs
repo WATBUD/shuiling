@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 public partial class CombatEffect : Node3D
 {
+	private static int _activeEffectCount;
 	public const float MinimumDamageTextScale = 0.5f;
 	public const float MaximumDamageTextScale = 2.0f;
 	public static float DamageTextScale { get; private set; } = 1.0f;
@@ -18,6 +19,7 @@ public partial class CombatEffect : Node3D
 	private Label3D? _label;
 	private Label3D? _labelShadow;
 	private Label3D? _labelHighlight;
+	private bool _registeredAsActive;
 
 	public static void SetDamageTextScale(float scale)
 	{
@@ -26,8 +28,25 @@ public partial class CombatEffect : Node3D
 
 	public override void _Ready()
 	{
+		if (_activeEffectCount >= PerformanceConfig.MaximumVisibleCombatEffects)
+		{
+			QueueFree();
+			return;
+		}
+
+		_activeEffectCount++;
+		_registeredAsActive = true;
 		_textDrift = (float)GD.RandRange(-0.18, 0.18);
 		BuildVisuals();
+	}
+
+	public override void _ExitTree()
+	{
+		if (_registeredAsActive)
+		{
+			_activeEffectCount = Mathf.Max(_activeEffectCount - 1, 0);
+			_registeredAsActive = false;
+		}
 	}
 
 	public override void _Process(double delta)
@@ -76,14 +95,7 @@ public partial class CombatEffect : Node3D
 		_impactRoot = new Node3D { Name = "ImpactVisuals" };
 		AddChild(_impactRoot);
 
-		AddFxMesh(
-			"ImpactCore",
-			new SphereMesh { Radius = Radius * 0.15f, Height = Radius * 0.30f },
-			new Vector3(0.0f, Radius * 0.18f, 0.0f),
-			Vector3.Zero,
-			new Vector3(1.0f, 0.72f, 1.0f),
-			EffectColor
-		);
+		AddImpactSprite();
 		AddImpactParticles();
 
 		if (!string.IsNullOrEmpty(Text))
@@ -97,49 +109,37 @@ public partial class CombatEffect : Node3D
 		}
 	}
 
+	private void AddImpactSprite()
+	{
+		float size = Mathf.Max(Radius * 0.72f * KenneyParticleVfx.ImpactFlashScale, 0.08f);
+		MeshInstance3D sprite = KenneyParticleVfx.CreateSprite(
+			"ImpactCore",
+			"scratch_01.png",
+			EffectColor,
+			Vector2.One * size);
+		sprite.Position = new Vector3(0.0f, Radius * 0.18f, 0.0f);
+		if (sprite.Mesh?.SurfaceGetMaterial(0) is StandardMaterial3D material)
+		{
+			_materials.Add(material);
+		}
+		(_impactRoot ?? this).AddChild(sprite);
+	}
+
 	private void AddImpactParticles()
 	{
-		var particleMaterial = new StandardMaterial3D
-		{
-			AlbedoColor = new Color(EffectColor.R, EffectColor.G, EffectColor.B, 0.92f),
-			EmissionEnabled = true,
-			Emission = EffectColor,
-			EmissionEnergyMultiplier = 2.2f,
-			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-			BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled,
-		};
-		var sparkMesh = new QuadMesh
-		{
-			Size = new Vector2(Mathf.Max(Radius * 0.075f, 0.028f), Mathf.Max(Radius * 0.32f, 0.12f)),
-			Material = particleMaterial,
-		};
-		var processMaterial = new ParticleProcessMaterial
-		{
-			EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere,
-			EmissionSphereRadius = Radius * 0.14f,
-			Direction = Vector3.Up,
-			Spread = 180.0f,
-			InitialVelocityMin = Mathf.Max(Radius * 3.2f, 1.4f),
-			InitialVelocityMax = Mathf.Max(Radius * 5.8f, 2.6f),
-			Gravity = new Vector3(0.0f, -4.2f, 0.0f),
-			ScaleMin = 0.62f,
-			ScaleMax = 1.08f,
-			Color = new Color(EffectColor.R, EffectColor.G, EffectColor.B, 0.92f),
-		};
-		var sparks = new GpuParticles3D
-		{
-			Name = "ImpactSparks",
-			Amount = 8,
-			Lifetime = Mathf.Clamp(Lifetime * 0.62f, 0.16f, 0.34f),
-			OneShot = true,
-			Explosiveness = 1.0f,
-			Randomness = 0.48f,
-			ProcessMaterial = processMaterial,
-			DrawPass1 = sparkMesh,
-			Emitting = true,
-		};
-		(_impactRoot ?? this).AddChild(sparks);
+		(_impactRoot ?? this).AddChild(KenneyParticleVfx.CreateBurst(
+			"ImpactSparks",
+			"spark_03.png",
+			new Color(EffectColor.R, EffectColor.G, EffectColor.B, 0.92f),
+			10,
+			Mathf.Clamp(Lifetime * 0.62f, 0.16f, 0.34f),
+			Mathf.Max(Radius * 3.2f, 1.4f),
+			Mathf.Max(Radius * 5.8f, 2.6f),
+			180.0f,
+			new Vector3(0.0f, -4.2f, 0.0f),
+			Mathf.Max(Radius * 0.14f, 0.05f),
+			Mathf.Max(Radius * 0.38f, 0.15f),
+			Mathf.Max(Radius * 0.14f, 0.06f)));
 	}
 
 	private Label3D CreateDamageLabel(int outlineSize, Color outlineColor)
@@ -190,28 +190,4 @@ public partial class CombatEffect : Node3D
 		label.Modulate = color;
 	}
 
-	private void AddFxMesh(string nodeName, Mesh mesh, Vector3 position, Vector3 rotationDegrees, Vector3 scale, Color color)
-	{
-		var material = new StandardMaterial3D
-		{
-			AlbedoColor = color,
-			EmissionEnabled = true,
-			Emission = new Color(color.R, color.G, color.B),
-			EmissionEnergyMultiplier = 1.8f,
-			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-		};
-		_materials.Add(material);
-
-		var meshInstance = new MeshInstance3D
-		{
-			Name = nodeName,
-			Mesh = mesh,
-			Position = position,
-			RotationDegrees = rotationDegrees,
-			Scale = scale,
-		};
-		meshInstance.SetSurfaceOverrideMaterial(0, material);
-		(_impactRoot ?? this).AddChild(meshInstance);
-	}
 }

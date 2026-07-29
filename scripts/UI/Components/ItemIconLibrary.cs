@@ -33,6 +33,7 @@ public static class ItemIconLibrary
 		["equip.boots.traveler"] = "boots_traveler.png",
 		["equip.boots.reinforced"] = "boots_reinforced.png",
 		["equip.boots.windrunner"] = "boots_windrunner.png",
+		["equip.boots.gravity"] = "boots_gravity.png",
 		["equip.accessory.swift_ring"] = "accessory_swift.png",
 		["equip.accessory.crit_charm"] = "accessory_magic.png",
 		["equip.accessory.turtle_amulet"] = "accessory_guard.png",
@@ -66,6 +67,16 @@ public static class ItemIconLibrary
 		["loot.water_core"] = "gem_02.png",
 		["loot.dragon_scale"] = "material_ore.png",
 		["loot.cracked_core"] = "material_stone.png",
+		["loot.enhance_crystal.t1"] = "gem_02.png",
+		["loot.enhance_crystal.t2"] = "gem_02.png",
+		["loot.enhance_crystal.t3"] = "gem_02.png",
+		["loot.enhance_crystal.t4"] = "gem_02.png",
+		["loot.enhance_crystal.t5"] = "gem_02.png",
+		["loot.enhance_crystal.t6"] = "gem_02.png",
+		["loot.enhance_crystal.t7"] = "gem_02.png",
+		["loot.enhance_crystal.t8"] = "gem_02.png",
+		["loot.enhance_crystal.t9"] = "gem_02.png",
+		["loot.enhance_crystal.t10"] = "gem_02.png",
 	};
 
 	private static readonly Dictionary<string, Texture2D> Cache = new();

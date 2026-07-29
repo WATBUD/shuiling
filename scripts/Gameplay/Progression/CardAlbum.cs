@@ -34,7 +34,7 @@ public sealed class CardAlbum
 	// Add a card (one per model). Returns true only if it was newly added.
 	public bool Add(string cardKey)
 	{
-		return !string.IsNullOrWhiteSpace(cardKey) && _owned.Add(cardKey);
+		return ExternalModelLibrary.IsValidCardKey(cardKey) && _owned.Add(cardKey);
 	}
 
 	// Remove a card (NPC quest exchange). Returns true if it was present.
@@ -55,7 +55,7 @@ public sealed class CardAlbum
 
 		foreach (string key in keys)
 		{
-			if (!string.IsNullOrWhiteSpace(key))
+			if (ExternalModelLibrary.IsValidCardKey(key))
 			{
 				_owned.Add(key);
 			}

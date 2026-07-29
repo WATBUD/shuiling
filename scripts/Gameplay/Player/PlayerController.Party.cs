@@ -201,7 +201,7 @@ public partial class PlayerController
 		PostSystemMessage(
 			LocaleText.F("system.companion.fallen_recover", actor.LocalizedDisplayName),
 			new Color(1.0f, 0.58f, 0.42f),
-			GameMessageChannel.Party);
+			GameMessageChannel.Combat);
 	}
 
 	private void CollectNearbyFallenCompanions()

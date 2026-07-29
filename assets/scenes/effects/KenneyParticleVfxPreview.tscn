@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://cquixe828qfqk"]
+
+[ext_resource type="Script" uid="uid://cgm8li2p7f8f1" path="res://scripts/Effects/KenneyParticleVfxPreview.cs" id="1_preview"]
+[ext_resource type="Resource" path="res://assets/effects/kenney_particle_vfx_preset.tres" id="2_preset"]
+
+[node name="KenneyParticleVfxPreview" type="Node3D" unique_id=1649966311]
+script = ExtResource("1_preview")
+VfxPreset = ExtResource("2_preset")

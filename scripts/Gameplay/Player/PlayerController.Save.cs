@@ -188,6 +188,7 @@ public partial class PlayerController
 		RestoreNpcQuestSets(data);
 		RestoreMailbox(data);
 		RestoreCards(data);
+		EnsureTestModeCatalogUnlocks();
 		if (GetParent() is World world)
 		{
 			RefreshFallenCompanionMapVisibility(world.ActiveMapId);
@@ -235,12 +236,13 @@ public partial class PlayerController
 		{
 			string id = BuildLoadout.SkillGemIds[index];
 			bool valid = index == 0 ? BuildCatalog.IsMainAttackCore(id) : BuildCatalog.IsSupportCore(id);
-			if (!valid || (BuildCatalog.IsProjectileSupportGem(id) && !BuildCatalog.HasRangedActiveSkill(BuildLoadout)))
+			if (!valid || (BuildCatalog.IsProjectileSupportGem(id) && !BuildCatalog.HasProjectileActiveSkill(BuildLoadout)))
 			{
 				BuildLoadout.SkillGemIds[index] = "gem.skill.none";
 				BuildLoadout.SkillGemLevels[index] = 1;
 			}
 		}
+		MarkPlayerBuildStatsDirty();
 	}
 
 	public void SetDamageTextScale(float scale)

@@ -48,6 +48,7 @@ public sealed class EquipmentDefinition
 	public int AttackBonus { get; set; }
 	public int DefenseBonus { get; set; }
 	public float MoveSpeedBonus { get; set; }
+	public int JumpPowerBonus { get; set; }
 	public int AttackSpeed { get; set; }
 	public float AttackCooldownReduction { get; set; }
 	public float AttackRangeBonus { get; set; }
@@ -94,6 +95,7 @@ public sealed class SkillGemDefinition
 	public bool EnablesHeal { get; set; }
 	public bool EnablesShield { get; set; }
 	public bool IsRangedActiveSkill { get; set; }
+	public bool UsesProjectile { get; set; }
 	public bool IsSupportEffect { get; set; }
 	public bool RequiresProjectile { get; set; }
 	public float DamageMultiplier { get; set; } = 1.0f;
@@ -170,6 +172,7 @@ public sealed class BuildStats
 	public int Attack { get; set; }
 	public int Defense { get; set; }
 	public float MoveSpeedMultiplier { get; set; } = 1.0f;
+	public int JumpPower { get; set; } = EquipmentConfig.BaseJumpPower;
 	public float AttackCooldownMultiplier { get; set; } = 1.0f;
 	public float AttackRangeBonus { get; set; }
 	public float DetectionRadiusBonus { get; set; }
@@ -458,7 +461,8 @@ public static class BuildCatalog
 
 		new EquipmentDefinition { Id = "equip.boots.traveler", NameKey = "equip.boots.traveler", SummaryKey = "equip.summary.traveler_shoes", Slot = EquipmentSlot.Boots, DefenseBonus = 1, MoveSpeedBonus = 0.07f },
 		new EquipmentDefinition { Id = "equip.boots.reinforced", NameKey = "equip.boots.reinforced", SummaryKey = "equip.summary.reinforced_boots", Slot = EquipmentSlot.Boots, MaxHealthBonus = 10, DefenseBonus = 5, MoveSpeedBonus = 0.03f },
-		new EquipmentDefinition { Id = "equip.boots.windrunner", NameKey = "equip.boots.windrunner", SummaryKey = "equip.summary.windrunner_boots", Slot = EquipmentSlot.Boots, DefenseBonus = 2, MoveSpeedBonus = 0.15f, AttackCooldownReduction = 0.03f },
+		new EquipmentDefinition { Id = "equip.boots.windrunner", NameKey = "equip.boots.windrunner", SummaryKey = "equip.summary.windrunner_boots", Slot = EquipmentSlot.Boots, DefenseBonus = 2, MoveSpeedBonus = 0.15f },
+		new EquipmentDefinition { Id = "equip.boots.gravity", NameKey = "equip.boots.gravity", SummaryKey = "equip.summary.gravity_boots", Slot = EquipmentSlot.Boots, DefenseBonus = 2, JumpPowerBonus = 300 },
 
 		new EquipmentDefinition { Id = "equip.accessory.swift_ring", NameKey = "equip.accessory.swift_ring", SummaryKey = "equip.summary.swift_ring", Slot = EquipmentSlot.Accessory, MoveSpeedBonus = 0.12f, AttackCooldownReduction = 0.05f, SocketCount = 1 },
 		new EquipmentDefinition { Id = "equip.accessory.crit_charm", NameKey = "equip.accessory.crit_charm", SummaryKey = "equip.summary.crit_charm", Slot = EquipmentSlot.Accessory, AttackBonus = 4, CritChanceBonus = 0.12f, SocketCount = 1 },
@@ -474,12 +478,12 @@ public static class BuildCatalog
 	private static readonly List<SkillGemDefinition> SkillGems = new()
 	{
 		new SkillGemDefinition { Id = "gem.skill.none", NameKey = "gem.skill.none", SummaryKey = "gem.skill.summary.none" },
-		new SkillGemDefinition { Id = "gem.skill.fireball", NameKey = "gem.skill.fireball", SummaryKey = "gem.skill.summary.fireball", DamageElementId = "fire", DamageElementNameKey = "element.fire", AttackColor = new Color(1.0f, 0.28f, 0.08f, 0.94f), AttackBonus = 5, AttackRangeBonus = 2.0f, IsRangedActiveSkill = true },
+		new SkillGemDefinition { Id = "gem.skill.fireball", NameKey = "gem.skill.fireball", SummaryKey = "gem.skill.summary.fireball", DamageElementId = "fire", DamageElementNameKey = "element.fire", AttackColor = new Color(1.0f, 0.28f, 0.08f, 0.94f), AttackBonus = 5, AttackRangeBonus = 2.0f, IsRangedActiveSkill = true, UsesProjectile = true },
 		new SkillGemDefinition { Id = "gem.skill.whirlwind", NameKey = "gem.skill.whirlwind", SummaryKey = "gem.skill.summary.whirlwind", DamageElementId = "physical", DamageElementNameKey = "element.physical", AttackColor = new Color(1.0f, 0.70f, 0.32f, 0.92f), AttackBonus = 4, DefenseBonus = 2, AttackCooldownReduction = 0.04f },
 		new SkillGemDefinition { Id = "gem.skill.meteor", NameKey = "gem.skill.meteor", SummaryKey = "gem.skill.summary.meteor", DamageElementId = "fire", DamageElementNameKey = "element.fire", AttackColor = new Color(1.0f, 0.20f, 0.05f, 0.96f), AttackBonus = 12, AttackRangeBonus = 1.2f, AttackCooldownReduction = -0.08f, IsRangedActiveSkill = true },
 		new SkillGemDefinition { Id = "gem.skill.laser", NameKey = "gem.skill.laser", SummaryKey = "gem.skill.summary.laser", DamageElementId = "light", DamageElementNameKey = "element.light", AttackColor = new Color(1.0f, 0.95f, 0.58f, 0.95f), AttackBonus = 6, AttackRangeBonus = 3.2f, DetectionRadiusBonus = 2.0f, IsRangedActiveSkill = true },
-		new SkillGemDefinition { Id = "gem.skill.rocket", NameKey = "gem.skill.rocket", SummaryKey = "gem.skill.summary.rocket", DamageElementId = "fire", DamageElementNameKey = "element.fire", AttackColor = new Color(1.0f, 0.34f, 0.08f, 0.95f), AttackBonus = 9, AttackRangeBonus = 2.6f, AttackCooldownReduction = -0.05f, IsRangedActiveSkill = true },
-		new SkillGemDefinition { Id = "gem.skill.ice_shard", NameKey = "gem.skill.ice_shard", SummaryKey = "gem.skill.summary.ice_shard", DamageElementId = "ice", DamageElementNameKey = "element.ice", AttackColor = new Color(0.58f, 0.88f, 1.0f, 0.95f), AttackBonus = 5, AttackRangeBonus = 2.4f, IsRangedActiveSkill = true },
+		new SkillGemDefinition { Id = "gem.skill.rocket", NameKey = "gem.skill.rocket", SummaryKey = "gem.skill.summary.rocket", DamageElementId = "fire", DamageElementNameKey = "element.fire", AttackColor = new Color(1.0f, 0.34f, 0.08f, 0.95f), AttackBonus = 9, AttackRangeBonus = 2.6f, AttackCooldownReduction = -0.05f, IsRangedActiveSkill = true, UsesProjectile = true },
+		new SkillGemDefinition { Id = "gem.skill.ice_shard", NameKey = "gem.skill.ice_shard", SummaryKey = "gem.skill.summary.ice_shard", DamageElementId = "ice", DamageElementNameKey = "element.ice", AttackColor = new Color(0.58f, 0.88f, 1.0f, 0.95f), AttackBonus = 5, AttackRangeBonus = 2.4f, IsRangedActiveSkill = true, UsesProjectile = true },
 		new SkillGemDefinition { Id = "gem.skill.lightning", NameKey = "gem.skill.lightning", SummaryKey = "gem.skill.summary.lightning", DamageElementId = "lightning", DamageElementNameKey = "element.lightning", AttackColor = new Color(0.95f, 0.88f, 0.20f, 0.95f), AttackBonus = 6, AttackRangeBonus = 2.8f, DetectionRadiusBonus = 1.6f, IsRangedActiveSkill = true },
 		new SkillGemDefinition { Id = "gem.skill.chain", NameKey = "gem.skill.chain", SummaryKey = "gem.skill.summary.chain", IsSupportEffect = true, RequiresProjectile = true, DamageMultiplier = 0.88f, DetectionRadiusBonus = 2.0f, BehaviorId = ProjectileBehavior.Chain, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.water_core" },
 		new SkillGemDefinition { Id = "gem.skill.explosion", NameKey = "gem.skill.explosion", SummaryKey = "gem.skill.summary.explosion", IsSupportEffect = true, RequiresProjectile = true, DamageMultiplier = 0.92f, AttackCooldownReduction = -0.04f, BehaviorId = ProjectileBehavior.Explosion, BehaviorRadius = 3.0f, UpgradeMaterialId = "loot.red_horn" },
@@ -612,7 +616,7 @@ public static class BuildCatalog
 		// The active core owns its damage type; support cores only alter compatible
 		// behavior and stats up to the number of unlocked support slots.
 		int unlockedSupportCores = GetUnlockedSupportCoreCount(actor.Level);
-		bool hasRangedActiveSkill = HasRangedActiveSkill(loadout);
+		bool hasProjectileActiveSkill = HasProjectileActiveSkill(loadout);
 		bool hasMainAttackCore = HasMainAttackCore(loadout);
 		for (int slot = 0; slot < loadout.SkillGemIds.Length; slot++)
 		{
@@ -630,7 +634,7 @@ public static class BuildCatalog
 			{
 				continue;
 			}
-			if (IsProjectileSupportGem(gem.Id) && !hasRangedActiveSkill)
+			if (IsProjectileSupportGem(gem.Id) && !hasProjectileActiveSkill)
 			{
 				continue;
 			}
@@ -680,13 +684,13 @@ public static class BuildCatalog
 		ApplyEquipment(stats, GetEquipment(loadout.AccessoryId), GetEquipmentStarMultiplier(loadout.AccessoryId));
 
 		int unlocked = GetUnlockedSupportCoreCount(player.Level);
-		bool hasRanged = HasRangedActiveSkill(loadout);
+		bool hasProjectile = HasProjectileActiveSkill(loadout);
 		bool hasMain = HasMainAttackCore(loadout);
 		for (int slot = 0; slot < loadout.SkillGemIds.Length && slot < unlocked; slot++)
 		{
 			SkillGemDefinition gem = GetSkillGem(loadout.SkillGemIds[slot]);
 			if ((slot == 0 && !IsMainAttackCore(gem.Id)) || (slot > 0 && !IsSupportCore(gem.Id))
-				|| (slot > 0 && !hasMain) || (IsProjectileSupportGem(gem.Id) && !hasRanged))
+				|| (slot > 0 && !hasMain) || (IsProjectileSupportGem(gem.Id) && !hasProjectile))
 			{
 				continue;
 			}
@@ -893,6 +897,37 @@ public static class BuildCatalog
 		return ids;
 	}
 
+	// Canonical inventory catalogue for developer/test worlds. New definitions
+	// added to any source catalogue automatically appear here without maintaining
+	// a separate starter-item list.
+	public static List<string> GetAllInventoryItemIds()
+	{
+		var ids = new HashSet<string>(System.StringComparer.Ordinal);
+		foreach (string id in GetAllEquipmentItemIds())
+		{
+			if (!IsFreeItem(id))
+			{
+				ids.Add(id);
+			}
+		}
+		foreach (string id in GetAllGemItemIds())
+		{
+			ids.Add(id);
+		}
+		foreach (MonsterLootDefinition material in MonsterLootCatalog.Materials)
+		{
+			ids.Add(material.Id);
+		}
+		foreach (string id in Consumables.Keys)
+		{
+			ids.Add(id);
+		}
+
+		var result = new List<string>(ids);
+		result.Sort(System.StringComparer.Ordinal);
+		return result;
+	}
+
 	public static bool IsFreeItem(string id)
 	{
 		return id is "gem.attribute.none" or "gem.skill.none"
@@ -1081,6 +1116,8 @@ public static class BuildCatalog
 
 	public static bool IsRangedActiveSkillGem(string gemId) => GetSkillGem(gemId).IsRangedActiveSkill;
 
+	public static bool IsProjectileActiveSkillGem(string gemId) => GetSkillGem(gemId).UsesProjectile;
+
 	public static bool IsProjectileSupportGem(string gemId) => GetSkillGem(gemId).RequiresProjectile;
 
 	public static bool IsMainAttackCore(string gemId)
@@ -1117,6 +1154,11 @@ public static class BuildCatalog
 	public static bool HasRangedActiveSkill(CompanionBuildLoadout loadout)
 	{
 		return IsRangedActiveSkillGem(loadout.GetSkillGemId(0));
+	}
+
+	public static bool HasProjectileActiveSkill(CompanionBuildLoadout loadout)
+	{
+		return IsProjectileActiveSkillGem(loadout.GetSkillGemId(0));
 	}
 
 	// Cost to raise a behavior gem from its current level to the next one, or null if
@@ -1232,6 +1274,7 @@ public static class BuildCatalog
 		stats.Attack += Mathf.RoundToInt(equipment.AttackBonus * bonusMultiplier);
 		stats.Defense += Mathf.RoundToInt(equipment.DefenseBonus * bonusMultiplier);
 		stats.MoveSpeedMultiplier += equipment.MoveSpeedBonus * bonusMultiplier;
+		stats.JumpPower += Mathf.RoundToInt(equipment.JumpPowerBonus * bonusMultiplier);
 		if (equipment.Slot == EquipmentSlot.Weapon && equipment.Id != "equip.weapon.none")
 		{
 			int attackSpeed = GetWeaponAttackSpeed(equipment, bonusMultiplier);

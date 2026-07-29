@@ -193,9 +193,9 @@ public partial class PlayerController
 
 		SimpleActor? nearest = null;
 		float bestDistance = MercenaryBrokerInteractRange;
-		foreach (Node node in GetTree().GetNodesInGroup("npcs"))
+		foreach (SimpleActor actor in SimpleActor.ActiveActors)
 		{
-			if (node is not SimpleActor actor || !IsMercenaryBroker(actor) || !actor.IsActiveWorldTarget)
+			if (!IsMercenaryBroker(actor) || !actor.IsActiveWorldTarget)
 			{
 				continue;
 			}

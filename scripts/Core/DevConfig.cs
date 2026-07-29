@@ -10,6 +10,7 @@ public static class DevConfig
 	private static bool _grantStarterPet;
 	private static int _deadTestPets;
 	private static bool _grantAllGems;
+	private static bool _grantAllCards;
 
 	// 總開關：只有 test_mode=true 時，下面所有測試旗標才會生效。
 	// 檔案不存在（例如正式版沒打包 dev_config.cfg）時預設 false → 全部關閉。
@@ -52,6 +53,16 @@ public static class DevConfig
 		}
 	}
 
+	// 測試模式專用：是否自動解鎖全部怪物卡片。
+	public static bool GrantAllCards
+	{
+		get
+		{
+			EnsureLoaded();
+			return _testMode && _grantAllCards;
+		}
+	}
+
 	private static void EnsureLoaded()
 	{
 		if (_loaded)
@@ -71,5 +82,6 @@ public static class DevConfig
 		_grantStarterPet = (bool)config.GetValue("dev", "grant_starter_pet", false);
 		_deadTestPets = config.GetValue("dev", "dead_test_pets", 0).AsInt32();
 		_grantAllGems = (bool)config.GetValue("dev", "grant_all_gems", false);
+		_grantAllCards = (bool)config.GetValue("dev", "grant_all_cards", false);
 	}
 }

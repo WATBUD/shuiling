@@ -5,6 +5,13 @@ public static class ExternalModelLibrary
 {
 	private static readonly Dictionary<ulong, AnimationPlayer?> AnimationPlayerCache = new();
 	private static readonly Dictionary<ulong, Node3D?> RootMotionNodeCache = new();
+	private static AnimationLibrary? _kayKitSkeletonAnimations;
+	private const string KayKitSkeletonModelFolder = "/kaykit_skeletons/";
+	private static readonly string[] KayKitSkeletonAnimationScenes =
+	{
+		"res://assets/models/monsters/kaykit_skeletons/animations/Rig_Medium_General.glb",
+		"res://assets/models/monsters/kaykit_skeletons/animations/Rig_Medium_MovementBasic.glb",
+	};
 
 	private static readonly string[] PlayerModels =
 	{
@@ -30,6 +37,24 @@ public static class ExternalModelLibrary
 		("res://assets/models/characters/mage.glb", "character.mage"),
 		("res://assets/models/characters/rogue.glb", "character.rogue"),
 		("res://assets/models/characters/guard.gltf", "character.guard"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-a.glb", "character.blocky.craftsman"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-b.glb", "character.blocky.adventurer"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-c.glb", "character.blocky.elder"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-d.glb", "character.blocky.android"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-e.glb", "character.blocky.scholar"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-f.glb", "character.blocky.villager"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-g.glb", "character.blocky.crimson_knight"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-h.glb", "character.blocky.arcane_knight"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-i.glb", "character.blocky.alchemist"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-j.glb", "character.blocky.guard"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-k.glb", "character.blocky.traveler"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-l.glb", "character.blocky.goblin"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-m.glb", "character.blocky.ranger"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-n.glb", "character.blocky.mystic"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-o.glb", "character.blocky.orc"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-p.glb", "character.blocky.merchant"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-q.glb", "character.blocky.gentleman"),
+		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-r.glb", "character.blocky.ninja"),
 	};
 
 	// Every model the player can pick on the character-select screen: humanoids
@@ -73,6 +98,13 @@ public static class ExternalModelLibrary
 		foreach (string path in MonsterRanged)
 		{
 			TryAdd(path, MonsterModelDisplay(path));
+		}
+		foreach (MonsterSpeciesDefinition species in MonsterSpeciesCatalog.Current.All)
+		{
+			foreach (string path in species.ModelPaths)
+			{
+				TryAdd(path, MonsterModelDisplay(path));
+			}
 		}
 
 		// Scan the whole cube-pets folder so EVERY pet model is selectable
@@ -153,6 +185,10 @@ public static class ExternalModelLibrary
 		["panda"] = "character.mob.panda",
 		["penguin"] = "character.mob.penguin",
 		["pig"] = "character.mob.pig",
+		["skeleton warrior"] = "character.mob.skeleton_warrior",
+		["rogue skeleton"] = "character.mob.skeleton_rogue",
+		["mage skeleton"] = "character.mob.skeleton_mage",
+		["minion skeleton"] = "character.mob.skeleton_minion",
 	};
 
 	private static string MonsterModelDisplay(string path)
@@ -172,6 +208,59 @@ public static class ExternalModelLibrary
 
 	private static Dictionary<string, string>? _cardKeyToModelPath;
 
+	private static void EnsureCardModelRegistry()
+	{
+		if (_cardKeyToModelPath != null)
+		{
+			return;
+		}
+
+		var registry = new Dictionary<string, string>();
+		_cardKeyToModelPath = registry;
+
+		void Register(string path)
+		{
+			if (string.IsNullOrWhiteSpace(path)
+				|| !ResourceLoader.Exists(path)
+				|| HasInvalidImportRemap(path))
+			{
+				return;
+			}
+
+			string key = CanonicalModelKey(path);
+			// Every card must have one explicit monster name. This prevents
+			// player/NPC models and untranslated filenames entering the album.
+			if (string.IsNullOrWhiteSpace(key)
+				|| !MonsterModelNameKeys.ContainsKey(key)
+				|| registry.ContainsKey(key))
+			{
+				return;
+			}
+
+			registry[key] = path;
+		}
+
+		foreach (string path in MonsterMelee)
+		{
+			Register(path);
+		}
+		foreach (string path in MonsterRanged)
+		{
+			Register(path);
+		}
+		foreach (MonsterSpeciesDefinition species in MonsterSpeciesCatalog.Current.All)
+		{
+			foreach (string path in species.ModelPaths)
+			{
+				Register(path);
+			}
+		}
+		foreach (string path in ListModelFiles("res://assets/models/pets/cube_pets/"))
+		{
+			Register(path);
+		}
+	}
+
 	// Reverse lookup: canonical card key → a concrete model path, so the album can
 	// instantiate a 3D preview from a stored card key. Cached after first build.
 	public static string GetModelPathForCardKey(string cardKey)
@@ -181,20 +270,20 @@ public static class ExternalModelLibrary
 			return string.Empty;
 		}
 
-		if (_cardKeyToModelPath == null)
+		EnsureCardModelRegistry();
+
+		return _cardKeyToModelPath!.TryGetValue(cardKey, out string? modelPath) ? modelPath : string.Empty;
+	}
+
+	public static bool IsValidCardKey(string cardKey)
+	{
+		if (string.IsNullOrWhiteSpace(cardKey))
 		{
-			_cardKeyToModelPath = new Dictionary<string, string>();
-			foreach ((string path, string _) in GetAvailableCharacterModels())
-			{
-				string key = CanonicalModelKey(path);
-				if (!_cardKeyToModelPath.ContainsKey(key))
-				{
-					_cardKeyToModelPath[key] = path;
-				}
-			}
+			return false;
 		}
 
-		return _cardKeyToModelPath.TryGetValue(cardKey, out string? modelPath) ? modelPath : string.Empty;
+		EnsureCardModelRegistry();
+		return _cardKeyToModelPath!.ContainsKey(cardKey);
 	}
 
 	// Fixed, stable list of the named monster-card keys (used to assign each NPC a
@@ -203,7 +292,8 @@ public static class ExternalModelLibrary
 	{
 		get
 		{
-			var keys = new List<string>(MonsterModelNameKeys.Keys);
+			EnsureCardModelRegistry();
+			var keys = new List<string>(_cardKeyToModelPath!.Keys);
 			keys.Sort(System.StringComparer.Ordinal);
 			return keys;
 		}
@@ -303,6 +393,7 @@ public static class ExternalModelLibrary
 			return null;
 		}
 
+		EnsureKayKitSkeletonAnimations(model, path);
 		ApplyFallbackMaterials(model, path);
 		TryPlayActorAnimation(model, "idle");
 		return model;
@@ -464,6 +555,7 @@ public static class ExternalModelLibrary
 			"wild_marsh" => new Vector3(0.96f, 0.96f, 0.96f),
 			"wild_badlands" => new Vector3(1.12f, 1.12f, 1.12f),
 			"wild_snow" => new Vector3(1.08f, 1.08f, 1.08f),
+			"wild_skeleton" => new Vector3(1.10f, 1.10f, 1.10f),
 			_ => new Vector3(1.04f, 1.04f, 1.04f),
 		};
 	}
@@ -522,6 +614,7 @@ public static class ExternalModelLibrary
 		model.RotationDegrees = new Vector3(0.0f, 180.0f, 0.0f);
 		model.Scale = new Vector3(0.88f, 0.88f, 0.88f);
 		player.AddChild(model);
+		EnsureKayKitSkeletonAnimations(model, path);
 		ApplyFallbackMaterials(model, path);
 		TryPlayActorAnimation(model, "idle");
 		return model;
@@ -558,7 +651,9 @@ public static class ExternalModelLibrary
 		model.RotationDegrees = rotationDegrees;
 		model.Scale = scale;
 		parent.AddChild(model);
+		EnsureKayKitSkeletonAnimations(model, path);
 		ApplyFallbackMaterials(model, path);
+		TryPlayActorAnimation(model, "idle");
 		return true;
 	}
 
@@ -660,6 +755,7 @@ public static class ExternalModelLibrary
 			model.RotationDegrees = rotationDegrees;
 			model.Scale = GetModelSpecificScale(path, scale);
 			parent.AddChild(model);
+			EnsureKayKitSkeletonAnimations(model, path);
 			ApplyFallbackMaterials(model, path);
 			TryPlayActorAnimation(model, "idle");
 			return true;
@@ -676,6 +772,73 @@ public static class ExternalModelLibrary
 		}
 
 		return requestedScale;
+	}
+
+	private static void EnsureKayKitSkeletonAnimations(Node3D model, string sourcePath)
+	{
+		if (!sourcePath.Contains(KayKitSkeletonModelFolder, System.StringComparison.OrdinalIgnoreCase)
+			|| sourcePath.Contains("/animations/", System.StringComparison.OrdinalIgnoreCase)
+			|| FindAnimationPlayer(model) != null)
+		{
+			return;
+		}
+
+		AnimationLibrary? animations = GetKayKitSkeletonAnimationLibrary();
+		if (animations == null)
+		{
+			return;
+		}
+
+		var player = new AnimationPlayer { Name = "KayKitAnimationPlayer" };
+		model.AddChild(player);
+		player.AddAnimationLibrary("", animations);
+	}
+
+	private static AnimationLibrary? GetKayKitSkeletonAnimationLibrary()
+	{
+		if (_kayKitSkeletonAnimations != null)
+		{
+			return _kayKitSkeletonAnimations;
+		}
+
+		var merged = new AnimationLibrary();
+		foreach (string scenePath in KayKitSkeletonAnimationScenes)
+		{
+			if (!ResourceLoader.Exists(scenePath)
+				|| ResourceLoader.Load<PackedScene>(scenePath) is not PackedScene packedScene
+				|| packedScene.Instantiate() is not Node animationRoot)
+			{
+				continue;
+			}
+
+			AnimationPlayer? sourcePlayer = FindAnimationPlayer(animationRoot);
+			if (sourcePlayer != null)
+			{
+				foreach (StringName animationName in sourcePlayer.GetAnimationList())
+				{
+					if (animationName == "RESET" || merged.HasAnimation(animationName))
+					{
+						continue;
+					}
+
+					Animation? animation = sourcePlayer.GetAnimation(animationName);
+					if (animation != null)
+					{
+						merged.AddAnimation(animationName, animation);
+					}
+				}
+			}
+
+			animationRoot.Free();
+		}
+
+		if (merged.GetAnimationList().Count == 0)
+		{
+			return null;
+		}
+
+		_kayKitSkeletonAnimations = merged;
+		return _kayKitSkeletonAnimations;
 	}
 
 	private static bool IsBlockedActorPath(Node3D parent, string path)

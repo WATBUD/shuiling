@@ -12,7 +12,6 @@ public partial class MercenaryShopPanel : PanelContainer
 	private Button _mercTabButton = null!;
 	private Button _companionTabButton = null!;
 	private int _selectedTab; // 0 = 傭兵, 1 = 夥伴
-	private float _refreshUiRemaining;
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -26,21 +25,6 @@ public partial class MercenaryShopPanel : PanelContainer
 	public override void _ExitTree()
 	{
 		LocaleText.LanguageChanged -= RefreshAll;
-	}
-
-	public override void _Process(double delta)
-	{
-		if (!Visible)
-		{
-			return;
-		}
-
-		_refreshUiRemaining -= (float)delta;
-		if (_refreshUiRemaining <= 0.0f)
-		{
-			_refreshUiRemaining = 1.0f;
-			RefreshAll();
-		}
 	}
 
 	public void Bind(PlayerController player)

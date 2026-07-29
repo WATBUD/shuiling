@@ -32,8 +32,8 @@ public partial class CombatProjectile : Node3D
 	public Vector3 SpawnOrigin { get; set; }
 	public ProjectileBehaviorProfile Behavior { get; set; } = new();
 
-	private readonly List<StandardMaterial3D> _materials = new();
 	private readonly HashSet<SimpleActor> _alreadyHit = new();
+	private readonly List<SimpleActor> _targetScratch = new(24);
 	private Vector3 _direction = Vector3.Forward;
 	private SimpleActor? _homingTarget;
 	private float _traveled;
@@ -304,11 +304,17 @@ public partial class CombatProjectile : Node3D
 
 	private List<SimpleActor> FindTargets(Vector3 center, float radius)
 	{
+		_targetScratch.Clear();
 		if (Attacker != null && IsInstanceValid(Attacker))
 		{
-			return Attacker.FindProjectileTargets(center, radius, _alreadyHit);
+			Attacker.FindProjectileTargets(center, radius, _alreadyHit, _targetScratch);
 		}
-		return PlayerAttacker?.FindPlayerProjectileTargets(center, radius, _alreadyHit) ?? new List<SimpleActor>();
+		else if (PlayerAttacker != null && IsInstanceValid(PlayerAttacker))
+		{
+			PlayerAttacker.FindPlayerProjectileTargets(center, radius, _alreadyHit, _targetScratch);
+		}
+
+		return _targetScratch;
 	}
 
 	private int ResolveProjectileHit(SimpleActor target, int damage)
@@ -353,13 +359,16 @@ public partial class CombatProjectile : Node3D
 			int bladeCount = VisualSkillId == "gem.skill.whirlwind" ? 3 : 1;
 			for (int index = 0; index < bladeCount; index++)
 			{
-				AddFxMesh(
+				MeshInstance3D slash = AddFxSprite(
 					$"SlashBlade{index}",
-					new BoxMesh { Size = new Vector3(HitRadius * (VisualSkillId == "gem.skill.whirlwind" ? 2.35f : 1.9f), 0.055f, HitRadius * 0.34f) },
+					index % 2 == 0 ? "slash_03.png" : "slash_04.png",
 					new Vector3(0.0f, index * 0.08f, 0.0f),
-					new Vector3(0.0f, index * (360.0f / bladeCount), index % 2 == 0 ? 18.0f : -18.0f),
+					new Vector2(
+						HitRadius * (VisualSkillId == "gem.skill.whirlwind" ? 2.8f : 2.25f),
+						HitRadius * (VisualSkillId == "gem.skill.whirlwind" ? 1.65f : 1.25f)),
 					new Color(1.0f, 0.92f, 0.58f, 0.90f)
 				);
+				slash.RotationDegrees = new Vector3(0.0f, index * (360.0f / bladeCount), index % 2 == 0 ? 18.0f : -18.0f);
 			}
 			AddProjectileTrail(new Color(EffectColor.R, EffectColor.G, EffectColor.B, 0.78f), VisualSkillId == "gem.skill.whirlwind" ? 26 : 12, 0.24f, HitRadius * 0.045f, Vector3.Zero);
 			AddSupportAccents();
@@ -390,7 +399,7 @@ public partial class CombatProjectile : Node3D
 		if (VisualSkillId == "gem.skill.laser")
 		{
 			AddFxMesh("LaserCore", new CapsuleMesh { Radius = 0.075f, Height = 1.70f }, Vector3.Zero, new Vector3(90.0f, 0.0f, 0.0f), new Color(0.82f, 0.98f, 1.0f, 0.98f));
-			AddFxMesh("LaserGlow", new CapsuleMesh { Radius = 0.19f, Height = 1.42f }, Vector3.Zero, new Vector3(90.0f, 0.0f, 0.0f), new Color(0.18f, 0.76f, 1.0f, 0.42f));
+			AddFxSprite("LaserGlow", "flare_01.png", Vector3.Zero, new Vector2(0.78f, 0.78f), new Color(0.18f, 0.76f, 1.0f, 0.72f));
 			AddProjectileTrail(new Color(0.26f, 0.84f, 1.0f, 0.76f), 18, 0.30f, 0.035f, Vector3.Zero);
 			AddSupportAccents();
 			return;
@@ -398,8 +407,8 @@ public partial class CombatProjectile : Node3D
 
 		if (VisualSkillId == "gem.skill.meteor")
 		{
-			AddFxMesh("MeteorCore", new SphereMesh { Radius = 0.36f, Height = 0.72f }, Vector3.Zero, Vector3.Zero, new Color(0.30f, 0.20f, 0.16f, 1.0f));
-			AddFxMesh("MeteorFlame", new SphereMesh { Radius = 0.48f, Height = 0.96f }, new Vector3(0.0f, 0.0f, 0.24f), Vector3.Zero, new Color(1.0f, 0.28f, 0.05f, 0.62f));
+			AddFxSprite("MeteorCore", "fire_01.png", Vector3.Zero, new Vector2(1.15f, 1.45f), new Color(1.0f, 0.32f, 0.05f, 0.94f));
+			AddFxSprite("MeteorFlame", "flame_05.png", new Vector3(0.0f, 0.0f, 0.24f), new Vector2(1.38f, 1.72f), new Color(1.0f, 0.18f, 0.025f, 0.72f));
 			AddProjectileTrail(new Color(1.0f, 0.18f, 0.025f, 0.86f), 34, 0.48f, 0.075f, new Vector3(0.0f, 1.4f, 0.0f));
 			AddProjectileTrail(new Color(0.22f, 0.18f, 0.16f, 0.52f), 18, 0.68f, 0.13f, new Vector3(0.0f, 0.7f, 0.0f));
 			AddSupportAccents();
@@ -408,25 +417,34 @@ public partial class CombatProjectile : Node3D
 
 		if (VisualSkillId == "gem.skill.fireball")
 		{
-			AddFxMesh("FireballCore", new SphereMesh { Radius = 0.30f, Height = 0.60f }, Vector3.Zero, Vector3.Zero, new Color(1.0f, 0.78f, 0.18f, 1.0f));
-			AddFxMesh("FireballFlame", new SphereMesh { Radius = 0.42f, Height = 0.84f }, new Vector3(0.0f, 0.0f, 0.18f), Vector3.Zero, new Color(1.0f, 0.18f, 0.03f, 0.58f));
+			AddFxSprite("FireballCore", "fire_02.png", Vector3.Zero, new Vector2(0.82f, 0.96f), new Color(1.0f, 0.74f, 0.18f, 1.0f));
+			AddFxSprite("FireballFlame", "flame_05.png", new Vector3(0.0f, 0.0f, 0.18f), new Vector2(1.08f, 1.22f), new Color(1.0f, 0.18f, 0.03f, 0.68f));
 			AddProjectileTrail(new Color(1.0f, 0.24f, 0.035f, 0.88f), 28, 0.42f, 0.06f, new Vector3(0.0f, 0.9f, 0.0f));
 			AddSupportAccents();
 			return;
 		}
 
-		AddFxMesh(
+		if (VisualSkillId == "gem.skill.lightning")
+		{
+			AddFxSprite("LightningCore", "spark_06.png", Vector3.Zero, new Vector2(0.92f, 0.92f), new Color(1.0f, 0.94f, 0.34f, 0.98f));
+			AddFxSprite("LightningGlow", "flare_01.png", Vector3.Zero, new Vector2(0.68f, 0.68f), new Color(0.62f, 0.88f, 1.0f, 0.82f));
+			AddProjectileTrail(new Color(1.0f, 0.92f, 0.32f, 0.92f), 24, 0.28f, 0.055f, Vector3.Zero);
+			AddSupportAccents();
+			return;
+		}
+
+		AddFxSprite(
 			"AttackOrb",
-			new SphereMesh { Radius = 0.22f, Height = 0.44f },
+			KenneyParticleVfx.TextureFor("MagicProjectile", VisualSkillId, ElementId),
 			Vector3.Zero,
-			Vector3.Zero,
+			new Vector2(0.62f, 0.62f),
 			EffectColor
 		);
-		AddFxMesh(
+		AddFxSprite(
 			"Trail",
-			new CapsuleMesh { Radius = 0.06f, Height = 0.72f },
+			"light_02.png",
 			new Vector3(0.0f, 0.0f, 0.4f),
-			new Vector3(90.0f, 0.0f, 0.0f),
+			new Vector2(0.28f, 0.88f),
 			new Color(EffectColor.R, EffectColor.G, EffectColor.B, EffectColor.A * 0.5f)
 		);
 		AddProjectileTrail(new Color(EffectColor.R, EffectColor.G, EffectColor.B, 0.66f), 18, 0.34f, 0.04f, Vector3.Zero);
@@ -437,13 +455,13 @@ public partial class CombatProjectile : Node3D
 	{
 		if (Behavior.SplitCount > 0)
 		{
-			AddFxMesh("SplitShardLeft", new BoxMesh { Size = new Vector3(0.07f, 0.07f, 0.55f) }, new Vector3(-0.22f, 0.0f, 0.05f), new Vector3(0.0f, -24.0f, 18.0f), new Color(0.82f, 0.92f, 1.0f, 0.78f));
-			AddFxMesh("SplitShardRight", new BoxMesh { Size = new Vector3(0.07f, 0.07f, 0.55f) }, new Vector3(0.22f, 0.0f, 0.05f), new Vector3(0.0f, 24.0f, -18.0f), new Color(0.82f, 0.92f, 1.0f, 0.78f));
+			AddFxSprite("SplitShardLeft", "trace_06.png", new Vector3(-0.22f, 0.0f, 0.05f), new Vector2(0.24f, 0.68f), new Color(0.82f, 0.92f, 1.0f, 0.78f));
+			AddFxSprite("SplitShardRight", "trace_06.png", new Vector3(0.22f, 0.0f, 0.05f), new Vector2(0.24f, 0.68f), new Color(0.82f, 0.92f, 1.0f, 0.78f));
 		}
 		if (Behavior.ChainBounces > 0)
 		{
-			AddFxMesh("ChainSparkA", new BoxMesh { Size = new Vector3(0.55f, 0.035f, 0.035f) }, Vector3.Zero, new Vector3(24.0f, 35.0f, 18.0f), new Color(0.72f, 0.94f, 1.0f, 0.88f));
-			AddFxMesh("ChainSparkB", new BoxMesh { Size = new Vector3(0.035f, 0.55f, 0.035f) }, Vector3.Zero, new Vector3(-18.0f, -20.0f, 32.0f), new Color(0.72f, 0.94f, 1.0f, 0.72f));
+			AddFxSprite("ChainSparkA", "spark_06.png", Vector3.Zero, new Vector2(0.62f, 0.62f), new Color(0.72f, 0.94f, 1.0f, 0.88f));
+			AddFxSprite("ChainSparkB", "spark_07.png", Vector3.Zero, new Vector2(0.44f, 0.44f), new Color(0.72f, 0.94f, 1.0f, 0.72f));
 		}
 		if (Behavior.PierceCount > 0)
 		{
@@ -451,55 +469,36 @@ public partial class CombatProjectile : Node3D
 		}
 		if (Behavior.ExplosionRadius > 0.0f)
 		{
-			AddFxMesh("ExplosionCharge", new SphereMesh { Radius = 0.50f, Height = 1.0f }, Vector3.Zero, Vector3.Zero, new Color(1.0f, 0.30f, 0.045f, 0.20f));
+			AddFxSprite("ExplosionCharge", "fire_01.png", Vector3.Zero, new Vector2(1.0f, 1.0f), new Color(1.0f, 0.30f, 0.045f, 0.34f));
 		}
 		if (HasLifeSteal)
 		{
-			AddFxMesh("LifeStealCore", new SphereMesh { Radius = 0.12f, Height = 0.24f }, new Vector3(0.0f, 0.18f, 0.0f), Vector3.Zero, new Color(0.72f, 0.16f, 0.92f, 0.78f));
+			AddFxSprite("LifeStealCore", "magic_05.png", new Vector3(0.0f, 0.18f, 0.0f), new Vector2(0.48f, 0.48f), new Color(0.72f, 0.16f, 0.92f, 0.78f));
 		}
 	}
 
 	private void AddProjectileTrail(Color color, int amount, float lifetime, float size, Vector3 gravity)
 	{
-		var particleMaterial = new StandardMaterial3D
-		{
-			AlbedoColor = color,
-			EmissionEnabled = true,
-			Emission = new Color(color.R, color.G, color.B),
-			EmissionEnergyMultiplier = 2.7f,
-			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-			BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled,
-		};
-		var trailMesh = new QuadMesh
-		{
-			Size = new Vector2(Mathf.Max(size, 0.022f), Mathf.Max(size * 3.2f, 0.075f)),
-			Material = particleMaterial,
-		};
-		var processMaterial = new ParticleProcessMaterial
-		{
-			EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere,
-			EmissionSphereRadius = Mathf.Max(size * 1.8f, 0.04f),
-			Direction = Vector3.Back,
-			Spread = 38.0f,
-			InitialVelocityMin = 0.15f,
-			InitialVelocityMax = 1.2f,
-			Gravity = gravity,
-			ScaleMin = 0.55f,
-			ScaleMax = 1.25f,
-			Color = color,
-		};
-		AddChild(new GpuParticles3D
-		{
-			Name = "ProjectileTrail",
-			Amount = amount,
-			Lifetime = lifetime,
-			LocalCoords = false,
-			Randomness = 0.55f,
-			ProcessMaterial = processMaterial,
-			DrawPass1 = trailMesh,
-			Emitting = true,
-		});
+		string texture = IsArrow
+			? "trace_03.png"
+			: color.R + color.G + color.B < 0.80f
+				? "smoke_06.png"
+				: KenneyParticleVfx.TextureFor("ProjectileTrail", VisualSkillId, ElementId);
+		AddChild(KenneyParticleVfx.CreateBurst(
+			"ProjectileTrail",
+			texture,
+			color,
+			amount,
+			lifetime,
+			0.15f,
+			1.2f,
+			38.0f,
+			gravity,
+			Mathf.Max(size * 2.0f, 0.035f),
+			Mathf.Max(size * 4.2f, 0.10f),
+			Mathf.Max(size * 1.8f, 0.04f),
+			false,
+			Vector3.Back));
 	}
 
 	private void AddFxMesh(string nodeName, Mesh mesh, Vector3 position, Vector3 rotationDegrees, Color color)
@@ -511,11 +510,9 @@ public partial class CombatProjectile : Node3D
 			Roughness = 0.2f,
 			EmissionEnabled = true,
 			Emission = new Color(color.R, color.G, color.B),
-			EmissionEnergyMultiplier = 2.2f,
+			EmissionEnergyMultiplier = 4.6f,
 			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
 		};
-		_materials.Add(material);
-
 		var meshInstance = new MeshInstance3D
 		{
 			Name = nodeName,
@@ -525,5 +522,13 @@ public partial class CombatProjectile : Node3D
 		};
 		meshInstance.SetSurfaceOverrideMaterial(0, material);
 		AddChild(meshInstance);
+	}
+
+	private MeshInstance3D AddFxSprite(string nodeName, string texture, Vector3 position, Vector2 size, Color color)
+	{
+		MeshInstance3D sprite = KenneyParticleVfx.CreateSprite(nodeName, texture, color, size);
+		sprite.Position = position;
+		AddChild(sprite);
+		return sprite;
 	}
 }

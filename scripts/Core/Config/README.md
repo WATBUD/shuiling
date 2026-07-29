@@ -14,6 +14,7 @@
 - `WorldDropConfig.cs`：地面物品壽命、拾取距離、輪詢與回收上限
 - `RecruitmentConfig.cs`：夥伴招募所庫存上限、補充週期與手動刷新費用
 - `MerchantConfig.cs`：一般商人、鐵匠與夥伴商店的刷新週期
+- `CityNpcConfig.cs`：城鎮功能 NPC 的職業模型對應
 
 修改原則：
 

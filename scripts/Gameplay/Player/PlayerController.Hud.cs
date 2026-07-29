@@ -834,6 +834,7 @@ public partial class PlayerController
 		if (_activeBoss == null || !IsInstanceValid(_activeBoss) || _activeBoss.IsDefeated || !_activeBoss.Visible)
 		{
 			_activeBoss = null;
+			_bossHudRenderedActor = null;
 			_bossHudCombatVisibleRemaining = 0.0f;
 			_bossHudPanel.Visible = false;
 			return;
@@ -847,14 +848,25 @@ public partial class PlayerController
 		}
 
 		_bossHudPanel.Visible = true;
-		_bossHudNameLabel.Text = LocaleText.F("boss.hud.name", _activeBoss.Level, _activeBoss.LocalizedDisplayName);
-		_bossHudNameLabel.AddThemeColorOverride(
-			"font_color",
-			_activeBoss.IsBossEnraged ? new Color(1.0f, 0.24f, 0.10f) : new Color(1.0f, 0.78f, 0.30f));
 		int maxHealth = Mathf.Max(_activeBoss.EffectiveMaxHealth, 1);
 		int currentHealth = Mathf.Clamp(_activeBoss.CurrentHealth, 0, maxHealth);
-		_bossHudHealthLabel.Text = LocaleText.F("boss.hud.health", currentHealth, maxHealth);
-		_bossHudHealthBar.Value = currentHealth / (double)maxHealth * 100.0;
+		bool enraged = _activeBoss.IsBossEnraged;
+		if (_bossHudRenderedActor != _activeBoss
+			|| _bossHudRenderedHealth != currentHealth
+			|| _bossHudRenderedMaxHealth != maxHealth
+			|| _bossHudRenderedEnraged != enraged)
+		{
+			_bossHudRenderedActor = _activeBoss;
+			_bossHudRenderedHealth = currentHealth;
+			_bossHudRenderedMaxHealth = maxHealth;
+			_bossHudRenderedEnraged = enraged;
+			_bossHudNameLabel.Text = LocaleText.F("boss.hud.name", _activeBoss.Level, _activeBoss.LocalizedDisplayName);
+			_bossHudNameLabel.AddThemeColorOverride(
+				"font_color",
+				enraged ? new Color(1.0f, 0.24f, 0.10f) : new Color(1.0f, 0.78f, 0.30f));
+			_bossHudHealthLabel.Text = LocaleText.F("boss.hud.health", currentHealth, maxHealth);
+			_bossHudHealthBar.Value = currentHealth / (double)maxHealth * 100.0;
+		}
 	}
 
 	private void UpdateCaptureAmmoHud()
@@ -949,11 +961,16 @@ public partial class PlayerController
 
 	private void UpdateTargetInfoPanel()
 	{
-		bool foundActor = _cameraMode == CameraViewMode.GodView
-			? TryRaycastActor(GetViewport().GetMousePosition(), out SimpleActor actor)
-			: TryRaycastActor(out actor);
-		if (foundActor)
+		SimpleActor? actor = FocusedTarget;
+		if (actor != null)
 		{
+			// The dedicated boss combat bar already shows the same information.
+			if (actor.IsBoss && _activeBoss == actor && _bossHudPanel != null && _bossHudPanel.Visible)
+			{
+				_targetInfoPanel.HideActor();
+				return;
+			}
+
 			_targetInfoPanel.ShowActor(actor);
 			return;
 		}

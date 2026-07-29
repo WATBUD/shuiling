@@ -639,7 +639,7 @@ public partial class InventoryPanel : PanelContainer
 			&& loadout != null
 			&& BuildCatalog.HasMainAttackCore(loadout)
 			&& !(BuildCatalog.IsProjectileSupportGem(itemId)
-				&& !BuildCatalog.HasRangedActiveSkill(loadout));
+				&& !BuildCatalog.HasProjectileActiveSkill(loadout));
 	}
 
 	// Double-clicking an equipped slot takes the item off and returns it to the bag
@@ -1122,7 +1122,7 @@ public partial class InventoryPanel : PanelContainer
 					reasonKey = "tooltip.requires_main_core";
 					return false;
 				}
-				if (BuildCatalog.IsProjectileSupportGem(itemId) && !BuildCatalog.HasRangedActiveSkill(selectedLoadout))
+				if (BuildCatalog.IsProjectileSupportGem(itemId) && !BuildCatalog.HasProjectileActiveSkill(selectedLoadout))
 				{
 					reasonKey = "tooltip.requires_ranged_skill";
 					return false;
@@ -1361,7 +1361,7 @@ public partial class InventoryPanel : PanelContainer
 		CompanionBuildLoadout? loadout = GetSelectedLoadout();
 		if (kind == InventoryItemKind.SkillGem
 			&& BuildCatalog.IsProjectileSupportGem(itemId)
-			&& (loadout == null || !BuildCatalog.HasRangedActiveSkill(loadout)))
+			&& (loadout == null || !BuildCatalog.HasProjectileActiveSkill(loadout)))
 		{
 			return false;
 		}
@@ -1555,6 +1555,23 @@ public partial class InventoryPanel : PanelContainer
 			return true;
 		}
 
+		var cascadedProjectileSupports = new List<string>();
+		if (_selectedTarget == EquipTarget.SupportCore
+			&& _selectedSupportIndex == 0
+			&& BuildCatalog.IsMainAttackCore(itemId)
+			&& !BuildCatalog.IsProjectileActiveSkillGem(itemId))
+		{
+			CompanionBuildLoadout loadout = GetSelectedLoadout()!;
+			for (int index = 1; index < loadout.SkillGemIds.Length; index++)
+			{
+				string supportId = loadout.GetSkillGemId(index);
+				if (BuildCatalog.IsProjectileSupportGem(supportId))
+				{
+					cascadedProjectileSupports.Add(supportId);
+				}
+			}
+		}
+
 		ApplyEquipToSelectedTarget(itemId);
 		if (GetEquippedItemId(_selectedTarget) != itemId)
 		{
@@ -1563,6 +1580,10 @@ public partial class InventoryPanel : PanelContainer
 
 		_player.ConsumeInventoryItemForEquip(itemId);
 		_player.ReturnInventoryItemFromUnequip(displaced);
+		foreach (string supportId in cascadedProjectileSupports)
+		{
+			_player.ReturnInventoryItemFromUnequip(supportId);
+		}
 		HideItemTooltip();
 		RefreshAll();
 		return true;
@@ -1877,6 +1898,7 @@ public partial class InventoryPanel : PanelContainer
 		AddStatLine(lines, "stat.attack", Mathf.RoundToInt(item.AttackBonus * starMultiplier));
 		AddStatLine(lines, "stat.defense", Mathf.RoundToInt(item.DefenseBonus * starMultiplier));
 		AddPercentLine(lines, "tooltip.move_speed", item.MoveSpeedBonus * starMultiplier);
+		AddStatLine(lines, "stat.jump_power", Mathf.RoundToInt(item.JumpPowerBonus * starMultiplier));
 		if (item.Slot == EquipmentSlot.Weapon && item.Id != "equip.weapon.none")
 		{
 			int attackSpeed = BuildCatalog.GetWeaponAttackSpeed(item, starMultiplier);

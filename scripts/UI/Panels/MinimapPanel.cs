@@ -12,6 +12,7 @@ public partial class MinimapPanel : PanelContainer
 	private Label _npcLegendLabel = null!;
 	private Label _monsterLegendLabel = null!;
 	private float _monsterCountRefreshRemaining;
+	private float _redrawRemaining;
 
 	public override void _Ready()
 	{
@@ -26,8 +27,15 @@ public partial class MinimapPanel : PanelContainer
 
 	public override void _Process(double delta)
 	{
-		_mapView.QueueRedraw();
-		_monsterCountRefreshRemaining -= (float)delta;
+		float step = (float)delta;
+		_redrawRemaining -= step;
+		if (_redrawRemaining <= 0.0f)
+		{
+			_redrawRemaining = PerformanceConfig.MinimapRefreshIntervalSeconds;
+			_mapView.QueueRedraw();
+		}
+
+		_monsterCountRefreshRemaining -= step;
 		if (_monsterCountRefreshRemaining <= 0.0f)
 		{
 			_monsterCountRefreshRemaining = 0.25f;
@@ -205,14 +213,21 @@ public partial class MinimapView : Control
 
 	private void DrawActors(string groupName, Color color, float dotRadius, Vector2 center, float radius, bool activePartyOnly = false)
 	{
-		foreach (Node node in GetTree().GetNodesInGroup(groupName))
+		foreach (SimpleActor actor in SimpleActor.ActiveActors)
 		{
-			if (node is not SimpleActor actor || actor.IsDefeated || !actor.Visible)
+			if (!IsInstanceValid(actor) || actor.IsDefeated || !actor.Visible)
 			{
 				continue;
 			}
 
-			if (activePartyOnly && !actor.IsInActiveParty)
+			bool belongsToGroup = groupName switch
+			{
+				"monsters" => actor.ActorKind == "monster" && !actor.IsCaptured,
+				"npcs" => actor.ActorKind != "monster" && !actor.IsCaptured,
+				"captured_actors" => actor.IsCaptured,
+				_ => false,
+			};
+			if (!belongsToGroup || (activePartyOnly && !actor.IsInActiveParty))
 			{
 				continue;
 			}

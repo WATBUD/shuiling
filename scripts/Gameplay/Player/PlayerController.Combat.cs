@@ -55,9 +55,9 @@ public partial class PlayerController
 
 		bool hitAny = false;
 		SimpleActor? focused = FocusedTarget;
-		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
+		foreach (SimpleActor monster in SimpleActor.ActiveActors)
 		{
-			if (node is not SimpleActor monster || !IsInstanceValid(monster) || !monster.IsHostileToPlayer)
+			if (!IsInstanceValid(monster) || !monster.IsHostileToPlayer)
 			{
 				continue;
 			}
@@ -79,7 +79,7 @@ public partial class PlayerController
 
 			// null attacker: for a client this forwards the hit to the host, which
 			// owns the monster's HP (same path companions/net use).
-			monster.ReceiveDamage(stats.Attack, null);
+			monster.ReceiveDamage(stats.Attack, null, this);
 			SpawnImpactEffect(monster.GlobalPosition + Vector3.Up * 0.9f);
 			hitAny = true;
 		}
@@ -100,6 +100,12 @@ public partial class PlayerController
 		Node parent = GetTree().CurrentScene ?? GetParent();
 		SkillAttackVfx.SpawnCast(parent, GlobalPosition + Vector3.Up * 1.1f + forward * 0.35f, forward,
 			skillId, stats.DamageElementId, stats.AttackColor, stats.Behavior, stats.LifeStealPercent > 0.0f);
+
+		if (skillId is "gem.skill.lightning" or "gem.skill.meteor" or "gem.skill.laser")
+		{
+			ResolvePlayerTargetedCoreStrike(target, stats, parent, skillId);
+			return;
+		}
 
 		int count = skillId == "gem.skill.whirlwind" ? 3 : 1 + Mathf.Max(stats.Behavior.ExtraProjectiles, 0);
 		for (int index = 0; index < count; index++)
@@ -127,14 +133,52 @@ public partial class PlayerController
 		}
 	}
 
-	public List<SimpleActor> FindPlayerProjectileTargets(Vector3 center, float radius, ICollection<SimpleActor> exclude)
+	private void ResolvePlayerTargetedCoreStrike(SimpleActor target, BuildStats stats, Node parent, string skillId)
 	{
-		var results = new List<SimpleActor>();
+		if (!IsInstanceValid(target) || target.IsDefeated)
+		{
+			return;
+		}
+
+		Vector3 targetPosition = target.GlobalPosition + Vector3.Up * 0.08f;
+		if (skillId == "gem.skill.laser")
+		{
+			Vector3 beamOrigin = GlobalPosition + Vector3.Up * 1.1f;
+			SkillAttackVfx.SpawnSpecial(
+				parent,
+				SkillAttackVfx.ChainEvent,
+				beamOrigin,
+				targetPosition - beamOrigin,
+				skillId,
+				stats.DamageElementId,
+				stats.AttackColor,
+				0.9f,
+				new ProjectileBehaviorProfile(),
+				stats.LifeStealPercent > 0.0f);
+		}
+
+		float radius = skillId == "gem.skill.meteor" ? 1.65f : 1.15f;
+		SkillAttackVfx.SpawnImpact(
+			parent,
+			targetPosition,
+			Vector3.Down,
+			skillId,
+			stats.DamageElementId,
+			stats.AttackColor,
+			radius,
+			new ProjectileBehaviorProfile(),
+			stats.LifeStealPercent > 0.0f);
+		ResolvePlayerProjectileHit(target, Mathf.Max(stats.Attack, 1));
+	}
+
+	public void FindPlayerProjectileTargets(Vector3 center, float radius, ICollection<SimpleActor> exclude, List<SimpleActor> results)
+	{
+		results.Clear();
 		center.Y = 0.0f;
 		float radiusSquared = radius * radius;
-		foreach (Node node in GetTree().GetNodesInGroup("monsters"))
+		foreach (SimpleActor actor in SimpleActor.ActiveActors)
 		{
-			if (node is not SimpleActor actor || !IsInstanceValid(actor) || !actor.IsHostileToPlayer
+			if (!IsInstanceValid(actor) || !actor.IsHostileToPlayer
 				|| actor.IsDefeated || (exclude != null && exclude.Contains(actor)))
 			{
 				continue;
@@ -146,8 +190,6 @@ public partial class PlayerController
 				results.Add(actor);
 			}
 		}
-		results.Sort((left, right) => center.DistanceSquaredTo(left.GlobalPosition).CompareTo(center.DistanceSquaredTo(right.GlobalPosition)));
-		return results;
 	}
 
 	public int ResolvePlayerProjectileHit(SimpleActor target, int baseDamage)
@@ -162,7 +204,7 @@ public partial class PlayerController
 		{
 			damage = Mathf.RoundToInt(damage * 1.55f);
 		}
-		int dealt = target.ReceiveDamage(damage, null);
+		int dealt = target.ReceiveDamage(damage, null, this);
 		if (dealt > 0 && GD.Randf() < stats.ControlChance)
 		{
 			target.ApplyElementStatusFromPlayer(stats.DamageElementId);
@@ -269,43 +311,17 @@ public partial class PlayerController
 	// fades on the struck monster (replaces the old swing halo).
 	private void SpawnImpactEffect(Vector3 point)
 	{
-		var material = new StandardMaterial3D
-		{
-			AlbedoColor = new Color(1.0f, 0.86f, 0.5f, 0.95f),
-			Emission = new Color(1.0f, 0.7f, 0.32f),
-			EmissionEnabled = true,
-			EmissionEnergyMultiplier = 3.4f,
-			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-			BlendMode = BaseMaterial3D.BlendModeEnum.Add,
-			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-			CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-		};
-
-		var burst = new MeshInstance3D
-		{
-			Name = "MeleeImpact",
-			Mesh = new SphereMesh { Radius = 0.32f, Height = 0.64f, RadialSegments = 12, Rings = 6 },
-			MaterialOverride = material,
-			Scale = Vector3.One * 0.35f,
-		};
-
 		Node parent = GetTree().CurrentScene ?? GetParent();
-		parent.AddChild(burst);
-		burst.GlobalPosition = point;
-
-		// Pop outward while fading, then free.
-		Tween tween = burst.CreateTween();
-		tween.SetParallel(true);
-		tween.TweenProperty(burst, "scale", Vector3.One * 1.45f, 0.18);
-		tween.TweenProperty(material, "albedo_color", new Color(1.0f, 0.7f, 0.32f, 0.0f), 0.18);
-		tween.SetParallel(false);
-		tween.TweenCallback(Callable.From(() =>
-		{
-			if (IsInstanceValid(burst))
-			{
-				burst.QueueFree();
-			}
-		}));
+		SkillAttackVfx.SpawnSpecial(
+			parent,
+			SkillAttackVfx.ImpactEvent,
+			point,
+			GetPlayerProjectileDirection(),
+			"gem.skill.whirlwind",
+			"physical",
+			new Color(1.0f, 0.78f, 0.28f, 0.94f),
+			0.62f,
+			new ProjectileBehaviorProfile());
 	}
 
 	private void CreateCaptureRhythmPanel()
@@ -680,6 +696,7 @@ public partial class PlayerController
 
 		if (Level > playerLevelBefore)
 		{
+			MarkPlayerBuildStatsDirty();
 			ShowPlayerLevelUpFeedback();
 		}
 
@@ -709,7 +726,10 @@ public partial class PlayerController
 		_isDead = true;
 		CurrentHealth = 0;
 		Velocity = Vector3.Zero;
-		PostSystemMessage(LocaleText.T("system.player.defeated"), new Color(1.0f, 0.42f, 0.36f));
+		PostSystemMessage(
+			LocaleText.T("system.player.defeated"),
+			new Color(1.0f, 0.42f, 0.36f),
+			GameMessageChannel.Combat);
 
 		foreach (SimpleActor actor in _activeParty)
 		{
