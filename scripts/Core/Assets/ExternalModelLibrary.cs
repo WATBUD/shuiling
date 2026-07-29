@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 public static class ExternalModelLibrary
 {
+	public const string KenneyBlockyRoot = "res://assets/models/characters/kenney_blocky/";
 	private static readonly Dictionary<ulong, AnimationPlayer?> AnimationPlayerCache = new();
 	private static readonly Dictionary<ulong, Node3D?> RootMotionNodeCache = new();
 	private static AnimationLibrary? _kayKitSkeletonAnimations;
@@ -37,24 +38,24 @@ public static class ExternalModelLibrary
 		("res://assets/models/characters/mage.glb", "character.mage"),
 		("res://assets/models/characters/rogue.glb", "character.rogue"),
 		("res://assets/models/characters/guard.gltf", "character.guard"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-a.glb", "character.blocky.craftsman"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-b.glb", "character.blocky.adventurer"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-c.glb", "character.blocky.elder"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-d.glb", "character.blocky.android"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-e.glb", "character.blocky.scholar"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-f.glb", "character.blocky.villager"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-g.glb", "character.blocky.crimson_knight"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-h.glb", "character.blocky.arcane_knight"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-i.glb", "character.blocky.alchemist"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-j.glb", "character.blocky.guard"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-k.glb", "character.blocky.traveler"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-l.glb", "character.blocky.goblin"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-m.glb", "character.blocky.ranger"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-n.glb", "character.blocky.mystic"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-o.glb", "character.blocky.orc"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-p.glb", "character.blocky.merchant"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-q.glb", "character.blocky.gentleman"),
-		("res://assets/_downloads/kenney_blocky-characters_20/Models/GLB format/character-r.glb", "character.blocky.ninja"),
+		(KenneyBlockyRoot + "character-a.glb", "character.blocky.craftsman"),
+		(KenneyBlockyRoot + "character-b.glb", "character.blocky.adventurer"),
+		(KenneyBlockyRoot + "character-c.glb", "character.blocky.elder"),
+		(KenneyBlockyRoot + "character-d.glb", "character.blocky.android"),
+		(KenneyBlockyRoot + "character-e.glb", "character.blocky.scholar"),
+		(KenneyBlockyRoot + "character-f.glb", "character.blocky.villager"),
+		(KenneyBlockyRoot + "character-g.glb", "character.blocky.crimson_knight"),
+		(KenneyBlockyRoot + "character-h.glb", "character.blocky.arcane_knight"),
+		(KenneyBlockyRoot + "character-i.glb", "character.blocky.alchemist"),
+		(KenneyBlockyRoot + "character-j.glb", "character.blocky.guard"),
+		(KenneyBlockyRoot + "character-k.glb", "character.blocky.traveler"),
+		(KenneyBlockyRoot + "character-l.glb", "character.blocky.goblin"),
+		(KenneyBlockyRoot + "character-m.glb", "character.blocky.ranger"),
+		(KenneyBlockyRoot + "character-n.glb", "character.blocky.mystic"),
+		(KenneyBlockyRoot + "character-o.glb", "character.blocky.orc"),
+		(KenneyBlockyRoot + "character-p.glb", "character.blocky.merchant"),
+		(KenneyBlockyRoot + "character-q.glb", "character.blocky.gentleman"),
+		(KenneyBlockyRoot + "character-r.glb", "character.blocky.ninja"),
 	};
 
 	// Every model the player can pick on the character-select screen: humanoids

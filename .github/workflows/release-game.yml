@@ -39,6 +39,42 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v5
 
+      - name: Validate curated runtime models
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $modelRoot = ".\assets\models\characters\kenney_blocky"
+          $requiredModels = @(
+            "character-a.glb",
+            "character-i.glb",
+            "character-m.glb",
+            "character-p.glb",
+            "character-q.glb"
+          )
+          foreach ($file in $requiredModels) {
+            $path = Join-Path $modelRoot $file
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Required city NPC model is missing from Git checkout: $path"
+            }
+          }
+          $allModels = @(Get-ChildItem -LiteralPath $modelRoot -Filter "character-*.glb" -File)
+          if ($allModels.Count -ne 18) {
+            throw "Expected 18 curated Kenney Blocky models, found $($allModels.Count)."
+          }
+          $textureRoot = Join-Path $modelRoot "Textures"
+          $allTextures = @(Get-ChildItem -LiteralPath $textureRoot -Filter "texture-*.png" -File)
+          if ($allTextures.Count -ne 18) {
+            throw "Expected 18 Kenney Blocky textures, found $($allTextures.Count)."
+          }
+          foreach ($model in $allModels) {
+            $suffix = $model.BaseName.Substring("character-".Length)
+            $texture = Join-Path $textureRoot "texture-$suffix.png"
+            if (-not (Test-Path -LiteralPath $texture -PathType Leaf)) {
+              throw "Texture required by $($model.Name) is missing: $texture"
+            }
+          }
+          Write-Host "Validated $($allModels.Count) curated models and $($allTextures.Count) textures."
+
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v5
         with:
