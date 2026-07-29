@@ -7,7 +7,7 @@ this file.
 ## Project
 
 Godot 4.7 C# creature-collecting action RPG. You capture monsters, build their "cores",
-and they fight for you. Build with: `dotnet build "新遊戲專案.csproj"` after any C# change.
+and they fight for you. Build with: `dotnet build "shuiling.csproj"` after any C# change.
 
 - `main_menu.tscn` — startup/main menu (`scripts/UI/Screens/MainMenu.cs`).
 - `node_3d.tscn` — gameplay world (`scripts/World/World.cs`).

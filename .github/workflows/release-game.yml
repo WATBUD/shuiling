@@ -115,8 +115,8 @@ jobs:
       - name: Restore and compile C# project
         shell: pwsh
         run: |
-          dotnet restore ".\新遊戲專案.csproj"
-          dotnet build ".\新遊戲專案.csproj" -c Release --no-restore
+          dotnet restore ".\shuiling.csproj"
+          dotnet build ".\shuiling.csproj" -c Release --no-restore
 
       - name: Import project and export Windows game
         shell: pwsh
@@ -192,7 +192,7 @@ jobs:
         run: |
           gh release create "v$env:VERSION" ".\game.zip" ".\version.json" `
             --repo "$env:GITHUB_REPOSITORY" `
-            --title "水靈測試版 $env:VERSION" `
+            --title "shuiling test build $env:VERSION" `
             --notes "由 GitHub Actions 自動建置，來源提交：$env:GITHUB_SHA" `
             --latest
 

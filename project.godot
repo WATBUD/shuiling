@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="水靈"
+config/name="shuiling"
 config/version="0.1.0"
 run/main_scene="res://main_menu.tscn"
 config/features=PackedStringArray("4.7", "C#")
@@ -31,7 +31,7 @@ window/stretch/aspect="expand"
 
 [dotnet]
 
-project/assembly_name="新遊戲專案"
+project/assembly_name="shuiling"
 
 [gui]
 

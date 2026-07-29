@@ -27,9 +27,6 @@ public partial class MainMenu : Control
 	private Button _joinConfirmButton = null!;
 
 	private SettingsPanel? _settingsPanel;
-	private AudioStreamPlayer? _menuMusic;
-	private System.Collections.Generic.List<string> _menuTracks = new();
-
 	// The world chosen from the list to host.
 	private string _hostWorldId = string.Empty;
 	private int _hostWorldSeed;
@@ -217,36 +214,7 @@ public partial class MainMenu : Control
 	// Main-menu background music (its own looping player, on the Music bus).
 	private void StartMenuMusic()
 	{
-		AudioSettings.Initialize();
-		_menuTracks = MusicPlayer.ScanTracks("res://assets/audio/music/menu/");
-		if (_menuTracks.Count == 0)
-		{
-			return;
-		}
-
-		_menuMusic = new AudioStreamPlayer { Name = "MenuMusic", Bus = AudioSettings.MusicBus, VolumeDb = -8.0f };
-		AddChild(_menuMusic);
-		_menuMusic.Finished += PlayRandomMenuTrack;
-		PlayRandomMenuTrack();
-	}
-
-	private void PlayRandomMenuTrack()
-	{
-		if (_menuMusic == null || _menuTracks.Count == 0)
-		{
-			return;
-		}
-
-		string path = _menuTracks[(int)(GD.Randi() % (uint)_menuTracks.Count)];
-		var stream = ResourceLoader.Exists(path) ? GD.Load<AudioStream>(path) : null;
-		if (stream == null)
-		{
-			return;
-		}
-
-		MusicPlayer.SetStreamLoop(stream, _menuTracks.Count == 1);
-		_menuMusic.Stream = stream;
-		_menuMusic.Play();
+		PreGameMusic.Start(this);
 	}
 
 	// Shared "new world" window: pick single-player or multiplayer BEFORE going to
@@ -510,7 +478,7 @@ public partial class MainMenu : Control
 	{
 		NetworkManager.Instance?.ResetSession();
 		GameLaunchOptions.LoadWorld(world.Id, world.Seed);
-		GetTree().ChangeSceneToFile("res://node_3d.tscn");
+		LoadingScreen.ChangeSceneToFile(this, "res://node_3d.tscn");
 	}
 
 	private void NewWorld()
@@ -906,7 +874,7 @@ public partial class MainMenu : Control
 			// Existing world: host with its saved seed + progress, enter directly.
 			NetworkManager.Instance.OverrideWorldSeed(_hostWorldSeed);
 			GameLaunchOptions.LoadWorld(_hostWorldId, _hostWorldSeed);
-			GetTree().ChangeSceneToFile("res://node_3d.tscn");
+			LoadingScreen.ChangeSceneToFile(this, "res://node_3d.tscn");
 		}
 	}
 

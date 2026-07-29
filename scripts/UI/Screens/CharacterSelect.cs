@@ -21,6 +21,7 @@ public partial class CharacterSelect : Control
 
 	public override void _Ready()
 	{
+		PreGameMusic.Start(this);
 		// Joining someone else's server: pick a character for the guest, no world
 		// creation. Otherwise the mode was chosen on the "new world" window.
 		_isJoiningGuest = GameLaunchOptions.IsJoiningGuest;
@@ -346,7 +347,7 @@ public partial class CharacterSelect : Control
 		NetworkPrefs.SaveGuestProfile(modelPath, name);
 		GameLaunchOptions.IsJoiningGuest = false;
 		GameLaunchOptions.StartJoinGuest(modelPath, name);
-		GetTree().ChangeSceneToFile("res://node_3d.tscn");
+		LoadingScreen.ChangeSceneToFile(this, "res://node_3d.tscn");
 	}
 
 	private void StartGame(bool host)
@@ -390,12 +391,12 @@ public partial class CharacterSelect : Control
 		if (host)
 		{
 			// Server already up — just enter the shared world.
-			GetTree().ChangeSceneToFile("res://node_3d.tscn");
+			LoadingScreen.ChangeSceneToFile(this, "res://node_3d.tscn");
 		}
 		else
 		{
 			NetworkManager.Instance?.ResetSession();
-			GetTree().ChangeSceneToFile("res://node_3d.tscn");
+			LoadingScreen.ChangeSceneToFile(this, "res://node_3d.tscn");
 		}
 	}
 

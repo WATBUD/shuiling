@@ -217,6 +217,7 @@ public partial class World : Node3D
 
 	public override void _Ready()
 	{
+		PreGameMusic.Stop(this);
 		LocaleText.LanguageChanged += RefreshLocalizedWorldLabels;
 		if (NetworkManager.Instance is { } net)
 		{
@@ -279,6 +280,7 @@ public partial class World : Node3D
 
 		NetworkAfterWorldReady();
 		_musicPlayer.PlayForMap(_activeMapId);
+		LoadingScreen.Hide(this);
 	}
 
 	public override void _ExitTree()
@@ -750,6 +752,14 @@ public partial class World : Node3D
 
 		for (int index = 0; index < 8; index++)
 		{
+			// The south ring position overlaps the city portal at z = -28.
+			// Leave that slot empty so a small street lamp never grows out of
+			// the center of the teleport effect.
+			if (index == 4)
+			{
+				continue;
+			}
+
 			Vector3 offset = RingOffset(index * 45.0f, 29.0f);
 			CreateExternalProp($"CityRingLantern{index}", "res://assets/models/environment/lantern.glb", center + offset, Vector3.Zero, new Vector3(1.18f, 1.18f, 1.18f), new Vector3(0.6f, 2.2f, 0.6f), new Vector3(0.0f, 1.1f, 0.0f));
 		}

@@ -1,5 +1,7 @@
 <Project Sdk="Godot.NET.Sdk/4.7.0">
   <PropertyGroup>
+    <AssemblyName>shuiling</AssemblyName>
+    <RootNamespace>Shuiling</RootNamespace>
     <TargetFramework>net8.0</TargetFramework>
     <TargetFramework Condition=" '$(GodotTargetPlatform)' == 'android' ">net9.0</TargetFramework>
     <EnableDynamicLoading>true</EnableDynamicLoading>

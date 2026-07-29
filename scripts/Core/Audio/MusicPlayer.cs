@@ -10,6 +10,7 @@ public partial class MusicPlayer : Node
 	private const string MusicRoot = "res://assets/audio/music/";
 	private const string CityDir = MusicRoot + "city/";
 	private const string WildDir = MusicRoot + "wild/";
+	private const string SnowThemePath = WildDir + "wild_snow/snow_ambient_calm.mp3";
 
 	private readonly List<string> _cityTracks = new();
 	private readonly List<string> _wildTracks = new(); // shared fallback (files in wild/)
@@ -68,6 +69,16 @@ public partial class MusicPlayer : Node
 			key = "wild_forest";
 			list = new List<string>();
 			dedicatedStream = _forestTheme;
+		}
+		else if (mapId == "wild_snow" && ResourceLoader.Exists(SnowThemePath))
+		{
+			key = "wild_snow";
+			list = new List<string>();
+			dedicatedStream = GD.Load<AudioStream>(SnowThemePath);
+			if (dedicatedStream != null)
+			{
+				SetStreamLoop(dedicatedStream, true);
+			}
 		}
 		else if (_mapTracks.TryGetValue(mapId, out List<string>? mapList) && mapList.Count > 0)
 		{

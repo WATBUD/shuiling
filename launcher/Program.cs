@@ -12,7 +12,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-// 水靈 Windows 自動更新器
+// shuiling Windows 自動更新器
 // 下載永遠先進暫存區，驗證完成後才替換 app；安裝失敗會還原上一版。
 internal static class Program
 {
@@ -91,7 +91,7 @@ internal static class Program
 	private static async Task<int> Main()
 	{
 		Console.OutputEncoding = System.Text.Encoding.UTF8;
-		Console.Title = $"水靈更新器 v{LauncherVersion}";
+		Console.Title = $"shuiling updater v{LauncherVersion}";
 		Log($"Launcher v{LauncherVersion}");
 
 		using var singleInstance = new Mutex(true, "ShuilingLauncher.UpdateLock", out bool ownsMutex);
