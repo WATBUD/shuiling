@@ -414,6 +414,7 @@ public partial class PlayerController : CharacterBody3D
 				Experience = 0;
 				MarkPlayerBuildStatsDirty();
 			}
+			EnsurePlayerAttributePoints();
 
 			// 初始寵物改為開發者測試旗標控制：僅在 dev_config.cfg 的 grant_starter_pet=true 時贈送。
 			if (DevConfig.GrantStarterPet)

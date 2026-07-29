@@ -95,6 +95,7 @@ public sealed class SkillGemDefinition
 	public bool EnablesHeal { get; set; }
 	public bool EnablesShield { get; set; }
 	public bool IsRangedActiveSkill { get; set; }
+	public bool IsSpell { get; set; }
 	public bool UsesProjectile { get; set; }
 	public bool IsSupportEffect { get; set; }
 	public bool RequiresProjectile { get; set; }
@@ -182,6 +183,7 @@ public sealed class BuildStats
 	public float KnockbackForce { get; set; }
 	public float ControlChance { get; set; }
 	public float DamageMultiplier { get; set; } = 1.0f;
+	public float SpellDamageMultiplier { get; set; } = 1.0f;
 	public float ProjectileSpeedMultiplier { get; set; } = 1.0f;
 	public float IncomingDamageMultiplier { get; set; } = 1.0f;
 	public int EquipmentSocketCount { get; set; }
@@ -478,13 +480,13 @@ public static class BuildCatalog
 	private static readonly List<SkillGemDefinition> SkillGems = new()
 	{
 		new SkillGemDefinition { Id = "gem.skill.none", NameKey = "gem.skill.none", SummaryKey = "gem.skill.summary.none" },
-		new SkillGemDefinition { Id = "gem.skill.fireball", NameKey = "gem.skill.fireball", SummaryKey = "gem.skill.summary.fireball", DamageElementId = "fire", DamageElementNameKey = "element.fire", AttackColor = new Color(1.0f, 0.28f, 0.08f, 0.94f), AttackBonus = 5, AttackRangeBonus = 2.0f, IsRangedActiveSkill = true, UsesProjectile = true },
+		new SkillGemDefinition { Id = "gem.skill.fireball", NameKey = "gem.skill.fireball", SummaryKey = "gem.skill.summary.fireball", DamageElementId = "fire", DamageElementNameKey = "element.fire", AttackColor = new Color(1.0f, 0.28f, 0.08f, 0.94f), AttackBonus = 5, AttackRangeBonus = 2.0f, IsRangedActiveSkill = true, IsSpell = true, UsesProjectile = true },
 		new SkillGemDefinition { Id = "gem.skill.whirlwind", NameKey = "gem.skill.whirlwind", SummaryKey = "gem.skill.summary.whirlwind", DamageElementId = "physical", DamageElementNameKey = "element.physical", AttackColor = new Color(1.0f, 0.70f, 0.32f, 0.92f), AttackBonus = 4, DefenseBonus = 2, AttackCooldownReduction = 0.04f },
-		new SkillGemDefinition { Id = "gem.skill.meteor", NameKey = "gem.skill.meteor", SummaryKey = "gem.skill.summary.meteor", DamageElementId = "fire", DamageElementNameKey = "element.fire", AttackColor = new Color(1.0f, 0.20f, 0.05f, 0.96f), AttackBonus = 12, AttackRangeBonus = 1.2f, AttackCooldownReduction = -0.08f, IsRangedActiveSkill = true },
-		new SkillGemDefinition { Id = "gem.skill.laser", NameKey = "gem.skill.laser", SummaryKey = "gem.skill.summary.laser", DamageElementId = "light", DamageElementNameKey = "element.light", AttackColor = new Color(1.0f, 0.95f, 0.58f, 0.95f), AttackBonus = 6, AttackRangeBonus = 3.2f, DetectionRadiusBonus = 2.0f, IsRangedActiveSkill = true },
+		new SkillGemDefinition { Id = "gem.skill.meteor", NameKey = "gem.skill.meteor", SummaryKey = "gem.skill.summary.meteor", DamageElementId = "fire", DamageElementNameKey = "element.fire", AttackColor = new Color(1.0f, 0.20f, 0.05f, 0.96f), AttackBonus = 12, AttackRangeBonus = 1.2f, AttackCooldownReduction = -0.08f, IsRangedActiveSkill = true, IsSpell = true },
+		new SkillGemDefinition { Id = "gem.skill.laser", NameKey = "gem.skill.laser", SummaryKey = "gem.skill.summary.laser", DamageElementId = "light", DamageElementNameKey = "element.light", AttackColor = new Color(1.0f, 0.95f, 0.58f, 0.95f), AttackBonus = 6, AttackRangeBonus = 3.2f, DetectionRadiusBonus = 2.0f, IsRangedActiveSkill = true, IsSpell = true },
 		new SkillGemDefinition { Id = "gem.skill.rocket", NameKey = "gem.skill.rocket", SummaryKey = "gem.skill.summary.rocket", DamageElementId = "fire", DamageElementNameKey = "element.fire", AttackColor = new Color(1.0f, 0.34f, 0.08f, 0.95f), AttackBonus = 9, AttackRangeBonus = 2.6f, AttackCooldownReduction = -0.05f, IsRangedActiveSkill = true, UsesProjectile = true },
-		new SkillGemDefinition { Id = "gem.skill.ice_shard", NameKey = "gem.skill.ice_shard", SummaryKey = "gem.skill.summary.ice_shard", DamageElementId = "ice", DamageElementNameKey = "element.ice", AttackColor = new Color(0.58f, 0.88f, 1.0f, 0.95f), AttackBonus = 5, AttackRangeBonus = 2.4f, IsRangedActiveSkill = true, UsesProjectile = true },
-		new SkillGemDefinition { Id = "gem.skill.lightning", NameKey = "gem.skill.lightning", SummaryKey = "gem.skill.summary.lightning", DamageElementId = "lightning", DamageElementNameKey = "element.lightning", AttackColor = new Color(0.95f, 0.88f, 0.20f, 0.95f), AttackBonus = 6, AttackRangeBonus = 2.8f, DetectionRadiusBonus = 1.6f, IsRangedActiveSkill = true },
+		new SkillGemDefinition { Id = "gem.skill.ice_shard", NameKey = "gem.skill.ice_shard", SummaryKey = "gem.skill.summary.ice_shard", DamageElementId = "ice", DamageElementNameKey = "element.ice", AttackColor = new Color(0.58f, 0.88f, 1.0f, 0.95f), AttackBonus = 5, AttackRangeBonus = 2.4f, IsRangedActiveSkill = true, IsSpell = true, UsesProjectile = true },
+		new SkillGemDefinition { Id = "gem.skill.lightning", NameKey = "gem.skill.lightning", SummaryKey = "gem.skill.summary.lightning", DamageElementId = "lightning", DamageElementNameKey = "element.lightning", AttackColor = new Color(0.95f, 0.88f, 0.20f, 0.95f), AttackBonus = 6, AttackRangeBonus = 2.8f, DetectionRadiusBonus = 1.6f, IsRangedActiveSkill = true, IsSpell = true },
 		new SkillGemDefinition { Id = "gem.skill.chain", NameKey = "gem.skill.chain", SummaryKey = "gem.skill.summary.chain", IsSupportEffect = true, RequiresProjectile = true, DamageMultiplier = 0.88f, DetectionRadiusBonus = 2.0f, BehaviorId = ProjectileBehavior.Chain, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.water_core" },
 		new SkillGemDefinition { Id = "gem.skill.explosion", NameKey = "gem.skill.explosion", SummaryKey = "gem.skill.summary.explosion", IsSupportEffect = true, RequiresProjectile = true, DamageMultiplier = 0.92f, AttackCooldownReduction = -0.04f, BehaviorId = ProjectileBehavior.Explosion, BehaviorRadius = 3.0f, UpgradeMaterialId = "loot.red_horn" },
 		new SkillGemDefinition { Id = "gem.skill.piercing", NameKey = "gem.skill.piercing", SummaryKey = "gem.skill.summary.piercing", IsSupportEffect = true, RequiresProjectile = true, DamageMultiplier = 0.94f, AttackRangeBonus = 2.0f, BehaviorId = ProjectileBehavior.Pierce, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.small_bone" },
@@ -671,10 +673,13 @@ public static class BuildCatalog
 		loadout.EnsureSkillSlots();
 		var stats = new BuildStats
 		{
-			MaxHealth = Mathf.Max(player.MaxHealth, 1),
-			Attack = Mathf.Max(player.Attack, 1),
-			Defense = Mathf.Max(player.Defense, 0),
+			MaxHealth = Mathf.Max(player.MaxHealth + player.Vitality * 20, 1),
+			Attack = Mathf.Max(player.Attack + player.Strength * 2, 1),
+			Defense = Mathf.Max(player.Defense + player.Vitality / 2, 0),
 			CritChance = player.CritChance,
+			MoveSpeedMultiplier = 1.0f + player.Agility * 0.002f,
+			AttackCooldownMultiplier = 1.0f / (1.0f + player.Agility * 0.0025f),
+			SpellDamageMultiplier = 1.0f + player.Intelligence * 0.01f,
 		};
 
 		ApplyEquipment(stats, GetEquipment(loadout.HelmetId), GetEquipmentStarMultiplier(loadout.HelmetId));

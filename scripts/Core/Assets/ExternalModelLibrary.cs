@@ -32,7 +32,7 @@ public static class ExternalModelLibrary
 		("res://assets/models/player/player_mage.glb", "character.mage"),
 		("res://assets/models/player/player_barbarian.glb", "character.barbarian"),
 		("res://assets/models/characters/adventurer.gltf", "character.adventurer"),
-		("res://assets/models/characters/archer.glb", "character.archer"),
+		(KenneyBlockyRoot + "character-m.glb", "character.archer"),
 		("res://assets/models/characters/knight.glb", "character.knight"),
 		("res://assets/models/characters/barbarian.glb", "character.barbarian"),
 		("res://assets/models/characters/mage.glb", "character.mage"),
@@ -50,7 +50,6 @@ public static class ExternalModelLibrary
 		(KenneyBlockyRoot + "character-j.glb", "character.blocky.guard"),
 		(KenneyBlockyRoot + "character-k.glb", "character.blocky.traveler"),
 		(KenneyBlockyRoot + "character-l.glb", "character.blocky.goblin"),
-		(KenneyBlockyRoot + "character-m.glb", "character.blocky.ranger"),
 		(KenneyBlockyRoot + "character-n.glb", "character.blocky.mystic"),
 		(KenneyBlockyRoot + "character-o.glb", "character.blocky.orc"),
 		(KenneyBlockyRoot + "character-p.glb", "character.blocky.merchant"),
@@ -409,7 +408,7 @@ public static class ExternalModelLibrary
 
 	private static readonly string[] NpcRanged =
 	{
-		"res://assets/models/characters/archer.glb",
+		KenneyBlockyRoot + "character-m.glb",
 		"res://assets/models/characters/rogue.glb",
 	};
 

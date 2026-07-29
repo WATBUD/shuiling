@@ -1819,6 +1819,8 @@ public partial class SimpleActor : CharacterBody3D
 		// once when captured and never need this migration path again.
 		int historicLevelGains = Mathf.Max(Level - 1, 0) + Mathf.Max(RebirthCount, 0) * (MaxCompanionLevel - 1);
 		int rebirthBonus = RebirthTotalStatBonus;
+		// Legacy saves were raised with the original evolution-only formula.
+		// Keep that formula for reconstructing their level-one baseline.
 		int healthPerLevel = 14 + EvolutionStage * 4;
 		int attackPerLevel = 3 + EvolutionStage;
 		int defensePerLevel = 2 + EvolutionStage;
@@ -2800,12 +2802,29 @@ public partial class SimpleActor : CharacterBody3D
 	private void LevelUp()
 	{
 		Level++;
-		MaxHealth += 14 + EvolutionStage * 4;
+		MaxHealth += GetHealthGrowthPerLevel();
 		CurrentHealth = MaxHealth;
-		Attack += 3 + EvolutionStage;
-		Defense += 2 + EvolutionStage;
+		Attack += GetAttackGrowthPerLevel();
+		Defense += GetDefenseGrowthPerLevel();
 		MarkBaseStatsChanged();
 		CurrentHealth = EffectiveMaxHealth;
+	}
+
+	// Companions never use the player's manual point pool. Their physique
+	// (ability rank), rarity and evolution stage determine automatic growth.
+	private int GetHealthGrowthPerLevel()
+	{
+		return 14 + EvolutionStage * 4 + Mathf.Max(Rarity, 0) * 3 + Mathf.Max(AbilityRank - 1, 0) * 2;
+	}
+
+	private int GetAttackGrowthPerLevel()
+	{
+		return 3 + EvolutionStage + Mathf.CeilToInt(Mathf.Max(Rarity, 0) * 0.5f) + Mathf.Max(AbilityRank - 1, 0) / 3;
+	}
+
+	private int GetDefenseGrowthPerLevel()
+	{
+		return 2 + EvolutionStage + Mathf.Max(Rarity, 0) / 2 + Mathf.Max(AbilityRank - 1, 0) / 4;
 	}
 
 	private bool TryUseSupportBuild(ref Vector3 velocity, float step)

@@ -96,6 +96,7 @@ public partial class PlayerController
 		forward.Y = 0.0f;
 		forward = forward.LengthSquared() > 0.001f ? forward.Normalized() : -GlobalTransform.Basis.Z;
 		string skillId = BuildLoadout.GetSkillGemId(0);
+		int coreDamage = GetPlayerCoreDamage(stats, skillId);
 		bool isMelee = !BuildCatalog.HasRangedActiveSkill(BuildLoadout);
 		Node parent = GetTree().CurrentScene ?? GetParent();
 		SkillAttackVfx.SpawnCast(parent, GlobalPosition + Vector3.Up * 1.1f + forward * 0.35f, forward,
@@ -115,7 +116,7 @@ public partial class PlayerController
 			var projectile = new CombatProjectile
 			{
 				PlayerAttacker = this,
-				Damage = Mathf.Max(stats.Attack, 1),
+				Damage = coreDamage,
 				EffectColor = stats.AttackColor,
 				IsMelee = isMelee,
 				VisualSkillId = skillId,
@@ -168,7 +169,13 @@ public partial class PlayerController
 			radius,
 			new ProjectileBehaviorProfile(),
 			stats.LifeStealPercent > 0.0f);
-		ResolvePlayerProjectileHit(target, Mathf.Max(stats.Attack, 1));
+		ResolvePlayerProjectileHit(target, GetPlayerCoreDamage(stats, skillId));
+	}
+
+	private static int GetPlayerCoreDamage(BuildStats stats, string skillId)
+	{
+		float multiplier = BuildCatalog.GetSkillGem(skillId).IsSpell ? stats.SpellDamageMultiplier : 1.0f;
+		return Mathf.Max(Mathf.RoundToInt(stats.Attack * multiplier), 1);
 	}
 
 	public void FindPlayerProjectileTargets(Vector3 center, float radius, ICollection<SimpleActor> exclude, List<SimpleActor> results)
@@ -688,10 +695,7 @@ public partial class PlayerController
 		{
 			Experience -= ExperienceToNextLevel;
 			Level++;
-			MaxHealth += 12;
-			CurrentHealth = Mathf.Min(CurrentHealth + 12, MaxHealth);
-			Attack += 2;
-			Defense += 1;
+			UnspentAttributePoints += AttributePointsPerLevel;
 		}
 
 		if (Level > playerLevelBefore)

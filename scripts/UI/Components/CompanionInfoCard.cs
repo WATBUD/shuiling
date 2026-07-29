@@ -16,6 +16,9 @@ public partial class CompanionInfoCard : PanelContainer
 	private HFlowContainer _traitFlow = null!;
 	private HFlowContainer _equipmentFlow = null!;
 	private HFlowContainer _skillGemFlow = null!;
+	private VBoxContainer _playerAttributeSection = null!;
+	private Label _attributePointLabel = null!;
+	private readonly Dictionary<PlayerAttribute, Button> _attributeButtons = new();
 	private FloatingTooltip _tooltip = null!;
 	private SimpleActor? _actor;
 	private PlayerController? _player;
@@ -76,6 +79,28 @@ public partial class CompanionInfoCard : PanelContainer
 		_skillGemsTitle = MakeLabel(12, new Color(0.74f, 0.88f, 0.80f), "build.skill_gems");
 		metaRows.AddChild(_skillGemsTitle);
 		_skillGemFlow = AddFlow(metaRows);
+
+		_playerAttributeSection = new VBoxContainer
+		{
+			Visible = false,
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		_playerAttributeSection.AddThemeConstantOverride("separation", 4);
+		rows.AddChild(_playerAttributeSection);
+		_attributePointLabel = MakeLabel(13, new Color(1.0f, 0.84f, 0.38f));
+		_playerAttributeSection.AddChild(_attributePointLabel);
+		var attributeGrid = new GridContainer
+		{
+			Columns = 4,
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		attributeGrid.AddThemeConstantOverride("h_separation", 6);
+		attributeGrid.AddThemeConstantOverride("v_separation", 4);
+		_playerAttributeSection.AddChild(attributeGrid);
+		AddAttributeButton(attributeGrid, PlayerAttribute.Strength);
+		AddAttributeButton(attributeGrid, PlayerAttribute.Vitality);
+		AddAttributeButton(attributeGrid, PlayerAttribute.Agility);
+		AddAttributeButton(attributeGrid, PlayerAttribute.Intelligence);
 
 		_tooltip = new FloatingTooltip
 		{
@@ -143,11 +168,13 @@ public partial class CompanionInfoCard : PanelContainer
 			_detailSignature = string.Empty;
 			_mode.Visible = false;
 			_mood.Visible = false;
+			_playerAttributeSection.Visible = false;
 			_tooltip?.HideTooltip();
 			return;
 		}
 
 		BuildStats stats = _actor.CurrentBuildStats;
+		_playerAttributeSection.Visible = false;
 		SetPetSectionsVisible(true);
 		_traitsTitle.Text = LocaleText.T("build.traits");
 		_equipmentTitle.Text = LocaleText.T("build.equipment");
@@ -205,6 +232,7 @@ public partial class CompanionInfoCard : PanelContainer
 		}
 
 		_title.Text = $"{_player.LocalizedPlayerName} - {LocaleText.F("inventory.info_header", _player.Level)}";
+		_player.EnsurePlayerAttributePoints();
 		_experience.Text = $"{LocaleText.T("stat.experience")} {_player.Experience}/{_player.ExperienceToNextLevel}";
 		_experienceBar.MaxValue = Mathf.Max(_player.ExperienceToNextLevel, 1);
 		_experienceBar.Value = Mathf.Clamp(_player.Experience, 0, _player.ExperienceToNextLevel);
@@ -226,17 +254,65 @@ public partial class CompanionInfoCard : PanelContainer
 			LocaleText.F("party.title", _player.ActiveParty.Count, _player.ActivePartyLimit, _player.AvailableCompanionCount));
 		_mode.Visible = false;
 		_mood.Visible = false;
+		RefreshPlayerAttributes();
 		SetPetSectionsVisible(true);
 		_traitsTitle.Text = LocaleText.T("build.traits");
 		_equipmentTitle.Text = LocaleText.T("build.equipment");
 		_skillGemsTitle.Text = LocaleText.T("build.skill_gems");
 		CompanionBuildLoadout loadout = _player.BuildLoadout;
-		string playerSignature = $"player|{_player.Level}|{loadout.HelmetId}|{loadout.WeaponId}|{loadout.ArmorId}|{loadout.BootsId}|{loadout.AccessoryId}|{string.Join(",", loadout.SkillGemIds)}|{string.Join(",", loadout.SkillGemLevels)}";
+		string playerSignature = $"player|{_player.Level}|{_player.UnspentAttributePoints}|{_player.Strength}|{_player.Vitality}|{_player.Agility}|{_player.Intelligence}|{loadout.HelmetId}|{loadout.WeaponId}|{loadout.ArmorId}|{loadout.BootsId}|{loadout.AccessoryId}|{string.Join(",", loadout.SkillGemIds)}|{string.Join(",", loadout.SkillGemLevels)}";
 		if (_detailSignature != playerSignature)
 		{
 			_detailSignature = playerSignature;
 			RebuildPlayerTerms();
 		}
+	}
+
+	private void AddAttributeButton(GridContainer parent, PlayerAttribute attribute)
+	{
+		var button = new Button
+		{
+			CustomMinimumSize = new Vector2(0.0f, 34.0f),
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			FocusMode = FocusModeEnum.None,
+		};
+		button.Pressed += () => OnAttributePressed(attribute);
+		parent.AddChild(button);
+		_attributeButtons[attribute] = button;
+	}
+
+	private void OnAttributePressed(PlayerAttribute attribute)
+	{
+		if (_player == null || !_player.AllocateAttributePoint(attribute))
+		{
+			return;
+		}
+
+		SetPlayer(_player);
+	}
+
+	private void RefreshPlayerAttributes()
+	{
+		if (_player == null)
+		{
+			_playerAttributeSection.Visible = false;
+			return;
+		}
+
+		_playerAttributeSection.Visible = true;
+		_attributePointLabel.Text = LocaleText.F("player.attribute.points", _player.UnspentAttributePoints);
+		SetAttributeButton(PlayerAttribute.Strength, "player.attribute.strength", _player.Strength);
+		SetAttributeButton(PlayerAttribute.Vitality, "player.attribute.vitality", _player.Vitality);
+		SetAttributeButton(PlayerAttribute.Agility, "player.attribute.agility", _player.Agility);
+		SetAttributeButton(PlayerAttribute.Intelligence, "player.attribute.intelligence", _player.Intelligence);
+	}
+
+	private void SetAttributeButton(PlayerAttribute attribute, string nameKey, int value)
+	{
+		Button button = _attributeButtons[attribute];
+		button.Text = $"{LocaleText.T(nameKey)}  {value}  +";
+		button.Disabled = _player == null || _player.UnspentAttributePoints <= 0;
+		button.TooltipText = LocaleText.T($"{nameKey}.detail");
 	}
 
 	private void RebuildPlayerTerms()

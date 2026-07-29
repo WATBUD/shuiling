@@ -50,6 +50,11 @@ public sealed class PlayerSaveData
 	public int CurrentHealth { get; set; } = 1500;
 	public int Attack { get; set; } = 16;
 	public int Defense { get; set; } = 10;
+	public int UnspentAttributePoints { get; set; }
+	public int Strength { get; set; }
+	public int Vitality { get; set; }
+	public int Agility { get; set; }
+	public int Intelligence { get; set; }
 	public CompanionBuildSaveData BuildLoadout { get; set; } = new()
 	{
 		HelmetId = "equip.helmet.none",

@@ -6,6 +6,7 @@ public partial class PlayerController
 
 	public PlayerSaveData ExportSaveData()
 	{
+		EnsurePlayerAttributePoints();
 		var data = new PlayerSaveData
 		{
 			PlayerName = PlayerName,
@@ -16,6 +17,11 @@ public partial class PlayerController
 			CurrentHealth = CurrentHealth,
 			Attack = Attack,
 			Defense = Defense,
+			UnspentAttributePoints = UnspentAttributePoints,
+			Strength = Strength,
+			Vitality = Vitality,
+			Agility = Agility,
+			Intelligence = Intelligence,
 			BuildLoadout = ExportPlayerBuildLoadout(),
 			Gold = Gold,
 			CameraMode = CameraModeToSaveId(_cameraMode),
@@ -124,6 +130,12 @@ public partial class PlayerController
 		MaxHealth = Mathf.Max(data.MaxHealth, 1);
 		Attack = Mathf.Max(data.Attack, 0);
 		Defense = Mathf.Max(data.Defense, 0);
+		UnspentAttributePoints = Mathf.Max(data.UnspentAttributePoints, 0);
+		Strength = Mathf.Max(data.Strength, 0);
+		Vitality = Mathf.Max(data.Vitality, 0);
+		Agility = Mathf.Max(data.Agility, 0);
+		Intelligence = Mathf.Max(data.Intelligence, 0);
+		EnsurePlayerAttributePoints();
 		RestorePlayerBuildLoadout(data.BuildLoadout);
 		CurrentHealth = Mathf.Clamp(data.CurrentHealth, 1, EffectiveMaxHealth);
 		Gold = Mathf.Max(data.Gold, 0);
