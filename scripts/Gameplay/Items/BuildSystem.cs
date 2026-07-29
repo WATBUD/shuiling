@@ -172,6 +172,8 @@ public sealed class BuildStats
 	public int MaxHealth { get; set; }
 	public int Attack { get; set; }
 	public int Defense { get; set; }
+	public float AttackDisplayValue { get; set; }
+	public float DefenseDisplayValue { get; set; }
 	public float MoveSpeedMultiplier { get; set; } = 1.0f;
 	public int JumpPower { get; set; } = EquipmentConfig.BaseJumpPower;
 	public float AttackCooldownMultiplier { get; set; } = 1.0f;
@@ -673,13 +675,10 @@ public static class BuildCatalog
 		loadout.EnsureSkillSlots();
 		var stats = new BuildStats
 		{
-			MaxHealth = Mathf.Max(player.MaxHealth + player.Vitality * 20, 1),
-			Attack = Mathf.Max(player.Attack + player.Strength * 2, 1),
-			Defense = Mathf.Max(player.Defense + player.Vitality / 2, 0),
-			CritChance = player.CritChance,
-			MoveSpeedMultiplier = 1.0f + player.Agility * 0.002f,
-			AttackCooldownMultiplier = 1.0f / (1.0f + player.Agility * 0.0025f),
-			SpellDamageMultiplier = 1.0f + player.Intelligence * 0.01f,
+			MaxHealth = Mathf.Max(player.MaxHealth + player.HealthAttributePoints * PlayerController.HealthPerPoint, 1),
+			Attack = Mathf.Max(player.Attack, 1),
+			Defense = Mathf.Max(player.Defense, 0),
+			CritChance = player.CritChance + player.CritChanceAttributePoints * PlayerController.CritChancePercentPerPoint / 100.0f,
 		};
 
 		ApplyEquipment(stats, GetEquipment(loadout.HelmetId), GetEquipmentStarMultiplier(loadout.HelmetId));
@@ -708,8 +707,18 @@ public static class BuildCatalog
 		}
 
 		stats.Attack = Mathf.Max(Mathf.RoundToInt(stats.Attack * stats.DamageMultiplier), 1);
+		stats.AttackDisplayValue = stats.Attack + player.AttackAttributePoints * PlayerController.AttackPerPoint;
+		stats.DefenseDisplayValue = stats.Defense + player.DefenseAttributePoints * PlayerController.DefensePerPoint;
+		stats.Attack = Mathf.Max(Mathf.RoundToInt(stats.AttackDisplayValue), 1);
+		stats.Defense = Mathf.Max(Mathf.RoundToInt(stats.DefenseDisplayValue), 0);
+		float equippedMoveSpeed = player.WalkSpeed * stats.MoveSpeedMultiplier;
+		stats.MoveSpeedMultiplier = (equippedMoveSpeed + player.MoveSpeedAttributePoints * PlayerController.MoveSpeedPerPoint)
+			/ Mathf.Max(player.WalkSpeed, 0.01f);
+		float equippedAttackSpeed = 1.0f / Mathf.Max(player.AttackCooldown * stats.AttackCooldownMultiplier, 0.01f);
+		float allocatedAttackSpeed = equippedAttackSpeed + player.AttackSpeedAttributePoints * PlayerController.AttackSpeedPerPoint;
+		stats.AttackCooldownMultiplier = 1.0f / Mathf.Max(player.AttackCooldown * allocatedAttackSpeed, 0.01f);
 		stats.MoveSpeedMultiplier = Mathf.Clamp(stats.MoveSpeedMultiplier, 0.55f, 2.4f);
-		stats.AttackCooldownMultiplier = Mathf.Clamp(stats.AttackCooldownMultiplier, 0.42f, 1.85f);
+		stats.AttackCooldownMultiplier = Mathf.Clamp(stats.AttackCooldownMultiplier, 0.08f, 1.85f);
 		stats.CritChance = Mathf.Clamp(stats.CritChance, 0.0f, 0.75f);
 		stats.LifeStealPercent = Mathf.Clamp(stats.LifeStealPercent, 0.0f, 0.45f);
 		stats.ControlChance = Mathf.Clamp(stats.ControlChance, 0.0f, 0.75f);

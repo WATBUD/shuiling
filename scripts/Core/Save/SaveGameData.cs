@@ -51,6 +51,14 @@ public sealed class PlayerSaveData
 	public int Attack { get; set; } = 16;
 	public int Defense { get; set; } = 10;
 	public int UnspentAttributePoints { get; set; }
+	public int HealthAttributePoints { get; set; }
+	public int AttackAttributePoints { get; set; }
+	public int DefenseAttributePoints { get; set; }
+	public int MoveSpeedAttributePoints { get; set; }
+	public int AttackSpeedAttributePoints { get; set; }
+	public int CritChanceAttributePoints { get; set; }
+	public int PlayerRebirthCount { get; set; }
+	// Legacy four-stat fields: loaded once and refunded after the direct-stat migration.
 	public int Strength { get; set; }
 	public int Vitality { get; set; }
 	public int Agility { get; set; }

@@ -18,10 +18,13 @@ public partial class PlayerController
 			Attack = Attack,
 			Defense = Defense,
 			UnspentAttributePoints = UnspentAttributePoints,
-			Strength = Strength,
-			Vitality = Vitality,
-			Agility = Agility,
-			Intelligence = Intelligence,
+			HealthAttributePoints = HealthAttributePoints,
+			AttackAttributePoints = AttackAttributePoints,
+			DefenseAttributePoints = DefenseAttributePoints,
+			MoveSpeedAttributePoints = MoveSpeedAttributePoints,
+			AttackSpeedAttributePoints = AttackSpeedAttributePoints,
+			CritChanceAttributePoints = CritChanceAttributePoints,
+			PlayerRebirthCount = PlayerRebirthCount,
 			BuildLoadout = ExportPlayerBuildLoadout(),
 			Gold = Gold,
 			CameraMode = CameraModeToSaveId(_cameraMode),
@@ -131,10 +134,15 @@ public partial class PlayerController
 		Attack = Mathf.Max(data.Attack, 0);
 		Defense = Mathf.Max(data.Defense, 0);
 		UnspentAttributePoints = Mathf.Max(data.UnspentAttributePoints, 0);
-		Strength = Mathf.Max(data.Strength, 0);
-		Vitality = Mathf.Max(data.Vitality, 0);
-		Agility = Mathf.Max(data.Agility, 0);
-		Intelligence = Mathf.Max(data.Intelligence, 0);
+		HealthAttributePoints = Mathf.Max(data.HealthAttributePoints, 0);
+		AttackAttributePoints = Mathf.Max(data.AttackAttributePoints, 0);
+		DefenseAttributePoints = Mathf.Max(data.DefenseAttributePoints, 0);
+		MoveSpeedAttributePoints = Mathf.Max(data.MoveSpeedAttributePoints, 0);
+		AttackSpeedAttributePoints = Mathf.Max(data.AttackSpeedAttributePoints, 0);
+		CritChanceAttributePoints = Mathf.Max(data.CritChanceAttributePoints, 0);
+		PlayerRebirthCount = Mathf.Max(data.PlayerRebirthCount, 0);
+		UnspentAttributePoints += Mathf.Max(data.Strength, 0) + Mathf.Max(data.Vitality, 0)
+			+ Mathf.Max(data.Agility, 0) + Mathf.Max(data.Intelligence, 0);
 		EnsurePlayerAttributePoints();
 		RestorePlayerBuildLoadout(data.BuildLoadout);
 		CurrentHealth = Mathf.Clamp(data.CurrentHealth, 1, EffectiveMaxHealth);

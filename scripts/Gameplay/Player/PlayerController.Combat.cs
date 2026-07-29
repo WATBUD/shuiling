@@ -688,14 +688,18 @@ public partial class PlayerController
 
 		// The player and each companion scale the reward by their OWN level gap to
 		// the defeated monster — over-leveled earners gain almost nothing.
-		int playerXp = ExperienceTable.ScaleReward(amountBase, Level, sourceLevel);
+		int playerXp = Level >= MaxPlayerLevel ? 0 : ExperienceTable.ScaleReward(amountBase, Level, sourceLevel);
 		int playerLevelBefore = Level;
 		Experience += playerXp;
-		while (Experience >= ExperienceToNextLevel)
+		while (Level < MaxPlayerLevel && Experience >= ExperienceToNextLevel)
 		{
 			Experience -= ExperienceToNextLevel;
 			Level++;
 			UnspentAttributePoints += AttributePointsPerLevel;
+		}
+		if (Level >= MaxPlayerLevel)
+		{
+			Experience = 0;
 		}
 
 		if (Level > playerLevelBefore)

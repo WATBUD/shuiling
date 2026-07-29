@@ -35,6 +35,7 @@ public partial class PartyPanel : PanelContainer
 	private Button _attackModeButton = null!;
 	private PopupMenu _memberContextMenu = null!;
 	private SimpleActor? _contextActor;
+	private bool _contextIsPlayer;
 	private GodotObject? _selected;
 
 	public override void _Ready()
@@ -265,7 +266,8 @@ public partial class PartyPanel : PanelContainer
 			return "[0]: - 0/0";
 		}
 
-		return $"[0]: {_player.LocalizedPlayerName} {_player.CurrentHealth}/{_player.MaxHealth}";
+		string rebirthTag = _player.PlayerRebirthCount > 0 ? $" ✦x{_player.PlayerRebirthCount}" : string.Empty;
+		return $"[0]: {_player.LocalizedPlayerName}{rebirthTag} {_player.CurrentHealth}/{_player.EffectiveMaxHealth}";
 	}
 
 	private static string FormatActorListText(int index, SimpleActor actor)
@@ -409,7 +411,7 @@ public partial class PartyPanel : PanelContainer
 
 	private void OnMemberButtonGuiInput(Button sourceButton, InputEvent inputEvent, SimpleActor? actor)
 	{
-		if (actor == null || !IsInstanceValid(actor) || _player == null)
+		if (_player == null || (actor != null && !IsInstanceValid(actor)))
 		{
 			return;
 		}
@@ -424,15 +426,22 @@ public partial class PartyPanel : PanelContainer
 		// defers via the popup; double-click defers the toggle with CallDeferred.
 		if (mouseButton.ButtonIndex == MouseButton.Right)
 		{
-			_selected = actor;
+			_selected = actor != null ? actor : _player;
 			UpdateDetails();
 			sourceButton.AcceptEvent();
-			ShowMemberContextMenu(actor, GetViewport().GetMousePosition());
+			if (actor == null)
+			{
+				ShowPlayerContextMenu(GetViewport().GetMousePosition());
+			}
+			else
+			{
+				ShowMemberContextMenu(actor, GetViewport().GetMousePosition());
+			}
 			return;
 		}
 
 		// Double-click toggles between active and inactive; both remain in the party roster.
-		if (mouseButton is { ButtonIndex: MouseButton.Left, DoubleClick: true })
+		if (actor != null && mouseButton is { ButtonIndex: MouseButton.Left, DoubleClick: true })
 		{
 			_selected = actor;
 			sourceButton.AcceptEvent();
@@ -481,6 +490,7 @@ public partial class PartyPanel : PanelContainer
 		}
 
 		_contextActor = actor;
+		_contextIsPlayer = false;
 		_memberContextMenu.Clear();
 
 		if (_player.IsInActiveParty(actor))
@@ -511,9 +521,45 @@ public partial class PartyPanel : PanelContainer
 		_memberContextMenu.Popup();
 	}
 
+	private void ShowPlayerContextMenu(Vector2 screenPosition)
+	{
+		if (_player == null)
+		{
+			return;
+		}
+
+		_contextActor = null;
+		_contextIsPlayer = true;
+		_memberContextMenu.Clear();
+		string rebirthText = _player.PlayerRebirthCount > 0
+			? LocaleText.F("button.rebirth_count", _player.PlayerRebirthCount)
+			: LocaleText.T("button.rebirth");
+		_memberContextMenu.AddItem(rebirthText, 8);
+		_memberContextMenu.SetItemDisabled(_memberContextMenu.GetItemIndex(8), !_player.CanPlayerRebirth);
+		_memberContextMenu.Position = new Vector2I(Mathf.RoundToInt(screenPosition.X), Mathf.RoundToInt(screenPosition.Y));
+		_memberContextMenu.ResetSize();
+		_memberContextMenu.Popup();
+	}
+
 	private void OnMemberContextMenuIdPressed(long id)
 	{
-		if (_player == null || _contextActor == null || !IsInstanceValid(_contextActor))
+		if (_player == null)
+		{
+			return;
+		}
+
+		if (_contextIsPlayer)
+		{
+			if (id == 8)
+			{
+				_player.TryPlayerRebirth();
+			}
+			RefreshParty();
+			UpdateDetails();
+			return;
+		}
+
+		if (_contextActor == null || !IsInstanceValid(_contextActor))
 		{
 			return;
 		}

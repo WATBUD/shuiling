@@ -19,6 +19,7 @@ public partial class CompanionInfoCard : PanelContainer
 	private VBoxContainer _playerAttributeSection = null!;
 	private Label _attributePointLabel = null!;
 	private readonly Dictionary<PlayerAttribute, Button> _attributeButtons = new();
+	private readonly Dictionary<PlayerAttribute, Label> _attributeValueLabels = new();
 	private FloatingTooltip _tooltip = null!;
 	private SimpleActor? _actor;
 	private PlayerController? _player;
@@ -58,9 +59,17 @@ public partial class CompanionInfoCard : PanelContainer
 		var columns = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Begin, SizeFlagsVertical = SizeFlags.ShrinkBegin };
 		columns.AddThemeConstantOverride("separation", 12);
 		rows.AddChild(columns);
+		var statColumn = new VBoxContainer
+		{
+			Alignment = BoxContainer.AlignmentMode.Begin,
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			SizeFlagsVertical = SizeFlags.ShrinkBegin,
+		};
+		statColumn.AddThemeConstantOverride("separation", 1);
+		columns.AddChild(statColumn);
 		_stats = MakeLabel(12, new Color(0.80f, 0.87f, 0.93f));
 		_stats.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-		columns.AddChild(_stats);
+		statColumn.AddChild(_stats);
 		var metaRows = new VBoxContainer { Alignment = BoxContainer.AlignmentMode.Begin, SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkBegin };
 		metaRows.AddThemeConstantOverride("separation", 0);
 		columns.AddChild(metaRows);
@@ -85,22 +94,18 @@ public partial class CompanionInfoCard : PanelContainer
 			Visible = false,
 			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 		};
-		_playerAttributeSection.AddThemeConstantOverride("separation", 4);
-		rows.AddChild(_playerAttributeSection);
-		_attributePointLabel = MakeLabel(13, new Color(1.0f, 0.84f, 0.38f));
+		_playerAttributeSection.AddThemeConstantOverride("separation", 0);
+		statColumn.AddChild(_playerAttributeSection);
+		statColumn.MoveChild(_playerAttributeSection, 0);
+		_attributePointLabel = MakeLabel(12, new Color(1.0f, 0.84f, 0.38f));
+		_attributePointLabel.Visible = false;
 		_playerAttributeSection.AddChild(_attributePointLabel);
-		var attributeGrid = new GridContainer
-		{
-			Columns = 4,
-			SizeFlagsHorizontal = SizeFlags.ExpandFill,
-		};
-		attributeGrid.AddThemeConstantOverride("h_separation", 6);
-		attributeGrid.AddThemeConstantOverride("v_separation", 4);
-		_playerAttributeSection.AddChild(attributeGrid);
-		AddAttributeButton(attributeGrid, PlayerAttribute.Strength);
-		AddAttributeButton(attributeGrid, PlayerAttribute.Vitality);
-		AddAttributeButton(attributeGrid, PlayerAttribute.Agility);
-		AddAttributeButton(attributeGrid, PlayerAttribute.Intelligence);
+		AddAttributeButton(_playerAttributeSection, PlayerAttribute.Health);
+		AddAttributeButton(_playerAttributeSection, PlayerAttribute.Attack);
+		AddAttributeButton(_playerAttributeSection, PlayerAttribute.Defense);
+		AddAttributeButton(_playerAttributeSection, PlayerAttribute.MoveSpeed);
+		AddAttributeButton(_playerAttributeSection, PlayerAttribute.AttackSpeed);
+		AddAttributeButton(_playerAttributeSection, PlayerAttribute.CritChance);
 
 		_tooltip = new FloatingTooltip
 		{
@@ -199,7 +204,6 @@ public partial class CompanionInfoCard : PanelContainer
 			$"{LocaleText.T("stat.state")} {_actor.StateName}");
 		var metaLines = new List<string>
 		{
-			$"{_actor.TypeName} / {_actor.CombatRangeName}",
 			$"{LocaleText.T("stat.race")} {LocaleText.T(BuildCatalog.GetRaceNameKey(BuildCatalog.GetRaceId(_actor)))} / {LocaleText.T("stat.element")} {_actor.BuildElementName}",
 			$"{LocaleText.T("stat.affinity")} {_actor.Affinity} / 100",
 		};
@@ -231,7 +235,8 @@ public partial class CompanionInfoCard : PanelContainer
 			return;
 		}
 
-		_title.Text = $"{_player.LocalizedPlayerName} - {LocaleText.F("inventory.info_header", _player.Level)}";
+		string playerRebirthTag = _player.PlayerRebirthCount > 0 ? $"  ✦x{_player.PlayerRebirthCount}" : string.Empty;
+		_title.Text = $"{_player.LocalizedPlayerName} - {LocaleText.F("inventory.info_header", _player.Level)}{playerRebirthTag}";
 		_player.EnsurePlayerAttributePoints();
 		_experience.Text = $"{LocaleText.T("stat.experience")} {_player.Experience}/{_player.ExperienceToNextLevel}";
 		_experienceBar.MaxValue = Mathf.Max(_player.ExperienceToNextLevel, 1);
@@ -239,17 +244,11 @@ public partial class CompanionInfoCard : PanelContainer
 		_experienceBar.Visible = true;
 		BuildStats playerStats = _player.CurrentBuildStats;
 		_stats.Text = string.Join("\n",
-			$"HP {_player.CurrentHealth} / {_player.EffectiveMaxHealth}",
-			$"{LocaleText.T("stat.attack")} {playerStats.Attack}",
-			$"{LocaleText.T("stat.defense")} {_player.EffectiveDefense}",
-			$"{LocaleText.T("stat.move_speed")} {_player.WalkSpeed * playerStats.MoveSpeedMultiplier:0.0}",
-			LocaleText.F("stat.attack_speed_value", GetAttackSpeed(_player.AttackCooldown * playerStats.AttackCooldownMultiplier).ToString("0.00")),
 			$"{LocaleText.T("tooltip.attack_range")} {_player.AttackRange + playerStats.AttackRangeBonus:0.0}",
 			$"{LocaleText.T("tooltip.detection_radius")} {_player.DetectionRadius:0.0}",
-			$"{LocaleText.T("tooltip.crit_chance")} {playerStats.CritChance * 100.0f:0.#}%",
 			$"{LocaleText.T("stat.state")} {LocaleText.T("party.playable")}");
 		_meta.Text = string.Join("\n",
-			$"Player / {LocaleText.T("combat.range.melee")} / {LocaleText.T("personality.brave")}",
+			LocaleText.F("player.attribute.points", _player.UnspentAttributePoints),
 			LocaleText.F("inventory.gold", _player.Gold),
 			LocaleText.F("party.title", _player.ActiveParty.Count, _player.ActivePartyLimit, _player.AvailableCompanionCount));
 		_mode.Visible = false;
@@ -260,7 +259,7 @@ public partial class CompanionInfoCard : PanelContainer
 		_equipmentTitle.Text = LocaleText.T("build.equipment");
 		_skillGemsTitle.Text = LocaleText.T("build.skill_gems");
 		CompanionBuildLoadout loadout = _player.BuildLoadout;
-		string playerSignature = $"player|{_player.Level}|{_player.UnspentAttributePoints}|{_player.Strength}|{_player.Vitality}|{_player.Agility}|{_player.Intelligence}|{loadout.HelmetId}|{loadout.WeaponId}|{loadout.ArmorId}|{loadout.BootsId}|{loadout.AccessoryId}|{string.Join(",", loadout.SkillGemIds)}|{string.Join(",", loadout.SkillGemLevels)}";
+		string playerSignature = $"player|{_player.Level}|{_player.UnspentAttributePoints}|{_player.HealthAttributePoints}|{_player.AttackAttributePoints}|{_player.DefenseAttributePoints}|{_player.MoveSpeedAttributePoints}|{_player.AttackSpeedAttributePoints}|{_player.CritChanceAttributePoints}|{loadout.HelmetId}|{loadout.WeaponId}|{loadout.ArmorId}|{loadout.BootsId}|{loadout.AccessoryId}|{string.Join(",", loadout.SkillGemIds)}|{string.Join(",", loadout.SkillGemLevels)}";
 		if (_detailSignature != playerSignature)
 		{
 			_detailSignature = playerSignature;
@@ -268,17 +267,37 @@ public partial class CompanionInfoCard : PanelContainer
 		}
 	}
 
-	private void AddAttributeButton(GridContainer parent, PlayerAttribute attribute)
+	private void AddAttributeButton(VBoxContainer parent, PlayerAttribute attribute)
 	{
+		var row = new HBoxContainer
+		{
+			SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
+			SizeFlagsVertical = SizeFlags.ShrinkBegin,
+		};
+		row.AddThemeConstantOverride("separation", 2);
+		parent.AddChild(row);
+		var valueLabel = MakeLabel(12, new Color(0.80f, 0.87f, 0.93f));
+		valueLabel.SizeFlagsHorizontal = SizeFlags.ShrinkBegin;
+		valueLabel.SizeFlagsVertical = SizeFlags.ShrinkCenter;
+		valueLabel.VerticalAlignment = VerticalAlignment.Center;
+		valueLabel.AutowrapMode = TextServer.AutowrapMode.Off;
+		row.AddChild(valueLabel);
 		var button = new Button
 		{
-			CustomMinimumSize = new Vector2(0.0f, 34.0f),
-			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			Text = "+",
+			Flat = true,
+			CustomMinimumSize = new Vector2(18.0f, 18.0f),
+			SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
+			SizeFlagsVertical = SizeFlags.ShrinkCenter,
 			FocusMode = FocusModeEnum.None,
 		};
+		button.AddThemeFontSizeOverride("font_size", 12);
+		button.AddThemeColorOverride("font_color", new Color(1.0f, 0.84f, 0.38f));
+		button.AddThemeColorOverride("font_hover_color", new Color(1.0f, 0.96f, 0.66f));
 		button.Pressed += () => OnAttributePressed(attribute);
-		parent.AddChild(button);
+		row.AddChild(button);
 		_attributeButtons[attribute] = button;
+		_attributeValueLabels[attribute] = valueLabel;
 	}
 
 	private void OnAttributePressed(PlayerAttribute attribute)
@@ -301,18 +320,21 @@ public partial class CompanionInfoCard : PanelContainer
 
 		_playerAttributeSection.Visible = true;
 		_attributePointLabel.Text = LocaleText.F("player.attribute.points", _player.UnspentAttributePoints);
-		SetAttributeButton(PlayerAttribute.Strength, "player.attribute.strength", _player.Strength);
-		SetAttributeButton(PlayerAttribute.Vitality, "player.attribute.vitality", _player.Vitality);
-		SetAttributeButton(PlayerAttribute.Agility, "player.attribute.agility", _player.Agility);
-		SetAttributeButton(PlayerAttribute.Intelligence, "player.attribute.intelligence", _player.Intelligence);
+		BuildStats stats = _player.CurrentBuildStats;
+		SetAttributeButton(PlayerAttribute.Health, "stat.health", $"{_player.CurrentHealth} / {stats.MaxHealth}", "player.attribute.health.detail");
+		SetAttributeButton(PlayerAttribute.Attack, "stat.attack", stats.AttackDisplayValue.ToString("0.0"), "player.attribute.attack.detail");
+		SetAttributeButton(PlayerAttribute.Defense, "stat.defense", stats.DefenseDisplayValue.ToString("0.0"), "player.attribute.defense.detail");
+		SetAttributeButton(PlayerAttribute.MoveSpeed, "stat.move_speed", (_player.WalkSpeed * stats.MoveSpeedMultiplier).ToString("0.00"), "player.attribute.move_speed.detail");
+		SetAttributeButton(PlayerAttribute.AttackSpeed, "stat.attack_speed", GetAttackSpeed(_player.AttackCooldown * stats.AttackCooldownMultiplier).ToString("0.00"), "player.attribute.attack_speed.detail");
+		SetAttributeButton(PlayerAttribute.CritChance, "tooltip.crit_chance", $"{stats.CritChance * 100.0f:0.0}%", "player.attribute.crit_chance.detail");
 	}
 
-	private void SetAttributeButton(PlayerAttribute attribute, string nameKey, int value)
+	private void SetAttributeButton(PlayerAttribute attribute, string nameKey, string value, string detailKey)
 	{
 		Button button = _attributeButtons[attribute];
-		button.Text = $"{LocaleText.T(nameKey)}  {value}  +";
+		_attributeValueLabels[attribute].Text = $"{LocaleText.T(nameKey)} {value}";
 		button.Disabled = _player == null || _player.UnspentAttributePoints <= 0;
-		button.TooltipText = LocaleText.T($"{nameKey}.detail");
+		button.TooltipText = LocaleText.T(detailKey);
 	}
 
 	private void RebuildPlayerTerms()
