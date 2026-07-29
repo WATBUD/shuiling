@@ -1877,7 +1877,15 @@ public partial class InventoryPanel : PanelContainer
 		AddStatLine(lines, "stat.attack", Mathf.RoundToInt(item.AttackBonus * starMultiplier));
 		AddStatLine(lines, "stat.defense", Mathf.RoundToInt(item.DefenseBonus * starMultiplier));
 		AddPercentLine(lines, "tooltip.move_speed", item.MoveSpeedBonus * starMultiplier);
-		AddPercentLine(lines, "tooltip.attack_cooldown", item.AttackCooldownReduction * starMultiplier);
+		if (item.Slot == EquipmentSlot.Weapon && item.Id != "equip.weapon.none")
+		{
+			int attackSpeed = BuildCatalog.GetWeaponAttackSpeed(item, starMultiplier);
+			lines.Add(LocaleText.F("tooltip.stat_line", LocaleText.T("stat.attack_speed"), attackSpeed));
+		}
+		else
+		{
+			AddPercentLine(lines, "stat.attack_speed", item.AttackCooldownReduction * starMultiplier);
+		}
 		AddDecimalLine(lines, "tooltip.attack_range", item.AttackRangeBonus * starMultiplier);
 		AddPercentLine(lines, "tooltip.crit_chance", item.CritChanceBonus * starMultiplier);
 		AddStatLine(lines, "tooltip.socket_count", item.SocketCount);

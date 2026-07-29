@@ -1,7 +1,7 @@
 using Godot;
 using System.Collections.Generic;
 
-// 夥伴招募所「夥伴」分頁：與傭兵相同節奏，每 6 小時累積 1 隻 1 等候選夥伴到上限。
+// 夥伴招募所「夥伴」分頁：每 3 小時累積 1 隻 1 等候選夥伴到上限。
 public partial class PlayerController
 {
 	private void EnsureCompanionRecruitOffers()
@@ -9,7 +9,7 @@ public partial class PlayerController
 		if (_companionRecruitNextRefreshUnix <= 0.0)
 		{
 			AddOneCompanionRecruitOffer();
-			_companionRecruitNextRefreshUnix = Time.GetUnixTimeFromSystem() + MercenaryRefreshSeconds;
+			_companionRecruitNextRefreshUnix = Time.GetUnixTimeFromSystem() + RecruitmentConfig.RefillSeconds;
 			return;
 		}
 
@@ -30,16 +30,16 @@ public partial class PlayerController
 
 		double now = Time.GetUnixTimeFromSystem();
 		bool added = false;
-		while (now >= _companionRecruitNextRefreshUnix && _companionRecruitOffers.Count < RecruitOfferCap)
+		while (now >= _companionRecruitNextRefreshUnix && _companionRecruitOffers.Count < RecruitmentConfig.OfferCapacityPerCategory)
 		{
 			AddOneCompanionRecruitOffer();
 			added = true;
-			_companionRecruitNextRefreshUnix += MercenaryRefreshSeconds;
+			_companionRecruitNextRefreshUnix += RecruitmentConfig.RefillSeconds;
 		}
 
-		if (_companionRecruitOffers.Count >= RecruitOfferCap)
+		if (_companionRecruitOffers.Count >= RecruitmentConfig.OfferCapacityPerCategory)
 		{
-			_companionRecruitNextRefreshUnix = now + MercenaryRefreshSeconds;
+			_companionRecruitNextRefreshUnix = now + RecruitmentConfig.RefillSeconds;
 		}
 
 		if (added)
@@ -58,7 +58,7 @@ public partial class PlayerController
 
 	private void AddOneCompanionRecruitOffer()
 	{
-		if (_companionRecruitOffers.Count >= RecruitOfferCap)
+		if (_companionRecruitOffers.Count >= RecruitmentConfig.OfferCapacityPerCategory)
 		{
 			return;
 		}
@@ -79,6 +79,41 @@ public partial class PlayerController
 			template.Attack,
 			template.Defense,
 			"companion"));
+	}
+
+	private void RestoreCompanionRecruitOffers(PlayerSaveData data)
+	{
+		_companionRecruitOffers.Clear();
+		if (data.CompanionRecruitOffers != null)
+		{
+			foreach (MercenaryOfferSaveData offer in data.CompanionRecruitOffers)
+			{
+				if (_companionRecruitOffers.Count >= RecruitmentConfig.OfferCapacityPerCategory)
+				{
+					break;
+				}
+				if (offer.Cost <= 0 || string.IsNullOrWhiteSpace(offer.NameKey))
+				{
+					continue;
+				}
+
+				_companionRecruitOffers.Add(new ContractCompanionOffer(
+					offer.Id,
+					offer.NameKey,
+					offer.RoleNameKey,
+					offer.CombatRole,
+					offer.SummaryKey,
+					Mathf.Max(offer.Level, 1),
+					Mathf.Max(offer.Cost, 1),
+					Mathf.Max(offer.MaxHealth, 1),
+					Mathf.Max(offer.Attack, 1),
+					Mathf.Max(offer.Defense, 0),
+					"companion"));
+			}
+		}
+
+		_companionRecruitNextRefreshUnix = data.CompanionRecruitNextRefreshUnix;
+		EnsureCompanionRecruitOffers();
 	}
 
 	// 招募一隻夥伴（消耗金幣，直接加入收藏／出戰），與購買寵物相同流程。

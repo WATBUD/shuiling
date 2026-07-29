@@ -84,7 +84,7 @@ public partial class PlayerController
 		}
 		AddRandomItems(petKeys, _petShopStockNameKeys, PetShopStockCount);
 
-		_merchantNextRefreshUnix = Time.GetUnixTimeFromSystem() + MercenaryRefreshSeconds;
+		_merchantNextRefreshUnix = Time.GetUnixTimeFromSystem() + MerchantConfig.RefreshSeconds;
 	}
 
 	private void AddRandomItems(List<string> source, List<string> target, int count)

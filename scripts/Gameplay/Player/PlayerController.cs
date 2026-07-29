@@ -106,9 +106,6 @@ public partial class PlayerController : CharacterBody3D
 	public const int MountAffinityRequirement = 50;
 	private const float MercenaryBrokerInteractRange = 4.6f;
 	private const float MerchantInteractRange = 4.6f;
-	private const int MercenaryRefreshCost = 5000;
-	private const int MercenaryOfferCount = 5;
-	private const double MercenaryRefreshSeconds = 6.0 * 60.0 * 60.0;
 	private const int MerchantRefreshCost = 5000;
 	private const int BlacksmithStockCount = 6;
 	private const int PetShopStockCount = 4;
@@ -182,8 +179,7 @@ public partial class PlayerController : CharacterBody3D
 	private readonly List<string> _petShopStockNameKeys = new();
 	private readonly RandomNumberGenerator _mercenaryRng = new();
 	private double _mercenaryNextRefreshUnix;
-	// 夥伴招募所：傭兵與夥伴各自累積 1 隻/6 小時到上限。
-	private const int RecruitOfferCap = 6;
+	// 夥伴招募所：傭兵與夥伴各自每 3 小時補充 1 隻，上限各 3 隻。
 	private readonly List<ContractCompanionOffer> _companionRecruitOffers = new();
 	private double _companionRecruitNextRefreshUnix;
 	public IReadOnlyList<ContractCompanionOffer> CompanionRecruitOffers => _companionRecruitOffers;
@@ -323,7 +319,7 @@ public partial class PlayerController : CharacterBody3D
 		}
 	}
 	public IReadOnlyList<ContractCompanionOffer> ContractCompanionOffers => _contractCompanionOffers;
-	public int MercenaryManualRefreshCost => MercenaryRefreshCost;
+	public int MercenaryManualRefreshCost => RecruitmentConfig.ManualRefreshGoldCost;
 	public int MerchantManualRefreshCost => MerchantRefreshCost;
 	public int PetReviveCostPerCompanion => PetReviveGoldCost;
 	public IReadOnlyDictionary<string, int> InventoryItems => _inventoryItems;

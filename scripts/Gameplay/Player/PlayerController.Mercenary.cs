@@ -23,6 +23,7 @@ public partial class PlayerController
 		}
 
 		SimpleActor actor = world.SpawnContractCompanion(offer);
+		actor.ClearBuildLoadout();
 		Gold = Mathf.Max(Gold - offer.Cost, 0);
 		PostSystemMessage(LocaleText.F("system.mercenary.hired", LocaleText.T(offer.NameKey), offer.Cost, Gold), new Color(1.0f, 0.86f, 0.46f), GameMessageChannel.Party);
 		_contractCompanionOffers.Remove(offer);
@@ -34,20 +35,20 @@ public partial class PlayerController
 
 	public bool TryRefreshMercenaryOffersManually()
 	{
-		if (Gold < MercenaryRefreshCost)
+		if (Gold < RecruitmentConfig.ManualRefreshGoldCost)
 		{
-			PostSystemMessage(LocaleText.F("system.mercenary.refresh_not_enough_gold", MercenaryRefreshCost, Gold), new Color(1.0f, 0.62f, 0.48f));
+			PostSystemMessage(LocaleText.F("system.mercenary.refresh_not_enough_gold", RecruitmentConfig.ManualRefreshGoldCost, Gold), new Color(1.0f, 0.62f, 0.48f));
 			return false;
 		}
 
-		if (_contractCompanionOffers.Count >= RecruitOfferCap)
+		if (_contractCompanionOffers.Count >= RecruitmentConfig.OfferCapacityPerCategory)
 		{
 			return false;
 		}
 
-		Gold -= MercenaryRefreshCost;
+		Gold -= RecruitmentConfig.ManualRefreshGoldCost;
 		AddOneMercenaryOffer();
-		PostSystemMessage(LocaleText.F("system.mercenary.refreshed", MercenaryRefreshCost, Gold), new Color(0.82f, 0.94f, 1.0f));
+		PostSystemMessage(LocaleText.F("system.mercenary.refreshed", RecruitmentConfig.ManualRefreshGoldCost, Gold), new Color(0.82f, 0.94f, 1.0f));
 		_inventoryPanel.RefreshAll();
 		_mercenaryShopPanel.RefreshAll();
 		return true;
@@ -65,11 +66,11 @@ public partial class PlayerController
 
 	private void EnsureMercenaryOffers()
 	{
-		// 傭兵每 6 小時累積 1 隻到上限；首次初始化先給 1 隻並排定下一次。
+		// 每 3 小時累積 1 隻到上限；首次初始化先給 1 隻並排定下一次。
 		if (_mercenaryNextRefreshUnix <= 0.0)
 		{
 			AddOneMercenaryOffer();
-			_mercenaryNextRefreshUnix = Time.GetUnixTimeFromSystem() + MercenaryRefreshSeconds;
+			_mercenaryNextRefreshUnix = Time.GetUnixTimeFromSystem() + RecruitmentConfig.RefillSeconds;
 			return;
 		}
 
@@ -90,17 +91,17 @@ public partial class PlayerController
 
 		double now = Time.GetUnixTimeFromSystem();
 		bool added = false;
-		while (now >= _mercenaryNextRefreshUnix && _contractCompanionOffers.Count < RecruitOfferCap)
+		while (now >= _mercenaryNextRefreshUnix && _contractCompanionOffers.Count < RecruitmentConfig.OfferCapacityPerCategory)
 		{
 			AddOneMercenaryOffer();
 			added = true;
-			_mercenaryNextRefreshUnix += MercenaryRefreshSeconds;
+			_mercenaryNextRefreshUnix += RecruitmentConfig.RefillSeconds;
 		}
 
 		// 已達上限：把下一次時間貼齊到未來，避免一次灌爆或無限迴圈。
-		if (_contractCompanionOffers.Count >= RecruitOfferCap)
+		if (_contractCompanionOffers.Count >= RecruitmentConfig.OfferCapacityPerCategory)
 		{
-			_mercenaryNextRefreshUnix = now + MercenaryRefreshSeconds;
+			_mercenaryNextRefreshUnix = now + RecruitmentConfig.RefillSeconds;
 		}
 
 		if (added)
@@ -119,7 +120,7 @@ public partial class PlayerController
 
 	private void AddOneMercenaryOffer()
 	{
-		if (_contractCompanionOffers.Count >= RecruitOfferCap)
+		if (_contractCompanionOffers.Count >= RecruitmentConfig.OfferCapacityPerCategory)
 		{
 			return;
 		}
@@ -154,6 +155,10 @@ public partial class PlayerController
 		_contractCompanionOffers.Clear();
 		foreach (MercenaryOfferSaveData offer in data.MercenaryOffers)
 		{
+			if (_contractCompanionOffers.Count >= RecruitmentConfig.OfferCapacityPerCategory)
+			{
+				break;
+			}
 			if (offer.Cost <= 0 || string.IsNullOrWhiteSpace(offer.NameKey))
 			{
 				continue;

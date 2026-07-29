@@ -1,7 +1,7 @@
 using Godot;
 using System.Collections.Generic;
 
-// 夥伴招募所面板：上方分頁切換「傭兵 / 夥伴」，兩個清單皆為每 6 小時累積 1 隻 1 等的候選。
+// 夥伴招募所面板：上方分頁切換「傭兵 / 夥伴」，兩個清單皆為每 3 小時累積 1 隻 1 等的候選。
 public partial class MercenaryShopPanel : PanelContainer
 {
 	private PlayerController? _player;
@@ -265,6 +265,7 @@ public partial class MercenaryShopPanel : PanelContainer
 		actor.ConfigureStats(offer.NameKey, offer.Level, offer.MaxHealth, offer.Attack, offer.Defense, offer.Level * 8, 0);
 		actor.ConfigureGrowth("ability.none", Mathf.Max(offer.Level / 2, 1));
 		actor.ConfigureCombatProfile(offer.CombatRole, "personality.brave", "ability.none", 5);
+		actor.ClearBuildLoadout();
 		return actor;
 	}
 

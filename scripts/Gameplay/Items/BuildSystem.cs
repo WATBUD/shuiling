@@ -48,6 +48,7 @@ public sealed class EquipmentDefinition
 	public int AttackBonus { get; set; }
 	public int DefenseBonus { get; set; }
 	public float MoveSpeedBonus { get; set; }
+	public int AttackSpeed { get; set; }
 	public float AttackCooldownReduction { get; set; }
 	public float AttackRangeBonus { get; set; }
 	public float CritChanceBonus { get; set; }
@@ -440,16 +441,16 @@ public static class BuildCatalog
 		new EquipmentDefinition { Id = "equip.helmet.guardian", NameKey = "equip.helmet.guardian", SummaryKey = "equip.summary.guardian_helmet", Slot = EquipmentSlot.Helmet, MaxHealthBonus = 26, DefenseBonus = 8, SocketCount = 1 },
 		new EquipmentDefinition { Id = "equip.helmet.mystic", NameKey = "equip.helmet.mystic", SummaryKey = "equip.summary.mystic_hood", Slot = EquipmentSlot.Helmet, MaxHealthBonus = 12, DefenseBonus = 4, AttackCooldownReduction = 0.07f, AttackRangeBonus = 0.6f, SocketCount = 2 },
 
-		new EquipmentDefinition { Id = "equip.weapon.sword", NameKey = "equip.weapon.sword", SummaryKey = "equip.summary.sword", Slot = EquipmentSlot.Weapon, AttackBonus = 10, AttackCooldownReduction = 0.04f, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.weapon.short_sword", NameKey = "equip.weapon.short_sword", SummaryKey = "equip.summary.short_sword", Slot = EquipmentSlot.Weapon, AttackBonus = 8, AttackCooldownReduction = 0.10f, CritChanceBonus = 0.03f, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.weapon.dagger", NameKey = "equip.weapon.dagger", SummaryKey = "equip.summary.dagger", Slot = EquipmentSlot.Weapon, AttackBonus = 6, AttackCooldownReduction = 0.18f, CritChanceBonus = 0.10f, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.weapon.longbow", NameKey = "equip.weapon.longbow", SummaryKey = "equip.summary.longbow", Slot = EquipmentSlot.Weapon, AttackBonus = 9, AttackRangeBonus = 3.2f, AttackCooldownReduction = 0.02f, CritChanceBonus = 0.04f, SocketCount = 2 },
-		new EquipmentDefinition { Id = "equip.weapon.spear", NameKey = "equip.weapon.spear", SummaryKey = "equip.summary.spear", Slot = EquipmentSlot.Weapon, AttackBonus = 12, DefenseBonus = 3, AttackRangeBonus = 1.4f, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.weapon.warhammer", NameKey = "equip.weapon.warhammer", SummaryKey = "equip.summary.warhammer", Slot = EquipmentSlot.Weapon, AttackBonus = 20, DefenseBonus = 4, AttackCooldownReduction = -0.12f, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.weapon.scepter", NameKey = "equip.weapon.scepter", SummaryKey = "equip.summary.scepter", Slot = EquipmentSlot.Weapon, AttackBonus = 8, DefenseBonus = 5, AttackRangeBonus = 1.6f, AttackCooldownReduction = 0.05f, SocketCount = 2 },
-		new EquipmentDefinition { Id = "equip.weapon.staff", NameKey = "equip.weapon.staff", SummaryKey = "equip.summary.staff", Slot = EquipmentSlot.Weapon, AttackBonus = 7, AttackRangeBonus = 2.0f, AttackCooldownReduction = 0.08f, SocketCount = 2 },
-		new EquipmentDefinition { Id = "equip.weapon.great_axe", NameKey = "equip.weapon.great_axe", SummaryKey = "equip.summary.great_axe", Slot = EquipmentSlot.Weapon, AttackBonus = 18, DefenseBonus = 2, AttackCooldownReduction = -0.08f, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.weapon.claws", NameKey = "equip.weapon.claws", SummaryKey = "equip.summary.claws", Slot = EquipmentSlot.Weapon, AttackBonus = 8, AttackCooldownReduction = 0.16f, CritChanceBonus = 0.06f, SocketCount = 1 },
+		new EquipmentDefinition { Id = "equip.weapon.sword", NameKey = "equip.weapon.sword", SummaryKey = "equip.summary.sword", Slot = EquipmentSlot.Weapon, AttackBonus = 10, AttackSpeed = 54, SocketCount = 1 },
+		new EquipmentDefinition { Id = "equip.weapon.short_sword", NameKey = "equip.weapon.short_sword", SummaryKey = "equip.summary.short_sword", Slot = EquipmentSlot.Weapon, AttackBonus = 8, AttackSpeed = 60, CritChanceBonus = 0.03f, SocketCount = 1 },
+		new EquipmentDefinition { Id = "equip.weapon.dagger", NameKey = "equip.weapon.dagger", SummaryKey = "equip.summary.dagger", Slot = EquipmentSlot.Weapon, AttackBonus = 6, AttackSpeed = 68, CritChanceBonus = 0.10f, SocketCount = 1 },
+		new EquipmentDefinition { Id = "equip.weapon.longbow", NameKey = "equip.weapon.longbow", SummaryKey = "equip.summary.longbow", Slot = EquipmentSlot.Weapon, AttackBonus = 9, AttackRangeBonus = 3.2f, AttackSpeed = 52, CritChanceBonus = 0.04f, SocketCount = 2 },
+		new EquipmentDefinition { Id = "equip.weapon.spear", NameKey = "equip.weapon.spear", SummaryKey = "equip.summary.spear", Slot = EquipmentSlot.Weapon, AttackBonus = 12, DefenseBonus = 3, AttackRangeBonus = 1.4f, AttackSpeed = 50, SocketCount = 1 },
+		new EquipmentDefinition { Id = "equip.weapon.warhammer", NameKey = "equip.weapon.warhammer", SummaryKey = "equip.summary.warhammer", Slot = EquipmentSlot.Weapon, AttackBonus = 20, DefenseBonus = 4, AttackSpeed = 38, SocketCount = 1 },
+		new EquipmentDefinition { Id = "equip.weapon.scepter", NameKey = "equip.weapon.scepter", SummaryKey = "equip.summary.scepter", Slot = EquipmentSlot.Weapon, AttackBonus = 8, DefenseBonus = 5, AttackRangeBonus = 1.6f, AttackSpeed = 55, SocketCount = 2 },
+		new EquipmentDefinition { Id = "equip.weapon.staff", NameKey = "equip.weapon.staff", SummaryKey = "equip.summary.staff", Slot = EquipmentSlot.Weapon, AttackBonus = 7, AttackRangeBonus = 2.0f, AttackSpeed = 58, SocketCount = 2 },
+		new EquipmentDefinition { Id = "equip.weapon.great_axe", NameKey = "equip.weapon.great_axe", SummaryKey = "equip.summary.great_axe", Slot = EquipmentSlot.Weapon, AttackBonus = 18, DefenseBonus = 2, AttackSpeed = 42, SocketCount = 1 },
+		new EquipmentDefinition { Id = "equip.weapon.claws", NameKey = "equip.weapon.claws", SummaryKey = "equip.summary.claws", Slot = EquipmentSlot.Weapon, AttackBonus = 8, AttackSpeed = 66, CritChanceBonus = 0.06f, SocketCount = 1 },
 
 		new EquipmentDefinition { Id = "equip.armor.scout", NameKey = "equip.armor.scout", SummaryKey = "equip.summary.scout_armor", Slot = EquipmentSlot.Armor, MaxHealthBonus = 18, DefenseBonus = 5, MoveSpeedBonus = 0.05f, SocketCount = 1 },
 		new EquipmentDefinition { Id = "equip.armor.plate", NameKey = "equip.armor.plate", SummaryKey = "equip.summary.plate_armor", Slot = EquipmentSlot.Armor, MaxHealthBonus = 44, DefenseBonus = 16, MoveSpeedBonus = -0.05f, SocketCount = 1 },
@@ -1210,12 +1211,34 @@ public static class BuildCatalog
 	}
 
 	// bonusMultiplier 由精煉星等提供（每星 +8%）；插槽數不受星等影響。
+	public static int GetWeaponAttackSpeed(EquipmentDefinition equipment, float bonusMultiplier = 1.0f)
+	{
+		if (equipment.Slot != EquipmentSlot.Weapon || equipment.Id == "equip.weapon.none")
+		{
+			return EquipmentConfig.NeutralWeaponAttackSpeed;
+		}
+
+		float speed = EquipmentConfig.NeutralWeaponAttackSpeed
+			+ (equipment.AttackSpeed - EquipmentConfig.NeutralWeaponAttackSpeed) * bonusMultiplier;
+		return Mathf.Clamp(
+			Mathf.RoundToInt(speed),
+			EquipmentConfig.MinimumWeaponAttackSpeed,
+			EquipmentConfig.MaximumWeaponAttackSpeed);
+	}
+
 	private static void ApplyEquipment(BuildStats stats, EquipmentDefinition equipment, float bonusMultiplier = 1.0f)
 	{
 		stats.MaxHealth += Mathf.RoundToInt(equipment.MaxHealthBonus * bonusMultiplier);
 		stats.Attack += Mathf.RoundToInt(equipment.AttackBonus * bonusMultiplier);
 		stats.Defense += Mathf.RoundToInt(equipment.DefenseBonus * bonusMultiplier);
 		stats.MoveSpeedMultiplier += equipment.MoveSpeedBonus * bonusMultiplier;
+		if (equipment.Slot == EquipmentSlot.Weapon && equipment.Id != "equip.weapon.none")
+		{
+			int attackSpeed = GetWeaponAttackSpeed(equipment, bonusMultiplier);
+			float speedDifference = attackSpeed - EquipmentConfig.NeutralWeaponAttackSpeed;
+			stats.AttackCooldownMultiplier -= speedDifference
+				* EquipmentConfig.WeaponAttackSpeedToCooldownReduction;
+		}
 		stats.AttackCooldownMultiplier -= equipment.AttackCooldownReduction * bonusMultiplier;
 		stats.AttackRangeBonus += equipment.AttackRangeBonus * bonusMultiplier;
 		stats.CritChance += equipment.CritChanceBonus * bonusMultiplier;

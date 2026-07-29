@@ -26,6 +26,7 @@ public partial class PlayerController
 			InventoryItems = new Dictionary<string, int>(_inventoryItems),
 			StorageItems = new Dictionary<string, int>(_storageItems),
 			MercenaryNextRefreshUnix = _mercenaryNextRefreshUnix,
+			CompanionRecruitNextRefreshUnix = _companionRecruitNextRefreshUnix,
 			MerchantNextRefreshUnix = _merchantNextRefreshUnix,
 			BlacksmithStockItemIds = new List<string>(_blacksmithStockItemIds),
 			PetShopStockNameKeys = new List<string>(_petShopStockNameKeys),
@@ -36,6 +37,23 @@ public partial class PlayerController
 		foreach (ContractCompanionOffer offer in _contractCompanionOffers)
 		{
 			data.MercenaryOffers.Add(new MercenaryOfferSaveData
+			{
+				Id = offer.Id,
+				NameKey = offer.NameKey,
+				RoleNameKey = offer.RoleNameKey,
+				CombatRole = offer.CombatRole,
+				SummaryKey = offer.SummaryKey,
+				Level = offer.Level,
+				Cost = offer.Cost,
+				MaxHealth = offer.MaxHealth,
+				Attack = offer.Attack,
+				Defense = offer.Defense,
+			});
+		}
+
+		foreach (ContractCompanionOffer offer in _companionRecruitOffers)
+		{
+			data.CompanionRecruitOffers.Add(new MercenaryOfferSaveData
 			{
 				Id = offer.Id,
 				NameKey = offer.NameKey,
@@ -115,6 +133,7 @@ public partial class PlayerController
 		SetBossAnnouncementOpacity(data.BossAnnouncementOpacity);
 		SetCameraMode(CameraModeFromSaveId(data.CameraMode));
 		RestoreMercenaryOffers(data);
+		RestoreCompanionRecruitOffers(data);
 		RestoreMerchantStock(data);
 
 		_inventoryItems.Clear();

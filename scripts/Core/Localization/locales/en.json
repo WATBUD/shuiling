@@ -417,7 +417,7 @@
 	"tooltip.stat_line": "{0} {1}",
 	"tooltip.element": "Element: {0}",
 	"tooltip.move_speed": "Move Speed",
-	"tooltip.attack_cooldown": "Attack Cooldown",
+	"tooltip.attack_cooldown": "Attack Speed",
 	"tooltip.attack_range": "Attack Range",
 	"tooltip.detection_radius": "Detection Radius",
 	"tooltip.follow_distance": "Follow Distance",

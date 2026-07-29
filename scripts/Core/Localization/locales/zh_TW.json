@@ -417,7 +417,7 @@
 	"tooltip.stat_line": "{0} {1}",
 	"tooltip.element": "元素：{0}",
 	"tooltip.move_speed": "移動速度",
-	"tooltip.attack_cooldown": "攻擊冷卻",
+	"tooltip.attack_cooldown": "攻擊速度",
 	"tooltip.attack_range": "攻擊距離",
 	"tooltip.detection_radius": "索敵距離",
 	"tooltip.follow_distance": "跟隨距離",

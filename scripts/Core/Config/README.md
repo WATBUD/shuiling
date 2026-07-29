@@ -12,6 +12,8 @@
 - `CoreConfig.cs`：核心技能／輔助核心掉落、Boss 核心與欄位解鎖
 - `BossConfig.cs`：Boss 素材數量與金幣倍率
 - `WorldDropConfig.cs`：地面物品壽命、拾取距離、輪詢與回收上限
+- `RecruitmentConfig.cs`：夥伴招募所庫存上限、補充週期與手動刷新費用
+- `MerchantConfig.cs`：一般商人、鐵匠與夥伴商店的刷新週期
 
 修改原則：
 

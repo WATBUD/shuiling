@@ -3696,7 +3696,10 @@ public partial class SimpleActor : CharacterBody3D
 				+ item.AttackBonus * EquipmentConfig.AttackScoreWeight
 				+ item.DefenseBonus * EquipmentConfig.DefenseScoreWeight
 				+ item.MoveSpeedBonus * EquipmentConfig.MoveSpeedScoreWeight
-				+ item.AttackCooldownReduction * EquipmentConfig.AttackCooldownScoreWeight
+				+ (BuildCatalog.GetWeaponAttackSpeed(item) - EquipmentConfig.NeutralWeaponAttackSpeed)
+					* EquipmentConfig.WeaponAttackSpeedToCooldownReduction
+					* EquipmentConfig.AttackSpeedScoreWeight
+				+ item.AttackCooldownReduction * EquipmentConfig.AttackSpeedScoreWeight
 				+ item.AttackRangeBonus * EquipmentConfig.AttackRangeScoreWeight
 				+ item.CritChanceBonus * EquipmentConfig.CriticalChanceScoreWeight
 				+ item.SocketCount * EquipmentConfig.SocketScoreWeight;
