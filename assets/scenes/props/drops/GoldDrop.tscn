@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://c8gold2drop3aa"]
+[gd_scene load_steps=6 format=3 uid="uid://c8gold2drop3aa"]
 
 [ext_resource type="Script" path="res://scripts/Gameplay/Items/DropVisual.cs" id="1"]
 
@@ -43,40 +43,6 @@ scale_min = 0.5
 scale_max = 1.2
 color = Color(1.0, 0.86, 0.36, 0.9)
 
-[sub_resource type="Animation" id="anim_spin"]
-resource_name = "spin"
-length = 3.0
-loop_mode = 1
-tracks/0/type = "value"
-tracks/0/imported = false
-tracks/0/enabled = true
-tracks/0/path = NodePath(".:rotation")
-tracks/0/interp = 1
-tracks/0/loop_wrap = true
-tracks/0/keys = {
-"times": PackedFloat32Array(0, 3),
-"transitions": PackedFloat32Array(1, 1),
-"update": 0,
-"values": [Vector3(0, 0, 0), Vector3(0, 6.2831855, 0)]
-}
-tracks/1/type = "value"
-tracks/1/imported = false
-tracks/1/enabled = true
-tracks/1/path = NodePath(".:position")
-tracks/1/interp = 1
-tracks/1/loop_wrap = true
-tracks/1/keys = {
-"times": PackedFloat32Array(0, 1.5, 3),
-"transitions": PackedFloat32Array(1, 1, 1),
-"update": 0,
-"values": [Vector3(0, 0, 0), Vector3(0, 0.07, 0), Vector3(0, 0, 0)]
-}
-
-[sub_resource type="AnimationLibrary" id="anim_lib"]
-_data = {
-"spin": SubResource("anim_spin")
-}
-
 [node name="GoldDrop" type="Node3D"]
 script = ExtResource("1")
 
@@ -108,9 +74,3 @@ outline_size = 5
 pixel_size = 0.007
 modulate = Color(1.0, 0.88, 0.32, 1.0)
 outline_modulate = Color(0.02, 0.02, 0.018, 0.96)
-
-[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
-libraries = {
-"": SubResource("anim_lib")
-}
-autoplay = "spin"

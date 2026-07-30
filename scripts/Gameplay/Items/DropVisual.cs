@@ -2,11 +2,12 @@ using Godot;
 
 // Root script for the drop visual scenes (GoldDrop / ItemDrop / CardDrop).
 //
-// The scene owns everything visual — mesh, glow, particles, and a self-running
-// AnimationPlayer for the spin/bob — so artists can open the .tscn and preview
-// it in the editor without running the game. This script only feeds in the
-// runtime-dynamic bits: the label text/colour and (for item drops) a per-item
-// body tint. It also starts/stops particles as a pooled instance is reused.
+// The scene owns the static look — mesh, glow, particles — and this script
+// drives the idle motion (a steady spin plus a gentle vertical bob) and feeds
+// in the runtime-dynamic bits: the label text/colour and (for item drops) a
+// per-item body tint. Motion is code-driven rather than baked into an
+// AnimationPlayer so it behaves identically whether the drop is freshly spawned
+// or reused from the pool.
 //
 // Child nodes are looked up by fixed name (see the .tscn files):
 //   "Label"     — Label3D shown above the drop (optional)
@@ -18,14 +19,32 @@ public partial class DropVisual : Node3D
 	// drops set this; gold and card drops keep their authored materials.
 	[Export] public bool Tintable { get; set; }
 
+	[Export] public float SpinDegreesPerSecond { get; set; } = 80.0f;
+	[Export] public float BobHeight { get; set; } = 0.08f;
+	[Export] public float BobSpeed { get; set; } = 2.2f;
+
 	private Label3D? _label;
 	private GpuParticles3D? _particles;
 	private MeshInstance3D? _body;
 	private bool _resolved;
+	private float _baseY;
+	private float _bobPhase;
 
 	public override void _Ready()
 	{
 		ResolveNodes();
+		_baseY = Position.Y;
+	}
+
+	public override void _Process(double delta)
+	{
+		float step = (float)delta;
+		RotateY(Mathf.DegToRad(SpinDegreesPerSecond) * step);
+
+		_bobPhase += step * BobSpeed;
+		Vector3 position = Position;
+		position.Y = _baseY + Mathf.Sin(_bobPhase) * BobHeight;
+		Position = position;
 	}
 
 	private void ResolveNodes()
@@ -62,6 +81,14 @@ public partial class DropVisual : Node3D
 	public void OnActivated()
 	{
 		ResolveNodes();
+
+		// Reset the idle motion so a reused instance starts from a clean pose.
+		_bobPhase = 0.0f;
+		Rotation = Vector3.Zero;
+		Vector3 position = Position;
+		position.Y = _baseY;
+		Position = position;
+
 		if (_particles != null)
 		{
 			// Restart clears any left-over particles from the previous life and
