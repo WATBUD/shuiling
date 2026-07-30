@@ -1,64 +1,33 @@
 using Godot;
 using System.Collections.Generic;
 
+// A physical loot pickup in the world. WorldDrop is pure gameplay logic now:
+// it holds the drop's data, drives its lifetime and pickup, and delegates all
+// visuals to an authored scene (see DropVisual + the *Drop.tscn files) that it
+// instantiates as a child. Creation and recycling go through WorldDropFactory /
+// WorldDropPool — do not `new` one directly.
 public partial class WorldDrop : Node3D
 {
+	public enum DropKind
+	{
+		Gold,
+		Item,
+		Card,
+	}
+
+	private static readonly Dictionary<DropKind, string> ScenePaths = new()
+	{
+		{ DropKind.Gold, "res://assets/scenes/props/drops/GoldDrop.tscn" },
+		{ DropKind.Item, "res://assets/scenes/props/drops/ItemDrop.tscn" },
+		{ DropKind.Card, "res://assets/scenes/props/drops/CardDrop.tscn" },
+	};
+
+	private static readonly Dictionary<DropKind, PackedScene?> SceneCache = new();
+
 	private static readonly List<WorldDrop> ActiveDropRegistry = new();
 	public static IReadOnlyList<WorldDrop> ActiveDrops => ActiveDropRegistry;
 
-	// Drop visuals reuse a handful of colours, so cache their materials and
-	// meshes instead of allocating fresh ones per drop. A defeated monster can
-	// spit out 5+ drops (a boss ~8) in a single frame; building unique
-	// materials/meshes for each was a large slice of the death-frame hitch.
-	// Materials are never mutated after creation, so sharing is safe.
-	private static readonly Dictionary<int, StandardMaterial3D> BodyMaterialCache = new();
-	private static readonly Dictionary<int, StandardMaterial3D> GlowMaterialCache = new();
-	private static Mesh? _sharedGoldMesh;
-	private static Mesh? _sharedItemMesh;
-	private static Mesh? _sharedGlowMesh;
-	private static Mesh? _sharedCardFrameMesh;
-	private static PackedScene? _cardDropScene;
-	private static SphereMesh? _cardParticleMesh;
-	private const string CardDropScenePath = "res://assets/scenes/props/Card.tscn";
-
-	private static StandardMaterial3D GetBodyMaterial(Color color, bool isGold)
-	{
-		int key = unchecked((int)color.ToRgba32() * 2 + (isGold ? 1 : 0));
-		if (BodyMaterialCache.TryGetValue(key, out StandardMaterial3D? cached))
-		{
-			return cached;
-		}
-
-		var material = new StandardMaterial3D
-		{
-			AlbedoColor = color,
-			EmissionEnabled = true,
-			Emission = color * 0.45f,
-			Roughness = 0.35f,
-			Metallic = isGold ? 0.45f : 0.12f,
-		};
-		BodyMaterialCache[key] = material;
-		return material;
-	}
-
-	private static StandardMaterial3D GetGlowMaterial(Color color)
-	{
-		int key = unchecked((int)color.ToRgba32());
-		if (GlowMaterialCache.TryGetValue(key, out StandardMaterial3D? cached))
-		{
-			return cached;
-		}
-
-		var material = new StandardMaterial3D
-		{
-			AlbedoColor = new Color(color.R, color.G, color.B, 0.28f),
-			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-			EmissionEnabled = true,
-			Emission = color * 0.25f,
-		};
-		GlowMaterialCache[key] = material;
-		return material;
-	}
+	private static readonly Color CardTint = new(1.0f, 0.82f, 0.34f, 1.0f);
 
 	[Export] public string ItemId { get; set; } = string.Empty;
 	[Export] public int Amount { get; set; } = 1;
@@ -67,57 +36,85 @@ public partial class WorldDrop : Node3D
 	[Export] public float PickupRadius { get; set; } = WorldDropConfig.PickupRadius;
 	[Export] public float LifetimeSeconds { get; set; } = WorldDropConfig.LifetimeSeconds;
 
+	private DropKind _kind;
+	private DropVisual? _visual;
 	private float _age;
-	private float _bobPhase;
-	private float _visualUpdateAccumulator;
-	private Label3D? _label;
+	private bool _registered;
 
-	public bool IsGoldDrop => GoldAmount > 0;
-	public bool IsCardDrop => !string.IsNullOrEmpty(CardKey);
+	public DropKind Kind => _kind;
+	public bool IsGoldDrop => _kind == DropKind.Gold;
+	public bool IsCardDrop => _kind == DropKind.Card;
 	public bool IsCollected { get; private set; }
 	public float AgeSeconds => _age;
 
-	public override void _Ready()
+	// The pool creates instances through here so the kind is fixed for the
+	// lifetime of the node (its authored visual scene never changes).
+	public static WorldDrop CreateForKind(DropKind kind)
 	{
-		if (!ActiveDropRegistry.Contains(this))
-		{
-			ActiveDropRegistry.Add(this);
-		}
-
-		AddToGroup("world_drops");
-		_bobPhase = (float)GD.RandRange(0.0, Mathf.Tau);
-		BuildVisual();
+		return new WorldDrop { _kind = kind };
 	}
 
 	public override void _ExitTree()
 	{
-		ActiveDropRegistry.Remove(this);
+		// Failsafe: if the node is hard-freed (e.g. scene teardown) while active,
+		// make sure it leaves the registry. Normal recycling unregisters first,
+		// so this is idempotent.
+		Unregister();
 	}
 
 	public override void _Process(double delta)
 	{
-		float step = (float)delta;
-		_age += step;
+		_age += (float)delta;
 		if (_age >= LifetimeSeconds)
 		{
-			QueueFree();
-			return;
+			Recycle();
 		}
+	}
 
-		_visualUpdateAccumulator += step;
-		if (_visualUpdateAccumulator < PerformanceConfig.WorldDropVisualRefreshIntervalSeconds)
+	// Brings a freshly-acquired (or reused) drop to life: builds/reuses its
+	// visual, applies the dynamic label + tint, and registers it for collection.
+	public void Activate()
+	{
+		_age = 0.0f;
+		IsCollected = false;
+		Visible = true;
+		SetProcess(true);
+
+		EnsureVisual();
+		_visual?.Configure(GetDisplayText(), GetTint());
+		_visual?.OnActivated();
+		Register();
+	}
+
+	private void EnsureVisual()
+	{
+		if (_visual != null && GodotObject.IsInstanceValid(_visual))
 		{
 			return;
 		}
 
-		float visualStep = _visualUpdateAccumulator;
-		_visualUpdateAccumulator = 0.0f;
-		_bobPhase += visualStep * 3.4f;
-		RotationDegrees = new Vector3(0.0f, RotationDegrees.Y + visualStep * 65.0f, 0.0f);
-		if (_label != null)
+		PackedScene? scene = LoadScene(_kind);
+		if (scene?.Instantiate() is DropVisual visual)
 		{
-			_label.Position = new Vector3(0.0f, 0.92f + Mathf.Sin(_bobPhase) * 0.08f, 0.0f);
+			visual.Name = "Visual";
+			AddChild(visual);
+			_visual = visual;
 		}
+	}
+
+	private static PackedScene? LoadScene(DropKind kind)
+	{
+		if (SceneCache.TryGetValue(kind, out PackedScene? cached))
+		{
+			return cached;
+		}
+
+		string path = ScenePaths[kind];
+		PackedScene? scene = ResourceLoader.Exists(path)
+			? ResourceLoader.Load<PackedScene>(path)
+			: null;
+		SceneCache[kind] = scene;
+		return scene;
 	}
 
 	public bool TryCollect(PlayerController player)
@@ -141,193 +138,56 @@ public partial class WorldDrop : Node3D
 			player.AddInventoryItem(ItemId, Mathf.Max(Amount, 1));
 		}
 
-		QueueFree();
+		Recycle();
 		return true;
 	}
 
-	private void BuildVisual()
+	// Returns the drop to the pool for reuse. Replaces the old QueueFree path so
+	// a burst of loot doesn't churn node allocations and rebuild materials.
+	public void Recycle()
 	{
-		if (IsCardDrop)
+		_visual?.OnRecycled();
+		Unregister();
+		SetProcess(false);
+		WorldDropPool.Release(this);
+	}
+
+	private void Register()
+	{
+		if (_registered)
 		{
-			BuildCardVisual();
 			return;
 		}
 
-		var color = IsGoldDrop
-			? new Color(1.0f, 0.78f, 0.18f, 0.96f)
-			: GetItemColor(ItemId);
-
-		Mesh mesh;
-		if (IsGoldDrop)
-		{
-			mesh = _sharedGoldMesh ??= new CylinderMesh { TopRadius = 0.22f, BottomRadius = 0.24f, Height = 0.12f, RadialSegments = 24 };
-		}
-		else
-		{
-			mesh = _sharedItemMesh ??= new BoxMesh { Size = new Vector3(0.42f, 0.42f, 0.42f) };
-		}
-
-		var body = new MeshInstance3D
-		{
-			Name = IsGoldDrop ? "GoldDropVisual" : "ItemDropVisual",
-			Mesh = mesh,
-			Position = new Vector3(0.0f, 0.24f, 0.0f),
-			RotationDegrees = IsGoldDrop ? new Vector3(90.0f, 0.0f, 0.0f) : new Vector3(18.0f, 35.0f, 0.0f),
-		};
-		body.SetSurfaceOverrideMaterial(0, GetBodyMaterial(color, IsGoldDrop));
-		AddChild(body);
-
-		if (!IsGoldDrop)
-		{
-			var glow = new MeshInstance3D
-			{
-				Name = "ItemGlow",
-				Mesh = _sharedGlowMesh ??= new SphereMesh { Radius = 0.32f, Height = 0.42f },
-				Position = new Vector3(0.0f, 0.24f, 0.0f),
-			};
-			glow.SetSurfaceOverrideMaterial(0, GetGlowMaterial(color));
-			AddChild(glow);
-		}
-
-		_label = new Label3D
-		{
-			Name = "DropLabel",
-			Text = GetDisplayText(),
-			Position = new Vector3(0.0f, 0.92f, 0.0f),
-			Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-			FontSize = 18,
-			PixelSize = 0.007f,
-			OutlineSize = 5,
-			HorizontalAlignment = HorizontalAlignment.Center,
-			Width = 260.0f,
-		};
-		_label.OutlineModulate = new Color(0.02f, 0.02f, 0.018f, 0.96f);
-		_label.Modulate = IsGoldDrop ? new Color(1.0f, 0.88f, 0.32f) : color.Lightened(0.25f);
-		AddChild(_label);
+		ActiveDropRegistry.Add(this);
+		AddToGroup("world_drops");
+		_registered = true;
 	}
 
-	// Monster cards use the editor-authored Card.tscn so artists can adjust the
-	// drop model without changing code.
-	private void BuildCardVisual()
+	private void Unregister()
 	{
-		var frameColor = new Color(1.0f, 0.82f, 0.34f, 1.0f);
-		_cardDropScene ??= ResourceLoader.Exists(CardDropScenePath)
-			? ResourceLoader.Load<PackedScene>(CardDropScenePath)
-			: null;
-		if (_cardDropScene?.Instantiate() is Node3D cardModel)
+		if (!_registered)
 		{
-			cardModel.Name = "CardDropModel";
-			cardModel.Position = Vector3.Zero;
-			AddChild(cardModel);
-		}
-		else
-		{
-			// Keep a visible fallback if an editor move/rename temporarily makes
-			// the authored scene unavailable.
-			var fallback = new MeshInstance3D
-			{
-				Name = "CardDropFallback",
-				Mesh = _sharedCardFrameMesh ??= new BoxMesh { Size = new Vector3(0.40f, 0.56f, 0.035f) },
-				Position = new Vector3(0.0f, 0.42f, 0.0f),
-			};
-			fallback.SetSurfaceOverrideMaterial(0, GetCardMaterial(frameColor, true));
-			AddChild(fallback);
+			return;
 		}
 
-		AddCardRisingParticles(frameColor);
-
-		_label = new Label3D
+		ActiveDropRegistry.Remove(this);
+		if (IsInGroup("world_drops"))
 		{
-			Name = "DropLabel",
-			Text = GetDisplayText(),
-			Position = new Vector3(0.0f, 1.05f, 0.0f),
-			Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-			FontSize = 18,
-			PixelSize = 0.007f,
-			OutlineSize = 5,
-			HorizontalAlignment = HorizontalAlignment.Center,
-			Width = 260.0f,
-		};
-		_label.OutlineModulate = new Color(0.02f, 0.02f, 0.018f, 0.96f);
-		_label.Modulate = frameColor.Lightened(0.2f);
-		AddChild(_label);
+			RemoveFromGroup("world_drops");
+		}
+
+		_registered = false;
 	}
 
-	private void AddCardRisingParticles(Color color)
+	private Color GetTint()
 	{
-		if (_cardParticleMesh == null)
+		return _kind switch
 		{
-			var particleMaterial = new StandardMaterial3D
-			{
-				AlbedoColor = new Color(color.R, color.G, color.B, 0.88f),
-				Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-				ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-				EmissionEnabled = true,
-				Emission = color * 3.2f,
-			};
-			_cardParticleMesh = new SphereMesh
-			{
-				Radius = 0.045f,
-				Height = 0.09f,
-				RadialSegments = 10,
-				Rings = 5,
-			};
-			_cardParticleMesh.SurfaceSetMaterial(0, particleMaterial);
-		}
-
-		// Keep the process material instance-local. Sharing one live GPU particle
-		// material across drops can race uniform-set creation on Godot 4.7 D3D12.
-		var processMaterial = new ParticleProcessMaterial
-		{
-			EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere,
-			EmissionSphereRadius = 0.34f,
-			Direction = Vector3.Up,
-			Spread = 32.0f,
-			Gravity = new Vector3(0.0f, 0.28f, 0.0f),
-			InitialVelocityMin = 0.48f,
-			InitialVelocityMax = 1.35f,
-			ScaleMin = 0.55f,
-			ScaleMax = 1.35f,
-			Color = new Color(color.R, color.G, color.B, 0.92f),
+			DropKind.Gold => DropPalette.Gold,
+			DropKind.Card => CardTint,
+			_ => DropPalette.ForItem(ItemId),
 		};
-
-		var particles = new GpuParticles3D
-		{
-			Name = "CardRisingParticles",
-			Amount = 30,
-			Lifetime = 1.65f,
-			Preprocess = 0.0f,
-			Randomness = 0.72f,
-			VisibilityAabb = new Aabb(new Vector3(-1.2f, -0.1f, -1.2f), new Vector3(2.4f, 3.2f, 2.4f)),
-			ProcessMaterial = processMaterial,
-			DrawPass1 = _cardParticleMesh,
-			Emitting = false,
-			Position = new Vector3(0.0f, 0.04f, 0.0f),
-		};
-		AddChild(particles);
-		// Start only after RenderingServer has registered the new material and
-		// draw-pass resources, avoiding a draw in the construction frame.
-		particles.SetDeferred("emitting", true);
-	}
-
-	private static StandardMaterial3D GetCardMaterial(Color color, bool isFrame)
-	{
-		int key = unchecked((int)color.ToRgba32() * 2 + (isFrame ? 1 : 0)) ^ 0x5C0DE;
-		if (BodyMaterialCache.TryGetValue(key, out StandardMaterial3D? cached))
-		{
-			return cached;
-		}
-
-		var material = new StandardMaterial3D
-		{
-			AlbedoColor = color,
-			EmissionEnabled = true,
-			Emission = color * (isFrame ? 0.55f : 0.32f),
-			Roughness = 0.3f,
-			Metallic = isFrame ? 0.6f : 0.15f,
-		};
-		BodyMaterialCache[key] = material;
-		return material;
 	}
 
 	private string GetDisplayText()
@@ -346,30 +206,5 @@ public partial class WorldDrop : Node3D
 			? LocaleText.T(MonsterLootCatalog.GetNameKey(ItemId))
 			: LocaleText.T(BuildCatalog.GetItemNameKey(ItemId));
 		return Amount > 1 ? $"{name} x{Amount}" : name;
-	}
-
-	private static Color GetItemColor(string itemId)
-	{
-		if (itemId.StartsWith("equip."))
-		{
-			return new Color(0.50f, 0.78f, 1.0f, 0.95f);
-		}
-
-		if (itemId.StartsWith("gem.attribute."))
-		{
-			return new Color(0.96f, 0.46f, 1.0f, 0.95f);
-		}
-
-		if (itemId.StartsWith("gem.skill."))
-		{
-			return new Color(0.40f, 1.0f, 0.66f, 0.95f);
-		}
-
-		if (MonsterLootCatalog.IsMonsterLoot(itemId))
-		{
-			return MonsterLootCatalog.GetDropColor(itemId);
-		}
-
-		return new Color(0.82f, 0.92f, 1.0f, 0.95f);
 	}
 }
