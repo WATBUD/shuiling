@@ -167,6 +167,12 @@ Combat facts:
 
 ## Maintenance rules
 
+- **Downloaded asset rule:** `assets/_downloads/` is an ignored local source/reference
+  pool, never a runtime asset location. Before using a downloaded model, texture, VFX,
+  audio file, or scene, copy the required files and license into a categorized,
+  Git-tracked `assets/` directory and reference only that curated path. Never commit a
+  `res://assets/_downloads/...` reference. Follow
+  `docs/ASSET_SOURCE_WORKFLOW.md` and run `tools/validate_runtime_assets.ps1`.
 - Keep scene orchestration in `World`/`PlayerController`; keep data contracts in `Core`.
 - New UI panels → `scripts/UI/Panels`; full-screen screens → `scripts/UI/Screens`;
   reusable widgets → `scripts/UI/Components`.

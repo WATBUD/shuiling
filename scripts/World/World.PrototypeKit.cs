@@ -4,7 +4,7 @@ using System.Collections.Generic;
 public partial class World
 {
 	private const string PrototypeKitRoot =
-		"res://assets/_downloads/kenney_prototype-kit/Models/GLB format/";
+		"res://assets/models/environment/kenney_prototype/";
 
 	private static readonly Dictionary<string, Mesh?> PrototypeMeshCache = new();
 

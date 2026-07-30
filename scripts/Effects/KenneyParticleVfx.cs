@@ -7,7 +7,7 @@ using System.Collections.Generic;
 public static class KenneyParticleVfx
 {
 	private const string Root =
-		"res://assets/_downloads/kenney-particle-pack/kenney-particle-pack-7e801dc538996622a91327bb1dd5879cf977aa09/addons/kenney_particle_pack/";
+		"res://assets/effects/textures/kenney_particles/";
 	private const string PresetPath = "res://assets/effects/kenney_particle_vfx_preset.tres";
 
 	private static readonly Dictionary<string, Texture2D?> TextureCache = new();

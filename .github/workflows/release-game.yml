@@ -39,6 +39,11 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v5
 
+      - name: Reject local download-pool references
+        shell: pwsh
+        run: |
+          .\tools\validate_runtime_assets.ps1
+
       - name: Validate curated runtime models
         shell: pwsh
         run: |
