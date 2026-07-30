@@ -206,7 +206,7 @@ public partial class RefinementPanel : PanelContainer
 		{
 			Text = LocaleText.T("refine.button"),
 			CustomMinimumSize = new Vector2(140.0f, 48.0f),
-			Disabled = !_player.CanAffordRefinement(quote),
+			Disabled = !quote.CanRefine || owned <= 0,
 		};
 		string capturedId = itemId;
 		refineButton.Pressed += () =>

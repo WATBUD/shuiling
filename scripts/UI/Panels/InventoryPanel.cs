@@ -1922,7 +1922,6 @@ public partial class InventoryPanel : PanelContainer
 		}
 		AddDecimalLine(lines, "tooltip.attack_range", item.AttackRangeBonus * starMultiplier);
 		AddPercentLine(lines, "tooltip.crit_chance", item.CritChanceBonus * starMultiplier);
-		AddStatLine(lines, "tooltip.socket_count", item.SocketCount);
 	}
 
 	private static void AppendAttributeGemTooltip(List<string> lines, AttributeGemDefinition item)

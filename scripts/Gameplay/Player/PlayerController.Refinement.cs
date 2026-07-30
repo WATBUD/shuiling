@@ -85,7 +85,16 @@ public partial class PlayerController
 			return false;
 		}
 
-		if (Gold < quote.Gold || GetInventoryCount(quote.CrystalId) < quote.CrystalCount)
+		if (Gold < quote.Gold)
+		{
+			PostSystemMessage(
+				LocaleText.F("system.refine.not_enough_gold", quote.Gold, Gold),
+				new Color(1.0f, 0.62f, 0.48f),
+				GameMessageChannel.Loot);
+			return false;
+		}
+
+		if (GetInventoryCount(quote.CrystalId) < quote.CrystalCount)
 		{
 			PostSystemMessage(
 				LocaleText.F("system.refine.not_enough", quote.Gold, quote.CrystalCount, GetInventoryItemDisplayName(quote.CrystalId)),

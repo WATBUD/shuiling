@@ -140,7 +140,7 @@ public sealed class ActorSaveData
 	public string PassiveAbility { get; set; } = "ability.none";
 	public int Affinity { get; set; } = 50;
 	public string MoodStateId { get; set; } = string.Empty;
-	public string AttackModeId { get; set; } = "command_priority";
+	public string AttackModeId { get; set; } = "manual";
 	public CompanionBuildSaveData BuildLoadout { get; set; } = new();
 }
 

@@ -14,6 +14,9 @@ public partial class PlayerController
 
 		_capturedCollection.Add(actor);
 		actor.Recruit(this);
+		_acceptedNpcQuests.Remove(actor);
+		_completedNpcQuests.Remove(actor);
+		_interactionPromptLabel.Visible = false;
 		PostSystemMessage(LocaleText.F("system.npc.joined", actor.LocalizedDisplayName), new Color(0.62f, 1.0f, 0.78f), GameMessageChannel.Party);
 
 		if (_activeParty.Count < ActivePartyLimit)

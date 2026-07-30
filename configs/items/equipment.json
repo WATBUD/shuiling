@@ -1,4 +1,4 @@
-{
+﻿{
     "system":  "equipment",
     "items":  [
                   {
@@ -43,8 +43,7 @@
                       "summaryKey":  "equip.summary.traveler_helmet",
                       "slot":  "Helmet",
                       "maxHealthBonus":  10,
-                      "defenseBonus":  3,
-                      "socketCount":  1
+                      "defenseBonus":  3
                   },
                   {
                       "uniqueId":  7,
@@ -53,8 +52,7 @@
                       "summaryKey":  "equip.summary.guardian_helmet",
                       "slot":  "Helmet",
                       "maxHealthBonus":  26,
-                      "defenseBonus":  8,
-                      "socketCount":  1
+                      "defenseBonus":  8
                   },
                   {
                       "uniqueId":  8,
@@ -65,8 +63,7 @@
                       "maxHealthBonus":  12,
                       "defenseBonus":  4,
                       "attackCooldownReduction":  0.07,
-                      "attackRangeBonus":  0.6,
-                      "socketCount":  2
+                      "attackRangeBonus":  0.6
                   },
                   {
                       "uniqueId":  9,
@@ -75,8 +72,7 @@
                       "summaryKey":  "equip.summary.sword",
                       "slot":  "Weapon",
                       "attackBonus":  10,
-                      "attackSpeed":  54,
-                      "socketCount":  1
+                      "attackSpeed":  54
                   },
                   {
                       "uniqueId":  10,
@@ -86,8 +82,7 @@
                       "slot":  "Weapon",
                       "attackBonus":  8,
                       "attackSpeed":  60,
-                      "critChanceBonus":  0.03,
-                      "socketCount":  1
+                      "critChanceBonus":  0.03
                   },
                   {
                       "uniqueId":  11,
@@ -97,8 +92,7 @@
                       "slot":  "Weapon",
                       "attackBonus":  6,
                       "attackSpeed":  68,
-                      "critChanceBonus":  0.10,
-                      "socketCount":  1
+                      "critChanceBonus":  0.10
                   },
                   {
                       "uniqueId":  12,
@@ -109,8 +103,7 @@
                       "attackBonus":  9,
                       "attackRangeBonus":  3.2,
                       "attackSpeed":  52,
-                      "critChanceBonus":  0.04,
-                      "socketCount":  2
+                      "critChanceBonus":  0.04
                   },
                   {
                       "uniqueId":  13,
@@ -121,8 +114,7 @@
                       "attackBonus":  12,
                       "defenseBonus":  3,
                       "attackRangeBonus":  1.4,
-                      "attackSpeed":  50,
-                      "socketCount":  1
+                      "attackSpeed":  50
                   },
                   {
                       "uniqueId":  14,
@@ -132,8 +124,7 @@
                       "slot":  "Weapon",
                       "attackBonus":  20,
                       "defenseBonus":  4,
-                      "attackSpeed":  38,
-                      "socketCount":  1
+                      "attackSpeed":  38
                   },
                   {
                       "uniqueId":  15,
@@ -144,8 +135,7 @@
                       "attackBonus":  8,
                       "defenseBonus":  5,
                       "attackRangeBonus":  1.6,
-                      "attackSpeed":  55,
-                      "socketCount":  2
+                      "attackSpeed":  55
                   },
                   {
                       "uniqueId":  16,
@@ -155,8 +145,7 @@
                       "slot":  "Weapon",
                       "attackBonus":  7,
                       "attackRangeBonus":  2.0,
-                      "attackSpeed":  58,
-                      "socketCount":  2
+                      "attackSpeed":  58
                   },
                   {
                       "uniqueId":  17,
@@ -166,8 +155,7 @@
                       "slot":  "Weapon",
                       "attackBonus":  18,
                       "defenseBonus":  2,
-                      "attackSpeed":  42,
-                      "socketCount":  1
+                      "attackSpeed":  42
                   },
                   {
                       "uniqueId":  18,
@@ -177,8 +165,7 @@
                       "slot":  "Weapon",
                       "attackBonus":  8,
                       "attackSpeed":  66,
-                      "critChanceBonus":  0.06,
-                      "socketCount":  1
+                      "critChanceBonus":  0.06
                   },
                   {
                       "uniqueId":  19,
@@ -188,8 +175,7 @@
                       "slot":  "Armor",
                       "maxHealthBonus":  18,
                       "defenseBonus":  5,
-                      "moveSpeedBonus":  0.05,
-                      "socketCount":  1
+                      "moveSpeedBonus":  0.05
                   },
                   {
                       "uniqueId":  20,
@@ -199,8 +185,7 @@
                       "slot":  "Armor",
                       "maxHealthBonus":  44,
                       "defenseBonus":  16,
-                      "moveSpeedBonus":  -0.05,
-                      "socketCount":  1
+                      "moveSpeedBonus":  -0.05
                   },
                   {
                       "uniqueId":  21,
@@ -211,8 +196,7 @@
                       "maxHealthBonus":  24,
                       "defenseBonus":  7,
                       "attackCooldownReduction":  0.10,
-                      "attackRangeBonus":  0.7,
-                      "socketCount":  2
+                      "attackRangeBonus":  0.7
                   },
                   {
                       "uniqueId":  22,
@@ -258,8 +242,7 @@
                       "summaryKey":  "equip.summary.swift_ring",
                       "slot":  "Accessory",
                       "moveSpeedBonus":  0.12,
-                      "attackCooldownReduction":  0.05,
-                      "socketCount":  1
+                      "attackCooldownReduction":  0.05
                   },
                   {
                       "uniqueId":  27,
@@ -268,8 +251,7 @@
                       "summaryKey":  "equip.summary.crit_charm",
                       "slot":  "Accessory",
                       "attackBonus":  4,
-                      "critChanceBonus":  0.12,
-                      "socketCount":  1
+                      "critChanceBonus":  0.12
                   },
                   {
                       "uniqueId":  28,
@@ -279,8 +261,7 @@
                       "slot":  "Accessory",
                       "maxHealthBonus":  34,
                       "defenseBonus":  8,
-                      "moveSpeedBonus":  -0.03,
-                      "socketCount":  1
+                      "moveSpeedBonus":  -0.03
                   },
                   {
                       "uniqueId":  29,
@@ -289,8 +270,7 @@
                       "summaryKey":  "equip.summary.focus_lens",
                       "slot":  "Accessory",
                       "attackRangeBonus":  1.4,
-                      "critChanceBonus":  0.06,
-                      "socketCount":  1
+                      "critChanceBonus":  0.06
                   }
               ]
 }

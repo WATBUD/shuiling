@@ -54,7 +54,6 @@ public sealed class EquipmentDefinition
 	public float AttackCooldownReduction { get; set; }
 	public float AttackRangeBonus { get; set; }
 	public float CritChanceBonus { get; set; }
-	public int SocketCount { get; set; }
 }
 
 public sealed class AttributeGemDefinition
@@ -190,7 +189,6 @@ public sealed class BuildStats
 	public float SpellDamageMultiplier { get; set; } = 1.0f;
 	public float ProjectileSpeedMultiplier { get; set; } = 1.0f;
 	public float IncomingDamageMultiplier { get; set; } = 1.0f;
-	public int EquipmentSocketCount { get; set; }
 	public bool HasHealSkill { get; set; }
 	public bool HasShieldSkill { get; set; }
 	public string ActiveRangedSkillId { get; set; } = string.Empty;
@@ -1257,7 +1255,7 @@ public static class BuildCatalog
 
 	public static string GetDefaultAttackModeId(SimpleActor actor)
 	{
-		return AiCommandPriority;
+		return AiManualOnly;
 	}
 
 	public static string LocalizedList(string[] keys)
@@ -1333,7 +1331,6 @@ public static class BuildCatalog
 		stats.AttackCooldownMultiplier -= equipment.AttackCooldownReduction * bonusMultiplier;
 		stats.AttackRangeBonus += equipment.AttackRangeBonus * bonusMultiplier;
 		stats.CritChance += equipment.CritChanceBonus * bonusMultiplier;
-		stats.EquipmentSocketCount += equipment.SocketCount;
 	}
 
 	private static void ApplySkillGem(BuildStats stats, SkillGemDefinition gem)

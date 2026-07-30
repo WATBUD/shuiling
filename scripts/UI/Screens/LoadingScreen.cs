@@ -179,7 +179,7 @@ public partial class LoadingScreen : CanvasLayer
 		}
 		if (_bearModel != null)
 		{
-			ExternalModelLibrary.StabilizeRootMotion(_bearModel, Vector3.Zero, new Vector3(0.0f, 108.0f, 0.0f));
+			ExternalModelLibrary.StabilizeRootMotion(_bearModel, Vector3.Zero, new Vector3(0.0f, LoadingScreenConfig.BearModelYawDegrees, 0.0f));
 			ExternalModelLibrary.TryPlayActorAnimation(_bearModel, "run");
 		}
 	}
@@ -216,7 +216,7 @@ public partial class LoadingScreen : CanvasLayer
 		if (_bearModel != null)
 		{
 			_bearModel.Scale = Vector3.One * LoadingScreenConfig.BearModelScale;
-			_bearModel.RotationDegrees = new Vector3(0.0f, 108.0f, 0.0f);
+			_bearModel.RotationDegrees = new Vector3(0.0f, LoadingScreenConfig.BearModelYawDegrees, 0.0f);
 			_bearPivot.AddChild(_bearModel);
 			ExternalModelLibrary.TryPlayActorAnimation(_bearModel, "run");
 		}

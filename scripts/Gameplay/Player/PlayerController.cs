@@ -143,7 +143,7 @@ public partial class PlayerController : CharacterBody3D
 	private const float MercenaryBrokerInteractRange = 4.6f;
 	private const float MerchantInteractRange = 4.6f;
 	private const int MerchantRefreshCost = 5000;
-	private const int BlacksmithStockCount = 6;
+	private const int BlacksmithStockCount = 5;
 	private const int PetShopStockCount = 4;
 	private const int PetReviveGoldCost = 40;
 	private const float InteractionPromptRefreshSeconds = 0.12f;

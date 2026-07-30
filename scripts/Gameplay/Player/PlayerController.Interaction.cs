@@ -8,6 +8,7 @@ public partial class PlayerController
 	{
 		_acceptedNpcQuests.Clear();
 		_completedNpcQuests.Clear();
+		RemoveRecruitedVillageNpcDuplicates();
 		foreach (SimpleActor actor in SimpleActor.ActiveActors)
 		{
 			if (!IsInstanceValid(actor) || actor.ActorKind == "monster" || actor.IsCaptured)
@@ -24,6 +25,41 @@ public partial class PlayerController
 			{
 				_completedNpcQuests.Add(actor);
 			}
+		}
+	}
+
+	private void RemoveRecruitedVillageNpcDuplicates()
+	{
+		var recruitedNpcNames = new HashSet<string>();
+		foreach (SimpleActor companion in _capturedCollection)
+		{
+			if (IsInstanceValid(companion) && companion.ActorKind == "npc" && companion.IsCaptured)
+			{
+				recruitedNpcNames.Add(companion.DisplayName);
+			}
+		}
+
+		if (recruitedNpcNames.Count == 0)
+		{
+			return;
+		}
+
+		var duplicates = new List<SimpleActor>();
+		foreach (SimpleActor actor in SimpleActor.ActiveActors)
+		{
+			if (IsInstanceValid(actor)
+				&& actor.ActorKind == "npc"
+				&& !actor.IsCaptured
+				&& recruitedNpcNames.Contains(actor.DisplayName))
+			{
+				duplicates.Add(actor);
+			}
+		}
+
+		foreach (SimpleActor duplicate in duplicates)
+		{
+			duplicate.RemoveFromGroup("npcs");
+			duplicate.CallDeferred(Node.MethodName.QueueFree);
 		}
 	}
 

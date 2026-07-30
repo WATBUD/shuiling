@@ -46,7 +46,7 @@ public partial class SimpleActor : CharacterBody3D
 	[Export] public string PassiveAbility { get; set; } = "ability.none";
 	[Export] public int Affinity { get; set; } = 50;
 	[Export] public string MoodStateId { get; set; } = string.Empty;
-	[Export] public string AttackModeId { get; set; } = BuildCatalog.AiCommandPriority;
+	[Export] public string AttackModeId { get; set; } = BuildCatalog.AiManualOnly;
 	[Export] public float DetectionRadius { get; set; } = 12.0f;
 	[Export] public float AttackRange { get; set; } = 1.8f;
 	[Export] public float AttackCooldown { get; set; } = 1.35f;
@@ -1003,6 +1003,7 @@ public partial class SimpleActor : CharacterBody3D
 		_fallenMapId = string.Empty;
 		_followTarget = followTarget;
 		_isInActiveParty = false;
+		AttackModeId = BuildCatalog.AiManualOnly;
 		_waitTime = 0.0f;
 		_captureLocked = false;
 		_captureProtectionRemaining = 0.0f;
@@ -3780,8 +3781,7 @@ public partial class SimpleActor : CharacterBody3D
 					* EquipmentConfig.AttackSpeedScoreWeight
 				+ item.AttackCooldownReduction * EquipmentConfig.AttackSpeedScoreWeight
 				+ item.AttackRangeBonus * EquipmentConfig.AttackRangeScoreWeight
-				+ item.CritChanceBonus * EquipmentConfig.CriticalChanceScoreWeight
-				+ item.SocketCount * EquipmentConfig.SocketScoreWeight;
+				+ item.CritChanceBonus * EquipmentConfig.CriticalChanceScoreWeight;
 			if (score > bestScore)
 			{
 				bestScore = score;

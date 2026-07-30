@@ -22,5 +22,4 @@ public static class EquipmentConfig
 	public const float AttackSpeedScoreWeight = 150.0f;
 	public const float AttackRangeScoreWeight = 12.0f;
 	public const float CriticalChanceScoreWeight = 180.0f;
-	public const float SocketScoreWeight = 10.0f;
 }

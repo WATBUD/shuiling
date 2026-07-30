@@ -63,18 +63,7 @@ public partial class PlayerController
 	private void GenerateMerchantStock()
 	{
 		_blacksmithStockItemIds.Clear();
-		var equipmentIds = new List<string>();
-		foreach (EquipmentSlot slot in new[] { EquipmentSlot.Helmet, EquipmentSlot.Weapon, EquipmentSlot.Armor, EquipmentSlot.Boots, EquipmentSlot.Accessory })
-		{
-			foreach (EquipmentDefinition equipment in BuildCatalog.GetEquipmentDefinitions(slot))
-			{
-				if (!BuildCatalog.IsFreeItem(equipment.Id))
-				{
-					equipmentIds.Add(equipment.Id);
-				}
-			}
-		}
-		AddRandomItems(equipmentIds, _blacksmithStockItemIds, BlacksmithStockCount);
+		AddRandomEquipmentBySlot(_blacksmithStockItemIds);
 
 		_petShopStockNameKeys.Clear();
 		var petKeys = new List<string>();
@@ -85,6 +74,42 @@ public partial class PlayerController
 		AddRandomItems(petKeys, _petShopStockNameKeys, PetShopStockCount);
 
 		_merchantNextRefreshUnix = Time.GetUnixTimeFromSystem() + MerchantConfig.RefreshSeconds;
+	}
+
+	private void AddRandomEquipmentBySlot(List<string> target)
+	{
+		EquipmentSlot[] slots =
+		{
+			EquipmentSlot.Helmet,
+			EquipmentSlot.Weapon,
+			EquipmentSlot.Armor,
+			EquipmentSlot.Boots,
+			EquipmentSlot.Accessory,
+		};
+
+		foreach (EquipmentSlot slot in slots)
+		{
+			var candidates = new List<string>();
+			foreach (EquipmentDefinition equipment in BuildCatalog.GetEquipmentDefinitions(slot))
+			{
+				if (!BuildCatalog.IsFreeItem(equipment.Id))
+				{
+					candidates.Add(equipment.Id);
+				}
+			}
+
+			if (candidates.Count <= 0)
+			{
+				continue;
+			}
+
+			int randomIndex = _mercenaryRng.RandiRange(0, candidates.Count - 1);
+			target.Add(candidates[randomIndex]);
+			if (target.Count >= BlacksmithStockCount)
+			{
+				return;
+			}
+		}
 	}
 
 	private void AddRandomItems(List<string> source, List<string> target, int count)
@@ -377,8 +402,7 @@ public partial class PlayerController
 			+ equipment.DefenseBonus * 7
 			+ Mathf.RoundToInt(equipment.AttackRangeBonus * 18.0f)
 			+ Mathf.RoundToInt(equipment.MoveSpeedBonus * 180.0f)
-			+ Mathf.RoundToInt(equipment.CritChanceBonus * 300.0f)
-			+ equipment.SocketCount * 45;
+			+ Mathf.RoundToInt(equipment.CritChanceBonus * 300.0f);
 	}
 
 	private static string[] GetShopMaterialIds()

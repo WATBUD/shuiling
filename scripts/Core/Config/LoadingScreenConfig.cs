@@ -8,6 +8,7 @@ public static class LoadingScreenConfig
 	// Main visual sizes.
 	public const int LoadingTextFontSize = 46;
 	public const float BearModelScale = 1.15f;
+	public const float BearModelYawDegrees = 0.0f;
 
 	// Bear framing. Larger scale or a smaller camera distance makes the bear larger.
 	public const float BearCameraDistance = 3.30f;
