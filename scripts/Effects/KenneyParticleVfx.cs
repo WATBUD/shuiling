@@ -92,6 +92,13 @@ public static class KenneyParticleVfx
 		bool localCoords = true,
 		Vector3? direction = null)
 	{
+		// Same guard as CreateSprite: a missing texture would turn every particle
+		// into a solid square. Emit nothing when the asset pack is absent.
+		if (LoadTexture(textureFile) == null)
+		{
+			return new GpuParticles3D { Name = name, Emitting = false, Visible = false };
+		}
+
 		bool softBlend = textureFile.StartsWith("smoke_");
 		var material = CreateMaterial(textureFile, color, true, !softBlend, true);
 		var mesh = new QuadMesh
@@ -142,6 +149,14 @@ public static class KenneyParticleVfx
 		bool billboard = true,
 		bool additive = true)
 	{
+		// Without the texture the quad renders as a solid, additive-blended
+		// rectangle — the "ugly rectangle" on hit. Draw nothing instead when the
+		// particle asset pack is missing.
+		if (LoadTexture(textureFile) == null)
+		{
+			return new MeshInstance3D { Name = name, Visible = false };
+		}
+
 		var mesh = new QuadMesh
 		{
 			Size = size * Preset.SpriteTextureScale,
