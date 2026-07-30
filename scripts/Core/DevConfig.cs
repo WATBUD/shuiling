@@ -71,6 +71,20 @@ public static class DevConfig
 		}
 
 		_loaded = true;
+
+		// Exported builds are always production builds. Keep dev_config.cfg useful
+		// while running from the Godot editor, but never allow a local or CI export
+		// to enable test grants accidentally.
+		if (!OS.HasFeature("editor"))
+		{
+			_testMode = false;
+			_grantStarterPet = false;
+			_deadTestPets = 0;
+			_grantAllGems = false;
+			_grantAllCards = false;
+			return;
+		}
+
 		var config = new ConfigFile();
 		if (config.Load(ConfigPath) != Error.Ok)
 		{

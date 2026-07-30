@@ -1,0 +1,296 @@
+{
+    "system":  "equipment",
+    "items":  [
+                  {
+                      "uniqueId":  1,
+                      "id":  "equip.helmet.none",
+                      "nameKey":  "equipment.none",
+                      "summaryKey":  "gem.summary.none",
+                      "slot":  "Helmet"
+                  },
+                  {
+                      "uniqueId":  2,
+                      "id":  "equip.weapon.none",
+                      "nameKey":  "equipment.none",
+                      "summaryKey":  "gem.summary.none",
+                      "slot":  "Weapon"
+                  },
+                  {
+                      "uniqueId":  3,
+                      "id":  "equip.armor.none",
+                      "nameKey":  "equipment.none",
+                      "summaryKey":  "gem.summary.none",
+                      "slot":  "Armor"
+                  },
+                  {
+                      "uniqueId":  4,
+                      "id":  "equip.boots.none",
+                      "nameKey":  "equipment.none",
+                      "summaryKey":  "gem.summary.none",
+                      "slot":  "Boots"
+                  },
+                  {
+                      "uniqueId":  5,
+                      "id":  "equip.accessory.none",
+                      "nameKey":  "equipment.none",
+                      "summaryKey":  "gem.summary.none",
+                      "slot":  "Accessory"
+                  },
+                  {
+                      "uniqueId":  6,
+                      "id":  "equip.helmet.traveler",
+                      "nameKey":  "equip.helmet.traveler",
+                      "summaryKey":  "equip.summary.traveler_helmet",
+                      "slot":  "Helmet",
+                      "maxHealthBonus":  10,
+                      "defenseBonus":  3,
+                      "socketCount":  1
+                  },
+                  {
+                      "uniqueId":  7,
+                      "id":  "equip.helmet.guardian",
+                      "nameKey":  "equip.helmet.guardian",
+                      "summaryKey":  "equip.summary.guardian_helmet",
+                      "slot":  "Helmet",
+                      "maxHealthBonus":  26,
+                      "defenseBonus":  8,
+                      "socketCount":  1
+                  },
+                  {
+                      "uniqueId":  8,
+                      "id":  "equip.helmet.mystic",
+                      "nameKey":  "equip.helmet.mystic",
+                      "summaryKey":  "equip.summary.mystic_hood",
+                      "slot":  "Helmet",
+                      "maxHealthBonus":  12,
+                      "defenseBonus":  4,
+                      "attackCooldownReduction":  0.07,
+                      "attackRangeBonus":  0.6,
+                      "socketCount":  2
+                  },
+                  {
+                      "uniqueId":  9,
+                      "id":  "equip.weapon.sword",
+                      "nameKey":  "equip.weapon.sword",
+                      "summaryKey":  "equip.summary.sword",
+                      "slot":  "Weapon",
+                      "attackBonus":  10,
+                      "attackSpeed":  54,
+                      "socketCount":  1
+                  },
+                  {
+                      "uniqueId":  10,
+                      "id":  "equip.weapon.short_sword",
+                      "nameKey":  "equip.weapon.short_sword",
+                      "summaryKey":  "equip.summary.short_sword",
+                      "slot":  "Weapon",
+                      "attackBonus":  8,
+                      "attackSpeed":  60,
+                      "critChanceBonus":  0.03,
+                      "socketCount":  1
+                  },
+                  {
+                      "uniqueId":  11,
+                      "id":  "equip.weapon.dagger",
+                      "nameKey":  "equip.weapon.dagger",
+                      "summaryKey":  "equip.summary.dagger",
+                      "slot":  "Weapon",
+                      "attackBonus":  6,
+                      "attackSpeed":  68,
+                      "critChanceBonus":  0.10,
+                      "socketCount":  1
+                  },
+                  {
+                      "uniqueId":  12,
+                      "id":  "equip.weapon.longbow",
+                      "nameKey":  "equip.weapon.longbow",
+                      "summaryKey":  "equip.summary.longbow",
+                      "slot":  "Weapon",
+                      "attackBonus":  9,
+                      "attackRangeBonus":  3.2,
+                      "attackSpeed":  52,
+                      "critChanceBonus":  0.04,
+                      "socketCount":  2
+                  },
+                  {
+                      "uniqueId":  13,
+                      "id":  "equip.weapon.spear",
+                      "nameKey":  "equip.weapon.spear",
+                      "summaryKey":  "equip.summary.spear",
+                      "slot":  "Weapon",
+                      "attackBonus":  12,
+                      "defenseBonus":  3,
+                      "attackRangeBonus":  1.4,
+                      "attackSpeed":  50,
+                      "socketCount":  1
+                  },
+                  {
+                      "uniqueId":  14,
+                      "id":  "equip.weapon.warhammer",
+                      "nameKey":  "equip.weapon.warhammer",
+                      "summaryKey":  "equip.summary.warhammer",
+                      "slot":  "Weapon",
+                      "attackBonus":  20,
+                      "defenseBonus":  4,
+                      "attackSpeed":  38,
+                      "socketCount":  1
+                  },
+                  {
+                      "uniqueId":  15,
+                      "id":  "equip.weapon.scepter",
+                      "nameKey":  "equip.weapon.scepter",
+                      "summaryKey":  "equip.summary.scepter",
+                      "slot":  "Weapon",
+                      "attackBonus":  8,
+                      "defenseBonus":  5,
+                      "attackRangeBonus":  1.6,
+                      "attackSpeed":  55,
+                      "socketCount":  2
+                  },
+                  {
+                      "uniqueId":  16,
+                      "id":  "equip.weapon.staff",
+                      "nameKey":  "equip.weapon.staff",
+                      "summaryKey":  "equip.summary.staff",
+                      "slot":  "Weapon",
+                      "attackBonus":  7,
+                      "attackRangeBonus":  2.0,
+                      "attackSpeed":  58,
+                      "socketCount":  2
+                  },
+                  {
+                      "uniqueId":  17,
+                      "id":  "equip.weapon.great_axe",
+                      "nameKey":  "equip.weapon.great_axe",
+                      "summaryKey":  "equip.summary.great_axe",
+                      "slot":  "Weapon",
+                      "attackBonus":  18,
+                      "defenseBonus":  2,
+                      "attackSpeed":  42,
+                      "socketCount":  1
+                  },
+                  {
+                      "uniqueId":  18,
+                      "id":  "equip.weapon.claws",
+                      "nameKey":  "equip.weapon.claws",
+                      "summaryKey":  "equip.summary.claws",
+                      "slot":  "Weapon",
+                      "attackBonus":  8,
+                      "attackSpeed":  66,
+                      "critChanceBonus":  0.06,
+                      "socketCount":  1
+                  },
+                  {
+                      "uniqueId":  19,
+                      "id":  "equip.armor.scout",
+                      "nameKey":  "equip.armor.scout",
+                      "summaryKey":  "equip.summary.scout_armor",
+                      "slot":  "Armor",
+                      "maxHealthBonus":  18,
+                      "defenseBonus":  5,
+                      "moveSpeedBonus":  0.05,
+                      "socketCount":  1
+                  },
+                  {
+                      "uniqueId":  20,
+                      "id":  "equip.armor.plate",
+                      "nameKey":  "equip.armor.plate",
+                      "summaryKey":  "equip.summary.plate_armor",
+                      "slot":  "Armor",
+                      "maxHealthBonus":  44,
+                      "defenseBonus":  16,
+                      "moveSpeedBonus":  -0.05,
+                      "socketCount":  1
+                  },
+                  {
+                      "uniqueId":  21,
+                      "id":  "equip.armor.spirit_robe",
+                      "nameKey":  "equip.armor.spirit_robe",
+                      "summaryKey":  "equip.summary.spirit_robe",
+                      "slot":  "Armor",
+                      "maxHealthBonus":  24,
+                      "defenseBonus":  7,
+                      "attackCooldownReduction":  0.10,
+                      "attackRangeBonus":  0.7,
+                      "socketCount":  2
+                  },
+                  {
+                      "uniqueId":  22,
+                      "id":  "equip.boots.traveler",
+                      "nameKey":  "equip.boots.traveler",
+                      "summaryKey":  "equip.summary.traveler_shoes",
+                      "slot":  "Boots",
+                      "defenseBonus":  1,
+                      "moveSpeedBonus":  0.07
+                  },
+                  {
+                      "uniqueId":  23,
+                      "id":  "equip.boots.reinforced",
+                      "nameKey":  "equip.boots.reinforced",
+                      "summaryKey":  "equip.summary.reinforced_boots",
+                      "slot":  "Boots",
+                      "maxHealthBonus":  10,
+                      "defenseBonus":  5,
+                      "moveSpeedBonus":  0.03
+                  },
+                  {
+                      "uniqueId":  24,
+                      "id":  "equip.boots.windrunner",
+                      "nameKey":  "equip.boots.windrunner",
+                      "summaryKey":  "equip.summary.windrunner_boots",
+                      "slot":  "Boots",
+                      "defenseBonus":  2,
+                      "moveSpeedBonus":  0.15
+                  },
+                  {
+                      "uniqueId":  25,
+                      "id":  "equip.boots.gravity",
+                      "nameKey":  "equip.boots.gravity",
+                      "summaryKey":  "equip.summary.gravity_boots",
+                      "slot":  "Boots",
+                      "defenseBonus":  2,
+                      "jumpPowerBonus":  100
+                  },
+                  {
+                      "uniqueId":  26,
+                      "id":  "equip.accessory.swift_ring",
+                      "nameKey":  "equip.accessory.swift_ring",
+                      "summaryKey":  "equip.summary.swift_ring",
+                      "slot":  "Accessory",
+                      "moveSpeedBonus":  0.12,
+                      "attackCooldownReduction":  0.05,
+                      "socketCount":  1
+                  },
+                  {
+                      "uniqueId":  27,
+                      "id":  "equip.accessory.crit_charm",
+                      "nameKey":  "equip.accessory.crit_charm",
+                      "summaryKey":  "equip.summary.crit_charm",
+                      "slot":  "Accessory",
+                      "attackBonus":  4,
+                      "critChanceBonus":  0.12,
+                      "socketCount":  1
+                  },
+                  {
+                      "uniqueId":  28,
+                      "id":  "equip.accessory.turtle_amulet",
+                      "nameKey":  "equip.accessory.turtle_amulet",
+                      "summaryKey":  "equip.summary.turtle_amulet",
+                      "slot":  "Accessory",
+                      "maxHealthBonus":  34,
+                      "defenseBonus":  8,
+                      "moveSpeedBonus":  -0.03,
+                      "socketCount":  1
+                  },
+                  {
+                      "uniqueId":  29,
+                      "id":  "equip.accessory.focus_lens",
+                      "nameKey":  "equip.accessory.focus_lens",
+                      "summaryKey":  "equip.summary.focus_lens",
+                      "slot":  "Accessory",
+                      "attackRangeBonus":  1.4,
+                      "critChanceBonus":  0.06,
+                      "socketCount":  1
+                  }
+              ]
+}

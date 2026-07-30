@@ -1,0 +1,236 @@
+{
+    "system":  "materials",
+    "items":  [
+                  {
+                      "uniqueId":  50,
+                      "id":  "loot.slime_mucus",
+                      "nameKey":  "item.loot.slime_mucus",
+                      "dropColor":  [
+                                        0.32,
+                                        0.92,
+                                        0.78,
+                                        0.95
+                                    ]
+                  },
+                  {
+                      "uniqueId":  51,
+                      "id":  "loot.beast_hide",
+                      "nameKey":  "item.loot.beast_hide",
+                      "dropColor":  [
+                                        0.62,
+                                        0.38,
+                                        0.22,
+                                        0.95
+                                    ]
+                  },
+                  {
+                      "uniqueId":  52,
+                      "id":  "loot.sharp_claw",
+                      "nameKey":  "item.loot.sharp_claw",
+                      "dropColor":  [
+                                        0.92,
+                                        0.86,
+                                        0.64,
+                                        0.95
+                                    ]
+                  },
+                  {
+                      "uniqueId":  53,
+                      "id":  "loot.soft_fur",
+                      "nameKey":  "item.loot.soft_fur",
+                      "dropColor":  [
+                                        0.82,
+                                        0.70,
+                                        0.58,
+                                        0.95
+                                    ]
+                  },
+                  {
+                      "uniqueId":  54,
+                      "id":  "loot.small_bone",
+                      "nameKey":  "item.loot.small_bone",
+                      "dropColor":  [
+                                        0.86,
+                                        0.82,
+                                        0.72,
+                                        0.95
+                                    ]
+                  },
+                  {
+                      "uniqueId":  55,
+                      "id":  "loot.insect_wing",
+                      "nameKey":  "item.loot.insect_wing",
+                      "dropColor":  [
+                                        0.72,
+                                        0.92,
+                                        0.76,
+                                        0.95
+                                    ]
+                  },
+                  {
+                      "uniqueId":  56,
+                      "id":  "loot.red_horn",
+                      "nameKey":  "item.loot.red_horn",
+                      "dropColor":  [
+                                        0.88,
+                                        0.22,
+                                        0.14,
+                                        0.95
+                                    ]
+                  },
+                  {
+                      "uniqueId":  57,
+                      "id":  "loot.venom_sac",
+                      "nameKey":  "item.loot.venom_sac",
+                      "dropColor":  [
+                                        0.54,
+                                        0.88,
+                                        0.22,
+                                        0.95
+                                    ]
+                  },
+                  {
+                      "uniqueId":  58,
+                      "id":  "loot.water_core",
+                      "nameKey":  "item.loot.water_core",
+                      "dropColor":  [
+                                        0.34,
+                                        0.72,
+                                        1.0,
+                                        0.95
+                                    ]
+                  },
+                  {
+                      "uniqueId":  59,
+                      "id":  "loot.dragon_scale",
+                      "nameKey":  "item.loot.dragon_scale",
+                      "dropColor":  [
+                                        0.86,
+                                        0.34,
+                                        0.18,
+                                        0.95
+                                    ]
+                  },
+                  {
+                      "uniqueId":  60,
+                      "id":  "loot.cracked_core",
+                      "nameKey":  "item.loot.cracked_core",
+                      "dropColor":  [
+                                        0.70,
+                                        0.68,
+                                        0.62,
+                                        0.95
+                                    ]
+                  },
+                  {
+                      "uniqueId":  61,
+                      "id":  "loot.enhance_crystal.t1",
+                      "nameKey":  "item.loot.enhance_crystal.t1",
+                      "dropColor":  [
+                                        0.70,
+                                        0.74,
+                                        0.80,
+                                        0.96
+                                    ]
+                  },
+                  {
+                      "uniqueId":  62,
+                      "id":  "loot.enhance_crystal.t2",
+                      "nameKey":  "item.loot.enhance_crystal.t2",
+                      "dropColor":  [
+                                        0.56,
+                                        0.82,
+                                        0.72,
+                                        0.96
+                                    ]
+                  },
+                  {
+                      "uniqueId":  63,
+                      "id":  "loot.enhance_crystal.t3",
+                      "nameKey":  "item.loot.enhance_crystal.t3",
+                      "dropColor":  [
+                                        0.42,
+                                        0.84,
+                                        0.58,
+                                        0.96
+                                    ]
+                  },
+                  {
+                      "uniqueId":  64,
+                      "id":  "loot.enhance_crystal.t4",
+                      "nameKey":  "item.loot.enhance_crystal.t4",
+                      "dropColor":  [
+                                        0.50,
+                                        0.80,
+                                        1.00,
+                                        0.96
+                                    ]
+                  },
+                  {
+                      "uniqueId":  65,
+                      "id":  "loot.enhance_crystal.t5",
+                      "nameKey":  "item.loot.enhance_crystal.t5",
+                      "dropColor":  [
+                                        0.36,
+                                        0.62,
+                                        1.00,
+                                        0.96
+                                    ]
+                  },
+                  {
+                      "uniqueId":  66,
+                      "id":  "loot.enhance_crystal.t6",
+                      "nameKey":  "item.loot.enhance_crystal.t6",
+                      "dropColor":  [
+                                        0.62,
+                                        0.48,
+                                        1.00,
+                                        0.96
+                                    ]
+                  },
+                  {
+                      "uniqueId":  67,
+                      "id":  "loot.enhance_crystal.t7",
+                      "nameKey":  "item.loot.enhance_crystal.t7",
+                      "dropColor":  [
+                                        0.82,
+                                        0.42,
+                                        0.98,
+                                        0.96
+                                    ]
+                  },
+                  {
+                      "uniqueId":  68,
+                      "id":  "loot.enhance_crystal.t8",
+                      "nameKey":  "item.loot.enhance_crystal.t8",
+                      "dropColor":  [
+                                        1.00,
+                                        0.44,
+                                        0.72,
+                                        0.96
+                                    ]
+                  },
+                  {
+                      "uniqueId":  69,
+                      "id":  "loot.enhance_crystal.t9",
+                      "nameKey":  "item.loot.enhance_crystal.t9",
+                      "dropColor":  [
+                                        1.00,
+                                        0.58,
+                                        0.30,
+                                        0.96
+                                    ]
+                  },
+                  {
+                      "uniqueId":  70,
+                      "id":  "loot.enhance_crystal.t10",
+                      "nameKey":  "item.loot.enhance_crystal.t10",
+                      "dropColor":  [
+                                        1.00,
+                                        0.86,
+                                        0.36,
+                                        0.98
+                                    ]
+                  }
+              ]
+}

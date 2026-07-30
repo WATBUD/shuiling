@@ -138,7 +138,11 @@ public partial class InventoryPanel : PanelContainer
 		_player = player;
 		if (_companionList != null)
 		{
-			SelectDefaultActor();
+			// Inventory equipment is player-first. Previously the panel silently
+			// selected the first companion, so double-clicking Gravity Shoes could
+			// equip the companion while the player kept the base jump power.
+			_selectedActor = null;
+			_selectingPlayer = true;
 			RefreshAll();
 		}
 	}
@@ -1331,7 +1335,7 @@ public partial class InventoryPanel : PanelContainer
 		}
 
 		int count = _player.GetInventoryCount(_selectedItemId);
-		_itemDetailTitleLabel.Text = $"{GetInventoryItemName(_selectedItemId)} x{count}";
+		_itemDetailTitleLabel.Text = $"{BuildItemTooltipTitle(_selectedItemId)} x{count}";
 		_itemDetailBodyLabel.Text = BuildItemTooltipBody(_selectedItemId, string.Empty);
 		_equipSelectedButton.Disabled = !CanEquipSelectedItem();
 		_useSelectedButton.Disabled = BuildCatalog.GetItemKind(_selectedItemId) != InventoryItemKind.Consumable;
@@ -1771,7 +1775,7 @@ public partial class InventoryPanel : PanelContainer
 			return;
 		}
 
-		_tooltip.ShowTooltip(GetInventoryItemName(itemId), BuildItemTooltipBody(itemId, slotName), this);
+		_tooltip.ShowTooltip(BuildItemTooltipTitle(itemId), BuildItemTooltipBody(itemId, slotName), this);
 	}
 
 	private void HideItemTooltip()
@@ -1840,6 +1844,13 @@ public partial class InventoryPanel : PanelContainer
 		return FormatTooltipLines(lines);
 	}
 
+	public static string BuildItemTooltipTitle(string itemId)
+	{
+		string name = GetInventoryItemName(itemId);
+		int uniqueId = BuildCatalog.GetItemUniqueId(itemId);
+		return uniqueId > 0 ? $"[#{uniqueId}] {name}" : name;
+	}
+
 	private static string FormatTooltipLines(List<string> lines)
 	{
 		if (lines.Count <= 3)
@@ -1898,7 +1909,8 @@ public partial class InventoryPanel : PanelContainer
 		AddStatLine(lines, "stat.attack", Mathf.RoundToInt(item.AttackBonus * starMultiplier));
 		AddStatLine(lines, "stat.defense", Mathf.RoundToInt(item.DefenseBonus * starMultiplier));
 		AddPercentLine(lines, "tooltip.move_speed", item.MoveSpeedBonus * starMultiplier);
-		AddStatLine(lines, "stat.jump_power", Mathf.RoundToInt(item.JumpPowerBonus * starMultiplier));
+		float jumpMultiplier = EquipmentConfig.EquipmentStarsAffectJumpPower ? starMultiplier : 1.0f;
+		AddStatLine(lines, "stat.jump_power", Mathf.RoundToInt(item.JumpPowerBonus * jumpMultiplier));
 		if (item.Slot == EquipmentSlot.Weapon && item.Id != "equip.weapon.none")
 		{
 			int attackSpeed = BuildCatalog.GetWeaponAttackSpeed(item, starMultiplier);

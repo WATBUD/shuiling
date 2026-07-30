@@ -440,7 +440,7 @@ public partial class CompanionInfoCard : PanelContainer
 			string capturedId = id;
 			string capturedSlot = slot;
 			string name = LocaleText.T(BuildCatalog.GetEquipment(id).NameKey) + BuildCatalog.GetStarSuffix(id);
-			AddTerm(_equipmentFlow, name, () => (name, InventoryPanel.BuildItemTooltipBody(capturedId, capturedSlot)));
+			AddTerm(_equipmentFlow, name, () => (InventoryPanel.BuildItemTooltipTitle(capturedId), InventoryPanel.BuildItemTooltipBody(capturedId, capturedSlot)));
 		}
 
 		int unlockedCores = BuildCatalog.GetUnlockedSupportCoreCount(_actor.Level);
@@ -455,7 +455,7 @@ public partial class CompanionInfoCard : PanelContainer
 			string slot = index == 0 ? LocaleText.T("build.slot.main_core") : LocaleText.T("build.slot.support_core_plain");
 			SkillGemDefinition gem = BuildCatalog.GetSkillGem(id);
 			string name = $"{LocaleText.T(gem.NameKey)} Lv.{loadout.GetSkillGemLevel(index)}";
-			AddTerm(_skillGemFlow, name, () => (name, InventoryPanel.BuildItemTooltipBody(id, slot)));
+			AddTerm(_skillGemFlow, name, () => (InventoryPanel.BuildItemTooltipTitle(id), InventoryPanel.BuildItemTooltipBody(id, slot)));
 		}
 	}
 

@@ -663,7 +663,10 @@ public partial class MerchantShopPanel : PanelContainer
 		{
 			body += $"\n{LocaleText.F("shop.owned_count", _player.GetInventoryCount(entry.ItemId))}  /  {LocaleText.F(isBuy ? "shop.button.buy" : "shop.button.sell", entry.Price)}";
 		}
-		_tooltip.ShowTooltip(entry.DisplayName, body, this);
+		string title = _shopKind == PlayerController.MerchantShopKind.PetShop
+			? entry.DisplayName
+			: InventoryPanel.BuildItemTooltipTitle(entry.ItemId);
+		_tooltip.ShowTooltip(title, body, this);
 	}
 
 	private void HideTradeTooltip()

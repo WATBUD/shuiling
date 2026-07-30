@@ -1,0 +1,125 @@
+{
+    "system":  "support_cores",
+    "items":  [
+                  {
+                      "uniqueId":  38,
+                      "id":  "gem.skill.chain",
+                      "nameKey":  "gem.skill.chain",
+                      "summaryKey":  "gem.skill.summary.chain",
+                      "isSupportEffect":  true,
+                      "requiresProjectile":  true,
+                      "damageMultiplier":  0.88,
+                      "detectionRadiusBonus":  2.0,
+                      "behaviorId":  "chain",
+                      "behaviorMagnitude":  2,
+                      "upgradeMaterialId":  "loot.water_core"
+                  },
+                  {
+                      "uniqueId":  39,
+                      "id":  "gem.skill.explosion",
+                      "nameKey":  "gem.skill.explosion",
+                      "summaryKey":  "gem.skill.summary.explosion",
+                      "isSupportEffect":  true,
+                      "requiresProjectile":  true,
+                      "damageMultiplier":  0.92,
+                      "attackCooldownReduction":  -0.04,
+                      "behaviorId":  "explosion",
+                      "behaviorRadius":  3.0,
+                      "upgradeMaterialId":  "loot.red_horn"
+                  },
+                  {
+                      "uniqueId":  40,
+                      "id":  "gem.skill.piercing",
+                      "nameKey":  "gem.skill.piercing",
+                      "summaryKey":  "gem.skill.summary.piercing",
+                      "isSupportEffect":  true,
+                      "requiresProjectile":  true,
+                      "damageMultiplier":  0.94,
+                      "attackRangeBonus":  2.0,
+                      "behaviorId":  "pierce",
+                      "behaviorMagnitude":  2,
+                      "upgradeMaterialId":  "loot.small_bone"
+                  },
+                  {
+                      "uniqueId":  41,
+                      "id":  "gem.skill.life_steal",
+                      "nameKey":  "gem.skill.life_steal",
+                      "summaryKey":  "gem.skill.summary.life_steal",
+                      "isSupportEffect":  true,
+                      "lifeStealPercent":  0.08,
+                      "damageMultiplier":  0.94
+                  },
+                  {
+                      "uniqueId":  42,
+                      "id":  "gem.skill.split",
+                      "nameKey":  "gem.skill.split",
+                      "summaryKey":  "gem.skill.summary.split",
+                      "isSupportEffect":  true,
+                      "requiresProjectile":  true,
+                      "damageMultiplier":  0.86,
+                      "behaviorId":  "split",
+                      "behaviorMagnitude":  2,
+                      "upgradeMaterialId":  "loot.sharp_claw"
+                  },
+                  {
+                      "uniqueId":  43,
+                      "id":  "gem.skill.multishot",
+                      "nameKey":  "gem.skill.multishot",
+                      "summaryKey":  "gem.skill.summary.multishot",
+                      "isSupportEffect":  true,
+                      "requiresProjectile":  true,
+                      "damageMultiplier":  0.78,
+                      "attackCooldownReduction":  -0.03,
+                      "behaviorId":  "multi",
+                      "behaviorMagnitude":  2,
+                      "upgradeMaterialId":  "loot.insect_wing"
+                  },
+                  {
+                      "uniqueId":  44,
+                      "id":  "gem.skill.faster_attacks",
+                      "nameKey":  "gem.skill.faster_attacks",
+                      "summaryKey":  "gem.skill.summary.faster_attacks",
+                      "isSupportEffect":  true,
+                      "damageMultiplier":  0.90,
+                      "attackCooldownReduction":  0.16
+                  },
+                  {
+                      "uniqueId":  45,
+                      "id":  "gem.skill.critical_strikes",
+                      "nameKey":  "gem.skill.critical_strikes",
+                      "summaryKey":  "gem.skill.summary.critical_strikes",
+                      "isSupportEffect":  true,
+                      "damageMultiplier":  0.92,
+                      "critChanceBonus":  0.16
+                  },
+                  {
+                      "uniqueId":  46,
+                      "id":  "gem.skill.swift_projectiles",
+                      "nameKey":  "gem.skill.swift_projectiles",
+                      "summaryKey":  "gem.skill.summary.swift_projectiles",
+                      "isSupportEffect":  true,
+                      "requiresProjectile":  true,
+                      "damageMultiplier":  0.95,
+                      "projectileSpeedMultiplier":  1.40,
+                      "attackRangeBonus":  2.5
+                  },
+                  {
+                      "uniqueId":  47,
+                      "id":  "gem.skill.brutality",
+                      "nameKey":  "gem.skill.brutality",
+                      "summaryKey":  "gem.skill.summary.brutality",
+                      "isSupportEffect":  true,
+                      "damageMultiplier":  1.30,
+                      "attackCooldownReduction":  -0.12
+                  },
+                  {
+                      "uniqueId":  48,
+                      "id":  "gem.skill.ailment",
+                      "nameKey":  "gem.skill.ailment",
+                      "summaryKey":  "gem.skill.summary.ailment",
+                      "isSupportEffect":  true,
+                      "damageMultiplier":  0.92,
+                      "controlChanceBonus":  0.18
+                  }
+              ]
+}

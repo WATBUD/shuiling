@@ -1,0 +1,10 @@
+{
+    "system":  "consumables",
+    "items":  [
+                  {
+                      "uniqueId":  49,
+                      "id":  "consumable.town_portal",
+                      "nameKey":  "item.town_portal"
+                  }
+              ]
+}

@@ -1,7 +1,12 @@
 // Equipment acquisition and progression balance.
 public static class EquipmentConfig
 {
+	// Player jump tuning.
+	// Final velocity = PlayerBaseJumpVelocity * (final jump power / BaseJumpPower).
 	public const int BaseJumpPower = 100;
+	public const float PlayerBaseJumpVelocity = 5.2f;
+	public const int MaximumPlayerJumpPower = 250;
+	public const bool EquipmentStarsAffectJumpPower = false;
 
 	public const float MonsterDropChance = 0.05f;
 	public const int BossGuaranteedDropCount = 2;

@@ -40,6 +40,7 @@ public sealed class CompanionIdentity
 
 public sealed class EquipmentDefinition
 {
+	public int UniqueId { get; set; }
 	public string Id { get; set; } = string.Empty;
 	public string NameKey { get; set; } = string.Empty;
 	public string SummaryKey { get; set; } = string.Empty;
@@ -76,6 +77,7 @@ public sealed class AttributeGemDefinition
 
 public sealed class SkillGemDefinition
 {
+	public int UniqueId { get; set; }
 	public string Id { get; set; } = string.Empty;
 	public string NameKey { get; set; } = string.Empty;
 	public string SummaryKey { get; set; } = string.Empty;
@@ -437,70 +439,14 @@ public static class BuildCatalog
 
 	private const string DefaultRaceId = "race.human";
 
-	private static readonly List<EquipmentDefinition> Equipment = new()
-	{
-		new EquipmentDefinition { Id = "equip.helmet.none", NameKey = "equipment.none", SummaryKey = "gem.summary.none", Slot = EquipmentSlot.Helmet },
-		new EquipmentDefinition { Id = "equip.weapon.none", NameKey = "equipment.none", SummaryKey = "gem.summary.none", Slot = EquipmentSlot.Weapon },
-		new EquipmentDefinition { Id = "equip.armor.none", NameKey = "equipment.none", SummaryKey = "gem.summary.none", Slot = EquipmentSlot.Armor },
-		new EquipmentDefinition { Id = "equip.boots.none", NameKey = "equipment.none", SummaryKey = "gem.summary.none", Slot = EquipmentSlot.Boots },
-		new EquipmentDefinition { Id = "equip.accessory.none", NameKey = "equipment.none", SummaryKey = "gem.summary.none", Slot = EquipmentSlot.Accessory },
-		new EquipmentDefinition { Id = "equip.helmet.traveler", NameKey = "equip.helmet.traveler", SummaryKey = "equip.summary.traveler_helmet", Slot = EquipmentSlot.Helmet, MaxHealthBonus = 10, DefenseBonus = 3, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.helmet.guardian", NameKey = "equip.helmet.guardian", SummaryKey = "equip.summary.guardian_helmet", Slot = EquipmentSlot.Helmet, MaxHealthBonus = 26, DefenseBonus = 8, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.helmet.mystic", NameKey = "equip.helmet.mystic", SummaryKey = "equip.summary.mystic_hood", Slot = EquipmentSlot.Helmet, MaxHealthBonus = 12, DefenseBonus = 4, AttackCooldownReduction = 0.07f, AttackRangeBonus = 0.6f, SocketCount = 2 },
-
-		new EquipmentDefinition { Id = "equip.weapon.sword", NameKey = "equip.weapon.sword", SummaryKey = "equip.summary.sword", Slot = EquipmentSlot.Weapon, AttackBonus = 10, AttackSpeed = 54, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.weapon.short_sword", NameKey = "equip.weapon.short_sword", SummaryKey = "equip.summary.short_sword", Slot = EquipmentSlot.Weapon, AttackBonus = 8, AttackSpeed = 60, CritChanceBonus = 0.03f, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.weapon.dagger", NameKey = "equip.weapon.dagger", SummaryKey = "equip.summary.dagger", Slot = EquipmentSlot.Weapon, AttackBonus = 6, AttackSpeed = 68, CritChanceBonus = 0.10f, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.weapon.longbow", NameKey = "equip.weapon.longbow", SummaryKey = "equip.summary.longbow", Slot = EquipmentSlot.Weapon, AttackBonus = 9, AttackRangeBonus = 3.2f, AttackSpeed = 52, CritChanceBonus = 0.04f, SocketCount = 2 },
-		new EquipmentDefinition { Id = "equip.weapon.spear", NameKey = "equip.weapon.spear", SummaryKey = "equip.summary.spear", Slot = EquipmentSlot.Weapon, AttackBonus = 12, DefenseBonus = 3, AttackRangeBonus = 1.4f, AttackSpeed = 50, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.weapon.warhammer", NameKey = "equip.weapon.warhammer", SummaryKey = "equip.summary.warhammer", Slot = EquipmentSlot.Weapon, AttackBonus = 20, DefenseBonus = 4, AttackSpeed = 38, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.weapon.scepter", NameKey = "equip.weapon.scepter", SummaryKey = "equip.summary.scepter", Slot = EquipmentSlot.Weapon, AttackBonus = 8, DefenseBonus = 5, AttackRangeBonus = 1.6f, AttackSpeed = 55, SocketCount = 2 },
-		new EquipmentDefinition { Id = "equip.weapon.staff", NameKey = "equip.weapon.staff", SummaryKey = "equip.summary.staff", Slot = EquipmentSlot.Weapon, AttackBonus = 7, AttackRangeBonus = 2.0f, AttackSpeed = 58, SocketCount = 2 },
-		new EquipmentDefinition { Id = "equip.weapon.great_axe", NameKey = "equip.weapon.great_axe", SummaryKey = "equip.summary.great_axe", Slot = EquipmentSlot.Weapon, AttackBonus = 18, DefenseBonus = 2, AttackSpeed = 42, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.weapon.claws", NameKey = "equip.weapon.claws", SummaryKey = "equip.summary.claws", Slot = EquipmentSlot.Weapon, AttackBonus = 8, AttackSpeed = 66, CritChanceBonus = 0.06f, SocketCount = 1 },
-
-		new EquipmentDefinition { Id = "equip.armor.scout", NameKey = "equip.armor.scout", SummaryKey = "equip.summary.scout_armor", Slot = EquipmentSlot.Armor, MaxHealthBonus = 18, DefenseBonus = 5, MoveSpeedBonus = 0.05f, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.armor.plate", NameKey = "equip.armor.plate", SummaryKey = "equip.summary.plate_armor", Slot = EquipmentSlot.Armor, MaxHealthBonus = 44, DefenseBonus = 16, MoveSpeedBonus = -0.05f, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.armor.spirit_robe", NameKey = "equip.armor.spirit_robe", SummaryKey = "equip.summary.spirit_robe", Slot = EquipmentSlot.Armor, MaxHealthBonus = 24, DefenseBonus = 7, AttackCooldownReduction = 0.10f, AttackRangeBonus = 0.7f, SocketCount = 2 },
-
-		new EquipmentDefinition { Id = "equip.boots.traveler", NameKey = "equip.boots.traveler", SummaryKey = "equip.summary.traveler_shoes", Slot = EquipmentSlot.Boots, DefenseBonus = 1, MoveSpeedBonus = 0.07f },
-		new EquipmentDefinition { Id = "equip.boots.reinforced", NameKey = "equip.boots.reinforced", SummaryKey = "equip.summary.reinforced_boots", Slot = EquipmentSlot.Boots, MaxHealthBonus = 10, DefenseBonus = 5, MoveSpeedBonus = 0.03f },
-		new EquipmentDefinition { Id = "equip.boots.windrunner", NameKey = "equip.boots.windrunner", SummaryKey = "equip.summary.windrunner_boots", Slot = EquipmentSlot.Boots, DefenseBonus = 2, MoveSpeedBonus = 0.15f },
-		new EquipmentDefinition { Id = "equip.boots.gravity", NameKey = "equip.boots.gravity", SummaryKey = "equip.summary.gravity_boots", Slot = EquipmentSlot.Boots, DefenseBonus = 2, JumpPowerBonus = 300 },
-
-		new EquipmentDefinition { Id = "equip.accessory.swift_ring", NameKey = "equip.accessory.swift_ring", SummaryKey = "equip.summary.swift_ring", Slot = EquipmentSlot.Accessory, MoveSpeedBonus = 0.12f, AttackCooldownReduction = 0.05f, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.accessory.crit_charm", NameKey = "equip.accessory.crit_charm", SummaryKey = "equip.summary.crit_charm", Slot = EquipmentSlot.Accessory, AttackBonus = 4, CritChanceBonus = 0.12f, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.accessory.turtle_amulet", NameKey = "equip.accessory.turtle_amulet", SummaryKey = "equip.summary.turtle_amulet", Slot = EquipmentSlot.Accessory, MaxHealthBonus = 34, DefenseBonus = 8, MoveSpeedBonus = -0.03f, SocketCount = 1 },
-		new EquipmentDefinition { Id = "equip.accessory.focus_lens", NameKey = "equip.accessory.focus_lens", SummaryKey = "equip.summary.focus_lens", Slot = EquipmentSlot.Accessory, AttackRangeBonus = 1.4f, CritChanceBonus = 0.06f, SocketCount = 1 },
-	};
+	private static readonly List<EquipmentDefinition> Equipment = ItemCatalogLoader.LoadEquipment();
 
 	private static readonly List<AttributeGemDefinition> AttributeGems = new()
 	{
 		new AttributeGemDefinition { Id = "gem.attribute.none", NameKey = "gem.attribute.none", SummaryKey = "gem.summary.none", ElementId = "physical", ElementNameKey = "element.physical", AttackColor = new Color(1.0f, 0.54f, 0.24f, 0.92f) },
 	};
 
-	private static readonly List<SkillGemDefinition> SkillGems = new()
-	{
-		new SkillGemDefinition { Id = "gem.skill.none", NameKey = "gem.skill.none", SummaryKey = "gem.skill.summary.none" },
-		new SkillGemDefinition { Id = "gem.skill.fireball", NameKey = "gem.skill.fireball", SummaryKey = "gem.skill.summary.fireball", DamageElementId = "fire", DamageElementNameKey = "element.fire", AttackColor = new Color(1.0f, 0.28f, 0.08f, 0.94f), AttackBonus = 5, AttackRangeBonus = 2.0f, IsRangedActiveSkill = true, IsSpell = true, UsesProjectile = true },
-		new SkillGemDefinition { Id = "gem.skill.whirlwind", NameKey = "gem.skill.whirlwind", SummaryKey = "gem.skill.summary.whirlwind", DamageElementId = "physical", DamageElementNameKey = "element.physical", AttackColor = new Color(1.0f, 0.70f, 0.32f, 0.92f), AttackBonus = 4, DefenseBonus = 2, AttackCooldownReduction = 0.04f },
-		new SkillGemDefinition { Id = "gem.skill.meteor", NameKey = "gem.skill.meteor", SummaryKey = "gem.skill.summary.meteor", DamageElementId = "fire", DamageElementNameKey = "element.fire", AttackColor = new Color(1.0f, 0.20f, 0.05f, 0.96f), AttackBonus = 12, AttackRangeBonus = 1.2f, AttackCooldownReduction = -0.08f, IsRangedActiveSkill = true, IsSpell = true },
-		new SkillGemDefinition { Id = "gem.skill.laser", NameKey = "gem.skill.laser", SummaryKey = "gem.skill.summary.laser", DamageElementId = "light", DamageElementNameKey = "element.light", AttackColor = new Color(1.0f, 0.95f, 0.58f, 0.95f), AttackBonus = 6, AttackRangeBonus = 3.2f, DetectionRadiusBonus = 2.0f, IsRangedActiveSkill = true, IsSpell = true },
-		new SkillGemDefinition { Id = "gem.skill.rocket", NameKey = "gem.skill.rocket", SummaryKey = "gem.skill.summary.rocket", DamageElementId = "fire", DamageElementNameKey = "element.fire", AttackColor = new Color(1.0f, 0.34f, 0.08f, 0.95f), AttackBonus = 9, AttackRangeBonus = 2.6f, AttackCooldownReduction = -0.05f, IsRangedActiveSkill = true, UsesProjectile = true },
-		new SkillGemDefinition { Id = "gem.skill.ice_shard", NameKey = "gem.skill.ice_shard", SummaryKey = "gem.skill.summary.ice_shard", DamageElementId = "ice", DamageElementNameKey = "element.ice", AttackColor = new Color(0.58f, 0.88f, 1.0f, 0.95f), AttackBonus = 5, AttackRangeBonus = 2.4f, IsRangedActiveSkill = true, IsSpell = true, UsesProjectile = true },
-		new SkillGemDefinition { Id = "gem.skill.lightning", NameKey = "gem.skill.lightning", SummaryKey = "gem.skill.summary.lightning", DamageElementId = "lightning", DamageElementNameKey = "element.lightning", AttackColor = new Color(0.95f, 0.88f, 0.20f, 0.95f), AttackBonus = 6, AttackRangeBonus = 2.8f, DetectionRadiusBonus = 1.6f, IsRangedActiveSkill = true, IsSpell = true },
-		new SkillGemDefinition { Id = "gem.skill.chain", NameKey = "gem.skill.chain", SummaryKey = "gem.skill.summary.chain", IsSupportEffect = true, RequiresProjectile = true, DamageMultiplier = 0.88f, DetectionRadiusBonus = 2.0f, BehaviorId = ProjectileBehavior.Chain, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.water_core" },
-		new SkillGemDefinition { Id = "gem.skill.explosion", NameKey = "gem.skill.explosion", SummaryKey = "gem.skill.summary.explosion", IsSupportEffect = true, RequiresProjectile = true, DamageMultiplier = 0.92f, AttackCooldownReduction = -0.04f, BehaviorId = ProjectileBehavior.Explosion, BehaviorRadius = 3.0f, UpgradeMaterialId = "loot.red_horn" },
-		new SkillGemDefinition { Id = "gem.skill.piercing", NameKey = "gem.skill.piercing", SummaryKey = "gem.skill.summary.piercing", IsSupportEffect = true, RequiresProjectile = true, DamageMultiplier = 0.94f, AttackRangeBonus = 2.0f, BehaviorId = ProjectileBehavior.Pierce, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.small_bone" },
-		new SkillGemDefinition { Id = "gem.skill.life_steal", NameKey = "gem.skill.life_steal", SummaryKey = "gem.skill.summary.life_steal", IsSupportEffect = true, LifeStealPercent = 0.08f, DamageMultiplier = 0.94f },
-		new SkillGemDefinition { Id = "gem.skill.split", NameKey = "gem.skill.split", SummaryKey = "gem.skill.summary.split", IsSupportEffect = true, RequiresProjectile = true, DamageMultiplier = 0.86f, BehaviorId = ProjectileBehavior.Split, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.sharp_claw" },
-		new SkillGemDefinition { Id = "gem.skill.multishot", NameKey = "gem.skill.multishot", SummaryKey = "gem.skill.summary.multishot", IsSupportEffect = true, RequiresProjectile = true, DamageMultiplier = 0.78f, AttackCooldownReduction = -0.03f, BehaviorId = ProjectileBehavior.Multi, BehaviorMagnitude = 2, UpgradeMaterialId = "loot.insect_wing" },
-		new SkillGemDefinition { Id = "gem.skill.faster_attacks", NameKey = "gem.skill.faster_attacks", SummaryKey = "gem.skill.summary.faster_attacks", IsSupportEffect = true, DamageMultiplier = 0.90f, AttackCooldownReduction = 0.16f },
-		new SkillGemDefinition { Id = "gem.skill.critical_strikes", NameKey = "gem.skill.critical_strikes", SummaryKey = "gem.skill.summary.critical_strikes", IsSupportEffect = true, DamageMultiplier = 0.92f, CritChanceBonus = 0.16f },
-		new SkillGemDefinition { Id = "gem.skill.swift_projectiles", NameKey = "gem.skill.swift_projectiles", SummaryKey = "gem.skill.summary.swift_projectiles", IsSupportEffect = true, RequiresProjectile = true, DamageMultiplier = 0.95f, ProjectileSpeedMultiplier = 1.40f, AttackRangeBonus = 2.5f },
-		new SkillGemDefinition { Id = "gem.skill.brutality", NameKey = "gem.skill.brutality", SummaryKey = "gem.skill.summary.brutality", IsSupportEffect = true, DamageMultiplier = 1.30f, AttackCooldownReduction = -0.12f },
-		new SkillGemDefinition { Id = "gem.skill.ailment", NameKey = "gem.skill.ailment", SummaryKey = "gem.skill.summary.ailment", IsSupportEffect = true, DamageMultiplier = 0.92f, ControlChanceBonus = 0.18f },
-	};
+	private static readonly List<SkillGemDefinition> SkillGems = ItemCatalogLoader.LoadCoreSkills();
 
 	private static readonly List<AttackModeDefinition> AttackModes = new()
 	{
@@ -779,6 +725,21 @@ public static class BuildCatalog
 		return 1.0f + GetEquipmentStars(id) * EquipmentStarBonusPerStar;
 	}
 
+	public static int CalculateEquippedJumpPower(CompanionBuildLoadout loadout)
+	{
+		EquipmentDefinition boots = GetEquipment(loadout.BootsId);
+		float starMultiplier = EquipmentConfig.EquipmentStarsAffectJumpPower
+			? GetEquipmentStarMultiplier(loadout.BootsId)
+			: 1.0f;
+		int bootsBonus = boots.Slot == EquipmentSlot.Boots
+			? Mathf.RoundToInt(boots.JumpPowerBonus * starMultiplier)
+			: 0;
+		return Mathf.Clamp(
+			EquipmentConfig.BaseJumpPower + bootsBonus,
+			EquipmentConfig.BaseJumpPower,
+			EquipmentConfig.MaximumPlayerJumpPower);
+	}
+
 	// 顯示用的星等後綴，例如 " ★3"；0★ 回傳空字串。
 	public static string GetStarSuffix(string id)
 	{
@@ -963,10 +924,82 @@ public static class BuildCatalog
 	// the city from the wild (emergency retreat). Keyed id -> name locale key.
 	public const string TownPortalScrollId = "consumable.town_portal";
 
-	private static readonly Dictionary<string, string> Consumables = new()
+	private static readonly Dictionary<string, string> Consumables = new();
+
+	static BuildCatalog()
 	{
-		[TownPortalScrollId] = "item.town_portal",
-	};
+		foreach (ConsumableDefinition item in ItemCatalogLoader.LoadConsumables())
+		{
+			Consumables[item.Id] = item.NameKey;
+		}
+	}
+
+	public static int GetItemUniqueId(string id)
+	{
+		string baseId = GetBaseEquipmentId(id);
+		foreach (EquipmentDefinition equipment in Equipment)
+		{
+			if (equipment.Id == baseId)
+			{
+				return equipment.UniqueId;
+			}
+		}
+		foreach (SkillGemDefinition gem in SkillGems)
+		{
+			if (gem.Id == id)
+			{
+				return gem.UniqueId;
+			}
+		}
+		foreach (ConsumableDefinition item in ItemCatalogLoader.LoadConsumablesCached())
+		{
+			if (item.Id == id)
+			{
+				return item.UniqueId;
+			}
+		}
+		foreach (MonsterLootDefinition material in MonsterLootCatalog.Materials)
+		{
+			if (material.Id == id)
+			{
+				return material.UniqueId;
+			}
+		}
+		return 0;
+	}
+
+	public static string GetItemIdByUniqueId(int uniqueId)
+	{
+		foreach (EquipmentDefinition equipment in Equipment)
+		{
+			if (equipment.UniqueId == uniqueId)
+			{
+				return equipment.Id;
+			}
+		}
+		foreach (SkillGemDefinition gem in SkillGems)
+		{
+			if (gem.UniqueId == uniqueId)
+			{
+				return gem.Id;
+			}
+		}
+		foreach (ConsumableDefinition item in ItemCatalogLoader.LoadConsumablesCached())
+		{
+			if (item.UniqueId == uniqueId)
+			{
+				return item.Id;
+			}
+		}
+		foreach (MonsterLootDefinition material in MonsterLootCatalog.Materials)
+		{
+			if (material.UniqueId == uniqueId)
+			{
+				return material.Id;
+			}
+		}
+		return string.Empty;
+	}
 
 	public static bool IsConsumable(string id)
 	{
@@ -1288,7 +1321,8 @@ public static class BuildCatalog
 		stats.Attack += Mathf.RoundToInt(equipment.AttackBonus * bonusMultiplier);
 		stats.Defense += Mathf.RoundToInt(equipment.DefenseBonus * bonusMultiplier);
 		stats.MoveSpeedMultiplier += equipment.MoveSpeedBonus * bonusMultiplier;
-		stats.JumpPower += Mathf.RoundToInt(equipment.JumpPowerBonus * bonusMultiplier);
+		float jumpBonusMultiplier = EquipmentConfig.EquipmentStarsAffectJumpPower ? bonusMultiplier : 1.0f;
+		stats.JumpPower += Mathf.RoundToInt(equipment.JumpPowerBonus * jumpBonusMultiplier);
 		if (equipment.Slot == EquipmentSlot.Weapon && equipment.Id != "equip.weapon.none")
 		{
 			int attackSpeed = GetWeaponAttackSpeed(equipment, bonusMultiplier);

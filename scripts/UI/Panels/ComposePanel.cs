@@ -215,7 +215,7 @@ public partial class ComposePanel : PanelContainer
 				CustomMinimumSize = new Vector2(64.0f, 66.0f),
 				ClipText = true,
 				Disabled = available <= 0,
-				TooltipText = LocaleText.F("mail.compose.attach_tooltip", GetItemName(itemId)),
+				TooltipText = LocaleText.F("mail.compose.attach_tooltip", InventoryPanel.BuildItemTooltipTitle(itemId)),
 			};
 			button.AddThemeFontSizeOverride("font_size", 12);
 			ItemIconLibrary.Apply(button, itemId, 42);
@@ -244,7 +244,7 @@ public partial class ComposePanel : PanelContainer
 				Text = $"x{entry.Value}",
 				CustomMinimumSize = new Vector2(58.0f, 40.0f),
 				ClipText = true,
-				TooltipText = LocaleText.F("mail.compose.remove_tooltip", GetItemName(entry.Key)),
+				TooltipText = LocaleText.F("mail.compose.remove_tooltip", InventoryPanel.BuildItemTooltipTitle(entry.Key)),
 			};
 			chip.AddThemeFontSizeOverride("font_size", 12);
 			ItemIconLibrary.Apply(chip, entry.Key, 28);

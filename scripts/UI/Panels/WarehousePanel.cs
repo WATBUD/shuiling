@@ -383,7 +383,9 @@ public partial class WarehousePanel : PanelContainer
 			Text = string.Empty,
 			CustomMinimumSize = new Vector2(ItemIconLibrary.InventorySlotWidth, 58.0f),
 			ClipText = true,
-			TooltipText = count > 1 ? $"{GetItemName(itemId)} x{count}" : GetItemName(itemId),
+			TooltipText = count > 1
+				? $"{InventoryPanel.BuildItemTooltipTitle(itemId)} x{count}"
+				: InventoryPanel.BuildItemTooltipTitle(itemId),
 		};
 		ItemIconLibrary.Apply(button, itemId, 42);
 		button.IconAlignment = HorizontalAlignment.Center;

@@ -173,6 +173,11 @@ Combat facts:
   Git-tracked `assets/` directory and reference only that curated path. Never commit a
   `res://assets/_downloads/...` reference. Follow
   `docs/ASSET_SOURCE_WORKFLOW.md` and run `tools/validate_runtime_assets.ps1`.
+- **Item catalog rule:** every real inventory item belongs in exactly one
+  `configs/items/*.json` catalog with a globally unique positive numeric `uniqueId`.
+  IDs use a single global sequence and must not be limited or inferred by item
+  category. Preserve published numeric and string IDs for save compatibility. Follow
+  `configs/items/README.md` and run `tools/validate_item_catalogs.ps1`.
 - Keep scene orchestration in `World`/`PlayerController`; keep data contracts in `Core`.
 - New UI panels → `scripts/UI/Panels`; full-screen screens → `scripts/UI/Screens`;
   reusable widgets → `scripts/UI/Components`.

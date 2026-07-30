@@ -1,36 +1,43 @@
 using Godot;
 using System.Collections.Generic;
 
-public readonly record struct MonsterLootDefinition(string Id, string NameKey, Color DropColor);
+public sealed class MonsterLootDefinition
+{
+	public int UniqueId { get; set; }
+	public string Id { get; set; } = string.Empty;
+	public string NameKey { get; set; } = string.Empty;
+	public Color DropColor { get; set; }
+}
 
 public static class MonsterLootCatalog
 {
-	private static readonly MonsterLootDefinition[] QuestMaterials =
+	private static readonly MonsterLootDefinition[] LegacyQuestMaterialDefaults =
 	{
-		new("loot.slime_mucus", "item.loot.slime_mucus", new Color(0.32f, 0.92f, 0.78f, 0.95f)),
-		new("loot.beast_hide", "item.loot.beast_hide", new Color(0.62f, 0.38f, 0.22f, 0.95f)),
-		new("loot.sharp_claw", "item.loot.sharp_claw", new Color(0.92f, 0.86f, 0.64f, 0.95f)),
-		new("loot.soft_fur", "item.loot.soft_fur", new Color(0.82f, 0.70f, 0.58f, 0.95f)),
-		new("loot.small_bone", "item.loot.small_bone", new Color(0.86f, 0.82f, 0.72f, 0.95f)),
-		new("loot.insect_wing", "item.loot.insect_wing", new Color(0.72f, 0.92f, 0.76f, 0.95f)),
-		new("loot.red_horn", "item.loot.red_horn", new Color(0.88f, 0.22f, 0.14f, 0.95f)),
-		new("loot.venom_sac", "item.loot.venom_sac", new Color(0.54f, 0.88f, 0.22f, 0.95f)),
-		new("loot.water_core", "item.loot.water_core", new Color(0.34f, 0.72f, 1.0f, 0.95f)),
-		new("loot.dragon_scale", "item.loot.dragon_scale", new Color(0.86f, 0.34f, 0.18f, 0.95f)),
-		new("loot.cracked_core", "item.loot.cracked_core", new Color(0.70f, 0.68f, 0.62f, 0.95f)),
+		new() { Id = "loot.slime_mucus", NameKey = "item.loot.slime_mucus", DropColor = new Color(0.32f, 0.92f, 0.78f, 0.95f) },
+		new() { Id = "loot.beast_hide", NameKey = "item.loot.beast_hide", DropColor = new Color(0.62f, 0.38f, 0.22f, 0.95f) },
+		new() { Id = "loot.sharp_claw", NameKey = "item.loot.sharp_claw", DropColor = new Color(0.92f, 0.86f, 0.64f, 0.95f) },
+		new() { Id = "loot.soft_fur", NameKey = "item.loot.soft_fur", DropColor = new Color(0.82f, 0.70f, 0.58f, 0.95f) },
+		new() { Id = "loot.small_bone", NameKey = "item.loot.small_bone", DropColor = new Color(0.86f, 0.82f, 0.72f, 0.95f) },
+		new() { Id = "loot.insect_wing", NameKey = "item.loot.insect_wing", DropColor = new Color(0.72f, 0.92f, 0.76f, 0.95f) },
+		new() { Id = "loot.red_horn", NameKey = "item.loot.red_horn", DropColor = new Color(0.88f, 0.22f, 0.14f, 0.95f) },
+		new() { Id = "loot.venom_sac", NameKey = "item.loot.venom_sac", DropColor = new Color(0.54f, 0.88f, 0.22f, 0.95f) },
+		new() { Id = "loot.water_core", NameKey = "item.loot.water_core", DropColor = new Color(0.34f, 0.72f, 1.0f, 0.95f) },
+		new() { Id = "loot.dragon_scale", NameKey = "item.loot.dragon_scale", DropColor = new Color(0.86f, 0.34f, 0.18f, 0.95f) },
+		new() { Id = "loot.cracked_core", NameKey = "item.loot.cracked_core", DropColor = new Color(0.70f, 0.68f, 0.62f, 0.95f) },
 
 		// 強化水晶 T1~T10：所有怪物依其世界階級（WorldTier）掉落，作為精煉裝備的材料。
-		new("loot.enhance_crystal.t1", "item.loot.enhance_crystal.t1", new Color(0.70f, 0.74f, 0.80f, 0.96f)),
-		new("loot.enhance_crystal.t2", "item.loot.enhance_crystal.t2", new Color(0.56f, 0.82f, 0.72f, 0.96f)),
-		new("loot.enhance_crystal.t3", "item.loot.enhance_crystal.t3", new Color(0.42f, 0.84f, 0.58f, 0.96f)),
-		new("loot.enhance_crystal.t4", "item.loot.enhance_crystal.t4", new Color(0.50f, 0.80f, 1.00f, 0.96f)),
-		new("loot.enhance_crystal.t5", "item.loot.enhance_crystal.t5", new Color(0.36f, 0.62f, 1.00f, 0.96f)),
-		new("loot.enhance_crystal.t6", "item.loot.enhance_crystal.t6", new Color(0.62f, 0.48f, 1.00f, 0.96f)),
-		new("loot.enhance_crystal.t7", "item.loot.enhance_crystal.t7", new Color(0.82f, 0.42f, 0.98f, 0.96f)),
-		new("loot.enhance_crystal.t8", "item.loot.enhance_crystal.t8", new Color(1.00f, 0.44f, 0.72f, 0.96f)),
-		new("loot.enhance_crystal.t9", "item.loot.enhance_crystal.t9", new Color(1.00f, 0.58f, 0.30f, 0.96f)),
-		new("loot.enhance_crystal.t10", "item.loot.enhance_crystal.t10", new Color(1.00f, 0.86f, 0.36f, 0.98f)),
+		new() { Id = "loot.enhance_crystal.t1", NameKey = "item.loot.enhance_crystal.t1", DropColor = new Color(0.70f, 0.74f, 0.80f, 0.96f) },
+		new() { Id = "loot.enhance_crystal.t2", NameKey = "item.loot.enhance_crystal.t2", DropColor = new Color(0.56f, 0.82f, 0.72f, 0.96f) },
+		new() { Id = "loot.enhance_crystal.t3", NameKey = "item.loot.enhance_crystal.t3", DropColor = new Color(0.42f, 0.84f, 0.58f, 0.96f) },
+		new() { Id = "loot.enhance_crystal.t4", NameKey = "item.loot.enhance_crystal.t4", DropColor = new Color(0.50f, 0.80f, 1.00f, 0.96f) },
+		new() { Id = "loot.enhance_crystal.t5", NameKey = "item.loot.enhance_crystal.t5", DropColor = new Color(0.36f, 0.62f, 1.00f, 0.96f) },
+		new() { Id = "loot.enhance_crystal.t6", NameKey = "item.loot.enhance_crystal.t6", DropColor = new Color(0.62f, 0.48f, 1.00f, 0.96f) },
+		new() { Id = "loot.enhance_crystal.t7", NameKey = "item.loot.enhance_crystal.t7", DropColor = new Color(0.82f, 0.42f, 0.98f, 0.96f) },
+		new() { Id = "loot.enhance_crystal.t8", NameKey = "item.loot.enhance_crystal.t8", DropColor = new Color(1.00f, 0.44f, 0.72f, 0.96f) },
+		new() { Id = "loot.enhance_crystal.t9", NameKey = "item.loot.enhance_crystal.t9", DropColor = new Color(1.00f, 0.58f, 0.30f, 0.96f) },
+		new() { Id = "loot.enhance_crystal.t10", NameKey = "item.loot.enhance_crystal.t10", DropColor = new Color(1.00f, 0.86f, 0.36f, 0.98f) },
 	};
+	private static readonly MonsterLootDefinition[] QuestMaterials = ItemCatalogLoader.LoadMaterials();
 
 	private static readonly string[] EnhanceCrystalIds =
 	{

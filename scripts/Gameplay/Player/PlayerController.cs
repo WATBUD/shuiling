@@ -21,6 +21,7 @@ public partial class PlayerController : CharacterBody3D
 	}
 	public int EffectiveMaxHealth => CurrentBuildStats.MaxHealth;
 	public int EffectiveDefense => CurrentBuildStats.Defense;
+	public int EffectiveJumpPower => BuildCatalog.CalculateEquippedJumpPower(BuildLoadout);
 
 	private void MarkPlayerBuildStatsDirty()
 	{
@@ -162,7 +163,7 @@ public partial class PlayerController : CharacterBody3D
 
 	[Export] public float WalkSpeed { get; set; } = 7.8f;
 	[Export] public float SprintSpeed { get; set; } = 12.8f;
-	[Export] public float JumpVelocity { get; set; } = 5.2f;
+	[Export] public float JumpVelocity { get; set; } = EquipmentConfig.PlayerBaseJumpVelocity;
 	[Export] public float ThirdPersonDistance { get; set; } = 6.2f;
 	[Export] public float ThirdPersonCameraHeight { get; set; } = 3.35f;
 	[Export] public float ThirdPersonLookHeight { get; set; } = 2.2f;
@@ -281,6 +282,8 @@ public partial class PlayerController : CharacterBody3D
 	private Label _playerHealthHudNameLabel = null!;
 	private Label _playerHealthHudValueLabel = null!;
 	private ProgressBar _playerHealthHudBar = null!;
+	private Label _playerExperienceHudValueLabel = null!;
+	private ProgressBar _playerExperienceHudBar = null!;
 	private CaptureRhythmPanel _captureRhythmPanel = null!;
 	private SystemLogPanel _systemLogPanel = null!;
 	private PanelContainer _bossAnnouncementPanel = null!;
@@ -791,7 +794,8 @@ public partial class PlayerController : CharacterBody3D
 
 		if (Input.IsActionJustPressed("jump") && IsOnFloor())
 		{
-			velocity.Y = JumpVelocity * CurrentBuildStats.JumpPower / EquipmentConfig.BaseJumpPower;
+			float jumpMultiplier = EffectiveJumpPower / (float)EquipmentConfig.BaseJumpPower;
+			velocity.Y = JumpVelocity * jumpMultiplier;
 		}
 
 		Vector2 inputDirection = Input.GetVector("move_left", "move_right", "move_forward", "move_back");

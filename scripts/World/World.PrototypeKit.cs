@@ -5,6 +5,7 @@ public partial class World
 {
 	private const string PrototypeKitRoot =
 		"res://assets/models/environment/kenney_prototype/";
+	private const float WalkableVisualSurfaceY = 0.002f;
 
 	private static readonly Dictionary<string, Mesh?> PrototypeMeshCache = new();
 
@@ -55,7 +56,7 @@ public partial class World
 		{
 			for (int z = 0; z < tilesPerSide; z++)
 			{
-				Vector3 position = new(start + x * tileSize, 0.008f, start + z * tileSize);
+				Vector3 position = new(start + x * tileSize, WalkableVisualSurfaceY * 0.5f, start + z * tileSize);
 				var transform = new Transform3D(
 					Basis.Identity.Scaled(new Vector3(tileSize * 0.992f, 1.0f, tileSize * 0.992f)),
 					position);
@@ -65,6 +66,11 @@ public partial class World
 
 		AddPrototypeFloorBatch($"{mapId}PrototypeFloorA", floorMesh, lightTiles, MakeMaterial(first, 0.96f));
 		AddPrototypeFloorBatch($"{mapId}PrototypeFloorB", floorMesh, darkTiles, MakeMaterial(second, 0.96f));
+	}
+
+	private static float FlatWalkableCenterY(float meshHeight, float surfaceY = WalkableVisualSurfaceY)
+	{
+		return surfaceY - meshHeight * 0.5f;
 	}
 
 	private void AddPrototypeFloorBatch(string name, Mesh mesh, List<Transform3D> transforms, Material material)

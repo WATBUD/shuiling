@@ -1,0 +1,142 @@
+{
+	"system":  "core_skills",
+	"items":  [
+				  {
+					  "uniqueId":  30,
+					  "id":  "gem.skill.none",
+					  "nameKey":  "gem.skill.none",
+					  "summaryKey":  "gem.skill.summary.none"
+				  },
+				  {
+					  "uniqueId":  31,
+					  "id":  "gem.skill.fireball",
+					  "nameKey":  "gem.skill.fireball",
+					  "summaryKey":  "gem.skill.summary.fireball",
+					  "damageElementId":  "fire",
+					  "damageElementNameKey":  "element.fire",
+					  "attackColor":  [
+										  1.0,
+										  0.28,
+										  0.08,
+										  0.94
+									  ],
+					  "attackBonus":  5,
+					  "attackRangeBonus":  2.0,
+					  "isRangedActiveSkill":  true,
+					  "isSpell":  true,
+					  "usesProjectile":  true
+				  },
+				  {
+					  "uniqueId":  32,
+					  "id":  "gem.skill.whirlwind",
+					  "nameKey":  "gem.skill.whirlwind",
+					  "summaryKey":  "gem.skill.summary.whirlwind",
+					  "damageElementId":  "physical",
+					  "damageElementNameKey":  "element.physical",
+					  "attackColor":  [
+										  1.0,
+										  0.70,
+										  0.32,
+										  0.92
+									  ],
+					  "attackBonus":  4,
+					  "defenseBonus":  2,
+					  "attackCooldownReduction":  0.04
+				  },
+				  {
+					  "uniqueId":  33,
+					  "id":  "gem.skill.meteor",
+					  "nameKey":  "gem.skill.meteor",
+					  "summaryKey":  "gem.skill.summary.meteor",
+					  "damageElementId":  "fire",
+					  "damageElementNameKey":  "element.fire",
+					  "attackColor":  [
+										  1.0,
+										  0.20,
+										  0.05,
+										  0.96
+									  ],
+					  "attackBonus":  12,
+					  "attackRangeBonus":  1.2,
+					  "attackCooldownReduction":  -0.08,
+					  "isRangedActiveSkill":  true,
+					  "isSpell":  true
+				  },
+				  {
+					  "uniqueId":  34,
+					  "id":  "gem.skill.laser",
+					  "nameKey":  "gem.skill.laser",
+					  "summaryKey":  "gem.skill.summary.laser",
+					  "damageElementId":  "light",
+					  "damageElementNameKey":  "element.light",
+					  "attackColor":  [
+										  1.0,
+										  0.95,
+										  0.58,
+										  0.95
+									  ],
+					  "attackBonus":  6,
+					  "attackRangeBonus":  3.2,
+					  "detectionRadiusBonus":  2.0,
+					  "isRangedActiveSkill":  true,
+					  "isSpell":  true
+				  },
+				  {
+					  "uniqueId":  35,
+					  "id":  "gem.skill.rocket",
+					  "nameKey":  "gem.skill.rocket",
+					  "summaryKey":  "gem.skill.summary.rocket",
+					  "damageElementId":  "fire",
+					  "damageElementNameKey":  "element.fire",
+					  "attackColor":  [
+										  1.0,
+										  0.34,
+										  0.08,
+										  0.95
+									  ],
+					  "attackBonus":  9,
+					  "attackRangeBonus":  2.6,
+					  "attackCooldownReduction":  -0.05,
+					  "isRangedActiveSkill":  true,
+					  "usesProjectile":  true
+				  },
+				  {
+					  "uniqueId":  36,
+					  "id":  "gem.skill.ice_shard",
+					  "nameKey":  "gem.skill.ice_shard",
+					  "summaryKey":  "gem.skill.summary.ice_shard",
+					  "damageElementId":  "ice",
+					  "damageElementNameKey":  "element.ice",
+					  "attackColor":  [
+										  0.58,
+										  0.88,
+										  1.0,
+										  0.95
+									  ],
+					  "attackBonus":  5,
+					  "attackRangeBonus":  2.4,
+					  "isRangedActiveSkill":  true,
+					  "isSpell":  true,
+					  "usesProjectile":  true
+				  },
+				  {
+					  "uniqueId":  37,
+					  "id":  "gem.skill.lightning",
+					  "nameKey":  "gem.skill.lightning",
+					  "summaryKey":  "gem.skill.summary.lightning",
+					  "damageElementId":  "lightning",
+					  "damageElementNameKey":  "element.lightning",
+					  "attackColor":  [
+										  0.95,
+										  0.88,
+										  0.20,
+										  0.95
+									  ],
+					  "attackBonus":  6,
+					  "attackRangeBonus":  2.8,
+					  "detectionRadiusBonus":  1.6,
+					  "isRangedActiveSkill":  true,
+					  "isSpell":  true
+				  }
+			  ]
+}

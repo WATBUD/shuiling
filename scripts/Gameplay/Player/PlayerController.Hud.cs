@@ -16,96 +16,201 @@ public partial class PlayerController
 		{
 			Name = "PlayerHealthHud",
 			MouseFilter = Control.MouseFilterEnum.Ignore,
-			AnchorLeft = 0.0f,
-			AnchorRight = 0.0f,
-			AnchorTop = 0.0f,
-			AnchorBottom = 0.0f,
-			OffsetLeft = 18.0f,
-			OffsetRight = 328.0f,
-			OffsetTop = 18.0f,
-			OffsetBottom = 100.0f,
+			AnchorLeft = 0.5f,
+			AnchorRight = 0.5f,
+			AnchorTop = 1.0f,
+			AnchorBottom = 1.0f,
+			OffsetLeft = -235.0f,
+			OffsetRight = 235.0f,
+			OffsetTop = -88.0f,
+			OffsetBottom = -22.0f,
 		};
 		var panelStyle = new StyleBoxFlat
 		{
-			BgColor = new Color(0.025f, 0.030f, 0.038f, 0.86f),
-			BorderColor = new Color(0.62f, 0.24f, 0.26f, 0.78f),
+			BgColor = new Color(0.055f, 0.062f, 0.072f, 0.94f),
+			BorderColor = new Color(0.72f, 0.78f, 0.84f, 0.96f),
 		};
-		panelStyle.SetBorderWidthAll(1);
-		panelStyle.SetCornerRadiusAll(7);
+		panelStyle.SetBorderWidthAll(2);
+		panelStyle.SetCornerRadiusAll(10);
+		panelStyle.ShadowColor = new Color(0.0f, 0.0f, 0.0f, 0.62f);
+		panelStyle.ShadowSize = 5;
 		_playerHealthHudPanel.AddThemeStyleboxOverride("panel", panelStyle);
 		layer.AddChild(_playerHealthHudPanel);
 
 		var margin = new MarginContainer();
-		margin.AddThemeConstantOverride("margin_left", 13);
-		margin.AddThemeConstantOverride("margin_right", 13);
-		margin.AddThemeConstantOverride("margin_top", 9);
-		margin.AddThemeConstantOverride("margin_bottom", 10);
+		margin.AddThemeConstantOverride("margin_left", 12);
+		margin.AddThemeConstantOverride("margin_right", 12);
+		margin.AddThemeConstantOverride("margin_top", 6);
+		margin.AddThemeConstantOverride("margin_bottom", 7);
 		_playerHealthHudPanel.AddChild(margin);
 
 		var rows = new VBoxContainer();
-		rows.AddThemeConstantOverride("separation", 7);
+		rows.AddThemeConstantOverride("separation", 3);
 		margin.AddChild(rows);
 
-		var titleRow = new HBoxContainer();
-		titleRow.AddThemeConstantOverride("separation", 10);
-		rows.AddChild(titleRow);
+		_playerHealthHudNameLabel = MakeHudLabel(string.Empty, 16, new Color(0.96f, 0.96f, 0.98f));
+		_playerHealthHudNameLabel.HorizontalAlignment = HorizontalAlignment.Center;
+		_playerHealthHudNameLabel.AddThemeConstantOverride("outline_size", 3);
+		_playerHealthHudNameLabel.AddThemeColorOverride("font_outline_color", new Color(0.03f, 0.04f, 0.06f, 0.98f));
+		rows.AddChild(_playerHealthHudNameLabel);
 
-		_playerHealthHudNameLabel = MakeHudLabel(LocalizedPlayerName, 17, new Color(1.0f, 0.94f, 0.84f));
-		_playerHealthHudNameLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-		titleRow.AddChild(_playerHealthHudNameLabel);
+		rows.AddChild(CreatePlayerStatusBarRow(
+			"HP",
+			new Color(1.0f, 0.29f, 0.49f),
+			new Color(0.40f, 0.055f, 0.12f),
+			out _playerHealthHudBar,
+			out _playerHealthHudValueLabel));
+		CreateBottomExperienceHud(layer);
+		UpdatePlayerHealthHud();
+	}
 
-		_playerHealthHudValueLabel = MakeHudLabel(string.Empty, 15, new Color(1.0f, 0.86f, 0.84f));
-		_playerHealthHudValueLabel.HorizontalAlignment = HorizontalAlignment.Right;
-		titleRow.AddChild(_playerHealthHudValueLabel);
+	private void CreateBottomExperienceHud(CanvasLayer layer)
+	{
+		var barLayer = new Control
+		{
+			Name = "BottomExperienceHud",
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			AnchorLeft = 0.0f,
+			AnchorRight = 1.0f,
+			AnchorTop = 1.0f,
+			AnchorBottom = 1.0f,
+			OffsetTop = -17.0f,
+			OffsetBottom = 0.0f,
+		};
+		layer.AddChild(barLayer);
 
-		_playerHealthHudBar = new ProgressBar
+		_playerExperienceHudBar = new ProgressBar
 		{
 			MinValue = 0.0,
 			MaxValue = 100.0,
 			ShowPercentage = false,
-			CustomMinimumSize = new Vector2(0.0f, 18.0f),
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			AnchorRight = 1.0f,
+			AnchorBottom = 1.0f,
 		};
-		var barBackground = new StyleBoxFlat
+		var background = new StyleBoxFlat
 		{
-			BgColor = new Color(0.12f, 0.035f, 0.045f, 0.94f),
-			BorderColor = new Color(0.34f, 0.11f, 0.13f, 0.95f),
+			BgColor = new Color(0.23f, 0.24f, 0.24f, 0.98f),
+			BorderColor = new Color(0.56f, 0.57f, 0.56f, 1.0f),
 		};
-		barBackground.SetBorderWidthAll(1);
-		barBackground.SetCornerRadiusAll(5);
-		var barFill = new StyleBoxFlat
+		background.BorderWidthTop = 2;
+		background.BorderWidthBottom = 2;
+		var fill = new StyleBoxFlat
 		{
-			BgColor = new Color(0.86f, 0.13f, 0.18f, 0.98f),
+			BgColor = new Color(0.76f, 0.92f, 0.02f, 1.0f),
+			BorderColor = new Color(0.94f, 1.0f, 0.27f, 1.0f),
 		};
-		barFill.SetCornerRadiusAll(5);
-		_playerHealthHudBar.AddThemeStyleboxOverride("background", barBackground);
-		_playerHealthHudBar.AddThemeStyleboxOverride("fill", barFill);
-		rows.AddChild(_playerHealthHudBar);
-		UpdatePlayerHealthHud();
+		fill.BorderWidthTop = 2;
+		fill.BorderWidthBottom = 2;
+		_playerExperienceHudBar.AddThemeStyleboxOverride("background", background);
+		_playerExperienceHudBar.AddThemeStyleboxOverride("fill", fill);
+		barLayer.AddChild(_playerExperienceHudBar);
+
+		_playerExperienceHudValueLabel = MakeHudLabel(string.Empty, 11, Colors.White);
+		_playerExperienceHudValueLabel.HorizontalAlignment = HorizontalAlignment.Center;
+		_playerExperienceHudValueLabel.VerticalAlignment = VerticalAlignment.Center;
+		_playerExperienceHudValueLabel.MouseFilter = Control.MouseFilterEnum.Ignore;
+		_playerExperienceHudValueLabel.AnchorRight = 1.0f;
+		_playerExperienceHudValueLabel.AnchorBottom = 1.0f;
+		_playerExperienceHudValueLabel.AddThemeConstantOverride("outline_size", 3);
+		_playerExperienceHudValueLabel.AddThemeColorOverride("font_outline_color", Colors.Black);
+		barLayer.AddChild(_playerExperienceHudValueLabel);
+
+		Label expCaption = MakeHudLabel("EXP", 9, new Color(0.92f, 0.95f, 0.92f));
+		expCaption.HorizontalAlignment = HorizontalAlignment.Left;
+		expCaption.VerticalAlignment = VerticalAlignment.Center;
+		expCaption.MouseFilter = Control.MouseFilterEnum.Ignore;
+		expCaption.AnchorBottom = 1.0f;
+		expCaption.OffsetLeft = 4.0f;
+		expCaption.OffsetRight = 40.0f;
+		expCaption.AddThemeConstantOverride("outline_size", 3);
+		expCaption.AddThemeColorOverride("font_outline_color", Colors.Black);
+		barLayer.AddChild(expCaption);
+	}
+
+	private HBoxContainer CreatePlayerStatusBarRow(
+		string caption,
+		Color fillColor,
+		Color emptyColor,
+		out ProgressBar bar,
+		out Label valueLabel)
+	{
+		var row = new HBoxContainer();
+		row.AddThemeConstantOverride("separation", 6);
+
+		Label captionLabel = MakeHudLabel(caption, 13, new Color(0.88f, 0.91f, 0.95f));
+		captionLabel.CustomMinimumSize = new Vector2(34.0f, 0.0f);
+		captionLabel.HorizontalAlignment = HorizontalAlignment.Right;
+		captionLabel.VerticalAlignment = VerticalAlignment.Center;
+		row.AddChild(captionLabel);
+
+		var barLayer = new Control
+		{
+			CustomMinimumSize = new Vector2(0.0f, 22.0f),
+			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+		};
+		row.AddChild(barLayer);
+
+		bar = new ProgressBar
+		{
+			MinValue = 0.0,
+			MaxValue = 100.0,
+			ShowPercentage = false,
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			AnchorRight = 1.0f,
+			AnchorBottom = 1.0f,
+		};
+		var background = new StyleBoxFlat
+		{
+			BgColor = emptyColor,
+			BorderColor = new Color(0.76f, 0.81f, 0.86f, 0.95f),
+		};
+		background.SetBorderWidthAll(2);
+		background.SetCornerRadiusAll(6);
+		var fill = new StyleBoxFlat
+		{
+			BgColor = fillColor,
+			BorderColor = fillColor.Lightened(0.32f),
+		};
+		fill.SetBorderWidthAll(2);
+		fill.SetCornerRadiusAll(6);
+		bar.AddThemeStyleboxOverride("background", background);
+		bar.AddThemeStyleboxOverride("fill", fill);
+		barLayer.AddChild(bar);
+
+		valueLabel = MakeHudLabel(string.Empty, 12, Colors.White);
+		valueLabel.HorizontalAlignment = HorizontalAlignment.Center;
+		valueLabel.VerticalAlignment = VerticalAlignment.Center;
+		valueLabel.MouseFilter = Control.MouseFilterEnum.Ignore;
+		valueLabel.AnchorRight = 1.0f;
+		valueLabel.AnchorBottom = 1.0f;
+		valueLabel.AddThemeConstantOverride("outline_size", 3);
+		valueLabel.AddThemeColorOverride("font_outline_color", new Color(0.03f, 0.025f, 0.035f, 0.98f));
+		barLayer.AddChild(valueLabel);
+		return row;
 	}
 
 	private void UpdatePlayerHealthHud()
 	{
-		if (_playerHealthHudBar == null || !IsInstanceValid(_playerHealthHudBar))
+		if (_playerHealthHudBar == null || !IsInstanceValid(_playerHealthHudBar)
+			|| _playerExperienceHudBar == null || !IsInstanceValid(_playerExperienceHudBar))
 		{
 			return;
 		}
 
 		int maximum = Mathf.Max(EffectiveMaxHealth, 1);
 		int current = Mathf.Clamp(CurrentHealth, 0, maximum);
-		_playerHealthHudNameLabel.Text = LocalizedPlayerName;
-		_playerHealthHudValueLabel.Text = $"HP  {current:N0} / {maximum:N0}";
+		_playerHealthHudNameLabel.Text = $"Lv. {Level}    {LocalizedPlayerName}";
+		_playerHealthHudValueLabel.Text = $"{current:N0} / {maximum:N0}";
 		_playerHealthHudBar.Value = current / (double)maximum * 100.0;
 
-		float ratio = current / (float)maximum;
-		Color fillColor = ratio <= 0.25f
-			? new Color(1.0f, 0.12f, 0.08f, 0.98f)
-			: ratio <= 0.55f
-				? new Color(0.96f, 0.34f, 0.10f, 0.98f)
-				: new Color(0.86f, 0.13f, 0.18f, 0.98f);
-		if (_playerHealthHudBar.GetThemeStylebox("fill") is StyleBoxFlat fill)
-		{
-			fill.BgColor = fillColor;
-		}
+		int experienceMaximum = Mathf.Max(ExperienceToNextLevel, 1);
+		int experienceCurrent = Level >= MaxPlayerLevel ? experienceMaximum : Mathf.Clamp(Experience, 0, experienceMaximum);
+		_playerExperienceHudBar.Value = experienceCurrent / (double)experienceMaximum * 100.0;
+		_playerExperienceHudValueLabel.Text = Level >= MaxPlayerLevel
+			? "MAX"
+			: $"{experienceCurrent:N0} / {experienceMaximum:N0} ({experienceCurrent / (double)experienceMaximum * 100.0:0.00}%)";
 	}
 
 	private void CreateCaptureAmmoHud()
@@ -920,7 +1025,7 @@ public partial class PlayerController
 		var layer = new CanvasLayer
 		{
 			Name = "TargetInfoLayer",
-			Layer = 20,
+			Layer = 32,
 		};
 
 		AddChild(layer);

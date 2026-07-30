@@ -519,10 +519,8 @@ public partial class World : Node3D
 		CreateStaticBox(_mapRoot, "CityGround", new Vector3(0.0f, -0.5f, 0.0f), new Vector3(MapSize, 1.0f, MapSize), _matGround);
 		CreatePrototypeGround("city");
 		CreateBoundaries();
-		CreateMesh(_mapRoot, "CityMainRoadEdge", BoxMeshFor(new Vector3(10.8f, 0.075f, 48.0f)), _mainCityCenter + new Vector3(0.0f, 0.048f, 8.0f), _matRoadEdge);
-		CreateMesh(_mapRoot, "CityMainRoad", BoxMeshFor(new Vector3(8.6f, 0.08f, 46.0f)), _mainCityCenter + new Vector3(0.0f, 0.055f, 8.0f), _matCobblestone);
-		CreateMesh(_mapRoot, "CityOuterPlazaEdge", CylinderMeshFor(11.4f, 11.4f, 0.09f), _citySpawnPosition + new Vector3(0.0f, 0.07f, 0.0f), _matRoadEdge);
-		CreateMesh(_mapRoot, "CityOuterPlaza", CylinderMeshFor(9.8f, 9.8f, 0.10f), _citySpawnPosition + new Vector3(0.0f, 0.085f, 0.0f), _matCobblestone);
+		CreateMesh(_mapRoot, "CityMainRoadEdge", BoxMeshFor(new Vector3(10.8f, 0.075f, 48.0f)), _mainCityCenter + new Vector3(0.0f, FlatWalkableCenterY(0.075f, 0.004f), 8.0f), _matRoadEdge);
+		CreateMesh(_mapRoot, "CityMainRoad", BoxMeshFor(new Vector3(8.6f, 0.08f, 46.0f)), _mainCityCenter + new Vector3(0.0f, FlatWalkableCenterY(0.08f, 0.008f), 8.0f), _matCobblestone);
 		CreateMainCity();
 		CreatePrototypeArchitecture("city");
 		CreateCityScenicEdges();
@@ -716,15 +714,13 @@ public partial class World : Node3D
 	{
 		Vector3 center = _mainCityCenter;
 		const float shopRadius = 31.0f;
-		CreateMesh(_mapRoot, "MainCityOuterRingEdge", CylinderMeshFor(35.4f, 35.4f, 0.09f), center + new Vector3(0.0f, 0.075f, 0.0f), _matRoadEdge);
-		CreateMesh(_mapRoot, "MainCityOuterRingRoad", CylinderMeshFor(33.0f, 33.0f, 0.10f), center + new Vector3(0.0f, 0.095f, 0.0f), _matCobblestone);
-		CreateMesh(_mapRoot, "MainCityInnerGardenEdge", CylinderMeshFor(22.8f, 22.8f, 0.11f), center + new Vector3(0.0f, 0.115f, 0.0f), _matRoadEdge);
-		CreateMesh(_mapRoot, "MainCityInnerGarden", CylinderMeshFor(20.7f, 20.7f, 0.12f), center + new Vector3(0.0f, 0.135f, 0.0f), _matMeadow);
-		CreateMesh(_mapRoot, "MainCityInnerWalk", CylinderMeshFor(13.4f, 13.4f, 0.13f), center + new Vector3(0.0f, 0.155f, 0.0f), _matPath);
-		CreateCityRoad("CityNorthSpoke", center + new Vector3(0.0f, 0.0f, -27.0f), new Vector2(12.4f, 18.0f));
+		// Keep the city center visually clean: one large plaza only. The former
+		// nested garden/edge/walk discs overlapped and produced noisy circular
+		// bands. Fountain/water and portal circles are authored separately below.
+		CreateMesh(_mapRoot, "MainCityPlaza", CylinderMeshFor(33.0f, 33.0f, 0.10f), center + new Vector3(0.0f, FlatWalkableCenterY(0.10f, 0.006f), 0.0f), _matCobblestone);
 		CreateCityRoad("CitySouthSpoke", center + new Vector3(0.0f, 0.0f, 29.0f), new Vector2(12.4f, 22.0f));
-		CreateMesh(_mapRoot, "CityPortalPlazaEdge", CylinderMeshFor(9.4f, 9.4f, 0.09f), center + new Vector3(0.0f, 0.08f, -28.0f), _matRoadEdge);
-		CreateMesh(_mapRoot, "CityPortalPlaza", CylinderMeshFor(7.8f, 7.8f, 0.10f), center + new Vector3(0.0f, 0.105f, -28.0f), _matCobblestone);
+		CreateMesh(_mapRoot, "CityPortalPlazaEdge", CylinderMeshFor(9.4f, 9.4f, 0.09f), center + new Vector3(0.0f, FlatWalkableCenterY(0.09f, 0.018f), -28.0f), _matRoadEdge);
+		CreateMesh(_mapRoot, "CityPortalPlaza", CylinderMeshFor(7.8f, 7.8f, 0.10f), center + new Vector3(0.0f, FlatWalkableCenterY(0.10f, 0.020f), -28.0f), _matCobblestone);
 		CreateBanner(center + new Vector3(-5.2f, 0.0f, -27.6f), 8.0f, _matCrystal);
 		CreateBanner(center + new Vector3(5.2f, 0.0f, -27.6f), -8.0f, _matCrystal);
 		CreateTorch(center + new Vector3(-7.1f, 0.0f, -24.4f));
@@ -806,8 +802,8 @@ public partial class World : Node3D
 
 	private void CreateCityRoad(string name, Vector3 center, Vector2 size)
 	{
-		CreateMesh(_mapRoot, $"{name}Edge", BoxMeshFor(new Vector3(size.X + 2.0f, 0.075f, size.Y + 2.0f)), center + new Vector3(0.0f, 0.072f, 0.0f), _matRoadEdge);
-		CreateMesh(_mapRoot, name, BoxMeshFor(new Vector3(size.X, 0.08f, size.Y)), center + new Vector3(0.0f, 0.09f, 0.0f), _matCobblestone);
+		CreateMesh(_mapRoot, $"{name}Edge", BoxMeshFor(new Vector3(size.X + 2.0f, 0.075f, size.Y + 2.0f)), center + new Vector3(0.0f, FlatWalkableCenterY(0.075f, 0.014f), 0.0f), _matRoadEdge);
+		CreateMesh(_mapRoot, name, BoxMeshFor(new Vector3(size.X, 0.08f, size.Y)), center + new Vector3(0.0f, FlatWalkableCenterY(0.08f, 0.016f), 0.0f), _matCobblestone);
 	}
 
 	private static Vector3 RingOffset(float degrees, float radius)
