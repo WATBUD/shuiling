@@ -51,7 +51,10 @@ public partial class World
 	{
 		_runtimeDropScratch.Clear();
 		IReadOnlyList<WorldDrop> drops = WorldDrop.ActiveDrops;
-		for (int index = 0; index < drops.Count; index++)
+		// Iterate backwards: Recycle() removes the drop from the active registry
+		// (this same live list) synchronously, so a forward pass would skip the
+		// element shifted into the freed slot.
+		for (int index = drops.Count - 1; index >= 0; index--)
 		{
 			WorldDrop drop = drops[index];
 			if (!IsInstanceValid(drop) || drop.IsQueuedForDeletion())
@@ -62,7 +65,7 @@ public partial class World
 			// Independent failsafe in case a drop's own process was paused or disabled.
 			if (drop.AgeSeconds >= Mathf.Max(drop.LifetimeSeconds, 1.0f))
 			{
-				drop.QueueFree();
+				drop.Recycle();
 				continue;
 			}
 
@@ -82,7 +85,7 @@ public partial class World
 			WorldDrop drop = _runtimeDropScratch[index];
 			if (IsInstanceValid(drop) && !drop.IsQueuedForDeletion())
 			{
-				drop.QueueFree();
+				drop.Recycle();
 			}
 		}
 	}

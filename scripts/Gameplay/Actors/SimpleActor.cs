@@ -3673,11 +3673,9 @@ public partial class SimpleActor : CharacterBody3D
 			return;
 		}
 
-		var drop = new WorldDrop { CardKey = cardKey };
 		Node parent = GetTree().CurrentScene ?? GetParent();
-		parent.AddChild(drop);
 		Vector3 position = GlobalPosition + RandomDropOffset(0.6f);
-		drop.GlobalPosition = new Vector3(position.X, 0.04f, position.Z);
+		WorldDropFactory.SpawnCard(parent, position, cardKey);
 	}
 
 	private void DropBossLoot(PlayerController player)
@@ -3720,16 +3718,15 @@ public partial class SimpleActor : CharacterBody3D
 
 	private void SpawnWorldDrop(Vector3 position, string itemId, int amount, int goldAmount)
 	{
-		var drop = new WorldDrop
-		{
-			ItemId = itemId,
-			Amount = Mathf.Max(amount, 1),
-			GoldAmount = Mathf.Max(goldAmount, 0),
-		};
-
 		Node parent = GetTree().CurrentScene ?? GetParent();
-		parent.AddChild(drop);
-		drop.GlobalPosition = new Vector3(position.X, 0.04f, position.Z);
+		if (goldAmount > 0)
+		{
+			WorldDropFactory.SpawnGold(parent, position, goldAmount);
+		}
+		else
+		{
+			WorldDropFactory.SpawnItem(parent, position, itemId, amount);
+		}
 	}
 
 	private Vector3 RandomDropOffset(float radius)
