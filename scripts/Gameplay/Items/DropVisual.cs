@@ -24,7 +24,7 @@ public partial class DropVisual : Node3D
 	[Export] public float BobSpeed { get; set; } = 2.2f;
 
 	private Label3D? _label;
-	private GpuParticles3D? _particles;
+	private CpuParticles3D? _particles;
 	private MeshInstance3D? _body;
 	private bool _resolved;
 	private float _baseY;
@@ -55,7 +55,7 @@ public partial class DropVisual : Node3D
 		}
 
 		_label = GetNodeOrNull<Label3D>("Label");
-		_particles = FindChild("Particles", recursive: true, owned: false) as GpuParticles3D;
+		_particles = FindChild("Particles", recursive: true, owned: false) as CpuParticles3D;
 		_body = FindChild("Body", recursive: true, owned: false) as MeshInstance3D;
 		_resolved = true;
 	}
@@ -94,7 +94,7 @@ public partial class DropVisual : Node3D
 			// Restart clears any left-over particles from the previous life and
 			// re-seeds emission; deferred so the RenderingServer has registered
 			// the instance before the first draw.
-			_particles.CallDeferred(GpuParticles3D.MethodName.Restart);
+			_particles.CallDeferred(CpuParticles3D.MethodName.Restart);
 			_particles.Emitting = true;
 		}
 	}
