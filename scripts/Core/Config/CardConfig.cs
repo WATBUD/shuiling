@@ -1,4 +1,4 @@
-// Monster-card drop, collection and exchange balance.
+ // Monster-card drop, collection and exchange balance.
 public static class CardConfig
 {
 	public const float NormalMonsterDropChance = 1f;
