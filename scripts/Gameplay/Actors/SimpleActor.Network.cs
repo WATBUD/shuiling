@@ -19,14 +19,16 @@ public partial class SimpleActor : CharacterBody3D
 		_netTargetYaw = Rotation.Y;
 	}
 
-	public void ApplyNetworkState(Vector3 position, float yaw, int health)
+	public void ApplyNetworkState(Vector3 position, float yaw, int health, bool captureReady)
 	{
 		_netTargetPosition = position;
 		_netTargetYaw = yaw;
 		int clamped = Mathf.Clamp(health, 0, EffectiveMaxHealth);
-		if (clamped != CurrentHealth)
+		bool stateChanged = clamped != CurrentHealth || captureReady != _networkCaptureReady;
+		CurrentHealth = clamped;
+		_networkCaptureReady = captureReady;
+		if (stateChanged)
 		{
-			CurrentHealth = clamped;
 			RefreshNameplate();
 		}
 	}

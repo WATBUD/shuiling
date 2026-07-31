@@ -74,20 +74,20 @@ public partial class NetworkManager : Node
 		}
 	}
 
-	public void BroadcastMonsterStates(int[] netIds, Vector3[] positions, float[] yaws, int[] healths)
+	public void BroadcastMonsterStates(int[] netIds, Vector3[] positions, float[] yaws, int[] healths, byte[] captureReady)
 	{
 		if (IsHost)
 		{
-			Rpc(MethodName.ClientMonsterStates, netIds, positions, yaws, healths);
+			Rpc(MethodName.ClientMonsterStates, netIds, positions, yaws, healths, captureReady);
 		}
 	}
 
 	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Unreliable)]
-	private void ClientMonsterStates(int[] netIds, Vector3[] positions, float[] yaws, int[] healths)
+	private void ClientMonsterStates(int[] netIds, Vector3[] positions, float[] yaws, int[] healths, byte[] captureReady)
 	{
 		if (ActiveWorld != null && IsInstanceValid(ActiveWorld))
 		{
-			ActiveWorld.HandleNetworkMonsterStates(netIds, positions, yaws, healths);
+			ActiveWorld.HandleNetworkMonsterStates(netIds, positions, yaws, healths, captureReady);
 		}
 	}
 

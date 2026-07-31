@@ -21,6 +21,7 @@ public partial class World
 	private Vector3[] _netStatePositions = System.Array.Empty<Vector3>();
 	private float[] _netStateYaws = System.Array.Empty<float>();
 	private int[] _netStateHealths = System.Array.Empty<int>();
+	private byte[] _netStateCaptureReady = System.Array.Empty<byte>();
 
 	public PlayerController ActivePlayer => _player;
 
@@ -157,6 +158,7 @@ public partial class World
 			_netStatePositions = new Vector3[count];
 			_netStateYaws = new float[count];
 			_netStateHealths = new int[count];
+			_netStateCaptureReady = new byte[count];
 		}
 
 		int index = 0;
@@ -167,10 +169,11 @@ public partial class World
 			_netStatePositions[index] = actor.GlobalPosition;
 			_netStateYaws[index] = actor.Rotation.Y;
 			_netStateHealths[index] = actor.CurrentHealth;
+			_netStateCaptureReady[index] = actor.CaptureReady ? (byte)1 : (byte)0;
 			index++;
 		}
 
-		Net!.BroadcastMonsterStates(_netStateIds, _netStatePositions, _netStateYaws, _netStateHealths);
+		Net!.BroadcastMonsterStates(_netStateIds, _netStatePositions, _netStateYaws, _netStateHealths, _netStateCaptureReady);
 	}
 
 	// Host: a wild monster just died — broadcast its removal immediately so
@@ -248,7 +251,7 @@ public partial class World
 
 		if (_netMonstersById.TryGetValue(netId, out NetMonsterInfo existing) && IsInstanceValid(existing.Actor))
 		{
-			existing.Actor.ApplyNetworkState(position, existing.Actor.Rotation.Y, health);
+			existing.Actor.ApplyNetworkState(position, existing.Actor.Rotation.Y, health, health <= existing.Actor.EffectiveMaxHealth * existing.Actor.CaptureHealthThreshold);
 			return;
 		}
 
@@ -301,8 +304,9 @@ public partial class World
 		actor.Position = position;
 		actor.HomePosition = position;
 		_actorsRoot.AddChild(actor);
-		actor.SetNetworkPuppet(netId);
 		actor.CurrentHealth = Mathf.Clamp(health, 0, actor.EffectiveMaxHealth);
+		actor.SetNetworkPuppet(netId);
+		actor.ApplyNetworkState(position, actor.Rotation.Y, health, actor.HealthRatio <= actor.CaptureHealthThreshold);
 		// Puppet physics on when it's in the local player's instance (see
 		// ApplyActorInstanceState) so it moves toward streamed positions and stays
 		// targetable; hidden + inert otherwise.
@@ -315,19 +319,19 @@ public partial class World
 		}
 	}
 
-	public void HandleNetworkMonsterStates(int[] netIds, Vector3[] positions, float[] yaws, int[] healths)
+	public void HandleNetworkMonsterStates(int[] netIds, Vector3[] positions, float[] yaws, int[] healths, byte[] captureReady)
 	{
 		if (!IsNetworkClientWorld)
 		{
 			return;
 		}
 
-		int count = Mathf.Min(Mathf.Min(netIds.Length, positions.Length), Mathf.Min(yaws.Length, healths.Length));
+		int count = Mathf.Min(Mathf.Min(netIds.Length, positions.Length), Mathf.Min(yaws.Length, Mathf.Min(healths.Length, captureReady.Length)));
 		for (int index = 0; index < count; index++)
 		{
 			if (_netMonstersById.TryGetValue(netIds[index], out NetMonsterInfo info) && IsInstanceValid(info.Actor))
 			{
-				info.Actor.ApplyNetworkState(positions[index], yaws[index], healths[index]);
+				info.Actor.ApplyNetworkState(positions[index], yaws[index], healths[index], captureReady[index] != 0);
 			}
 		}
 	}

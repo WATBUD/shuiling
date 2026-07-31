@@ -16,31 +16,14 @@ public partial class PlayerController
 		}
 
 		var toRevive = new List<SimpleActor>();
-		int awaitingRecovery = 0;
 		foreach (SimpleActor actor in _capturedCollection)
 		{
-			if (!IsInstanceValid(actor) || !actor.IsDefeated)
+			if (!IsInstanceValid(actor) || !actor.IsDefeated || actor.IsAwaitingRecovery)
 			{
 				continue;
 			}
 
-			if (actor.IsAwaitingRecovery)
-			{
-				awaitingRecovery++;
-			}
-			else
-			{
-				toRevive.Add(actor);
-			}
-		}
-
-		if (toRevive.Count == 0)
-		{
-			PostSystemMessage(
-				LocaleText.T(awaitingRecovery > 0 ? "system.revive.retrieve_first" : "system.revive.no_fallen"),
-				new Color(0.78f, 0.88f, 1.0f),
-				GameMessageChannel.Party);
-			return false;
+			toRevive.Add(actor);
 		}
 
 		_fountainReviving = true;
@@ -142,15 +125,23 @@ public partial class PlayerController
 			}
 		}
 
-		if (revived <= 0)
+		CurrentHealth = EffectiveMaxHealth;
+		foreach (SimpleActor actor in _activeParty)
 		{
-			return;
+			if (IsInstanceValid(actor) && !actor.IsDefeated && !actor.IsAwaitingRecovery)
+			{
+				actor.CurrentHealth = actor.EffectiveMaxHealth;
+			}
 		}
 
 		ReassignFollowSlots();
+		UpdatePlayerHealthHud();
 		_partyPanel.RefreshParty();
 		_formationPanel.RefreshAll();
 		_inventoryPanel.RefreshAll();
-		PostSystemMessage(LocaleText.F("system.revive.fountain_done", revived), new Color(0.54f, 1.0f, 0.70f), GameMessageChannel.Party);
+		string message = revived > 0
+			? LocaleText.F("system.revive.fountain_done", revived)
+			: LocaleText.T("system.revive.fountain_healed");
+		PostSystemMessage(message, new Color(0.54f, 1.0f, 0.70f), GameMessageChannel.Party);
 	}
 }
