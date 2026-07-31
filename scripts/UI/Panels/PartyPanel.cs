@@ -88,6 +88,10 @@ public partial class PartyPanel : PanelContainer
 	public void SetPanelVisible(bool visible)
 	{
 		Visible = visible;
+		if (!visible)
+		{
+			_companionInfoCard?.DiscardPendingAttributeAllocation();
+		}
 		if (visible)
 		{
 			_detailsRefreshRemaining = PerformanceConfig.PartyDetailsRefreshIntervalSeconds;
@@ -274,7 +278,9 @@ public partial class PartyPanel : PanelContainer
 	{
 		if (actor.IsDefeated)
 		{
-			string state = LocaleText.T(actor.IsAwaitingRecovery ? "party.state.fallen_field" : "party.state.dead");
+			// Recovery location remains gameplay state, but the roster presents one
+			// unified status whether the companion is still in the field or retrieved.
+			string state = LocaleText.T("party.state.dead");
 			return $"[{index}]: {actor.LocalizedDisplayName} · {state}";
 		}
 
@@ -601,7 +607,10 @@ public partial class PartyPanel : PanelContainer
 
 		foreach (SimpleActor actor in _player.ActiveParty)
 		{
-			if (IsInstanceValid(actor) && actor.IsCaptured && !actor.IsAwaitingRecovery)
+			if (IsInstanceValid(actor)
+				&& actor.IsCaptured
+				&& !actor.IsDefeated
+				&& !actor.IsAwaitingRecovery)
 			{
 				companions.Add(actor);
 			}
@@ -621,7 +630,13 @@ public partial class PartyPanel : PanelContainer
 
 		foreach (SimpleActor actor in _player.CapturedCollection)
 		{
-			if (IsInstanceValid(actor) && actor.IsCaptured && actor.IsDefeated && !actor.IsInWarehouseCollection)
+			// A companion still lying in the field is intentionally absent from
+			// the roster. It appears here only after the owner retrieves it.
+			if (IsInstanceValid(actor)
+				&& actor.IsCaptured
+				&& actor.IsDefeated
+				&& !actor.IsAwaitingRecovery
+				&& !actor.IsInWarehouseCollection)
 			{
 				companions.Add(actor);
 			}
@@ -640,7 +655,15 @@ public partial class PartyPanel : PanelContainer
 
 		foreach (SimpleActor actor in _player.CapturedCollection)
 		{
-			if (IsInstanceValid(actor) && actor.IsCaptured && !actor.IsInWarehouseCollection && !actor.IsAwaitingRecovery && !_player.IsInActiveParty(actor))
+			// Roster sections must be mutually exclusive. A recovered corpse has
+			// IsAwaitingRecovery=false but remains defeated until revived; without
+			// the IsDefeated check it appeared under both Inactive and Dead.
+			if (IsInstanceValid(actor)
+				&& actor.IsCaptured
+				&& !actor.IsDefeated
+				&& !actor.IsAwaitingRecovery
+				&& !actor.IsInWarehouseCollection
+				&& !_player.IsInActiveParty(actor))
 			{
 				companions.Add(actor);
 			}

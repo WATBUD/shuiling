@@ -9,6 +9,7 @@ public partial class RefinementPanel : PanelContainer
 	private Label _titleLabel = null!;
 	private Label _goldLabel = null!;
 	private Label _hintLabel = null!;
+	private FloatingTooltip _itemInfo = null!;
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -24,6 +25,34 @@ public partial class RefinementPanel : PanelContainer
 		LocaleText.LanguageChanged -= RefreshAll;
 	}
 
+	public override void _Process(double delta)
+	{
+		if (_itemInfo != null && _itemInfo.Visible)
+		{
+			_itemInfo.PositionNearMouse(this);
+		}
+	}
+
+	public override void _Input(InputEvent inputEvent)
+	{
+		if (_itemInfo == null || !_itemInfo.Visible
+			|| inputEvent is not InputEventMouseButton { Pressed: true } mouseButton)
+		{
+			return;
+		}
+
+		if (mouseButton.ButtonIndex == MouseButton.WheelUp)
+		{
+			_itemInfo.ScrollDetail(-48);
+			GetViewport().SetInputAsHandled();
+		}
+		else if (mouseButton.ButtonIndex == MouseButton.WheelDown)
+		{
+			_itemInfo.ScrollDetail(48);
+			GetViewport().SetInputAsHandled();
+		}
+	}
+
 	public void Bind(PlayerController player)
 	{
 		_player = player;
@@ -36,6 +65,10 @@ public partial class RefinementPanel : PanelContainer
 	public void SetPanelVisible(bool visible)
 	{
 		Visible = visible;
+		if (!visible)
+		{
+			_itemInfo?.HideTooltip();
+		}
 		if (visible)
 		{
 			RefreshAll();
@@ -52,6 +85,7 @@ public partial class RefinementPanel : PanelContainer
 		_titleLabel.Text = LocaleText.T("refine.title");
 		_hintLabel.Text = LocaleText.T("refine.hint");
 		_goldLabel.Text = LocaleText.F("inventory.gold", _player?.Gold ?? 0);
+		_itemInfo?.HideTooltip();
 		ClearChildren(_itemList);
 
 		if (_player == null)
@@ -138,6 +172,18 @@ public partial class RefinementPanel : PanelContainer
 		};
 		closeButton.Pressed += () => CloseRequested?.Invoke();
 		root.AddChild(closeButton);
+
+		_itemInfo = new FloatingTooltip
+		{
+			Name = "RefinementItemInfo",
+			MaxWidth = 460.0f,
+			MinWidth = 240.0f,
+			MaxWidthRatio = 0.55f,
+			MaxHeightRatio = 0.58f,
+			MinBodyHeight = 64.0f,
+			ZIndex = 100,
+		};
+		AddChild(_itemInfo);
 	}
 
 	private void AddItemRow(string itemId)
@@ -159,6 +205,9 @@ public partial class RefinementPanel : PanelContainer
 		style.SetBorderWidthAll(1);
 		style.SetCornerRadiusAll(6);
 		row.AddThemeStyleboxOverride("panel", style);
+		string capturedId = itemId;
+		row.MouseEntered += () => ShowItemInfo(capturedId);
+		row.MouseExited += HideItemInfo;
 		_itemList.AddChild(row);
 
 		var margin = new MarginContainer();
@@ -208,7 +257,6 @@ public partial class RefinementPanel : PanelContainer
 			CustomMinimumSize = new Vector2(140.0f, 48.0f),
 			Disabled = !quote.CanRefine || owned <= 0,
 		};
-		string capturedId = itemId;
 		refineButton.Pressed += () =>
 		{
 			if (_player != null)
@@ -218,6 +266,24 @@ public partial class RefinementPanel : PanelContainer
 			}
 		};
 		content.AddChild(refineButton);
+	}
+
+	private void ShowItemInfo(string itemId)
+	{
+		if (_itemInfo == null || _player == null)
+		{
+			return;
+		}
+
+		string title = InventoryPanel.BuildItemTooltipTitle(itemId);
+		string body = InventoryPanel.BuildItemTooltipBody(itemId, string.Empty);
+		body += $"\n{LocaleText.F("shop.owned_count", _player.GetInventoryCount(itemId))}";
+		_itemInfo.ShowTooltip(title, body, this);
+	}
+
+	private void HideItemInfo()
+	{
+		_itemInfo?.HideTooltip();
 	}
 
 	private static Label MakeLabel(int fontSize, Color color)

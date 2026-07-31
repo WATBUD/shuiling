@@ -25,6 +25,7 @@ public partial class WarehousePanel : PanelContainer
 	private HBoxContainer _companionColumns = null!;
 	private VBoxContainer _partyCompanionList = null!;
 	private VBoxContainer _collectionCompanionList = null!;
+	private FloatingTooltip _companionTooltip = null!;
 	private HBoxContainer _categoryTabs = null!;
 	private readonly Dictionary<ItemCategory, Button> _categoryButtons = new();
 	private ItemCategory _selectedCategory = ItemCategory.All;
@@ -45,6 +46,34 @@ public partial class WarehousePanel : PanelContainer
 		LocaleText.LanguageChanged -= RefreshAll;
 	}
 
+	public override void _Process(double delta)
+	{
+		if (_companionTooltip != null && _companionTooltip.Visible)
+		{
+			_companionTooltip.PositionNearMouse(this);
+		}
+	}
+
+	public override void _Input(InputEvent inputEvent)
+	{
+		if (_companionTooltip == null || !_companionTooltip.Visible
+			|| inputEvent is not InputEventMouseButton { Pressed: true } mouseButton)
+		{
+			return;
+		}
+
+		if (mouseButton.ButtonIndex == MouseButton.WheelUp)
+		{
+			_companionTooltip.ScrollDetail(-48);
+			GetViewport().SetInputAsHandled();
+		}
+		else if (mouseButton.ButtonIndex == MouseButton.WheelDown)
+		{
+			_companionTooltip.ScrollDetail(48);
+			GetViewport().SetInputAsHandled();
+		}
+	}
+
 	public void Bind(PlayerController player)
 	{
 		_player = player;
@@ -54,6 +83,10 @@ public partial class WarehousePanel : PanelContainer
 	public void SetPanelVisible(bool visible)
 	{
 		Visible = visible;
+		if (!visible)
+		{
+			_companionTooltip?.HideTooltip();
+		}
 		if (visible)
 		{
 			_selectedCategory = ItemCategory.All;
@@ -129,6 +162,15 @@ public partial class WarehousePanel : PanelContainer
 		var closeButton = new Button { Text = LocaleText.T("dialog.button.close"), CustomMinimumSize = new Vector2(0.0f, 40.0f) };
 		closeButton.Pressed += () => CloseRequested?.Invoke();
 		root.AddChild(closeButton);
+
+		_companionTooltip = new FloatingTooltip
+		{
+			Name = "WarehouseCompanionTooltip",
+			MaxWidthRatio = 0.42f,
+			MaxWidth = 460.0f,
+			MinWidth = 260.0f,
+		};
+		AddChild(_companionTooltip);
 	}
 
 	private VBoxContainer CreateCompanionColumn(HBoxContainer parent, string titleKey)
@@ -221,6 +263,7 @@ public partial class WarehousePanel : PanelContainer
 
 		ClearChildren(_bagGrid);
 		ClearChildren(_storageGrid);
+		_companionTooltip?.HideTooltip();
 		ClearChildren(_partyCompanionList);
 		ClearChildren(_collectionCompanionList);
 		if (_player == null)
@@ -287,17 +330,18 @@ public partial class WarehousePanel : PanelContainer
 	{
 		var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
 		row.AddThemeConstantOverride("separation", 8);
-		string status = _player != null && _player.IsInActiveParty(actor)
-			? LocaleText.T("actor.state.active")
-			: LocaleText.T("actor.state.stored");
 		var info = new Label
 		{
-			Text = $"{actor.LocalizedDisplayName}  Lv.{actor.Level}\n{LocaleText.F("stat.health_value", actor.CurrentHealth, actor.EffectiveMaxHealth)} · {status}",
-			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			Text = $"{actor.LocalizedDisplayName}  Lv.{actor.Level}",
+			SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
+			VerticalAlignment = VerticalAlignment.Center,
+			MouseFilter = MouseFilterEnum.Stop,
+			MouseDefaultCursorShape = CursorShape.PointingHand,
 		};
 		info.AddThemeFontSizeOverride("font_size", 15);
 		info.AddThemeColorOverride("font_color", new Color(0.9f, 0.94f, 1.0f));
 		row.AddChild(info);
+		row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
 
 		bool blocked = deposit && (_player == null || _player.IsMountedCompanion(actor));
 		var action = new Button
@@ -307,6 +351,8 @@ public partial class WarehousePanel : PanelContainer
 			Disabled = blocked,
 			TooltipText = blocked ? LocaleText.T("warehouse.mounted_blocked") : string.Empty,
 		};
+		info.MouseEntered += () => ShowCompanionTooltip(actor);
+		info.MouseExited += () => _companionTooltip.HideTooltip();
 		action.Pressed += () =>
 		{
 			if (_player == null)
@@ -325,6 +371,67 @@ public partial class WarehousePanel : PanelContainer
 		};
 		row.AddChild(action);
 		return row;
+	}
+
+	private void ShowCompanionTooltip(SimpleActor actor)
+	{
+		if (!IsInstanceValid(actor))
+		{
+			_companionTooltip.HideTooltip();
+			return;
+		}
+
+		_companionTooltip.ShowTooltip(
+			$"{actor.LocalizedDisplayName} - {LocaleText.F("inventory.info_header", actor.Level)}",
+			BuildCompanionTooltipBody(actor),
+			this);
+	}
+
+	private static string BuildCompanionTooltipBody(SimpleActor actor)
+	{
+		BuildStats stats = actor.CurrentBuildStats;
+		float attackSpeed = 1.0f / Mathf.Max(actor.EffectiveAttackCooldown, 0.01f);
+		string race = LocaleText.T(BuildCatalog.GetRaceNameKey(BuildCatalog.GetRaceId(actor)));
+		var sections = new List<string>
+		{
+			$"{LocaleText.T("stat.experience")} {actor.Experience}/{actor.ExperienceToNextLevel}",
+			string.Join("\n",
+				LocaleText.F("stat.health_value", actor.CurrentHealth, actor.EffectiveMaxHealth),
+				$"{LocaleText.T("stat.attack")} {actor.EffectiveAttack}",
+				$"{LocaleText.T("stat.defense")} {actor.EffectiveDefense}",
+				$"{LocaleText.T("stat.move_speed")} {actor.EffectiveMoveSpeed:0.0}",
+				LocaleText.F("stat.attack_speed_value", attackSpeed.ToString("0.00")),
+				$"{LocaleText.T("tooltip.attack_range")} {actor.EffectiveAttackRange:0.0}",
+				$"{LocaleText.T("tooltip.detection_radius")} {actor.EffectiveDetectionRadius:0.0}",
+				$"{LocaleText.T("tooltip.crit_chance")} {stats.CritChance * 100.0f:0.#}%",
+				$"{LocaleText.T("tooltip.life_steal")} {stats.LifeStealPercent * 100.0f:0.#}%",
+				$"{LocaleText.T("tooltip.control_chance")} {stats.ControlChance * 100.0f:0.#}%"),
+			string.Join("\n",
+				$"{LocaleText.T("stat.race")} {race} / {LocaleText.T("stat.element")} {actor.BuildElementName}",
+				$"{LocaleText.T("stat.growth")} {actor.GrowthName}",
+				$"{LocaleText.T("stat.affinity")} {actor.Affinity} / 100",
+				$"{LocaleText.T("stat.mood")}：{actor.MoodName}",
+				$"{LocaleText.T("build.slot.attack_mode")}: {actor.AttackModeName}"),
+		};
+
+		if (!string.IsNullOrEmpty(actor.TraitSummary))
+		{
+			sections.Add($"【{LocaleText.T("build.traits")}】\n{actor.TraitSummary}");
+		}
+		if (!string.IsNullOrEmpty(actor.BuildEquipmentSummary))
+		{
+			sections.Add($"【{LocaleText.T("build.equipment")}】\n{actor.BuildEquipmentSummary}");
+		}
+		if (!string.IsNullOrEmpty(actor.BuildSkillSummary))
+		{
+			sections.Add($"【{LocaleText.T("build.skill_gems")}】\n{actor.BuildSkillSummary}");
+		}
+		if (!string.IsNullOrEmpty(actor.FormationBonusSummary))
+		{
+			sections.Add(LocaleText.F("formation.bonus.active", actor.FormationBonusSummary));
+		}
+
+		return string.Join("\n", sections);
 	}
 
 	private static Label MakeEmptyLabel(string key)

@@ -14,12 +14,16 @@ public partial class InventoryItemDragButton : Button
 
 		var preview = new Button
 		{
-			Text = Text,
-			Icon = Icon,
-			CustomMinimumSize = new Vector2(64.0f, 72.0f),
+			// Dragging should show a compact cursor ghost, not expand the source
+			// texture and duplicate the full inventory button under the pointer.
+			Text = string.Empty,
+			CustomMinimumSize = new Vector2(42.0f, 42.0f),
 			MouseFilter = MouseFilterEnum.Ignore,
-			Modulate = new Color(1.0f, 1.0f, 1.0f, 0.88f),
+			Modulate = new Color(1.0f, 1.0f, 1.0f, 0.78f),
+			FocusMode = FocusModeEnum.None,
 		};
+		ItemIconLibrary.Apply(preview, DragItemId, 32);
+		preview.IconAlignment = HorizontalAlignment.Center;
 		SetDragPreview(preview);
 		return DragItemId;
 	}

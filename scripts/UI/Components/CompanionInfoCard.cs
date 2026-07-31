@@ -19,7 +19,17 @@ public partial class CompanionInfoCard : PanelContainer
 	private VBoxContainer _playerAttributeSection = null!;
 	private Label _attributePointLabel = null!;
 	private readonly Dictionary<PlayerAttribute, Button> _attributeButtons = new();
+	private readonly Dictionary<PlayerAttribute, Button> _attributeMinusButtons = new();
 	private readonly Dictionary<PlayerAttribute, Label> _attributeValueLabels = new();
+	private readonly Dictionary<PlayerAttribute, int> _pendingAttributePoints = new();
+	private HBoxContainer _attributeCommitActions = null!;
+	private Button _attributeConfirmButton = null!;
+	private Button _attributeCancelButton = null!;
+	private PlayerAttribute? _heldAttribute;
+	private int _heldAttributeDirection;
+	private float _attributeHoldRepeatRemaining;
+	private const float AttributeHoldInitialDelay = 0.42f;
+	private const float AttributeHoldRepeatInterval = 0.075f;
 	private FloatingTooltip _tooltip = null!;
 	private SimpleActor? _actor;
 	private PlayerController? _player;
@@ -53,6 +63,20 @@ public partial class CompanionInfoCard : PanelContainer
 		_experience.AutowrapMode = TextServer.AutowrapMode.Off;
 		_experience.SizeFlagsHorizontal = SizeFlags.ShrinkBegin;
 		header.AddChild(_experience);
+		_attributeCommitActions = new HBoxContainer
+		{
+			Visible = false,
+			SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
+			SizeFlagsVertical = SizeFlags.ShrinkCenter,
+		};
+		_attributeCommitActions.AddThemeConstantOverride("separation", 4);
+		header.AddChild(_attributeCommitActions);
+		_attributeConfirmButton = MakeAttributeCommitButton("button.confirm", new Color(0.56f, 1.0f, 0.68f));
+		_attributeConfirmButton.Pressed += ConfirmPendingAttributeAllocation;
+		_attributeCommitActions.AddChild(_attributeConfirmButton);
+		_attributeCancelButton = MakeAttributeCommitButton("dialog.button.cancel", new Color(1.0f, 0.68f, 0.58f));
+		_attributeCancelButton.Pressed += DiscardPendingAttributeAllocation;
+		_attributeCommitActions.AddChild(_attributeCancelButton);
 		_experienceBar = new ProgressBar { MinValue = 0.0, MaxValue = 1.0, ShowPercentage = false, CustomMinimumSize = new Vector2(0.0f, 14.0f), SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkCenter };
 		rows.AddChild(_experienceBar);
 
@@ -122,6 +146,7 @@ public partial class CompanionInfoCard : PanelContainer
 
 	public override void _Process(double delta)
 	{
+		UpdateHeldAttributeAdjustment((float)delta);
 		if (_tooltip != null && _tooltip.Visible)
 		{
 			_tooltip.PositionNearMouse(this);
@@ -130,6 +155,11 @@ public partial class CompanionInfoCard : PanelContainer
 
 	public override void _Input(InputEvent inputEvent)
 	{
+		if (inputEvent is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: false })
+		{
+			StopHeldAttributeAdjustment();
+		}
+
 		if (_tooltip == null || !_tooltip.Visible || inputEvent is not InputEventMouseButton { Pressed: true } mouseButton)
 		{
 			return;
@@ -158,6 +188,7 @@ public partial class CompanionInfoCard : PanelContainer
 
 	public void SetActor(SimpleActor? actor)
 	{
+		ClearPendingAttributeAllocation();
 		_player = null;
 		_actor = actor != null && IsInstanceValid(actor) ? actor : null;
 		if (_title == null) return;
@@ -226,8 +257,13 @@ public partial class CompanionInfoCard : PanelContainer
 
 	public void SetPlayer(PlayerController? player)
 	{
+		PlayerController? nextPlayer = player != null && IsInstanceValid(player) ? player : null;
+		if (_player != nextPlayer)
+		{
+			ClearPendingAttributeAllocation();
+		}
 		_actor = null;
-		_player = player != null && IsInstanceValid(player) ? player : null;
+		_player = nextPlayer;
 		if (_title == null) return;
 		if (_player == null)
 		{
@@ -237,6 +273,8 @@ public partial class CompanionInfoCard : PanelContainer
 
 		string playerRebirthTag = _player.PlayerRebirthCount > 0 ? $"  ✦x{_player.PlayerRebirthCount}" : string.Empty;
 		_title.Text = $"{_player.LocalizedPlayerName} - {LocaleText.F("inventory.info_header", _player.Level)}{playerRebirthTag}";
+		_attributeConfirmButton.Text = LocaleText.T("button.confirm");
+		_attributeCancelButton.Text = LocaleText.T("dialog.button.cancel");
 		_player.EnsurePlayerAttributePoints();
 		_experience.Text = $"{LocaleText.T("stat.experience")} {_player.Experience}/{_player.ExperienceToNextLevel}";
 		_experienceBar.MaxValue = Mathf.Max(_player.ExperienceToNextLevel, 1);
@@ -247,8 +285,9 @@ public partial class CompanionInfoCard : PanelContainer
 			$"{LocaleText.T("tooltip.attack_range")} {_player.AttackRange + playerStats.AttackRangeBonus:0.0}",
 			$"{LocaleText.T("tooltip.detection_radius")} {_player.DetectionRadius:0.0}",
 			$"{LocaleText.T("stat.state")} {LocaleText.T("party.playable")}");
+		int pendingTotal = GetPendingAttributePointTotal();
 		_meta.Text = string.Join("\n",
-			LocaleText.F("player.attribute.points", _player.UnspentAttributePoints),
+			LocaleText.F("player.attribute.points", Mathf.Max(_player.UnspentAttributePoints - pendingTotal, 0)),
 			LocaleText.F("inventory.gold", _player.Gold),
 			LocaleText.F("party.title", _player.ActiveParty.Count, _player.ActivePartyLimit, _player.AvailableCompanionCount));
 		_mode.Visible = false;
@@ -282,27 +321,191 @@ public partial class CompanionInfoCard : PanelContainer
 		valueLabel.VerticalAlignment = VerticalAlignment.Center;
 		valueLabel.AutowrapMode = TextServer.AutowrapMode.Off;
 		row.AddChild(valueLabel);
+		Button plusButton = MakeAttributeAdjustButton("+", new Color(1.0f, 0.84f, 0.38f));
+		BindAttributeAdjustButton(plusButton, attribute, 1);
+		row.AddChild(plusButton);
+		Button minusButton = MakeAttributeAdjustButton("−", new Color(1.0f, 0.68f, 0.58f));
+		BindAttributeAdjustButton(minusButton, attribute, -1);
+		row.AddChild(minusButton);
+		_attributeMinusButtons[attribute] = minusButton;
+		_attributeButtons[attribute] = plusButton;
+		_attributeValueLabels[attribute] = valueLabel;
+	}
+
+	private static Button MakeAttributeAdjustButton(string text, Color color)
+	{
 		var button = new Button
 		{
-			Text = "+",
+			Text = text,
 			Flat = true,
-			CustomMinimumSize = new Vector2(18.0f, 18.0f),
+			CustomMinimumSize = new Vector2(22.0f, 22.0f),
+			SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
+			SizeFlagsVertical = SizeFlags.ShrinkCenter,
+			FocusMode = FocusModeEnum.None,
+		};
+		button.AddThemeFontSizeOverride("font_size", 14);
+		button.AddThemeColorOverride("font_color", color);
+		button.AddThemeColorOverride("font_hover_color", color.Lightened(0.2f));
+		button.AddThemeColorOverride("font_pressed_color", color.Lightened(0.1f));
+		return button;
+	}
+
+	private static Button MakeAttributeCommitButton(string textKey, Color color)
+	{
+		var button = new Button
+		{
+			Text = LocaleText.T(textKey),
+			Flat = false,
+			CustomMinimumSize = new Vector2(58.0f, 28.0f),
 			SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
 			SizeFlagsVertical = SizeFlags.ShrinkCenter,
 			FocusMode = FocusModeEnum.None,
 		};
 		button.AddThemeFontSizeOverride("font_size", 12);
-		button.AddThemeColorOverride("font_color", new Color(1.0f, 0.84f, 0.38f));
-		button.AddThemeColorOverride("font_hover_color", new Color(1.0f, 0.96f, 0.66f));
-		button.Pressed += () => OnAttributePressed(attribute);
-		row.AddChild(button);
-		_attributeButtons[attribute] = button;
-		_attributeValueLabels[attribute] = valueLabel;
+		button.AddThemeColorOverride("font_color", color);
+		button.AddThemeColorOverride("font_hover_color", color.Lightened(0.15f));
+		return button;
 	}
 
-	private void OnAttributePressed(PlayerAttribute attribute)
+	private void BindAttributeAdjustButton(Button button, PlayerAttribute attribute, int direction)
 	{
-		if (_player == null || !_player.AllocateAttributePoint(attribute))
+		button.ButtonDown += () => BeginHeldAttributeAdjustment(attribute, direction);
+		button.ButtonUp += StopHeldAttributeAdjustment;
+	}
+
+	private void BeginHeldAttributeAdjustment(PlayerAttribute attribute, int direction)
+	{
+		_heldAttribute = attribute;
+		_heldAttributeDirection = direction;
+		_attributeHoldRepeatRemaining = AttributeHoldInitialDelay;
+		AdjustPendingAttribute(attribute, direction);
+	}
+
+	private void StopHeldAttributeAdjustment()
+	{
+		_heldAttribute = null;
+		_heldAttributeDirection = 0;
+		_attributeHoldRepeatRemaining = 0.0f;
+	}
+
+	private void UpdateHeldAttributeAdjustment(float step)
+	{
+		if (_heldAttribute is not PlayerAttribute attribute || _heldAttributeDirection == 0 || _player == null)
+		{
+			return;
+		}
+
+		_attributeHoldRepeatRemaining -= step;
+		while (_attributeHoldRepeatRemaining <= 0.0f)
+		{
+			if (!AdjustPendingAttribute(attribute, _heldAttributeDirection))
+			{
+				StopHeldAttributeAdjustment();
+				return;
+			}
+			_attributeHoldRepeatRemaining += AttributeHoldRepeatInterval;
+		}
+	}
+
+	private bool AdjustPendingAttribute(PlayerAttribute attribute, int direction)
+	{
+		if (_player == null)
+		{
+			return false;
+		}
+
+		int currentPending = GetPendingAttributePoints(attribute);
+		if (direction > 0)
+		{
+			if (GetPendingAttributePointTotal() >= _player.UnspentAttributePoints)
+			{
+				return false;
+			}
+			_pendingAttributePoints[attribute] = currentPending + 1;
+		}
+		else if (direction < 0)
+		{
+			if (currentPending <= 0)
+			{
+				return false;
+			}
+			_pendingAttributePoints[attribute] = currentPending - 1;
+		}
+		else
+		{
+			return false;
+		}
+
+		RefreshPendingAttributePreview();
+		return true;
+	}
+
+	private int GetPendingAttributePoints(PlayerAttribute attribute)
+	{
+		return _pendingAttributePoints.TryGetValue(attribute, out int count) ? count : 0;
+	}
+
+	private int GetPendingAttributePointTotal()
+	{
+		int total = 0;
+		foreach (int count in _pendingAttributePoints.Values)
+		{
+			total += Mathf.Max(count, 0);
+		}
+		return total;
+	}
+
+	private void ConfirmPendingAttributeAllocation()
+	{
+		StopHeldAttributeAdjustment();
+		if (_player == null)
+		{
+			ClearPendingAttributeAllocation();
+			return;
+		}
+
+		int total = GetPendingAttributePointTotal();
+		if (total <= 0 || total > _player.UnspentAttributePoints)
+		{
+			return;
+		}
+
+		foreach (PlayerAttribute attribute in System.Enum.GetValues<PlayerAttribute>())
+		{
+			int amount = GetPendingAttributePoints(attribute);
+			if (amount > 0)
+			{
+				_player.AllocateAttributePoints(attribute, amount);
+			}
+		}
+
+		ClearPendingAttributeAllocation();
+		SetPlayer(_player);
+	}
+
+	public void DiscardPendingAttributeAllocation()
+	{
+		PlayerController? player = _player;
+		ClearPendingAttributeAllocation();
+		if (player != null && IsInstanceValid(player) && _title != null)
+		{
+			SetPlayer(player);
+		}
+	}
+
+	private void ClearPendingAttributeAllocation()
+	{
+		StopHeldAttributeAdjustment();
+		_pendingAttributePoints.Clear();
+		if (_attributeCommitActions != null)
+		{
+			_attributeCommitActions.Visible = false;
+		}
+	}
+
+	private void RefreshPendingAttributePreview()
+	{
+		if (_player == null)
 		{
 			return;
 		}
@@ -319,22 +522,32 @@ public partial class CompanionInfoCard : PanelContainer
 		}
 
 		_playerAttributeSection.Visible = true;
-		_attributePointLabel.Text = LocaleText.F("player.attribute.points", _player.UnspentAttributePoints);
+		int pendingTotal = GetPendingAttributePointTotal();
+		_attributePointLabel.Visible = true;
+		_attributePointLabel.Text = LocaleText.F("player.attribute.points", Mathf.Max(_player.UnspentAttributePoints - pendingTotal, 0));
+		_attributeCommitActions.Visible = pendingTotal > 0;
 		BuildStats stats = _player.CurrentBuildStats;
-		SetAttributeButton(PlayerAttribute.Health, "stat.health", $"{_player.CurrentHealth} / {stats.MaxHealth}", "player.attribute.health.detail");
-		SetAttributeButton(PlayerAttribute.Attack, "stat.attack", stats.AttackDisplayValue.ToString("0.0"), "player.attribute.attack.detail");
-		SetAttributeButton(PlayerAttribute.Defense, "stat.defense", stats.DefenseDisplayValue.ToString("0.0"), "player.attribute.defense.detail");
-		SetAttributeButton(PlayerAttribute.MoveSpeed, "stat.move_speed", (_player.WalkSpeed * stats.MoveSpeedMultiplier).ToString("0.00"), "player.attribute.move_speed.detail");
-		SetAttributeButton(PlayerAttribute.AttackSpeed, "stat.attack_speed", GetAttackSpeed(_player.AttackCooldown * stats.AttackCooldownMultiplier).ToString("0.00"), "player.attribute.attack_speed.detail");
-		SetAttributeButton(PlayerAttribute.CritChance, "tooltip.crit_chance", $"{stats.CritChance * 100.0f:0.0}%", "player.attribute.crit_chance.detail");
+		int pendingHealth = GetPendingAttributePoints(PlayerAttribute.Health) * PlayerController.HealthPerPoint;
+		int projectedMaxHealth = stats.MaxHealth + pendingHealth;
+		int projectedHealth = Mathf.Min(_player.CurrentHealth + pendingHealth, projectedMaxHealth);
+		SetAttributeButton(PlayerAttribute.Health, "stat.health", $"{projectedHealth} / {projectedMaxHealth}", "player.attribute.health.detail");
+		SetAttributeButton(PlayerAttribute.Attack, "stat.attack", (stats.AttackDisplayValue + GetPendingAttributePoints(PlayerAttribute.Attack) * PlayerController.AttackPerPoint).ToString("0.0"), "player.attribute.attack.detail");
+		SetAttributeButton(PlayerAttribute.Defense, "stat.defense", (stats.DefenseDisplayValue + GetPendingAttributePoints(PlayerAttribute.Defense) * PlayerController.DefensePerPoint).ToString("0.0"), "player.attribute.defense.detail");
+		SetAttributeButton(PlayerAttribute.MoveSpeed, "stat.move_speed", (_player.WalkSpeed * stats.MoveSpeedMultiplier + GetPendingAttributePoints(PlayerAttribute.MoveSpeed) * PlayerController.MoveSpeedPerPoint).ToString("0.00"), "player.attribute.move_speed.detail");
+		SetAttributeButton(PlayerAttribute.AttackSpeed, "stat.attack_speed", (GetAttackSpeed(_player.AttackCooldown * stats.AttackCooldownMultiplier) + GetPendingAttributePoints(PlayerAttribute.AttackSpeed) * PlayerController.AttackSpeedPerPoint).ToString("0.00"), "player.attribute.attack_speed.detail");
+		SetAttributeButton(PlayerAttribute.CritChance, "tooltip.crit_chance", $"{stats.CritChance * 100.0f + GetPendingAttributePoints(PlayerAttribute.CritChance) * PlayerController.CritChancePercentPerPoint:0.0}%", "player.attribute.crit_chance.detail");
 	}
 
 	private void SetAttributeButton(PlayerAttribute attribute, string nameKey, string value, string detailKey)
 	{
 		Button button = _attributeButtons[attribute];
-		_attributeValueLabels[attribute].Text = $"{LocaleText.T(nameKey)} {value}";
-		button.Disabled = _player == null || _player.UnspentAttributePoints <= 0;
+		int pending = GetPendingAttributePoints(attribute);
+		string pendingText = pending > 0 ? $"  (+{pending})" : string.Empty;
+		_attributeValueLabels[attribute].Text = $"{LocaleText.T(nameKey)} {value}{pendingText}";
+		button.Disabled = _player == null || GetPendingAttributePointTotal() >= _player.UnspentAttributePoints;
+		_attributeMinusButtons[attribute].Disabled = _player == null || pending <= 0;
 		button.TooltipText = LocaleText.T(detailKey);
+		_attributeMinusButtons[attribute].TooltipText = LocaleText.T(detailKey);
 	}
 
 	private void RebuildPlayerTerms()

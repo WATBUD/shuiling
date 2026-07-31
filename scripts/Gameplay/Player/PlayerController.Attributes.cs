@@ -75,8 +75,14 @@ public partial class PlayerController
 
 	public bool AllocateAttributePoint(PlayerAttribute attribute)
 	{
+		return AllocateAttributePoints(attribute, 1);
+	}
+
+	public bool AllocateAttributePoints(PlayerAttribute attribute, int amount)
+	{
 		EnsurePlayerAttributePoints();
-		if (UnspentAttributePoints <= 0)
+		int requestedAmount = Mathf.Max(amount, 0);
+		if (requestedAmount <= 0 || UnspentAttributePoints < requestedAmount)
 		{
 			return false;
 		}
@@ -84,16 +90,16 @@ public partial class PlayerController
 		int previousMaxHealth = EffectiveMaxHealth;
 		switch (attribute)
 		{
-			case PlayerAttribute.Health: HealthAttributePoints++; break;
-			case PlayerAttribute.Attack: AttackAttributePoints++; break;
-			case PlayerAttribute.Defense: DefenseAttributePoints++; break;
-			case PlayerAttribute.MoveSpeed: MoveSpeedAttributePoints++; break;
-			case PlayerAttribute.AttackSpeed: AttackSpeedAttributePoints++; break;
-			case PlayerAttribute.CritChance: CritChanceAttributePoints++; break;
+			case PlayerAttribute.Health: HealthAttributePoints += requestedAmount; break;
+			case PlayerAttribute.Attack: AttackAttributePoints += requestedAmount; break;
+			case PlayerAttribute.Defense: DefenseAttributePoints += requestedAmount; break;
+			case PlayerAttribute.MoveSpeed: MoveSpeedAttributePoints += requestedAmount; break;
+			case PlayerAttribute.AttackSpeed: AttackSpeedAttributePoints += requestedAmount; break;
+			case PlayerAttribute.CritChance: CritChanceAttributePoints += requestedAmount; break;
 			default: return false;
 		}
 
-		UnspentAttributePoints--;
+		UnspentAttributePoints -= requestedAmount;
 		MarkPlayerBuildStatsDirty();
 		if (attribute == PlayerAttribute.Health)
 		{

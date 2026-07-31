@@ -125,6 +125,7 @@ public sealed class ActorSaveData
 	public bool IsAwaitingRecovery { get; set; }
 	public bool IsInWarehouseCollection { get; set; }
 	public string FallenMapId { get; set; } = string.Empty;
+	public long FallenRecoveryExpiresAtUnixSeconds { get; set; }
 	public SaveVector3 WorldPosition { get; set; } = new();
 	public int Attack { get; set; } = 10;
 	public int Defense { get; set; } = 6;

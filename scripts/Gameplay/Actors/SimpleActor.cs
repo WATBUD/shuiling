@@ -76,6 +76,7 @@ public partial class SimpleActor : CharacterBody3D
 	private bool _isDefeated;
 	private bool _isAwaitingRecovery;
 	private string _fallenMapId = string.Empty;
+	private long _fallenRecoveryExpiresAtUnixSeconds;
 	private bool _isWorldMapActive = true;
 	// True only when this actor shares the LOCAL player's instance (same map, tier
 	// and party group). The host simulates other groups' monsters invisibly for
@@ -400,6 +401,9 @@ public partial class SimpleActor : CharacterBody3D
 	public bool IsDefeated => _isDefeated;
 	public bool IsAwaitingRecovery => _isAwaitingRecovery;
 	public string FallenMapId => _fallenMapId;
+	public bool IsFallenRecoveryExpired => _isAwaitingRecovery
+		&& _fallenRecoveryExpiresAtUnixSeconds > 0
+		&& (long)Time.GetUnixTimeFromSystem() >= _fallenRecoveryExpiresAtUnixSeconds;
 	public bool IsActiveWorldTarget => !_isCaptured && !_isDefeated && !_isBurrowed && _isWorldMapActive && IsVisibleInTree();
 	public bool IsHostileToPlayer => ActorKind == "monster" && IsActiveWorldTarget;
 	public CompanionBuildLoadout BuildLoadout

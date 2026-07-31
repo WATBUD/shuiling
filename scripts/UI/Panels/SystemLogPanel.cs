@@ -124,9 +124,12 @@ public partial class SystemLogPanel : PanelContainer
 		}
 
 		GameMessageChannel safeChannel = channel == GameMessageChannel.All ? GameMessageChannel.System : channel;
-		_messages.Add(new MessageEntry(message.Trim(), color, safeChannel, DateTime.Now.ToString("HH:mm")));
+		var entry = new MessageEntry(message.Trim(), color, safeChannel, DateTime.Now.ToString("HH:mm"));
+		_messages.Add(entry);
+		MessageEntry? removedEntry = null;
 		while (_messages.Count > MaxStoredMessages)
 		{
+			removedEntry = _messages[0];
 			_messages.RemoveAt(0);
 		}
 
@@ -138,18 +141,38 @@ public partial class SystemLogPanel : PanelContainer
 		RefreshChannelButtons();
 		if (_selectedChannel == GameMessageChannel.All || _selectedChannel == safeChannel)
 		{
-			// Rebuilding the row list is only worth it while visible. When the
-			// log is closed (the common case during combat/looting), defer it so
-			// bursts of kill/loot messages don't rebuild the whole list each time.
+			// Combat death emits several messages together. Append only the new
+			// row instead of deleting and recreating up to 160 labels per message.
 			if (IsVisibleInTree())
 			{
-				RefreshMessages(true);
+				AppendVisibleMessage(entry, removedEntry);
 			}
 			else
 			{
 				_messagesDirty = true;
 			}
 		}
+	}
+
+	private void AppendVisibleMessage(MessageEntry entry, MessageEntry? removedEntry)
+	{
+		if (_emptyLabel != null && IsInstanceValid(_emptyLabel) && _emptyLabel.GetParent() == _rows)
+		{
+			_rows.RemoveChild(_emptyLabel);
+			_emptyLabel.QueueFree();
+		}
+
+		if (removedEntry != null
+			&& (_selectedChannel == GameMessageChannel.All || removedEntry.Channel == _selectedChannel)
+			&& _rows.GetChildCount() > 0)
+		{
+			Node oldest = _rows.GetChild(0);
+			_rows.RemoveChild(oldest);
+			oldest.QueueFree();
+		}
+
+		_rows.AddChild(CreateMessageLabel(entry));
+		_scrollToBottomPendingFrames = 2;
 	}
 
 	public override void _Notification(int what)
@@ -366,15 +389,7 @@ public partial class SystemLogPanel : PanelContainer
 				continue;
 			}
 
-			var label = MakeLabel(
-				$"[{entry.Timestamp}]  [{GetChannelName(entry.Channel)}]  {entry.Text}",
-				14,
-				entry.Color);
-			label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-			label.CustomMinimumSize = new Vector2(0.0f, 22.0f);
-			label.AddThemeColorOverride("font_outline_color", new Color(0.0f, 0.0f, 0.0f, 0.86f));
-			label.AddThemeConstantOverride("outline_size", 3);
-			_rows.AddChild(label);
+			_rows.AddChild(CreateMessageLabel(entry));
 			visibleCount++;
 		}
 
@@ -394,6 +409,19 @@ public partial class SystemLogPanel : PanelContainer
 			// loot or combat messages arrives together.
 			_scrollToBottomPendingFrames = 2;
 		}
+	}
+
+	private Label CreateMessageLabel(MessageEntry entry)
+	{
+		var label = MakeLabel(
+			$"[{entry.Timestamp}]  [{GetChannelName(entry.Channel)}]  {entry.Text}",
+			14,
+			entry.Color);
+		label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		label.CustomMinimumSize = new Vector2(0.0f, 22.0f);
+		label.AddThemeColorOverride("font_outline_color", new Color(0.0f, 0.0f, 0.0f, 0.86f));
+		label.AddThemeConstantOverride("outline_size", 3);
+		return label;
 	}
 
 	private void ScrollToBottom()

@@ -8,6 +8,7 @@ public partial class MapTravelTrigger : Area3D
 	private World _world = null!;
 	private string _ownerMapId = string.Empty;
 	private string _targetMap = string.Empty;
+	private bool _travelQueued;
 
 	public void Configure(World world, string ownerMapId, string targetMap, Vector3 boxSize, Vector3 offset)
 	{
@@ -29,7 +30,22 @@ public partial class MapTravelTrigger : Area3D
 
 	private void OnBodyEntered(Node3D body)
 	{
-		if (body is PlayerController && IsInstanceValid(_world))
+		if (body is PlayerController && IsInstanceValid(_world) && !_travelQueued)
+		{
+			// BodyEntered runs while the physics server is flushing queries. Map
+			// travel disables the old map root (and its CollisionObject children),
+			// which Godot forbids during that callback. Defer the whole transition
+			// rather than only individual collision-property writes so teleporting,
+			// process-mode changes and collision changes happen as one safe action.
+			_travelQueued = true;
+			CallDeferred(nameof(PerformQueuedTravel));
+		}
+	}
+
+	private void PerformQueuedTravel()
+	{
+		_travelQueued = false;
+		if (IsInstanceValid(_world))
 		{
 			_world.TryTriggerWalkInTravel(_ownerMapId, _targetMap);
 		}

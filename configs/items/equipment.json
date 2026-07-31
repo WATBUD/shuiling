@@ -239,10 +239,9 @@
                       "uniqueId":  26,
                       "id":  "equip.accessory.swift_ring",
                       "nameKey":  "equip.accessory.swift_ring",
-                      "summaryKey":  "equip.summary.swift_ring",
-                      "slot":  "Accessory",
-                      "moveSpeedBonus":  0.12,
-                      "attackCooldownReduction":  0.05
+					  "summaryKey":  "equip.summary.swift_ring",
+					  "slot":  "Accessory",
+					  "attackCooldownReduction":  0.05
                   },
                   {
                       "uniqueId":  27,

@@ -54,8 +54,6 @@ public partial class InventoryPanel : PanelContainer
 	private Label _sortLabel = null!;
 	private OptionButton _sortOption = null!;
 	private Button _sortDirectionButton = null!;
-	private Label _itemDetailTitleLabel = null!;
-	private Label _itemDetailBodyLabel = null!;
 	private Button _equipSelectedButton = null!;
 	private Button _useSelectedButton = null!;
 	private Button _upgradeSkillGemButton = null!;
@@ -111,6 +109,7 @@ public partial class InventoryPanel : PanelContainer
 		if (!visible)
 		{
 			HideItemTooltip();
+			_companionInfoCard?.DiscardPendingAttributeAllocation();
 		}
 
 		if (visible)

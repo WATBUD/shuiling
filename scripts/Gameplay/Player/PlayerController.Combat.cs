@@ -717,7 +717,13 @@ public partial class PlayerController
 		}
 
 		PostSystemMessage(LocaleText.F("system.exp.party_gain", playerXp), new Color(0.86f, 0.78f, 1.0f), GameMessageChannel.Combat);
-		_partyPanel.RefreshParty();
+		// A loaded save can contain a large companion collection. RefreshParty
+		// rebuilds every roster row, so doing it after every kill caused a hitch
+		// even while the panel was closed. SetPanelVisible refreshes on open.
+		if (_partyPanel.Visible)
+		{
+			_partyPanel.RefreshParty();
+		}
 	}
 
 	// Real death (no more invincible knockdown): the player is downed on the spot

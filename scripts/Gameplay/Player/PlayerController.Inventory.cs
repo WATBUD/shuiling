@@ -3,6 +3,8 @@ using System.Collections.Generic;
 
 public partial class PlayerController
 {
+	private bool _inventoryRefreshQueued;
+	private bool _mercenaryShopRefreshQueued;
 
 	public int GetInventoryCount(string itemId)
 	{
@@ -34,7 +36,7 @@ public partial class PlayerController
 		// just burned frames and caused loot/kill hitches.
 		if (_mercenaryShopPanel != null && _mercenaryShopPanel.Visible)
 		{
-			_mercenaryShopPanel.RefreshAll();
+			QueueMercenaryShopRefresh();
 		}
 	}
 
@@ -54,7 +56,47 @@ public partial class PlayerController
 		// while it's closed so grabbing a monster's loot pile doesn't stutter.
 		if (_inventoryPanel != null && _inventoryPanel.Visible)
 		{
+			QueueInventoryRefresh();
+		}
+	}
+
+	private void QueueInventoryRefresh()
+	{
+		if (_inventoryRefreshQueued)
+		{
+			return;
+		}
+
+		_inventoryRefreshQueued = true;
+		CallDeferred(nameof(FlushQueuedInventoryRefresh));
+	}
+
+	private void FlushQueuedInventoryRefresh()
+	{
+		_inventoryRefreshQueued = false;
+		if (_inventoryPanel != null && _inventoryPanel.Visible)
+		{
 			_inventoryPanel.RefreshAll();
+		}
+	}
+
+	private void QueueMercenaryShopRefresh()
+	{
+		if (_mercenaryShopRefreshQueued)
+		{
+			return;
+		}
+
+		_mercenaryShopRefreshQueued = true;
+		CallDeferred(nameof(FlushQueuedMercenaryShopRefresh));
+	}
+
+	private void FlushQueuedMercenaryShopRefresh()
+	{
+		_mercenaryShopRefreshQueued = false;
+		if (_mercenaryShopPanel != null && _mercenaryShopPanel.Visible)
+		{
+			_mercenaryShopPanel.RefreshAll();
 		}
 	}
 

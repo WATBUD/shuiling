@@ -22,6 +22,7 @@ public partial class SimpleActor : CharacterBody3D
 			IsAwaitingRecovery = _isAwaitingRecovery,
 			IsInWarehouseCollection = _isInWarehouseCollection,
 			FallenMapId = _fallenMapId,
+			FallenRecoveryExpiresAtUnixSeconds = _fallenRecoveryExpiresAtUnixSeconds,
 			WorldPosition = new SaveVector3 { X = GlobalPosition.X, Y = GlobalPosition.Y, Z = GlobalPosition.Z },
 			Attack = Attack,
 			Defense = Defense,
@@ -68,6 +69,11 @@ public partial class SimpleActor : CharacterBody3D
 		_isAwaitingRecovery = _isDefeated && data.IsAwaitingRecovery;
 		_isInWarehouseCollection = data.IsInWarehouseCollection;
 		_fallenMapId = data.FallenMapId;
+		_fallenRecoveryExpiresAtUnixSeconds = _isAwaitingRecovery
+			? data.FallenRecoveryExpiresAtUnixSeconds > 0
+				? data.FallenRecoveryExpiresAtUnixSeconds
+				: (long)Time.GetUnixTimeFromSystem() + FallenRecoveryLifetimeSeconds
+			: 0;
 		CurrentHealth = _isDefeated ? 0 : Mathf.Clamp(data.CurrentHealth, 1, MaxHealth);
 		Attack = Mathf.Max(data.Attack, 0);
 		Defense = Mathf.Max(data.Defense, 0);

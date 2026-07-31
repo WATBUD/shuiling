@@ -349,16 +349,11 @@ public partial class InventoryPanel : PanelContainer
 		if (_player == null || string.IsNullOrEmpty(_selectedItemId) || !_player.HasInventoryItem(_selectedItemId))
 		{
 			_selectedItemId = string.Empty;
-			_itemDetailTitleLabel.Text = LocaleText.T("inventory.detail.empty_title");
-			_itemDetailBodyLabel.Text = LocaleText.T("inventory.detail.empty_body");
 			_equipSelectedButton.Disabled = true;
 			_useSelectedButton.Disabled = true;
 			return;
 		}
 
-		int count = _player.GetInventoryCount(_selectedItemId);
-		_itemDetailTitleLabel.Text = $"{BuildItemTooltipTitle(_selectedItemId)} x{count}";
-		_itemDetailBodyLabel.Text = BuildItemTooltipBody(_selectedItemId, string.Empty);
 		_equipSelectedButton.Disabled = !CanEquipSelectedItem();
 		_useSelectedButton.Disabled = BuildCatalog.GetItemKind(_selectedItemId) != InventoryItemKind.Consumable;
 	}

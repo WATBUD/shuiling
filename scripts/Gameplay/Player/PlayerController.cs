@@ -354,7 +354,7 @@ public partial class PlayerController : CharacterBody3D
 			int count = 0;
 			foreach (SimpleActor actor in _capturedCollection)
 			{
-				if (IsInstanceValid(actor) && !actor.IsAwaitingRecovery)
+				if (IsInstanceValid(actor) && !actor.IsDefeated && !actor.IsAwaitingRecovery)
 				{
 					count++;
 				}
@@ -448,10 +448,16 @@ public partial class PlayerController : CharacterBody3D
 
 		AddToGroup("player");
 		CallDeferred(nameof(PrewarmTownPortalCastEffect));
+		CallDeferred(nameof(PrewarmWorldDrops));
 		EnsureInputActions();
 		Input.MouseMode = _cameraMode == CameraViewMode.GodView
 			? Input.MouseModeEnum.Visible
 			: Input.MouseModeEnum.Captured;
+	}
+
+	private void PrewarmWorldDrops()
+	{
+		WorldDropPool.Prewarm(this);
 	}
 
 	public override void _Process(double delta)

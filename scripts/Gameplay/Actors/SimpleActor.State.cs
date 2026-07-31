@@ -8,6 +8,7 @@ public partial class SimpleActor : CharacterBody3D
 		_isCaptured = true;
 		_isDefeated = false;
 		_isAwaitingRecovery = false;
+		_fallenRecoveryExpiresAtUnixSeconds = 0;
 		_fallenMapId = string.Empty;
 		_followTarget = followTarget;
 		_isInActiveParty = false;
@@ -131,6 +132,7 @@ public partial class SimpleActor : CharacterBody3D
 
 		_isAwaitingRecovery = false;
 		_isInActiveParty = false;
+		_fallenRecoveryExpiresAtUnixSeconds = 0;
 		Velocity = Vector3.Zero;
 		CollisionLayer = 0;
 		CollisionMask = 0;
@@ -149,6 +151,7 @@ public partial class SimpleActor : CharacterBody3D
 		_isAwaitingRecovery = false;
 		_isInActiveParty = false;
 		_fallenMapId = string.Empty;
+		_fallenRecoveryExpiresAtUnixSeconds = 0;
 		CurrentHealth = 0;
 		Velocity = Vector3.Zero;
 		CollisionLayer = 0;

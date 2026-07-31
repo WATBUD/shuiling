@@ -88,18 +88,24 @@ public static class ItemIconLibrary
 			return null;
 		}
 
-		if (Cache.TryGetValue(itemId, out Texture2D? cached))
+		// Refinement appends a star suffix to the runtime stack id (for example
+		// equip.weapon.sword@3). The visual identity must remain tied to the
+		// catalogue's stable numeric item id, never to that mutable display/stack
+		// string. Resolve the number back to its canonical base id before any icon
+		// lookup, so every refinement level shares the same image and cache entry.
+		string iconKey = ResolveIconKey(itemId);
+		if (Cache.TryGetValue(iconKey, out Texture2D? cached))
 		{
 			return cached;
 		}
 
-		if (!IconFiles.TryGetValue(itemId, out string? fileName))
+		if (!IconFiles.TryGetValue(iconKey, out string? fileName))
 		{
 			// Consumables have no PNG asset — draw their 2D icon procedurally.
-			Texture2D? generated = CreateProceduralIcon(itemId);
+			Texture2D? generated = CreateProceduralIcon(iconKey);
 			if (generated != null)
 			{
-				Cache[itemId] = generated;
+				Cache[iconKey] = generated;
 			}
 			return generated;
 		}
@@ -109,15 +115,32 @@ public static class ItemIconLibrary
 		// error even though a null texture can be handled safely by the UI.
 		if (!ResourceLoader.Exists(resourcePath, "Texture2D"))
 		{
-			return CreateProceduralIcon(itemId);
+			return CreateProceduralIcon(iconKey);
 		}
 
 		Texture2D? texture = ResourceLoader.Load<Texture2D>(resourcePath);
 		if (texture != null)
 		{
-			Cache[itemId] = texture;
+			Cache[iconKey] = texture;
 		}
 		return texture;
+	}
+
+	private static string ResolveIconKey(string itemId)
+	{
+		int uniqueId = BuildCatalog.GetItemUniqueId(itemId);
+		if (uniqueId > 0)
+		{
+			string canonicalId = BuildCatalog.GetItemIdByUniqueId(uniqueId);
+			if (!string.IsNullOrWhiteSpace(canonicalId))
+			{
+				return canonicalId;
+			}
+		}
+
+		// Compatibility fallback for malformed or retired refined ids that are not
+		// present in the current numeric catalogue.
+		return BuildCatalog.GetBaseEquipmentId(itemId);
 	}
 
 	private static Texture2D? CreateProceduralIcon(string itemId)

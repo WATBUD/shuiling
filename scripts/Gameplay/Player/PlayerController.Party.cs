@@ -209,6 +209,36 @@ public partial class PlayerController
 
 	private void CollectNearbyFallenCompanions()
 	{
+		bool removedExpiredCompanion = false;
+		for (int index = _capturedCollection.Count - 1; index >= 0; index--)
+		{
+			SimpleActor actor = _capturedCollection[index];
+			if (!IsInstanceValid(actor) || !actor.IsFallenRecoveryExpired)
+			{
+				continue;
+			}
+
+			_activeParty.Remove(actor);
+			ClearFormationAssignment(actor);
+			_capturedCollection.RemoveAt(index);
+			actor.QueueFree();
+			removedExpiredCompanion = true;
+		}
+
+		if (removedExpiredCompanion)
+		{
+			ReassignFollowSlots();
+			RecalculateFormationBonuses();
+			if (_partyPanel.Visible)
+			{
+				_partyPanel.RefreshParty();
+			}
+			if (_formationPanel.Visible)
+			{
+				_formationPanel.RefreshAll();
+			}
+		}
+
 		foreach (SimpleActor actor in _capturedCollection)
 		{
 			if (!IsInstanceValid(actor)

@@ -173,30 +173,9 @@ public partial class InventoryPanel : PanelContainer
 		_itemScroll.Resized += UpdateResponsiveItemColumns;
 		UpdateResponsiveItemColumns();
 
-		var detailPanel = MakeInfoPanel(new Vector2(0.0f, 145.0f));
-		itemSection.AddChild(detailPanel);
-
-		var detailMargin = new MarginContainer();
-		detailMargin.AddThemeConstantOverride("margin_left", 10);
-		detailMargin.AddThemeConstantOverride("margin_right", 10);
-		detailMargin.AddThemeConstantOverride("margin_top", 8);
-		detailMargin.AddThemeConstantOverride("margin_bottom", 8);
-		detailPanel.AddChild(detailMargin);
-
-		var detailRows = new VBoxContainer();
-		detailRows.AddThemeConstantOverride("separation", 6);
-		detailMargin.AddChild(detailRows);
-
-		_itemDetailTitleLabel = MakeLabel(16, new Color(1.0f, 0.92f, 0.58f));
-		detailRows.AddChild(_itemDetailTitleLabel);
-
-		_itemDetailBodyLabel = MakeLabel(12, new Color(0.82f, 0.88f, 0.94f));
-		_itemDetailBodyLabel.CustomMinimumSize = new Vector2(0.0f, 58.0f);
-		detailRows.AddChild(_itemDetailBodyLabel);
-
 		var actionRow = new HBoxContainer();
 		actionRow.AddThemeConstantOverride("separation", 8);
-		detailRows.AddChild(actionRow);
+		itemSection.AddChild(actionRow);
 		_equipSelectedButton = MakeButton(LocaleText.T("inventory.action.equip"));
 		_equipSelectedButton.CustomMinimumSize = new Vector2(120.0f, 34.0f);
 		_equipSelectedButton.Pressed += OnEquipSelectedPressed;

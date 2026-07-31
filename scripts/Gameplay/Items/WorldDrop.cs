@@ -86,6 +86,18 @@ public partial class WorldDrop : Node3D
 		Register();
 	}
 
+	// Build the authored child scene before combat starts. Resource loading and
+	// scene instantiation are the expensive parts of a first-time loot spawn; a
+	// small idle pool pays that cost during world setup instead of on the frame a
+	// monster dies.
+	public void WarmUp()
+	{
+		EnsureVisual();
+		Visible = false;
+		SetProcess(false);
+		_visual?.OnRecycled();
+	}
+
 	private void EnsureVisual()
 	{
 		if (_visual != null && GodotObject.IsInstanceValid(_visual))

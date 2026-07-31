@@ -29,19 +29,40 @@ public partial class DropVisual : Node3D
 	private bool _resolved;
 	private float _baseY;
 	private float _bobPhase;
+	private float _motionElapsed;
+	private float _motionRefreshRemaining;
 
 	public override void _Ready()
 	{
 		ResolveNodes();
 		_baseY = Position.Y;
+		// Stagger pooled visuals so a large loot pile does not update every
+		// transform on the same rendered frame.
+		_motionRefreshRemaining = (float)(GetInstanceId() % 7) / 7.0f
+			* PerformanceConfig.WorldDropVisualRefreshIntervalSeconds;
 	}
 
 	public override void _Process(double delta)
 	{
 		float step = (float)delta;
-		RotateY(Mathf.DegToRad(SpinDegreesPerSecond) * step);
+		_motionElapsed += step;
+		_motionRefreshRemaining -= step;
+		if (_motionRefreshRemaining > 0.0f)
+		{
+			return;
+		}
 
-		_bobPhase += step * BobSpeed;
+		float motionStep = _motionElapsed;
+		_motionElapsed = 0.0f;
+		_motionRefreshRemaining += PerformanceConfig.WorldDropVisualRefreshIntervalSeconds;
+		if (_motionRefreshRemaining <= 0.0f)
+		{
+			_motionRefreshRemaining = PerformanceConfig.WorldDropVisualRefreshIntervalSeconds;
+		}
+
+		RotateY(Mathf.DegToRad(SpinDegreesPerSecond) * motionStep);
+
+		_bobPhase += motionStep * BobSpeed;
 		Vector3 position = Position;
 		position.Y = _baseY + Mathf.Sin(_bobPhase) * BobHeight;
 		Position = position;
@@ -84,6 +105,7 @@ public partial class DropVisual : Node3D
 
 		// Reset the idle motion so a reused instance starts from a clean pose.
 		_bobPhase = 0.0f;
+		_motionElapsed = 0.0f;
 		Rotation = Vector3.Zero;
 		Vector3 position = Position;
 		position.Y = _baseY;

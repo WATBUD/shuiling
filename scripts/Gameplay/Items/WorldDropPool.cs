@@ -12,9 +12,36 @@ using System.Collections.Generic;
 public static class WorldDropPool
 {
 	private const int MaxIdlePerKind = 48;
+	private const int WarmItemCount = 8;
+	private const int WarmGoldCount = 3;
+	private const int WarmCardCount = 1;
 
 	private static readonly Dictionary<WorldDrop.DropKind, Stack<WorldDrop>> Idle = new();
 	private static Node? _holder;
+
+	public static void Prewarm(Node context)
+	{
+		PrewarmKind(WorldDrop.DropKind.Item, WarmItemCount, context);
+		PrewarmKind(WorldDrop.DropKind.Gold, WarmGoldCount, context);
+		PrewarmKind(WorldDrop.DropKind.Card, WarmCardCount, context);
+	}
+
+	private static void PrewarmKind(WorldDrop.DropKind kind, int count, Node context)
+	{
+		var warmed = new List<WorldDrop>(count);
+		for (int index = 0; index < count; index++)
+		{
+			WorldDrop drop = Acquire(kind, context);
+			context.AddChild(drop);
+			drop.WarmUp();
+			warmed.Add(drop);
+		}
+
+		foreach (WorldDrop drop in warmed)
+		{
+			Release(drop);
+		}
+	}
 
 	// Pulls a reusable drop of the requested kind, or creates one. The returned
 	// node is detached from the tree; the caller adds it where it belongs.

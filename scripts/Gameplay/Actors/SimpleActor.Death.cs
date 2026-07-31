@@ -2,6 +2,8 @@ using Godot;
 
 public partial class SimpleActor : CharacterBody3D
 {
+	private const long FallenRecoveryLifetimeSeconds = 10L * 60L * 60L;
+
 	private void Defeat(SimpleActor? attacker, PlayerController? playerAttacker)
 	{
 		_isDefeated = true;
@@ -18,6 +20,7 @@ public partial class SimpleActor : CharacterBody3D
 			UpdateNegativeMoodAfterDefeat();
 			_isAwaitingRecovery = true;
 			_fallenMapId = _followTarget?.GetParent() is World world ? world.ActiveMapId : string.Empty;
+			_fallenRecoveryExpiresAtUnixSeconds = (long)Time.GetUnixTimeFromSystem() + FallenRecoveryLifetimeSeconds;
 			_isInActiveParty = false;
 			CollisionLayer = _defaultCollisionLayer;
 			CollisionMask = _defaultCollisionMask;
