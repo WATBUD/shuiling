@@ -131,10 +131,28 @@ Progression, Nameplate, Build, State), taking core `SimpleActor.cs` to **1335 li
 `_Ready`/`_ExitTree`/`_Process`, the `_PhysicsProcess` dispatcher + behavior gates,
 display getters, and shared seams. All build-verified, one commit per concern.
 
-### Remaining (lower-priority tail, per this roadmap)
-- NetworkManager: gift-mail, monster/puppet sync, transport, session partials.
-- InventoryPanel: sorting, UI factories, layout, data-binding partials.
-- BuildCatalog: split definition types + catalog data from `BuildCatalog.Data.cs`.
-- ExternalModelLibrary: animation-glue + prop-placement partials.
-- Stage 2 (needs in-game tests): extract `IActorBehavior` strategy from the
-  `_PhysicsProcess` role branches; migrate remaining `GpuParticles3D` for gl_compatibility.
+**Other God-files — substantially decomposed (Stage-0).** Additional safe cuts landed,
+build-verified, one commit each:
+
+| File | Core lines (start → now) | Partials extracted |
+|------|--------------------------|--------------------|
+| `NetworkManager.cs` | 1484 → 499 | Party, Monsters, Mail, Companions, Session |
+| `InventoryPanel.cs` | 2131 → 1685 | Tooltips, DragButtons, Sorting, Factories |
+| `BuildSystem.cs` (`BuildCatalog`) | 1390 → 767 | Calculation, Definitions (types), StarCodec |
+| `ExternalModelLibrary.cs` | 1215 → 483 | FallbackMaterials, ImportRemap, Animation, Placement, ModelResolution |
+
+### Remaining (explicitly deferred — the least-safe cuts; do with in-game validation)
+These are still Stage-0 pure moves but are scattered / high-coupling, so they carry the
+most mechanical risk and are best done when the game can be smoke-tested after:
+- `InventoryPanel`: `Layout` (BuildPanel — writes ~all fields) and `Refresh*`
+  (18 methods, reads/writes selection state, scattered 142–1804) — highest coupling.
+- `BuildCatalog.Data`: the ~46-method catalog reader surface (scattered 458–1128,
+  interleaved with the backing dictionaries/consts that must stay in core).
+- `ExternalModelLibrary.Catalog`: card-registry/model-name methods interleaved with
+  fields and the `KnownCardKeys` property.
+
+### Stage 2 (behavioral — REQUIRES in-game regression tests)
+- Extract `IActorBehavior` strategy from the `_PhysicsProcess` role branches
+  (Monster/Pet/Companion/Puppet) so role logic stops sharing one method body.
+- Migrate remaining programmatic `GpuParticles3D` to `CpuParticles3D` (or gate behind a
+  renderer check) for the gl_compatibility target.
