@@ -125,9 +125,13 @@ build-verified and committed:
 | `InventoryPanel.cs` | `InventoryPanel.Tooltips.cs` + `InventoryDragButtons.cs` |
 | `BuildSystem.cs` (`BuildCatalog`) | `BuildCatalog.Calculation.cs` |
 
+**SimpleActor — fully decomposed.** Six more slices extracted (Save, Death,
+Progression, Nameplate, Build, State), taking core `SimpleActor.cs` to **1335 lines**
+(from 4449 — a 70% reduction) across 15 concern partials. Core now holds only fields,
+`_Ready`/`_ExitTree`/`_Process`, the `_PhysicsProcess` dispatcher + behavior gates,
+display getters, and shared seams. All build-verified, one commit per concern.
+
 ### Remaining (lower-priority tail, per this roadmap)
-- SimpleActor: optional further slices (Nameplate, Build, Progression, Save, State,
-  Death) — the core is already reasonable at 2533 lines.
 - NetworkManager: gift-mail, monster/puppet sync, transport, session partials.
 - InventoryPanel: sorting, UI factories, layout, data-binding partials.
 - BuildCatalog: split definition types + catalog data from `BuildCatalog.Data.cs`.
