@@ -333,8 +333,8 @@ public partial class SimpleActor : CharacterBody3D
 	// newly-added state only has to be wired into one gate — not hunted down across
 	// _PhysicsProcess, ReceiveDamage, targeting and SetWorldMapState.
 
-	// Untouchable by locally-applied damage (dead or grieving).
-	private bool IsInvulnerable => _isDefeated || _isMourning;
+	// Untouchable by locally-applied damage (dead, grieving, or burrowed).
+	private bool IsInvulnerable => _isDefeated || _isMourning || _isBurrowed;
 
 	// Shares the LOCAL player's instance (same map, tier and party group). Gates
 	// both visibility and whether this actor may engage the local player.
@@ -591,7 +591,7 @@ public partial class SimpleActor : CharacterBody3D
 	public bool IsDefeated => _isDefeated;
 	public bool IsAwaitingRecovery => _isAwaitingRecovery;
 	public string FallenMapId => _fallenMapId;
-	public bool IsActiveWorldTarget => !_isCaptured && !_isDefeated && _isWorldMapActive && IsVisibleInTree();
+	public bool IsActiveWorldTarget => !_isCaptured && !_isDefeated && !_isBurrowed && _isWorldMapActive && IsVisibleInTree();
 	public bool IsHostileToPlayer => ActorKind == "monster" && IsActiveWorldTarget;
 	public CompanionBuildLoadout BuildLoadout
 	{
@@ -863,6 +863,10 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			UpdateCaptureState(step);
 		}
+		if (ActorKind == "monster" && (IsMoleSpecies || _isBurrowed))
+		{
+			UpdateBurrow(step);
+		}
 		_attackCooldownRemaining = Mathf.Max(_attackCooldownRemaining - step, 0.0f);
 		_retaliationTargetRemaining = Mathf.Max(_retaliationTargetRemaining - step, 0.0f);
 		_specialControlCooldownRemaining = Mathf.Max(_specialControlCooldownRemaining - step, 0.0f);
@@ -900,6 +904,13 @@ public partial class SimpleActor : CharacterBody3D
 	// Wild monster / NPC frame: resolve combat (monsters only), then wander/chase.
 	private void RunWildActorFrame(Vector3 velocity, float step)
 	{
+		if (_isBurrowed)
+		{
+			// Underground: hold position, no combat or wandering until resurface.
+			StopInPlace(velocity, step);
+			return;
+		}
+
 		Node3D? player = GetCachedPlayerNode();
 		bool chasing = false;
 		Vector3 destination = _targetPosition;
