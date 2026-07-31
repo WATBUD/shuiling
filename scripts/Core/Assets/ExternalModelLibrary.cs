@@ -657,17 +657,7 @@ public static partial class ExternalModelLibrary
 		return true;
 	}
 
-	private static bool HasInvalidImportRemap(string path)
-	{
-		string importPath = $"{path}.import";
-		if (!FileAccess.FileExists(importPath))
-		{
-			return false;
-		}
-
-		string importText = FileAccess.GetFileAsString(importPath);
-		return importText.Contains("valid=false");
-	}
+	// Import remap validation moved to ExternalModelLibrary.ImportRemap.cs (Stage-0 — docs/ARCHITECTURE_REVIEW.md).
 
 	public static bool TryPlayActorAnimation(Node root, string state)
 	{
