@@ -141,17 +141,19 @@ build-verified, one commit each:
 | `BuildSystem.cs` (`BuildCatalog`) | 1390 → 767 | Calculation, Definitions (types), StarCodec |
 | `ExternalModelLibrary.cs` | 1215 → 483 | FallbackMaterials, ImportRemap, Animation, Placement, ModelResolution |
 
-### Remaining (explicitly deferred — the least-safe cuts; do with in-game validation)
-These are still Stage-0 pure moves but are scattered / high-coupling, so they carry the
-most mechanical risk and are best done when the game can be smoke-tested after:
-- `InventoryPanel`: `Layout` (BuildPanel — writes ~all fields) and `Refresh*`
-  (18 methods, reads/writes selection state, scattered 142–1804) — highest coupling.
-- `BuildCatalog.Data`: the ~46-method catalog reader surface (scattered 458–1128,
-  interleaved with the backing dictionaries/consts that must stay in core).
-- `ExternalModelLibrary.Catalog`: card-registry/model-name methods interleaved with
-  fields and the `KnownCardKeys` property.
+**Stage-0 COMPLETE for all five God-files.** The previously-deferred high-coupling cuts
+landed after the user smoke-tested the earlier batch, each build-verified:
+- `InventoryPanel`: `Layout` + `Refresh*` extracted → core **2131 → 971**.
+- `BuildCatalog.Data`: the 46-method catalog reader surface extracted (data/consts/static
+  ctor stayed in core) → `BuildSystem.cs` **1390 → 193**.
+- `ExternalModelLibrary.Catalog`: card-registry/model-name methods extracted
+  (`KnownCardKeys` property + fields stayed in core) → core **1215 → 231**.
 
-### Stage 2 (behavioral — REQUIRES in-game regression tests)
+Final Stage-0 core sizes: SimpleActor 1335, InventoryPanel 971, NetworkManager 499,
+ExternalModelLibrary 231, BuildSystem 193 — every God-file now reads as a set of
+focused, single-concern partials.
+
+### Stage 2 (behavioral — REQUIRES in-game regression tests, not yet started)
 - Extract `IActorBehavior` strategy from the `_PhysicsProcess` role branches
   (Monster/Pet/Companion/Puppet) so role logic stops sharing one method body.
 - Migrate remaining programmatic `GpuParticles3D` to `CpuParticles3D` (or gate behind a
