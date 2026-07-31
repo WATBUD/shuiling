@@ -22,16 +22,16 @@ public partial class World : Node3D
 		// 主城改為六屋圍繞：六棟建築等距（每 60°）環繞中央，並整體偏移 30° 讓正北（180°）
 		// 的傳送廣場走廊保持淨空。順序沿環：30 道具、90 強化屋、150 傭兵、210 寵物、270 倉庫、330 鐵匠。
 		// 傭兵公會已移除；其清單併入夥伴招募所（pet shop）。150° 留給日後擴充。
-		Vector3 itemShopOffset = RingOffset(30.0f, shopRadius);
-		Vector3 refinementOffset = RingOffset(90.0f, shopRadius);
-		Vector3 petShopOffset = RingOffset(210.0f, shopRadius);
-		Vector3 warehouseOffset = RingOffset(270.0f, shopRadius);
-		Vector3 blacksmithOffset = RingOffset(330.0f, shopRadius);
-		CreateItemShop(center + itemShopOffset, YawFacingCenter(itemShopOffset));
-		CreateRefinementHouse(center + refinementOffset, YawFacingCenter(refinementOffset));
-		CreatePetShop(center + petShopOffset, YawFacingCenter(petShopOffset));
-		CreateWarehouseBuilding(center + warehouseOffset, YawFacingCenter(warehouseOffset));
-		CreateBlacksmithShop(center + blacksmithOffset, YawFacingCenter(blacksmithOffset));
+		foreach (CityShopDef shop in GetCityShopRoster())
+		{
+			Vector3 offset = RingOffset(shop.RingAngle, shopRadius);
+			Vector3 shopPosition = center + offset;
+			float shopYaw = YawFacingCenter(offset);
+			StaticBody3D shopBody = CreateCityShopShell(
+				shop.Name, shopPosition, shopYaw, shop.Size,
+				shop.WallMaterial, shop.RoofMaterial, shop.SignKey, shop.SignColor, shop.IncludeFrontStep);
+			shop.Decorate(shopBody, shopPosition, shopYaw);
+		}
 
 		for (int index = 0; index < 8; index++)
 		{
@@ -376,20 +376,35 @@ public partial class World : Node3D
 		return new Basis(Vector3.Up, Mathf.DegToRad(yawDegrees)) * offset;
 	}
 
-	private void CreateBlacksmithShop(Vector3 position, float yawDegrees)
-	{
-		StaticBody3D shop = CreateCityShopShell(
-			"CityBlacksmithShop",
-			position,
-			yawDegrees,
-			new Vector3(6.8f, 3.1f, 6.0f),
-			_matWood,
-			_matActorDark,
-			"shop.blacksmith",
-			new Color(1.0f, 0.58f, 0.28f),
-			false
-		);
+	// Data-driven city shop roster: each entry places one building on the plaza
+	// ring. Separates the WHAT (which shops, where, shell appearance) from the HOW
+	// (CreateCityShopShell + per-shop interior decoration). Add or reorder a shop by
+	// editing this table — the 150-degree ring slot is intentionally left free.
+	private readonly record struct CityShopDef(
+		string Name,
+		float RingAngle,
+		Vector3 Size,
+		Material WallMaterial,
+		Material RoofMaterial,
+		string SignKey,
+		Color SignColor,
+		bool IncludeFrontStep,
+		System.Action<StaticBody3D, Vector3, float> Decorate);
 
+	private CityShopDef[] GetCityShopRoster()
+	{
+		return new[]
+		{
+			new CityShopDef("CityItemShop", 30.0f, new Vector3(7.4f, 3.2f, 6.2f), _matWall, _matNpcAccent, "shop.item", new Color(1.0f, 0.86f, 0.38f), false, DecorateItemShop),
+			new CityShopDef("CityRefinementHouse", 90.0f, new Vector3(7.8f, 3.1f, 6.0f), _matWall, _matCrystal, "shop.refinement", new Color(0.62f, 0.82f, 1.0f), true, DecorateRefinementHouse),
+			new CityShopDef("CityPetShop", 210.0f, new Vector3(8.2f, 2.9f, 5.8f), _matWall, _matCrystal, "shop.pet", new Color(0.64f, 1.0f, 0.82f), true, DecoratePetShop),
+			new CityShopDef("CityWarehouse", 270.0f, new Vector3(7.4f, 3.0f, 5.8f), _matWall, _matCrystal, "shop.warehouse", new Color(0.72f, 0.9f, 1.0f), true, DecorateWarehouse),
+			new CityShopDef("CityBlacksmithShop", 330.0f, new Vector3(6.8f, 3.1f, 6.0f), _matWood, _matActorDark, "shop.blacksmith", new Color(1.0f, 0.58f, 0.28f), false, DecorateBlacksmithShop),
+		};
+	}
+
+	private void DecorateBlacksmithShop(StaticBody3D shop, Vector3 position, float yawDegrees)
+	{
 		AddMesh(shop, "ToolRack", BoxMeshFor(new Vector3(1.8f, 0.12f, 0.08f)), new Vector3(0.0f, 1.8f, -3.08f), Vector3.Zero, Vector3.One, _matMetal);
 		AddMesh(shop, "HammerA", BoxMeshFor(new Vector3(0.14f, 0.78f, 0.08f)), new Vector3(-0.55f, 1.45f, -3.14f), new Vector3(0.0f, 0.0f, 16.0f), Vector3.One, _matMetal);
 		AddMesh(shop, "HammerB", BoxMeshFor(new Vector3(0.14f, 0.70f, 0.08f)), new Vector3(0.15f, 1.45f, -3.14f), new Vector3(0.0f, 0.0f, -16.0f), Vector3.One, _matMetal);
@@ -400,20 +415,8 @@ public partial class World : Node3D
 		CreateExternalProp("BlacksmithSideChimney", "res://assets/models/environment/chimney.glb", position + LocalOffset(yawDegrees, new Vector3(-2.25f, 0.0f, 0.55f)), new Vector3(0.0f, yawDegrees, 0.0f), new Vector3(1.7f, 1.7f, 1.7f), new Vector3(0.55f, 1.8f, 0.55f), new Vector3(0.0f, 0.9f, 0.0f));
 	}
 
-	private void CreateItemShop(Vector3 position, float yawDegrees)
+	private void DecorateItemShop(StaticBody3D shop, Vector3 position, float yawDegrees)
 	{
-		StaticBody3D shop = CreateCityShopShell(
-			"CityItemShop",
-			position,
-			yawDegrees,
-			new Vector3(7.4f, 3.2f, 6.2f),
-			_matWall,
-			_matNpcAccent,
-			"shop.item",
-			new Color(1.0f, 0.86f, 0.38f),
-			false
-		);
-
 		AddMesh(shop, "ShelfBack", BoxMeshFor(new Vector3(3.6f, 1.8f, 0.24f)), new Vector3(0.0f, 1.45f, 3.0f), Vector3.Zero, Vector3.One, _matWood);
 		AddMesh(shop, "ShelfLineA", BoxMeshFor(new Vector3(3.8f, 0.10f, 0.28f)), new Vector3(0.0f, 1.18f, 2.84f), Vector3.Zero, Vector3.One, _matNpcAccent);
 		AddMesh(shop, "ShelfLineB", BoxMeshFor(new Vector3(3.8f, 0.10f, 0.28f)), new Vector3(0.0f, 1.78f, 2.84f), Vector3.Zero, Vector3.One, _matNpcAccent);
@@ -426,19 +429,8 @@ public partial class World : Node3D
 		AddMesh(shop, "PotionSignRed", new SphereMesh { Radius = 0.11f, Height = 0.16f }, new Vector3(0.34f, 2.23f, -3.34f), Vector3.Zero, Vector3.One, _matTorchFire);
 	}
 
-	private void CreatePetShop(Vector3 position, float yawDegrees)
+	private void DecoratePetShop(StaticBody3D shop, Vector3 position, float yawDegrees)
 	{
-		StaticBody3D shop = CreateCityShopShell(
-			"CityPetShop",
-			position,
-			yawDegrees,
-			new Vector3(8.2f, 2.9f, 5.8f),
-			_matWall,
-			_matCrystal,
-			"shop.pet",
-			new Color(0.64f, 1.0f, 0.82f)
-		);
-
 		AddMesh(shop, "PawPad", new SphereMesh { Radius = 0.32f, Height = 0.16f }, new Vector3(0.0f, 2.05f, -3.08f), Vector3.Zero, new Vector3(1.25f, 0.28f, 0.7f), _matNpcAccent);
 		for (int index = 0; index < 4; index++)
 		{
@@ -460,38 +452,16 @@ public partial class World : Node3D
 		AddMesh(shop, "PetShopRibbonRight", BoxMeshFor(new Vector3(0.10f, 0.70f, 0.055f)), new Vector3(1.55f, 2.16f, -3.14f), new Vector3(0.0f, 0.0f, 14.0f), Vector3.One, _matCrystal);
 	}
 
-	private void CreateWarehouseBuilding(Vector3 position, float yawDegrees)
+	private void DecorateWarehouse(StaticBody3D shop, Vector3 position, float yawDegrees)
 	{
-		StaticBody3D shop = CreateCityShopShell(
-			"CityWarehouse",
-			position,
-			yawDegrees,
-			new Vector3(7.4f, 3.0f, 5.8f),
-			_matWall,
-			_matCrystal,
-			"shop.warehouse",
-			new Color(0.72f, 0.9f, 1.0f)
-		);
-
 		// Storage crates instead of a revival altar.
 		AddMesh(shop, "WarehouseCrateA", BoxMeshFor(new Vector3(0.9f, 0.9f, 0.9f)), new Vector3(-0.9f, 0.45f, -3.3f), new Vector3(0.0f, 14.0f, 0.0f), Vector3.One, _matWood);
 		AddMesh(shop, "WarehouseCrateB", BoxMeshFor(new Vector3(0.8f, 0.8f, 0.8f)), new Vector3(0.5f, 0.4f, -3.4f), new Vector3(0.0f, -22.0f, 0.0f), Vector3.One, _matWood);
 		AddMesh(shop, "WarehouseCrateC", BoxMeshFor(new Vector3(0.7f, 0.7f, 0.7f)), new Vector3(0.2f, 1.15f, -3.35f), new Vector3(0.0f, 8.0f, 0.0f), Vector3.One, _matWood);
 	}
 
-	private void CreateRefinementHouse(Vector3 position, float yawDegrees)
+	private void DecorateRefinementHouse(StaticBody3D shop, Vector3 position, float yawDegrees)
 	{
-		StaticBody3D shop = CreateCityShopShell(
-			"CityRefinementHouse",
-			position,
-			yawDegrees,
-			new Vector3(7.8f, 3.1f, 6.0f),
-			_matWall,
-			_matCrystal,
-			"shop.refinement",
-			new Color(0.62f, 0.82f, 1.0f)
-		);
-
 		// 鐵砧 + 懸浮的發光強化水晶，象徵精煉裝備。
 		AddMesh(shop, "RefineAnvilBase", BoxMeshFor(new Vector3(0.95f, 0.5f, 0.6f)), new Vector3(0.0f, 0.25f, -3.2f), Vector3.Zero, Vector3.One, _matMetal);
 		AddMesh(shop, "RefineAnvilTop", BoxMeshFor(new Vector3(1.3f, 0.28f, 0.66f)), new Vector3(0.0f, 0.62f, -3.2f), Vector3.Zero, Vector3.One, _matMetal);
