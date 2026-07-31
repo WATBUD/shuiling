@@ -149,9 +149,14 @@ landed after the user smoke-tested the earlier batch, each build-verified:
 - `ExternalModelLibrary.Catalog`: card-registry/model-name methods extracted
   (`KnownCardKeys` property + fields stayed in core) → core **1215 → 231**.
 
-Final Stage-0 core sizes: SimpleActor 1335, InventoryPanel 971, NetworkManager 499,
-ExternalModelLibrary 231, BuildSystem 193 — every God-file now reads as a set of
-focused, single-concern partials.
+**World.cs — decomposed too.** Construction concerns extracted into new partials
+(Terrain, CityBuild, Decor, Portals), alongside its existing Biomes/Caves/Network/
+RuntimeCleanup/Vegetation/PrototypeKit partials: core **3723 → 2176**.
+
+Final Stage-0 core sizes: World 2176, SimpleActor 1335, InventoryPanel 971,
+NetworkManager 499, ExternalModelLibrary 231, BuildSystem 193 — every God-file now
+reads as a set of focused, single-concern partials. Stage-0 is COMPLETE across the
+codebase; all changes are behavior-preserving and build-verified.
 
 ### Stage 2 (behavioral — REQUIRES in-game regression tests, not yet started)
 - Extract `IActorBehavior` strategy from the `_PhysicsProcess` role branches
