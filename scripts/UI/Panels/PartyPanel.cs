@@ -314,19 +314,6 @@ public partial class PartyPanel : PanelContainer
 		return style;
 	}
 
-	private static Button AddBuildButton(GridContainer parent, System.Action onPressed)
-	{
-		var button = new Button
-		{
-			CustomMinimumSize = new Vector2(0.0f, 36.0f),
-			SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-		};
-		button.AddThemeFontSizeOverride("font_size", 12);
-		button.Pressed += onPressed;
-		parent.AddChild(button);
-		return button;
-	}
-
 	private void SelectMember(GodotObject member)
 	{
 		_selected = member;
@@ -349,29 +336,6 @@ public partial class PartyPanel : PanelContainer
 
 		_selected = _player;
 		_companionInfoCard.SetPlayer(_player);
-	}
-
-	private void UpdateBuildButtons(SimpleActor actor)
-	{
-		SetBuildButtonsDisabled(false);
-		CompanionBuildLoadout loadout = actor.BuildLoadout;
-		_helmetButton.Text = BuildButtonText("build.slot.helmet", LocaleText.T(BuildCatalog.GetEquipment(loadout.HelmetId).NameKey));
-		_weaponButton.Text = BuildButtonText("build.slot.weapon", LocaleText.T(BuildCatalog.GetEquipment(loadout.WeaponId).NameKey));
-		_armorButton.Text = BuildButtonText("build.slot.armor", LocaleText.T(BuildCatalog.GetEquipment(loadout.ArmorId).NameKey));
-		_accessoryButton.Text = BuildButtonText("build.slot.accessory", LocaleText.T(BuildCatalog.GetEquipment(loadout.AccessoryId).NameKey));
-		_attributeGemButton.Text = BuildButtonText("build.slot.attribute", LocaleText.T(BuildCatalog.GetAttributeGem(loadout.AttributeGemId).NameKey));
-		_attackModeButton.Text = BuildButtonText("build.slot.attack_mode", actor.AttackModeName);
-		_skillGem1Button.Text = BuildButtonText("build.slot.skill1", LocaleText.T(BuildCatalog.GetSkillGem(loadout.SkillGemIds[0]).NameKey));
-		_skillGem2Button.Text = BuildButtonText("build.slot.skill2", LocaleText.T(BuildCatalog.GetSkillGem(loadout.SkillGemIds[1]).NameKey));
-		_skillGem3Button.Text = BuildButtonText("build.slot.skill3", LocaleText.T(BuildCatalog.GetSkillGem(loadout.SkillGemIds[2]).NameKey));
-		ItemIconLibrary.Apply(_helmetButton, loadout.HelmetId, 32);
-		ItemIconLibrary.Apply(_weaponButton, loadout.WeaponId, 32);
-		ItemIconLibrary.Apply(_armorButton, loadout.ArmorId, 32);
-		ItemIconLibrary.Apply(_accessoryButton, loadout.AccessoryId, 32);
-		ItemIconLibrary.Apply(_attributeGemButton, loadout.AttributeGemId, 32);
-		ItemIconLibrary.Apply(_skillGem1Button, loadout.SkillGemIds[0], 32);
-		ItemIconLibrary.Apply(_skillGem2Button, loadout.SkillGemIds[1], 32);
-		ItemIconLibrary.Apply(_skillGem3Button, loadout.SkillGemIds[2], 32);
 	}
 
 	private static string BuildButtonText(string slotKey, string value)
@@ -584,47 +548,6 @@ public partial class PartyPanel : PanelContainer
 		UpdateDetails();
 	}
 
-	private void OnHelmetPressed()
-	{
-		OpenInventoryForSelectedActor();
-	}
-
-	private void OnWeaponPressed()
-	{
-		OpenInventoryForSelectedActor();
-	}
-
-	private void OnArmorPressed()
-	{
-		OpenInventoryForSelectedActor();
-	}
-
-	private void OnAccessoryPressed()
-	{
-		OpenInventoryForSelectedActor();
-	}
-
-	private void OnAttributeGemPressed()
-	{
-		OpenInventoryForSelectedActor();
-	}
-
-	private void OnSkillGemPressed(int slotIndex)
-	{
-		OpenInventoryForSelectedActor();
-	}
-
-	private void OnAttackModePressed()
-	{
-		if (_selected is not SimpleActor actor || !IsInstanceValid(actor))
-		{
-			return;
-		}
-
-		actor.CycleAttackMode();
-		UpdateDetails();
-	}
-
 	private void OpenInventoryForSelectedActor()
 	{
 		if (_player == null || _selected is not SimpleActor actor || !IsInstanceValid(actor))
@@ -733,22 +656,5 @@ public partial class PartyPanel : PanelContainer
 		label.AddThemeColorOverride("font_color", color);
 		label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
 		return label;
-	}
-
-	private static Label AddStatRow(VBoxContainer rows, string titleKey)
-	{
-		var row = new HBoxContainer();
-		row.AddThemeConstantOverride("separation", 12);
-		rows.AddChild(row);
-
-		var titleLabel = MakeLabel(15, new Color(0.66f, 0.74f, 0.80f));
-		titleLabel.Text = LocaleText.T(titleKey);
-		titleLabel.CustomMinimumSize = new Vector2(72.0f, 0.0f);
-		row.AddChild(titleLabel);
-
-		var valueLabel = MakeLabel(15, new Color(0.96f, 0.98f, 1.0f));
-		valueLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-		row.AddChild(valueLabel);
-		return valueLabel;
 	}
 }

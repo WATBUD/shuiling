@@ -213,14 +213,6 @@ public partial class InventoryPanel : PanelContainer
 		}
 	}
 
-	private static void AddFlagLine(List<string> lines, string labelKey, bool enabled)
-	{
-		if (enabled)
-		{
-			lines.Add(LocaleText.F("tooltip.stat_line", LocaleText.T(labelKey), LocaleText.T("tooltip.enabled")));
-		}
-	}
-
 	private static string Signed(int value)
 	{
 		return value > 0 ? $"+{value}" : value.ToString();

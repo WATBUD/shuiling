@@ -359,14 +359,6 @@ public partial class InventoryPanel : PanelContainer
 		RefreshSelectedItemDetails();
 	}
 
-	private void SetPlayerSupportSlotButton(Button button, int index, CompanionBuildLoadout loadout)
-	{
-		string itemId = loadout.GetSkillGemId(index);
-		button.Text = $"{SupportSlotName(index)}\n{LocaleText.T(BuildCatalog.GetSkillGem(itemId).NameKey)}";
-		ItemIconLibrary.Apply(button, itemId, 26);
-		button.Disabled = index >= BuildCatalog.GetUnlockedSupportCoreCount(_player?.Level ?? 1);
-	}
-
 	// Core slots unlock with the creature's level. A locked slot shows the level it
 	// needs and cannot hold a core yet.
 	private bool IsSlotUnlocked(EquipTarget target)

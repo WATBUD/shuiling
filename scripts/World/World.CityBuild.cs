@@ -500,33 +500,6 @@ public partial class World : Node3D
 		AddMesh(shop, "RefineShardRight", CylinderMeshFor(0.0f, 0.16f, 0.72f), new Vector3(2.7f, 1.08f, -3.3f), new Vector3(0.0f, 0.0f, 12.0f), Vector3.One, _matCrystal);
 	}
 
-	private void CreateMercenaryGuild(Vector3 position, float yawDegrees)
-	{
-		StaticBody3D shop = CreateCityShopShell(
-			"CityMercenaryGuild",
-			position,
-			yawDegrees,
-			new Vector3(8.4f, 3.25f, 6.4f),
-			_matWood,
-			_matLeather,
-			"shop.mercenary_guild",
-			new Color(1.0f, 0.78f, 0.42f)
-		);
-
-		AddMesh(shop, "ContractBoard", BoxMeshFor(new Vector3(3.7f, 1.45f, 0.12f)), new Vector3(0.0f, 1.42f, -3.58f), Vector3.Zero, Vector3.One, _matWall);
-		for (int index = 0; index < 5; index++)
-		{
-			float x = -1.35f + index * 0.68f;
-			AddMesh(shop, $"ContractPaper{index}", BoxMeshFor(new Vector3(0.42f, 0.56f, 0.035f)), new Vector3(x, 1.46f + (index % 2) * 0.12f, -3.66f), new Vector3(0.0f, 0.0f, index % 2 == 0 ? -3.0f : 4.0f), Vector3.One, _matSkin);
-		}
-
-		AddMesh(shop, "GuildSpearLeft", new CylinderMesh { TopRadius = 0.035f, BottomRadius = 0.045f, Height = 1.85f }, new Vector3(-2.9f, 1.15f, -3.42f), new Vector3(0.0f, 0.0f, -18.0f), Vector3.One, _matWood);
-		AddMesh(shop, "GuildSpearRight", new CylinderMesh { TopRadius = 0.035f, BottomRadius = 0.045f, Height = 1.85f }, new Vector3(2.9f, 1.15f, -3.42f), new Vector3(0.0f, 0.0f, 18.0f), Vector3.One, _matWood);
-		AddMesh(shop, "GuildSpearTipLeft", CylinderMeshFor(0.0f, 0.10f, 0.30f), new Vector3(-3.15f, 1.98f, -3.42f), new Vector3(0.0f, 0.0f, -18.0f), Vector3.One, _matMetal);
-		AddMesh(shop, "GuildSpearTipRight", CylinderMeshFor(0.0f, 0.10f, 0.30f), new Vector3(3.15f, 1.98f, -3.42f), new Vector3(0.0f, 0.0f, 18.0f), Vector3.One, _matMetal);
-		AddMesh(shop, "GuildShield", new CylinderMesh { TopRadius = 0.42f, BottomRadius = 0.42f, Height = 0.10f }, new Vector3(0.0f, 2.02f, -3.64f), new Vector3(90.0f, 0.0f, 0.0f), new Vector3(0.85f, 1.0f, 1.14f), _matNpcAccent);
-	}
-
 	private StaticBody3D CreateCityShopShell(string name, Vector3 position, float yawDegrees, Vector3 size, Material wallMaterial, Material roofMaterial, string signKey, Color signColor, bool includeFrontStep = true)
 	{
 		var shop = new StaticBody3D
@@ -619,45 +592,4 @@ public partial class World : Node3D
 		}
 	}
 
-	private void CreateRevivalNpc(Vector3 position, float yawDegrees)
-	{
-		var npc = new StaticBody3D
-		{
-			Name = "PetRevivalNpc",
-			Position = position,
-			RotationDegrees = new Vector3(0.0f, yawDegrees, 0.0f),
-		};
-		npc.AddToGroup("revival_npc");
-		_propsRoot.AddChild(npc);
-
-		AddMesh(npc, "Robe", new CapsuleMesh { Radius = 0.30f, Height = 1.12f }, new Vector3(0.0f, 0.92f, 0.0f), Vector3.Zero, new Vector3(1.0f, 1.0f, 0.78f), _matNpc);
-		AddMesh(npc, "Head", new SphereMesh { Radius = 0.24f, Height = 0.48f }, new Vector3(0.0f, 1.62f, 0.0f), Vector3.Zero, Vector3.One, _matSkin);
-		AddMesh(npc, "HealerHat", CylinderMeshFor(0.18f, 0.30f, 0.22f), new Vector3(0.0f, 1.88f, 0.0f), Vector3.Zero, Vector3.One, _matCrystal);
-		AddMesh(npc, "Staff", new CylinderMesh { TopRadius = 0.035f, BottomRadius = 0.045f, Height = 1.7f }, new Vector3(0.46f, 0.92f, -0.02f), new Vector3(0.0f, 0.0f, -7.0f), Vector3.One, _matWood);
-		AddMesh(npc, "StaffOrb", new SphereMesh { Radius = 0.14f, Height = 0.22f }, new Vector3(0.58f, 1.74f, -0.02f), Vector3.Zero, Vector3.One, _matCrystal);
-		AddMesh(npc, "AuraRing", CylinderMeshFor(0.92f, 0.92f, 0.035f), new Vector3(0.0f, 0.06f, 0.0f), Vector3.Zero, Vector3.One, _matCrystal);
-
-		var label = new Label3D
-		{
-			Name = "RevivalNpcLabel",
-			Text = LocaleText.T("npc.revival.name"),
-			Position = new Vector3(0.0f, 2.35f, 0.0f),
-			Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-			FontSize = 22,
-			PixelSize = 0.008f,
-			OutlineSize = 6,
-			HorizontalAlignment = HorizontalAlignment.Center,
-			Width = 260.0f,
-		};
-		label.OutlineModulate = new Color(0.02f, 0.03f, 0.025f, 0.95f);
-		label.Modulate = new Color(0.64f, 1.0f, 0.82f);
-		npc.AddChild(label);
-
-		var collisionShape = new CollisionShape3D
-		{
-			Position = new Vector3(0.0f, 0.9f, 0.0f),
-			Shape = new CapsuleShape3D { Radius = 0.42f, Height = 1.8f },
-		};
-		npc.AddChild(collisionShape);
-	}
 }

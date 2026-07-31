@@ -679,26 +679,6 @@ public partial class World : Node3D
 		_actorsRoot.AddChild(actor);
 	}
 
-	private CityNpcStation CreateAmbientCityNpcStation(int index)
-	{
-		string[] names =
-		{
-			"name.npc.hunter",
-			"name.npc.gatherer",
-			"name.npc.apprentice",
-		};
-		string[] roles =
-		{
-			"Ranged",
-			"Gatherer",
-			"DPS",
-		};
-		float angle = index * 1.37f;
-		float radius = 16.0f + index % 4 * 3.2f;
-		var offset = new Vector3(Mathf.Sin(angle) * radius, 0.0f, 7.0f + Mathf.Cos(angle) * radius);
-		return new CityNpcStation(names[index % names.Length], offset, Mathf.RadToDeg(angle) + 180.0f, 1.2f, roles[index % roles.Length]);
-	}
-
 	public SimpleActor SpawnContractCompanion(PlayerController.ContractCompanionOffer offer)
 	{
 		SimpleActor actor = CreateActor(false, "city", offer.NameKey, offer.CombatRole, offer.Level);

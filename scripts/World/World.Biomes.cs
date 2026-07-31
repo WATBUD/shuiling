@@ -540,29 +540,6 @@ public partial class World
 		}
 	}
 
-	private void CreateLilyPad(Vector3 position)
-	{
-		if (TryPlacePropScene("res://assets/scenes/props/LilyPad.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), 1.0f))
-		{
-			return;
-		}
-
-		var pad = new Node3D
-		{
-			Name = "LilyPad",
-			Position = position,
-			RotationDegrees = new Vector3(0.0f, (float)_rng.RandfRange(0.0f, 360.0f), 0.0f),
-		};
-		_propsRoot.AddChild(pad);
-
-		float radius = (float)_rng.RandfRange(0.35f, 0.62f);
-		AddMesh(pad, "Pad", CylinderMeshFor(radius, radius, 0.03f), new Vector3(0.0f, 0.085f, 0.0f), Vector3.Zero, Vector3.One, _matLilyPad);
-		if (_rng.Randf() < 0.4f)
-		{
-			AddMesh(pad, "Bloom", new SphereMesh { Radius = 0.12f, Height = 0.16f }, new Vector3(radius * 0.3f, 0.16f, 0.0f), Vector3.Zero, Vector3.One, _matLilyBloom);
-		}
-	}
-
 	private void CreateFireflySwarm(Vector3 position)
 	{
 		if (TryPlacePropScene("res://assets/scenes/props/FireflySwarm.tscn", position, (float)_rng.RandfRange(0.0f, 360.0f), 1.0f))

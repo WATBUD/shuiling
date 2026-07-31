@@ -175,46 +175,7 @@ public partial class World : Node3D
 		_obstaclePositions.AddRange(_wildObstaclePositions);
 	}
 
-	private void CreateWildTerrainDressing()
-	{
-		// Use the current biome's ground palette so overlays match the ecosystem
-		// (snow stays white, badlands stays red, etc.) instead of forest greens.
-		BiomeGroundPalette palette = _wildGroundPalette;
-		CreateTerrainPatch("WildNorthMeadow", new Vector3(-28.0f, 0.0f, -46.0f), 17.0f, new Vector3(1.55f, 1.0f, 0.72f), -18.0f, palette.Meadow, 0.035f);
-		CreateTerrainPatch("WildEastMeadow", new Vector3(42.0f, 0.0f, 7.0f), 20.0f, new Vector3(1.2f, 1.0f, 0.88f), 22.0f, palette.Meadow, 0.034f);
-		CreateTerrainPatch("WildSouthField", new Vector3(25.0f, 0.0f, 50.0f), 16.0f, new Vector3(1.35f, 1.0f, 0.62f), -34.0f, palette.Field, 0.036f);
-		CreateTerrainPatch("WildWestField", new Vector3(-50.0f, 0.0f, 3.0f), 15.0f, new Vector3(1.0f, 1.0f, 0.68f), 12.0f, palette.Field, 0.036f);
-
-		CreateTerrainPatch("WildRiverBankA", new Vector3(-58.0f, 0.0f, -44.0f), 9.0f, new Vector3(1.85f, 1.0f, 0.42f), 34.0f, palette.Bank, 0.052f);
-		CreateTerrainPatch("WildRiverBankB", new Vector3(-43.0f, 0.0f, -33.0f), 9.0f, new Vector3(1.9f, 1.0f, 0.44f), 34.0f, palette.Bank, 0.052f);
-		CreateTerrainPatch("WildRiverBankC", new Vector3(-27.0f, 0.0f, -22.0f), 9.0f, new Vector3(1.8f, 1.0f, 0.43f), 34.0f, palette.Bank, 0.052f);
-		CreateTerrainPatch("WildRiverA", new Vector3(-58.0f, 0.0f, -44.0f), 7.0f, new Vector3(1.76f, 1.0f, 0.30f), 34.0f, palette.Shallow, 0.068f);
-		CreateTerrainPatch("WildRiverB", new Vector3(-43.0f, 0.0f, -33.0f), 7.0f, new Vector3(1.82f, 1.0f, 0.31f), 34.0f, palette.Water, 0.07f);
-		CreateTerrainPatch("WildRiverC", new Vector3(-27.0f, 0.0f, -22.0f), 7.0f, new Vector3(1.72f, 1.0f, 0.30f), 34.0f, palette.Shallow, 0.068f);
-
-		CreateTerrainPatch("WildCampClearing", _spawnCampCenter + new Vector3(0.0f, 0.0f, 6.0f), 16.0f, new Vector3(1.18f, 1.0f, 0.82f), 0.0f, palette.Path, 0.042f);
-		CreateTerrainPatch("WildRuinOvergrowth", new Vector3(-45.0f, 0.0f, -34.0f), 12.0f, new Vector3(1.0f, 1.0f, 0.72f), -8.0f, palette.Meadow, 0.038f);
-		CreateTerrainPatch("WildDenAsh", new Vector3(43.0f, 0.0f, 37.0f), 13.0f, new Vector3(1.05f, 1.0f, 0.78f), 12.0f, palette.Ash, 0.039f);
-
-		for (int index = 0; index < 10; index++)
-		{
-			float x = -62.0f + index * 13.5f;
-			float z = index % 2 == 0 ? -62.0f : 62.0f;
-			CreateTerrainPatch($"WildTreeLinePatch{index}", new Vector3(x, 0.0f, z), 8.0f, new Vector3(1.4f, 1.0f, 0.5f), index * 17.0f, palette.Meadow, 0.033f);
-		}
-	}
-
 	// Per-biome theme dressing lives in World.Biomes.cs (CreateWildMapThemeDressing).
-
-	private void CreateCityTerrainDressing()
-	{
-		CreateTerrainPatch("CityDistrictGreenNorth", _mainCityCenter + new Vector3(0.0f, 0.0f, -8.0f), 34.0f, new Vector3(1.55f, 1.0f, 0.95f), 0.0f, _matMeadow, 0.033f);
-		CreateTerrainPatch("CityDistrictGreenSouth", _mainCityCenter + new Vector3(0.0f, 0.0f, 22.0f), 29.0f, new Vector3(0.95f, 1.0f, 1.34f), 0.0f, _matMeadow, 0.034f);
-		CreateTerrainPatch("CityWestField", _mainCityCenter + new Vector3(-43.0f, 0.0f, 18.0f), 16.0f, new Vector3(1.2f, 1.0f, 0.64f), 18.0f, _matField, 0.036f);
-		CreateTerrainPatch("CityEastField", _mainCityCenter + new Vector3(43.0f, 0.0f, 14.0f), 16.0f, new Vector3(1.14f, 1.0f, 0.66f), -18.0f, _matField, 0.036f);
-		CreateTerrainPatch("CityWaterBank", _mainCityCenter + new Vector3(-31.0f, 0.0f, 10.0f), 13.0f, new Vector3(1.35f, 1.0f, 0.65f), 20.0f, _matPondBank, 0.043f);
-		CreateTerrainPatch("CityMillPond", _mainCityCenter + new Vector3(-31.0f, 0.0f, 10.0f), 10.0f, new Vector3(1.25f, 1.0f, 0.52f), 20.0f, _matWater, 0.06f);
-	}
 
 	private void CreateWildScenicEdges()
 	{
