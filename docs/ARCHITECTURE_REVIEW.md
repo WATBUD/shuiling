@@ -90,12 +90,47 @@ Recommendation: decide the shipping renderer. If `gl_compatibility` stays a targ
 migrate these to `CpuParticles3D` (as the drop scenes and mole dust already do), or gate
 GPU particles behind a renderer check with a CPU fallback. Track as its own task.
 
-## Done this session (examples of the target pattern)
+## Progress log
 
-- **World drops** — visuals moved to authored scenes (`assets/scenes/props/drops/*.tscn`),
-  `WorldDrop` reduced to logic, spawning centralized in `WorldDropFactory`, reuse via
-  `WorldDropPool`. Visual vs logic vs lifecycle now separated.
-- **Mole burrow** — new species behavior isolated in `SimpleActor.Burrow.cs`; the core
-  file gained only four small gate/hook lines.
+**World drops** — visuals moved to authored scenes (`assets/scenes/props/drops/*.tscn`),
+`WorldDrop` reduced to logic, spawning centralized in `WorldDropFactory`, reuse via
+`WorldDropPool`.
 
-These are the concrete, low-risk shape the rest of the roadmap should follow.
+**SimpleActor — fully decomposed (Stage-0 complete).** Core `SimpleActor.cs` went from
+**4449 → 2533 lines**; every extraction is a behavior-preserving move within the same
+partial class, verified by `dotnet build` (0 warnings/errors) and committed individually:
+
+| Partial | Concern |
+|---------|---------|
+| `SimpleActor.Burrow.cs` | mole dig behavior |
+| `SimpleActor.Capture.cs` | capture-protection + mourning |
+| `SimpleActor.Animation.cs` | movement fx, procedural body/ext-model animation |
+| `SimpleActor.Network.cs` | network-puppet lifecycle/sync |
+| `SimpleActor.Squad.cs` | companion follow / squad activity / pet dialogue |
+| `SimpleActor.Loot.cs` | monster/boss loot rolls |
+| `SimpleActor.Status.cs` | element status effects |
+| `SimpleActor.BossMovement.cs` | boss obstacle avoidance |
+| `SimpleActor.Combat.cs` | damage, attacks, projectiles, retaliation, whirlwind |
+
+Core retains fields, `_Ready`, `_PhysicsProcess` dispatcher + behavior gates, and shared
+seams (`TryRunMonsterCombat`, `SpawnCombatEffect`, `GetCachedPlayerNode`, `Defeat`).
+
+**Other God-files — lead cut done (Stage-0).** One safe concern extracted from each,
+build-verified and committed:
+
+| File | Extracted partial |
+|------|-------------------|
+| `NetworkManager.cs` | `NetworkManager.Party.cs` (party sync) |
+| `ExternalModelLibrary.cs` | `ExternalModelLibrary.FallbackMaterials.cs` |
+| `InventoryPanel.cs` | `InventoryPanel.Tooltips.cs` + `InventoryDragButtons.cs` |
+| `BuildSystem.cs` (`BuildCatalog`) | `BuildCatalog.Calculation.cs` |
+
+### Remaining (lower-priority tail, per this roadmap)
+- SimpleActor: optional further slices (Nameplate, Build, Progression, Save, State,
+  Death) — the core is already reasonable at 2533 lines.
+- NetworkManager: gift-mail, monster/puppet sync, transport, session partials.
+- InventoryPanel: sorting, UI factories, layout, data-binding partials.
+- BuildCatalog: split definition types + catalog data from `BuildCatalog.Data.cs`.
+- ExternalModelLibrary: animation-glue + prop-placement partials.
+- Stage 2 (needs in-game tests): extract `IActorBehavior` strategy from the
+  `_PhysicsProcess` role branches; migrate remaining `GpuParticles3D` for gl_compatibility.
