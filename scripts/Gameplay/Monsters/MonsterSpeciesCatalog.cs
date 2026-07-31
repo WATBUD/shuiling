@@ -65,6 +65,9 @@ public sealed class DefaultMonsterSpeciesCatalog : IMonsterSpeciesCatalog
 		new("name.monster.dragon", "Ranged", "loot.dragon_scale", new Color(1.0f, 0.34f, 0.26f, 0.94f), System.Array.Empty<string>(), BadlandsMap),
 		new("name.monster.rat", "DPS", "loot.soft_fur", new Color(0.62f, 0.48f, 0.36f, 0.94f), new[]
 		{
+			// Diglett-style burrowing mole (authored primitive scene). The old
+			// street-rat gltf stays as a fallback if the scene is unavailable.
+			"res://assets/models/monsters/mole/mole.tscn",
 			"res://assets/models/monsters/street_rat/street_rat_1k.gltf",
 		}, new[] { "wild_forest", "wild_marsh" }),
 		new("name.monster.fox", "DPS", "loot.beast_hide", new Color(1.0f, 0.48f, 0.20f, 0.94f), new[]
