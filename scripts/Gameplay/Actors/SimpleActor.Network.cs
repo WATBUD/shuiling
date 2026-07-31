@@ -19,6 +19,14 @@ public partial class SimpleActor : CharacterBody3D
 		_netTargetYaw = Rotation.Y;
 	}
 
+	public void ReleaseNetworkPuppet()
+	{
+		_isNetworkPuppet = false;
+		_networkId = -1;
+		NetworkMonsterId = -1;
+		_networkCaptureReady = false;
+	}
+
 	public void ApplyNetworkState(Vector3 position, float yaw, int health, bool captureReady)
 	{
 		_netTargetPosition = position;

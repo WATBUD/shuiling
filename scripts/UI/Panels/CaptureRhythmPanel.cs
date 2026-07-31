@@ -137,7 +137,9 @@ public partial class CaptureRhythmPanel : Control
 
 	public bool Begin(SimpleActor actor)
 	{
-		if (IsChallengeActive || !IsInstanceValid(actor) || !actor.CanBeCaptured)
+		if (IsChallengeActive
+			|| !IsInstanceValid(actor)
+			|| (!actor.CanBeCaptured && !(actor.IsNetworkPuppet && actor.CaptureReady)))
 		{
 			return false;
 		}

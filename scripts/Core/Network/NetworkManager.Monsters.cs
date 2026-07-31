@@ -131,6 +131,91 @@ public partial class NetworkManager : Node
 		}
 	}
 
+	public void SendMonsterCaptureNetHitRequest(int netId)
+	{
+		if (IsClient && netId >= 0)
+		{
+			RpcId(1, MethodName.ServerReceiveMonsterCaptureNetHit, netId);
+		}
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ServerReceiveMonsterCaptureNetHit(int netId)
+	{
+		if (Multiplayer.IsServer() && ActiveWorld != null && IsInstanceValid(ActiveWorld))
+		{
+			ActiveWorld.ApplyNetworkMonsterCaptureNetHit(netId, Multiplayer.GetRemoteSenderId());
+		}
+	}
+
+	public void SendMonsterCaptureLockRequest(int netId, bool locked)
+	{
+		if (IsClient && netId >= 0)
+		{
+			RpcId(1, MethodName.ServerSetMonsterCaptureLock, netId, locked);
+		}
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ServerSetMonsterCaptureLock(int netId, bool locked)
+	{
+		if (Multiplayer.IsServer() && ActiveWorld != null && IsInstanceValid(ActiveWorld))
+		{
+			ActiveWorld.SetNetworkMonsterCaptureLock(netId, Multiplayer.GetRemoteSenderId(), locked);
+		}
+	}
+
+	public void SendMonsterCaptureRequest(int netId)
+	{
+		if (IsClient && netId >= 0)
+		{
+			RpcId(1, MethodName.ServerReceiveMonsterCaptureRequest, netId);
+		}
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ServerReceiveMonsterCaptureRequest(int netId)
+	{
+		if (Multiplayer.IsServer() && ActiveWorld != null && IsInstanceValid(ActiveWorld))
+		{
+			ActiveWorld.TryGrantNetworkMonsterCapture(netId, Multiplayer.GetRemoteSenderId());
+		}
+	}
+
+	public void SendMonsterCaptureGranted(long peerId, int netId, string actorJson)
+	{
+		if (IsHost && peerId != 1)
+		{
+			RpcId(peerId, MethodName.ClientMonsterCaptureGranted, netId, actorJson);
+		}
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ClientMonsterCaptureGranted(int netId, string actorJson)
+	{
+		if (ActiveWorld != null && IsInstanceValid(ActiveWorld))
+		{
+			ActiveWorld.HandleNetworkMonsterCaptureGranted(netId, actorJson);
+		}
+	}
+
+	public void SendMonsterCaptureDenied(long peerId, int netId)
+	{
+		if (IsHost && peerId != 1)
+		{
+			RpcId(peerId, MethodName.ClientMonsterCaptureDenied, netId);
+		}
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ClientMonsterCaptureDenied(int netId)
+	{
+		if (ActiveWorld != null && IsInstanceValid(ActiveWorld))
+		{
+			ActiveWorld.HandleNetworkMonsterCaptureDenied(netId);
+		}
+	}
+
 	// Host → killer client: you defeated this map's boss at this tier — apply
 	// your own per-player tier unlock.
 	public void SendBossDefeatTo(long peerId, string mapId, int tier)

@@ -462,6 +462,16 @@ public partial class NetworkManager : Node
 		return false;
 	}
 
+	public bool IsRemotePlayerNear(long peerId, string mapId, int tier, int groupId, Vector3 position, float maxDistance)
+	{
+		return _playerPuppets.TryGetValue(peerId, out RemotePlayerPuppet? puppet)
+			&& IsInstanceValid(puppet)
+			&& puppet.MapId == mapId
+			&& puppet.Tier == tier
+			&& puppet.GroupId == groupId
+			&& puppet.GlobalPosition.DistanceTo(position) <= maxDistance;
+	}
+
 	// Host-side: nearest remote player standing in this monster's instance, so a
 	// host-simulated monster can chase and attack players other than the host.
 	public Node3D? FindNearestRemotePlayer(string mapId, int tier, int groupId, Vector3 origin, out long peerId, out float distance)

@@ -357,7 +357,13 @@ public partial class PlayerController
 
 		if (actor.IsNetworkPuppet)
 		{
-			PostSystemMessage(LocaleText.T("system.net.capture_blocked"), new Color(1.0f, 0.72f, 0.5f));
+			NetworkManager.Instance?.SendMonsterCaptureNetHitRequest(actor.NetworkMonsterId);
+			if (actor.CaptureReady)
+			{
+				return BeginCaptureChallenge(actor);
+			}
+
+			PostSystemMessage(LocaleText.F("system.capture.not_ready", actor.LocalizedDisplayName), new Color(1.0f, 0.82f, 0.5f), GameMessageChannel.Party);
 			return true;
 		}
 
@@ -383,15 +389,14 @@ public partial class PlayerController
 
 	public bool BeginCaptureChallenge(SimpleActor actor)
 	{
-		if (IsInstanceValid(actor) && actor.IsNetworkPuppet)
+		if (_capturedCollection.Count >= ActivePartyLimit)
 		{
-			// Multiplayer phase 1: host-owned monsters can't be captured yet.
-			PostSystemMessage(LocaleText.T("system.net.capture_blocked"), new Color(1.0f, 0.72f, 0.5f));
+			PostSystemMessage(LocaleText.F("system.capture.collection_full", ActivePartyLimit), new Color(1.0f, 0.72f, 0.5f), GameMessageChannel.Party);
 			return false;
 		}
 
 		if (!IsInstanceValid(actor)
-			|| !actor.CanBeCaptured
+			|| (!actor.IsNetworkPuppet && !actor.CanBeCaptured)
 			|| !actor.CaptureReady
 			|| _capturedCollection.Contains(actor)
 			|| _captureRhythmPanel == null)
@@ -405,6 +410,10 @@ public partial class PlayerController
 			// Locked for the whole challenge (which pauses the world), so the target
 			// can't be killed by anyone before the attempt resolves.
 			actor.SetCaptureLocked(true);
+			if (actor.IsNetworkPuppet)
+			{
+				NetworkManager.Instance?.SendMonsterCaptureLockRequest(actor.NetworkMonsterId, true);
+			}
 		}
 		return began;
 	}
@@ -414,6 +423,11 @@ public partial class PlayerController
 		if (IsInstanceValid(actor))
 		{
 			actor.EndCaptureProtection();
+			if (actor.IsNetworkPuppet)
+			{
+				NetworkManager.Instance?.SendMonsterCaptureRequest(actor.NetworkMonsterId);
+				return;
+			}
 		}
 		if (!CaptureActor(actor))
 		{
@@ -426,11 +440,32 @@ public partial class PlayerController
 		if (IsInstanceValid(actor))
 		{
 			actor.EndCaptureProtection();
+			if (actor.IsNetworkPuppet)
+			{
+				NetworkManager.Instance?.SendMonsterCaptureLockRequest(actor.NetworkMonsterId, false);
+			}
 		}
 		PostSystemMessage(
 			LocaleText.F("system.capture.rhythm_failed", actor.LocalizedDisplayName),
 			new Color(1.0f, 0.58f, 0.42f),
 			GameMessageChannel.Party);
+	}
+
+	public bool AcceptNetworkCapturedActor(SimpleActor actor, ActorSaveData data)
+	{
+		if (!IsInstanceValid(actor) || _capturedCollection.Count >= ActivePartyLimit)
+		{
+			return false;
+		}
+
+		actor.ReleaseNetworkPuppet();
+		actor.ApplySaveData(data);
+		return CaptureActor(actor);
+	}
+
+	public void NotifyNetworkCaptureDenied()
+	{
+		PostSystemMessage(LocaleText.T("system.capture.target_lost"), new Color(1.0f, 0.58f, 0.42f), GameMessageChannel.Party);
 	}
 
 	// charge in 0..1 (from how long the throw was held) scales speed + range.

@@ -1,5 +1,6 @@
 using Godot;
 using System.Collections.Generic;
+using System.Text.Json;
 
 // Multiplayer half of World (host-authoritative phase 1, see NetworkManager.cs).
 // Host: owns the real simulation, assigns net ids to wild monsters/bosses and
@@ -12,8 +13,11 @@ public partial class World
 
 	private readonly Dictionary<int, NetMonsterInfo> _netMonstersById = new();
 	private readonly Dictionary<int, long> _netLastDamagePeerByNetId = new();
+	private readonly Dictionary<int, (long PeerId, ulong ExpiresAtMsec)> _netCaptureReservations = new();
 	private readonly List<int> _netRemovalScratch = new();
+	private readonly List<int> _netCaptureReservationRemovalScratch = new();
 	private int _nextNetMonsterId;
+	private const ulong NetworkCaptureReservationMsec = 30000;
 
 	// Reused across ticks so the 10 Hz state broadcast allocates nothing (avoids
 	// GC hitches that showed up as combat/pickup stutter in multiplayer).
@@ -126,6 +130,7 @@ public partial class World
 			return;
 		}
 
+		CleanupExpiredNetworkCaptureReservations();
 		_netRemovalScratch.Clear();
 		foreach (KeyValuePair<int, NetMonsterInfo> entry in _netMonstersById)
 		{
@@ -143,6 +148,7 @@ public partial class World
 			Net!.BroadcastMonsterRemoved(netId, defeated);
 			_netMonstersById.Remove(netId);
 			_netLastDamagePeerByNetId.Remove(netId);
+			_netCaptureReservations.Remove(netId);
 		}
 
 		int count = _netMonstersById.Count;
@@ -194,6 +200,7 @@ public partial class World
 		Net!.BroadcastMonsterRemoved(netId, true);
 		_netMonstersById.Remove(netId);
 		_netLastDamagePeerByNetId.Remove(netId);
+		_netCaptureReservations.Remove(netId);
 	}
 
 	// A client's companion hit one of our monsters; host applies real damage.
@@ -218,6 +225,119 @@ public partial class World
 				// Per-player progression: the killer unlocks their own next tier.
 				Net.SendBossDefeatTo(attackerPeerId, GetTierMapId(info.Actor.MapId), info.Actor.WorldTier);
 			}
+		}
+	}
+
+	public void ApplyNetworkMonsterCaptureNetHit(int netId, long peerId)
+	{
+		if (!TryGetNetworkCaptureTarget(netId, peerId, out SimpleActor actor))
+		{
+			return;
+		}
+
+		actor.GrantCaptureProtection(8.0f);
+		if (!actor.CaptureReady)
+		{
+			actor.AddCaptureStagger(actor.MaxStagger * 0.25f);
+		}
+	}
+
+	public void SetNetworkMonsterCaptureLock(int netId, long peerId, bool locked)
+	{
+		if (!locked)
+		{
+			if (_netCaptureReservations.TryGetValue(netId, out var activeReservation) && activeReservation.PeerId == peerId)
+			{
+				_netCaptureReservations.Remove(netId);
+				if (_netMonstersById.TryGetValue(netId, out NetMonsterInfo activeInfo) && IsInstanceValid(activeInfo.Actor))
+				{
+					activeInfo.Actor.EndCaptureProtection();
+				}
+			}
+			return;
+		}
+
+		if (!TryGetNetworkCaptureTarget(netId, peerId, out SimpleActor actor))
+		{
+			return;
+		}
+
+		ulong now = Time.GetTicksMsec();
+		if (!actor.CaptureReady
+			|| (_netCaptureReservations.TryGetValue(netId, out var reservation)
+				&& reservation.PeerId != peerId
+				&& reservation.ExpiresAtMsec > now))
+		{
+			return;
+		}
+
+		_netCaptureReservations[netId] = (peerId, now + NetworkCaptureReservationMsec);
+		actor.GrantCaptureProtection(NetworkCaptureReservationMsec / 1000.0f);
+		actor.SetCaptureLocked(true);
+	}
+
+	public void TryGrantNetworkMonsterCapture(int netId, long peerId)
+	{
+		ulong now = Time.GetTicksMsec();
+		if (!TryGetNetworkCaptureTarget(netId, peerId, out SimpleActor actor)
+			|| !_netCaptureReservations.TryGetValue(netId, out var reservation)
+			|| reservation.PeerId != peerId
+			|| reservation.ExpiresAtMsec <= now)
+		{
+			Net!.SendMonsterCaptureDenied(peerId, netId);
+			return;
+		}
+
+		ActorSaveData data = actor.ExportSaveData();
+		string actorJson = JsonSerializer.Serialize(data);
+		_netMonstersById.Remove(netId);
+		_netLastDamagePeerByNetId.Remove(netId);
+		_netCaptureReservations.Remove(netId);
+		Net!.SendMonsterCaptureGranted(peerId, netId, actorJson);
+		Net.BroadcastMonsterRemoved(netId, false);
+		actor.QueueFree();
+	}
+
+	private bool TryGetNetworkCaptureTarget(int netId, long peerId, out SimpleActor actor)
+	{
+		actor = null!;
+		if (!IsNetworkHostWorld
+			|| !_netMonstersById.TryGetValue(netId, out NetMonsterInfo info)
+			|| !IsInstanceValid(info.Actor)
+			|| info.Actor.IsDefeated
+			|| info.Actor.IsCaptured
+			|| !Net!.IsRemotePlayerNear(peerId, info.Actor.MapId, info.Actor.WorldTier, info.Actor.GroupId, info.Actor.GlobalPosition, 36.0f))
+		{
+			return false;
+		}
+
+		actor = info.Actor;
+		return true;
+	}
+
+	private void CleanupExpiredNetworkCaptureReservations()
+	{
+		ulong now = Time.GetTicksMsec();
+		_netCaptureReservationRemovalScratch.Clear();
+		foreach (KeyValuePair<int, (long PeerId, ulong ExpiresAtMsec)> entry in _netCaptureReservations)
+		{
+			if (entry.Value.ExpiresAtMsec > now
+				&& _netMonstersById.TryGetValue(entry.Key, out NetMonsterInfo info)
+				&& IsInstanceValid(info.Actor))
+			{
+				continue;
+			}
+
+			if (_netMonstersById.TryGetValue(entry.Key, out NetMonsterInfo expiredInfo) && IsInstanceValid(expiredInfo.Actor))
+			{
+				expiredInfo.Actor.EndCaptureProtection();
+			}
+			_netCaptureReservationRemovalScratch.Add(entry.Key);
+		}
+
+		foreach (int netId in _netCaptureReservationRemovalScratch)
+		{
+			_netCaptureReservations.Remove(netId);
 		}
 	}
 
@@ -336,6 +456,45 @@ public partial class World
 		}
 	}
 
+	public void HandleNetworkMonsterCaptureGranted(int netId, string actorJson)
+	{
+		if (!IsNetworkClientWorld || !_netMonstersById.TryGetValue(netId, out NetMonsterInfo info) || !IsInstanceValid(info.Actor))
+		{
+			return;
+		}
+
+		ActorSaveData? data;
+		try
+		{
+			data = JsonSerializer.Deserialize<ActorSaveData>(actorJson);
+		}
+		catch (JsonException)
+		{
+			data = null;
+		}
+
+		if (data == null)
+		{
+			HandleNetworkMonsterCaptureDenied(netId);
+			return;
+		}
+
+		_netMonstersById.Remove(netId);
+		if (!_player.AcceptNetworkCapturedActor(info.Actor, data))
+		{
+			info.Actor.QueueFree();
+			_player.NotifyNetworkCaptureDenied();
+		}
+	}
+
+	public void HandleNetworkMonsterCaptureDenied(int netId)
+	{
+		if (IsNetworkClientWorld)
+		{
+			_player.NotifyNetworkCaptureDenied();
+		}
+	}
+
 	// Called when the connection drops mid-game: frozen puppets would otherwise
 	// linger as unkillable statues while the world falls back to local rules.
 	public void ClearNetworkPuppetMonsters()
@@ -351,6 +510,7 @@ public partial class World
 
 		_netMonstersById.Clear();
 		_netLastDamagePeerByNetId.Clear();
+		_netCaptureReservations.Clear();
 	}
 
 	public void HandleNetworkMonsterRemoved(int netId, bool defeated)
