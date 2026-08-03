@@ -151,7 +151,26 @@ public partial class RefinementPanel : PanelContainer
 			string capturedId = id;
 			PlayerController.RefinementQuote quote = _player.GetRefinementQuote(id);
 			bool disabled = !quote.CanRefine || _player.GetInventoryCount(id) <= 0;
-			grid.AddChild(MakeItemTile(id, "refine.button", disabled, () =>
+			string tip;
+			if (quote.CanRefine)
+			{
+				string crystalName = LocaleText.T(MonsterLootCatalog.GetNameKey(quote.CrystalId));
+				tip = LocaleText.F(
+					"refine.row.detail",
+					quote.CurrentStars,
+					quote.TargetStars,
+					quote.SuccessPercent,
+					quote.Gold,
+					crystalName,
+					quote.CrystalCount,
+					_player.GetInventoryCount(quote.CrystalId));
+			}
+			else
+			{
+				tip = LocaleText.T("refine.row.max");
+			}
+
+			grid.AddChild(MakeItemTile(id, "refine.button", disabled, tip, () =>
 			{
 				if (_player != null)
 				{
@@ -183,7 +202,10 @@ public partial class RefinementPanel : PanelContainer
 		{
 			string capturedId = id;
 			bool disabled = _player.GetInventoryCount(id) <= 0;
-			grid.AddChild(MakeItemTile(id, "refine.dismantle.button", disabled, () =>
+			int stars = BuildCatalog.GetEquipmentStars(id);
+			string crystalName = LocaleText.T(MonsterLootCatalog.GetNameKey(MonsterLootCatalog.GetEnhanceCrystalId(stars)));
+			string tip = LocaleText.F("refine.dismantle.yield", _player.GetEquipmentDismantleYield(id), crystalName);
+			grid.AddChild(MakeItemTile(id, "refine.dismantle.button", disabled, tip, () =>
 			{
 				if (_player != null)
 				{
@@ -223,7 +245,7 @@ public partial class RefinementPanel : PanelContainer
 	// Icon thumbnail tile with its own action button below (精煉/分解), so the
 	// action sits right on the item instead of a far-away confirm bar. Hover shows
 	// the full stats + cost tooltip.
-	private Control MakeItemTile(string itemId, string actionKey, bool actionDisabled, System.Action onAction)
+	private Control MakeItemTile(string itemId, string actionKey, bool actionDisabled, string actionTooltip, System.Action onAction)
 	{
 		var tile = new PanelContainer { CustomMinimumSize = new Vector2(RefineTileWidth, 132.0f) };
 		string capturedId = itemId;
@@ -262,6 +284,10 @@ public partial class RefinementPanel : PanelContainer
 			Disabled = actionDisabled,
 			CustomMinimumSize = new Vector2(0.0f, 30.0f),
 			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			// Its own independent tooltip: required materials (refine) / yield
+			// (dismantle), separate from the icon's item-stats tooltip.
+			TooltipText = actionTooltip,
+			MouseDefaultCursorShape = CursorShape.PointingHand,
 		};
 		actionButton.AddThemeFontSizeOverride("font_size", 13);
 		actionButton.Pressed += onAction;
@@ -507,40 +533,11 @@ public partial class RefinementPanel : PanelContainer
 			return;
 		}
 
+		// Item stats only; the refine cost / dismantle yield lives on the action
+		// button's own tooltip, kept independent of this stats tooltip.
 		string title = InventoryPanel.BuildItemTooltipTitle(itemId);
 		string body = InventoryPanel.BuildItemTooltipBody(itemId, string.Empty);
 		body += $"\n{LocaleText.F("shop.owned_count", _player.GetInventoryCount(itemId))}";
-
-		// Show the refine cost / dismantle yield inline, since the confirm strip is
-		// gone — the player sees what an action costs before pressing the tile button.
-		if (_tab == 0)
-		{
-			PlayerController.RefinementQuote quote = _player.GetRefinementQuote(itemId);
-			if (quote.CanRefine)
-			{
-				string crystalName = LocaleText.T(MonsterLootCatalog.GetNameKey(quote.CrystalId));
-				body += "\n" + LocaleText.F(
-					"refine.row.detail",
-					quote.CurrentStars,
-					quote.TargetStars,
-					quote.SuccessPercent,
-					quote.Gold,
-					crystalName,
-					quote.CrystalCount,
-					_player.GetInventoryCount(quote.CrystalId));
-			}
-			else
-			{
-				body += "\n" + LocaleText.T("refine.row.max");
-			}
-		}
-		else if (_tab == 1)
-		{
-			int stars = BuildCatalog.GetEquipmentStars(itemId);
-			string crystalName = LocaleText.T(MonsterLootCatalog.GetNameKey(MonsterLootCatalog.GetEnhanceCrystalId(stars)));
-			body += "\n" + LocaleText.F("refine.dismantle.yield", _player.GetEquipmentDismantleYield(itemId), crystalName);
-		}
-
 		_itemInfo.ShowTooltip(title, body, this);
 	}
 
