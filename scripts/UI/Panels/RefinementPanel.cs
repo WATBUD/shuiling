@@ -15,7 +15,14 @@ public partial class RefinementPanel : PanelContainer
 	private Button _tabDismantleButton = null!;
 	private Button _tabExchangeButton = null!;
 	private FloatingTooltip _itemInfo = null!;
+	private PanelContainer _detailPanel = null!;
+	private Label _detailLabel = null!;
+	private Button _confirmButton = null!;
+	private string _selectedRefineId = string.Empty;
+	private string _selectedDismantleId = string.Empty;
 	private int _tab;
+	private const float RefineTileWidth = 98.0f;
+	private const int RefineTileGap = 8;
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -104,6 +111,7 @@ public partial class RefinementPanel : PanelContainer
 		});
 		_itemInfo?.HideTooltip();
 		ClearChildren(_itemList);
+		_detailPanel.Visible = false;
 
 		if (_player == null)
 		{
@@ -132,49 +140,58 @@ public partial class RefinementPanel : PanelContainer
 		}
 
 		List<string> ids = _player.GetRefinableBagEquipmentIds();
+		if (!ids.Contains(_selectedRefineId))
+		{
+			_selectedRefineId = string.Empty;
+		}
+
 		if (ids.Count == 0)
 		{
 			var empty = MakeLabel(16, new Color(0.72f, 0.78f, 0.84f));
 			empty.Text = LocaleText.T("refine.empty");
 			_itemList.AddChild(empty);
+			_detailPanel.Visible = false;
 			return;
 		}
 
+		GridContainer grid = AddItemGrid();
 		foreach (string id in ids)
 		{
-			AddRefineRow(id);
+			string capturedId = id;
+			grid.AddChild(MakeItemTile(id, _selectedRefineId == id, () =>
+			{
+				_selectedRefineId = capturedId;
+				RefreshAll();
+			}));
 		}
+
+		UpdateRefineDetail();
 	}
 
-	private void AddRefineRow(string itemId)
+	private void UpdateRefineDetail()
 	{
 		if (_player == null)
 		{
 			return;
 		}
 
-		PlayerController.RefinementQuote quote = _player.GetRefinementQuote(itemId);
-		int owned = _player.GetInventoryCount(itemId);
+		_detailPanel.Visible = true;
+		_confirmButton.Text = LocaleText.T("refine.button");
+		if (string.IsNullOrEmpty(_selectedRefineId))
+		{
+			_detailLabel.Text = LocaleText.T("refine.select_hint");
+			_confirmButton.Disabled = true;
+			return;
+		}
 
-		PanelContainer row = CreateRowShell(out HBoxContainer content);
-		string capturedId = itemId;
-		row.MouseEntered += () => ShowItemInfo(capturedId);
-		row.MouseExited += HideItemInfo;
-
-		var info = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-		content.AddChild(info);
-
-		string baseName = LocaleText.T(BuildCatalog.GetItemNameKey(itemId));
-		var nameLabel = MakeLabel(17, new Color(0.96f, 0.98f, 1.0f));
-		nameLabel.Text = $"{baseName}{BuildCatalog.GetStarSuffix(itemId)}  ×{owned}";
-		info.AddChild(nameLabel);
-
-		var detailLabel = MakeLabel(14, new Color(0.80f, 0.88f, 0.94f));
+		PlayerController.RefinementQuote quote = _player.GetRefinementQuote(_selectedRefineId);
+		int owned = _player.GetInventoryCount(_selectedRefineId);
+		string baseName = LocaleText.T(BuildCatalog.GetItemNameKey(_selectedRefineId)) + BuildCatalog.GetStarSuffix(_selectedRefineId);
 		if (quote.CanRefine)
 		{
 			int ownedCrystals = _player.GetInventoryCount(quote.CrystalId);
 			string crystalName = LocaleText.T(MonsterLootCatalog.GetNameKey(quote.CrystalId));
-			detailLabel.Text = LocaleText.F(
+			_detailLabel.Text = $"{baseName}\n" + LocaleText.F(
 				"refine.row.detail",
 				quote.CurrentStars,
 				quote.TargetStars,
@@ -183,29 +200,13 @@ public partial class RefinementPanel : PanelContainer
 				crystalName,
 				quote.CrystalCount,
 				ownedCrystals);
+			_confirmButton.Disabled = owned <= 0;
 		}
 		else
 		{
-			detailLabel.Text = LocaleText.T("refine.row.max");
+			_detailLabel.Text = $"{baseName}\n" + LocaleText.T("refine.row.max");
+			_confirmButton.Disabled = true;
 		}
-
-		info.AddChild(detailLabel);
-
-		var refineButton = new Button
-		{
-			Text = LocaleText.T("refine.button"),
-			CustomMinimumSize = new Vector2(140.0f, 48.0f),
-			Disabled = !quote.CanRefine || owned <= 0,
-		};
-		refineButton.Pressed += () =>
-		{
-			if (_player != null)
-			{
-				_player.TryRefineBagEquipment(capturedId);
-				RefreshAll();
-			}
-		};
-		content.AddChild(refineButton);
 	}
 
 	private void RefreshDismantleTab()
@@ -216,60 +217,143 @@ public partial class RefinementPanel : PanelContainer
 		}
 
 		List<string> ids = _player.GetDismantlableEquipmentIds();
+		if (!ids.Contains(_selectedDismantleId))
+		{
+			_selectedDismantleId = string.Empty;
+		}
+
 		if (ids.Count == 0)
 		{
 			var empty = MakeLabel(16, new Color(0.72f, 0.78f, 0.84f));
 			empty.Text = LocaleText.T("refine.dismantle.empty");
 			_itemList.AddChild(empty);
+			_detailPanel.Visible = false;
 			return;
 		}
 
+		GridContainer grid = AddItemGrid();
 		foreach (string id in ids)
 		{
-			AddDismantleRow(id);
+			string capturedId = id;
+			grid.AddChild(MakeItemTile(id, _selectedDismantleId == id, () =>
+			{
+				_selectedDismantleId = capturedId;
+				RefreshAll();
+			}));
 		}
+
+		UpdateDismantleDetail();
 	}
 
-	private void AddDismantleRow(string itemId)
+	private void UpdateDismantleDetail()
 	{
 		if (_player == null)
 		{
 			return;
 		}
 
-		int owned = _player.GetInventoryCount(itemId);
-		CreateRowShell(out HBoxContainer content);
+		_detailPanel.Visible = true;
+		_confirmButton.Text = LocaleText.T("refine.dismantle.button");
+		if (string.IsNullOrEmpty(_selectedDismantleId))
+		{
+			_detailLabel.Text = LocaleText.T("refine.dismantle.select_hint");
+			_confirmButton.Disabled = true;
+			return;
+		}
 
-		var info = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-		content.AddChild(info);
-
-		string baseName = LocaleText.T(BuildCatalog.GetItemNameKey(itemId)) + BuildCatalog.GetStarSuffix(itemId);
-		var nameLabel = MakeLabel(17, new Color(0.96f, 0.98f, 1.0f));
-		nameLabel.Text = $"{baseName}  ×{owned}";
-		info.AddChild(nameLabel);
-
-		int stars = BuildCatalog.GetEquipmentStars(itemId);
+		int owned = _player.GetInventoryCount(_selectedDismantleId);
+		int stars = BuildCatalog.GetEquipmentStars(_selectedDismantleId);
+		string baseName = LocaleText.T(BuildCatalog.GetItemNameKey(_selectedDismantleId)) + BuildCatalog.GetStarSuffix(_selectedDismantleId);
 		string crystalName = LocaleText.T(MonsterLootCatalog.GetNameKey(MonsterLootCatalog.GetEnhanceCrystalId(stars)));
-		var detailLabel = MakeLabel(14, new Color(0.80f, 0.88f, 0.94f));
-		detailLabel.Text = LocaleText.F("refine.dismantle.yield", _player.GetEquipmentDismantleYield(itemId), crystalName);
-		info.AddChild(detailLabel);
+		_detailLabel.Text = $"{baseName}\n" + LocaleText.F("refine.dismantle.yield", _player.GetEquipmentDismantleYield(_selectedDismantleId), crystalName);
+		_confirmButton.Disabled = owned <= 0;
+	}
 
+	private void OnConfirmPressed()
+	{
+		if (_player == null)
+		{
+			return;
+		}
+
+		if (_tab == 0 && !string.IsNullOrEmpty(_selectedRefineId))
+		{
+			_player.TryRefineBagEquipment(_selectedRefineId);
+			RefreshAll();
+		}
+		else if (_tab == 1 && !string.IsNullOrEmpty(_selectedDismantleId))
+		{
+			_player.TryDismantleEquipment(_selectedDismantleId);
+			RefreshAll();
+		}
+	}
+
+	// A responsive icon grid inside the scroll, matching the gacha panel's layout.
+	private GridContainer AddItemGrid()
+	{
+		var grid = new GridContainer { Columns = 5, SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		grid.AddThemeConstantOverride("h_separation", RefineTileGap);
+		grid.AddThemeConstantOverride("v_separation", RefineTileGap);
+		_itemList.AddChild(grid);
+		if (_itemList.GetParent() is Control scroll)
+		{
+			float available = Mathf.Max(scroll.Size.X, RefineTileWidth);
+			grid.Columns = Mathf.Max(1, Mathf.FloorToInt((available + RefineTileGap) / (RefineTileWidth + RefineTileGap)));
+		}
+
+		return grid;
+	}
+
+	// Icon thumbnail tile: click selects (drives the detail panel), hover shows the
+	// full stats tooltip. Selected tile gets a gold border.
+	private Control MakeItemTile(string itemId, bool selected, System.Action onClick)
+	{
+		int owned = _player?.GetInventoryCount(itemId) ?? 0;
+		var tile = new PanelContainer { CustomMinimumSize = new Vector2(RefineTileWidth, 118.0f) };
 		string capturedId = itemId;
-		var dismantleButton = new Button
+		tile.MouseEntered += () => ShowItemInfo(capturedId);
+		tile.MouseExited += HideItemInfo;
+
+		var style = new StyleBoxFlat
 		{
-			Text = LocaleText.T("refine.dismantle.button"),
-			CustomMinimumSize = new Vector2(140.0f, 48.0f),
-			Disabled = owned <= 0,
+			BgColor = new Color(0.08f, 0.09f, 0.105f, 0.94f),
+			BorderColor = selected ? new Color(1.0f, 0.86f, 0.4f, 0.98f) : new Color(0.32f, 0.38f, 0.45f, 0.72f),
 		};
-		dismantleButton.Pressed += () =>
+		style.SetBorderWidthAll(selected ? 3 : 1);
+		style.SetCornerRadiusAll(6);
+		style.SetContentMarginAll(6);
+		tile.AddThemeStyleboxOverride("panel", style);
+		tile.GuiInput += inputEvent =>
 		{
-			if (_player != null)
+			if (inputEvent is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
 			{
-				_player.TryDismantleEquipment(capturedId);
-				RefreshAll();
+				tile.AcceptEvent();
+				onClick();
 			}
 		};
-		content.AddChild(dismantleButton);
+
+		var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+		box.AddThemeConstantOverride("separation", 2);
+		tile.AddChild(box);
+
+		TextureRect icon = ItemIconLibrary.CreateRect(itemId, 58.0f);
+		icon.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+		box.AddChild(icon);
+
+		var nameLabel = MakeLabel(13, new Color(0.96f, 0.98f, 1.0f));
+		nameLabel.Text = $"{LocaleText.T(BuildCatalog.GetItemNameKey(itemId))}{BuildCatalog.GetStarSuffix(itemId)}";
+		nameLabel.HorizontalAlignment = HorizontalAlignment.Center;
+		nameLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		nameLabel.MouseFilter = MouseFilterEnum.Ignore;
+		box.AddChild(nameLabel);
+
+		var countLabel = MakeLabel(12, new Color(0.78f, 0.86f, 0.94f));
+		countLabel.Text = $"×{owned}";
+		countLabel.HorizontalAlignment = HorizontalAlignment.Center;
+		countLabel.MouseFilter = MouseFilterEnum.Ignore;
+		box.AddChild(countLabel);
+
+		return tile;
 	}
 
 	private void RefreshExchangeTab()
@@ -479,6 +563,39 @@ public partial class RefinementPanel : PanelContainer
 		_itemList = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
 		_itemList.AddThemeConstantOverride("separation", 8);
 		scroll.AddChild(_itemList);
+
+		// Fixed detail + confirm strip for the grid tabs (refine / dismantle): the
+		// selected item's cost/yield shows here and the player confirms the action.
+		_detailPanel = new PanelContainer { Visible = false };
+		var detailStyle = new StyleBoxFlat
+		{
+			BgColor = new Color(0.07f, 0.08f, 0.10f, 0.96f),
+			BorderColor = new Color(0.40f, 0.50f, 0.62f, 0.82f),
+		};
+		detailStyle.SetBorderWidthAll(1);
+		detailStyle.SetCornerRadiusAll(6);
+		detailStyle.SetContentMarginAll(10);
+		_detailPanel.AddThemeStyleboxOverride("panel", detailStyle);
+		root.AddChild(_detailPanel);
+
+		var detailRow = new HBoxContainer();
+		detailRow.AddThemeConstantOverride("separation", 12);
+		_detailPanel.AddChild(detailRow);
+
+		_detailLabel = MakeLabel(15, new Color(0.86f, 0.92f, 0.98f));
+		_detailLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+		_detailLabel.SizeFlagsVertical = SizeFlags.ShrinkCenter;
+		_detailLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		detailRow.AddChild(_detailLabel);
+
+		_confirmButton = new Button
+		{
+			Text = LocaleText.T("refine.button"),
+			CustomMinimumSize = new Vector2(150.0f, 48.0f),
+			SizeFlagsVertical = SizeFlags.ShrinkCenter,
+		};
+		_confirmButton.Pressed += OnConfirmPressed;
+		detailRow.AddChild(_confirmButton);
 
 		var closeButton = new Button
 		{
