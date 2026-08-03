@@ -8,6 +8,7 @@ public partial class QuestLogPanel : PanelContainer
 	private VBoxContainer _questList = null!;
 	private Label _titleLabel = null!;
 	private Label _hintLabel = null!;
+	private CheckButton _trackerToggle = null!;
 	private float _refreshUiRemaining;
 
 	public System.Action? CloseRequested { get; set; }
@@ -66,6 +67,11 @@ public partial class QuestLogPanel : PanelContainer
 
 		_titleLabel.Text = LocaleText.T("quest.log.title");
 		_hintLabel.Text = LocaleText.T("quest.log.hint");
+		if (_trackerToggle != null)
+		{
+			_trackerToggle.Text = LocaleText.T("quest.log.show_tracker");
+			_trackerToggle.SetPressedNoSignal(_player?.ShowQuestTracker ?? false);
+		}
 		ClearChildren(_questList);
 
 		if (_player == null)
@@ -123,6 +129,10 @@ public partial class QuestLogPanel : PanelContainer
 		_hintLabel = MakeLabel(15, new Color(0.72f, 0.82f, 0.88f));
 		_hintLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
 		root.AddChild(_hintLabel);
+
+		_trackerToggle = new CheckButton { Text = LocaleText.T("quest.log.show_tracker") };
+		_trackerToggle.Toggled += enabled => _player?.SetShowQuestTracker(enabled);
+		root.AddChild(_trackerToggle);
 
 		var scroll = new ScrollContainer
 		{

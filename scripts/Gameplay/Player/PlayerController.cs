@@ -281,6 +281,7 @@ public partial class PlayerController : CharacterBody3D
 	private SettingsPanel _settingsPanel = null!;
 	private PanelContainer _pauseMenuPanel = null!;
 	private MinimapPanel _minimapPanel = null!;
+	private QuestTrackerPanel _questTrackerPanel = null!;
 	private PanelContainer _playerHealthHudPanel = null!;
 	private Label _playerHealthHudNameLabel = null!;
 	private Label _playerHealthHudValueLabel = null!;
@@ -346,6 +347,7 @@ public partial class PlayerController : CharacterBody3D
 	private float _bossWorldStatusRefreshRemaining;
 	private bool _bossAnnouncementsEnabled = true;
 	private float _bossAnnouncementOpacity = 0.90f;
+	private bool _showQuestTracker;
 	private string _bossWorldStatusSignature = string.Empty;
 
 	public IReadOnlyList<SimpleActor> CapturedCollection => _capturedCollection;
@@ -376,6 +378,7 @@ public partial class PlayerController : CharacterBody3D
 	public float NameplateScale => SimpleActor.NameplateScale;
 	public bool BossAnnouncementsEnabled => _bossAnnouncementsEnabled;
 	public float BossAnnouncementOpacity => _bossAnnouncementOpacity;
+	public bool ShowQuestTracker => _showQuestTracker;
 	public float HealthRatio => EffectiveMaxHealth <= 0 ? 0.0f : Mathf.Clamp(CurrentHealth / (float)EffectiveMaxHealth, 0.0f, 1.0f);
 	public int ExperienceToNextLevel => ExperienceTable.ToNextLevel(Level);
 
@@ -395,6 +398,7 @@ public partial class PlayerController : CharacterBody3D
 		CreatePlayerNameplate();
 		CreateTargetInfoPanel();
 		CreateMinimapPanel();
+		CreateQuestTrackerPanel();
 		CreatePlayerHealthHud();
 		CreateCaptureRhythmPanel();
 		CreatePartyPanel();

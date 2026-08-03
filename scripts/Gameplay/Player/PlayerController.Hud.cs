@@ -1055,6 +1055,27 @@ public partial class PlayerController
 		}
 	}
 
+	private void CreateQuestTrackerPanel()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "QuestTrackerLayer",
+			Layer = 23,
+		};
+
+		AddChild(layer);
+		_questTrackerPanel = new QuestTrackerPanel();
+		layer.AddChild(_questTrackerPanel);
+		_questTrackerPanel.Bind(this);
+		_questTrackerPanel.SetShown(_showQuestTracker);
+	}
+
+	public void SetShowQuestTracker(bool value)
+	{
+		_showQuestTracker = value;
+		_questTrackerPanel?.SetShown(value);
+	}
+
 	private void UpdateMouseModeForPanels()
 	{
 		Input.MouseMode = _pauseMenuPanel.Visible || _partyPanel.Visible || _partyInvitePanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _questLogPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _refinementPanel.Visible || _coreEnhancerPanel.Visible || _worldMapPanel.Visible || _gachaPanel.Visible || _warehousePanel.Visible || _mailboxPanel.Visible || _composePanel.Visible || _cardAlbumPanel.Visible || _settingsPanel.Visible || (_npcQuestDialog != null && _npcQuestDialog.Visible) || (_mapTravelDialog != null && _mapTravelDialog.Visible) || (_wildReturnDialog != null && _wildReturnDialog.Visible)

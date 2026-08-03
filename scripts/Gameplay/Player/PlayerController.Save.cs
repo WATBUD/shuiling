@@ -32,6 +32,7 @@ public partial class PlayerController
 			NameplateScale = NameplateScale,
 			BossAnnouncementsEnabled = BossAnnouncementsEnabled,
 			BossAnnouncementOpacity = BossAnnouncementOpacity,
+			ShowQuestTracker = _showQuestTracker,
 			InventoryItems = new Dictionary<string, int>(_inventoryItems),
 			StorageItems = new Dictionary<string, int>(_storageItems),
 			MercenaryNextRefreshUnix = _mercenaryNextRefreshUnix,
@@ -151,6 +152,7 @@ public partial class PlayerController
 		SetNameplateScale(data.NameplateScale);
 		SetBossAnnouncementsEnabled(data.BossAnnouncementsEnabled);
 		SetBossAnnouncementOpacity(data.BossAnnouncementOpacity);
+		SetShowQuestTracker(data.ShowQuestTracker);
 		SetCameraMode(CameraModeFromSaveId(data.CameraMode));
 		RestoreMercenaryOffers(data);
 		RestoreCompanionRecruitOffers(data);

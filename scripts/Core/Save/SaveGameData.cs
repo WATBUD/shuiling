@@ -79,6 +79,7 @@ public sealed class PlayerSaveData
 	public float NameplateScale { get; set; } = 3.0f;
 	public bool BossAnnouncementsEnabled { get; set; } = true;
 	public float BossAnnouncementOpacity { get; set; } = 0.90f;
+	public bool ShowQuestTracker { get; set; } = false;
 	public Dictionary<string, int> InventoryItems { get; set; } = new();
 	public Dictionary<string, int> StorageItems { get; set; } = new();
 	public List<string> AcceptedNpcQuestNames { get; set; } = new();
