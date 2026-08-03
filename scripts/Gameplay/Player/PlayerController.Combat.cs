@@ -799,14 +799,15 @@ public partial class PlayerController
 		_fallSfxPlayer.Play();
 	}
 
-	// An ORIGINAL synthesized approximation of the "screaming marmot 啊～～" meme
-	// vibe (NOT the copyrighted clip): a harsh high shriek that snaps up to ~1.2kHz,
-	// warbles with heavy vibrato/tremolo, adds a bright harmonic stack + rasp noise,
-	// and is soft-clipped for a screechy edge. Procedural 16-bit mono PCM.
+	// An ORIGINAL synthesized approximation of the "screaming marmot 啊～～" vibe
+	// (NOT the copyrighted clip): an instant, punchy, raspy shriek — a buzzy
+	// sawtooth that hits full volume at once near ~1.3kHz, warbles hard, glides
+	// down as it trails, driven through hard-clip distortion with a noise rasp and
+	// an exponential decay. Procedural 16-bit mono PCM.
 	private static AudioStream BuildFallScream()
 	{
 		const int rate = 22050;
-		const float duration = 1.1f;
+		const float duration = 0.85f;
 		int sampleCount = (int)(rate * duration);
 		var data = new byte[sampleCount * 2];
 		double phase = 0.0;
@@ -816,34 +817,25 @@ public partial class PlayerController
 			float frac = i / (float)sampleCount;
 			float t = i / (float)rate;
 
-			// Fast snap up into a high wavering shriek, easing down at the very end.
-			float rise = Mathf.Min(1.0f, frac / 0.06f);
-			float baseFreq = Mathf.Lerp(720.0f, 1240.0f, rise);
-			if (frac > 0.85f)
-			{
-				baseFreq = Mathf.Lerp(1240.0f, 940.0f, (frac - 0.85f) / 0.15f);
-			}
+			// A quick blip up, then a long glide down — the classic "AAAH" fall-off.
+			float pitch = frac < 0.04f
+				? Mathf.Lerp(1050.0f, 1360.0f, frac / 0.04f)
+				: Mathf.Lerp(1360.0f, 640.0f, (frac - 0.04f) / 0.96f);
+			pitch *= 1.0f + 0.08f * Mathf.Sin(t * Mathf.Tau * 34.0f);
+			phase += pitch / rate;
 
-			float freq = baseFreq * (1.0f + 0.06f * Mathf.Sin(t * Mathf.Tau * 30.0f));
-			phase += freq / rate;
-			double ph = phase * Mathf.Tau;
-
-			// Bright buzzy harmonic stack + a little rasp for the screech.
-			float tone = 0.60f * Mathf.Sin((float)ph)
-				+ 0.28f * Mathf.Sin((float)(ph * 2.0))
-				+ 0.16f * Mathf.Sin((float)(ph * 3.0))
-				+ 0.09f * Mathf.Sin((float)(ph * 4.0));
+			// Raw sawtooth (rich, buzzy) + rasp noise, then hard-clipped for a harsh
+			// animal-screech edge.
+			float saw = (float)(phase - System.Math.Floor(phase)) * 2.0f - 1.0f;
 			noiseState = (noiseState * 1664525u) + 1013904223u;
-			float noise = (((noiseState >> 8) / 16777215.0f) * 2.0f - 1.0f) * 0.12f;
+			float noise = (((noiseState >> 8) / 16777215.0f) * 2.0f - 1.0f) * 0.20f;
+			float driven = Mathf.Clamp((saw * 0.82f + noise) * 3.0f, -1.0f, 1.0f);
 
-			// Warble tremolo + fast attack / short release envelope.
-			float tremolo = 0.78f + 0.22f * Mathf.Sin(t * Mathf.Tau * 26.0f);
-			float attack = Mathf.Min(1.0f, frac / 0.05f);
-			float release = frac > 0.8f ? Mathf.Max(1.0f - ((frac - 0.8f) / 0.2f), 0.0f) : 1.0f;
-			float env = attack * release * tremolo;
+			// Instant onset (tiny 3ms fade to kill the click), warble, exp decay.
+			float tremolo = 0.82f + 0.18f * Mathf.Sin(t * Mathf.Tau * 30.0f);
+			float env = Mathf.Min(1.0f, frac / 0.0035f) * Mathf.Exp(-3.2f * frac) * tremolo;
 
-			float shaped = Mathf.Clamp((tone + noise) * 1.6f, -1.0f, 1.0f);
-			short sample = (short)(shaped * env * 0.5f * 32767.0f);
+			short sample = (short)(driven * env * 0.5f * 32767.0f);
 			data[i * 2] = (byte)(sample & 0xFF);
 			data[i * 2 + 1] = (byte)((sample >> 8) & 0xFF);
 		}
