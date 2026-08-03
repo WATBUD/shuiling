@@ -33,6 +33,8 @@ public partial class PlayerController
 			BossAnnouncementsEnabled = BossAnnouncementsEnabled,
 			BossAnnouncementOpacity = BossAnnouncementOpacity,
 			ShowQuestTracker = _showQuestTracker,
+			GachaMerchantLevel = _gachaMerchantLevel,
+			GachaMerchantExp = _gachaMerchantExp,
 			InventoryItems = new Dictionary<string, int>(_inventoryItems),
 			StorageItems = new Dictionary<string, int>(_storageItems),
 			MercenaryNextRefreshUnix = _mercenaryNextRefreshUnix,
@@ -153,6 +155,7 @@ public partial class PlayerController
 		SetBossAnnouncementsEnabled(data.BossAnnouncementsEnabled);
 		SetBossAnnouncementOpacity(data.BossAnnouncementOpacity);
 		SetShowQuestTracker(data.ShowQuestTracker);
+		SetGachaMerchantProgress(data.GachaMerchantLevel, data.GachaMerchantExp);
 		SetCameraMode(CameraModeFromSaveId(data.CameraMode));
 		RestoreMercenaryOffers(data);
 		RestoreCompanionRecruitOffers(data);

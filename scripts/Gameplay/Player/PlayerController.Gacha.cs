@@ -17,11 +17,67 @@ public partial class PlayerController
 
 	private readonly RandomNumberGenerator _gachaRng = new();
 
-	public int GachaDrawCost => GachaConfig.DrawCost;
+	// Per-save gacha merchant progression. The merchant starts at level 1; drawing
+	// feeds it EXP (scaled by the drawn star) until it levels up, which raises the
+	// draw cap the player may select. Persisted via SaveGameData.
+	private int _gachaMerchantLevel = GachaConfig.MerchantStartLevel;
+	private int _gachaMerchantExp;
 
-	private int RollGachaTier()
+	public int GachaMerchantLevel => _gachaMerchantLevel;
+	public int GachaMerchantExp => _gachaMerchantExp;
+	public int GachaMerchantExpToNext => GachaConfig.ExpToLevel(_gachaMerchantLevel);
+	public bool GachaMerchantMaxed => _gachaMerchantLevel >= GachaConfig.MerchantMaxLevel;
+
+	// Highest cap the player may currently draw at (merchant level + 1).
+	public int GachaUnlockedMaxTier => GachaConfig.UnlockedMaxTier(_gachaMerchantLevel);
+
+	// Gold cost of one draw at the given cap (clamped to what's unlocked).
+	public int GachaDrawCost(int tierCap)
 	{
-		for (int tier = CoreEnhanceConfig.MaxOrbTier; tier >= 1; tier--)
+		return GachaConfig.DrawCost(ClampGachaTierCap(tierCap));
+	}
+
+	private int ClampGachaTierCap(int tierCap)
+	{
+		return Mathf.Clamp(tierCap, 1, GachaUnlockedMaxTier);
+	}
+
+	// Load-time restore; clamps level to the valid range and drops leftover EXP that
+	// exceeds the (possibly changed) threshold so a maxed merchant reads as 0 EXP.
+	public void SetGachaMerchantProgress(int level, int exp)
+	{
+		_gachaMerchantLevel = Mathf.Clamp(level, GachaConfig.MerchantStartLevel, GachaConfig.MerchantMaxLevel);
+		int toNext = GachaConfig.ExpToLevel(_gachaMerchantLevel);
+		_gachaMerchantExp = toNext <= 0 ? 0 : Mathf.Clamp(exp, 0, toNext - 1);
+	}
+
+	private void AddGachaMerchantExp(int amount)
+	{
+		if (amount <= 0 || GachaMerchantMaxed)
+		{
+			return;
+		}
+
+		_gachaMerchantExp += amount;
+		while (!GachaMerchantMaxed && _gachaMerchantExp >= GachaConfig.ExpToLevel(_gachaMerchantLevel))
+		{
+			_gachaMerchantExp -= GachaConfig.ExpToLevel(_gachaMerchantLevel);
+			_gachaMerchantLevel++;
+			PostSystemMessage(
+				LocaleText.F("gacha.merchant_level_up", _gachaMerchantLevel, GachaUnlockedMaxTier),
+				new Color(0.7f, 1.0f, 0.78f),
+				GameMessageChannel.Loot);
+		}
+
+		if (GachaMerchantMaxed)
+		{
+			_gachaMerchantExp = 0;
+		}
+	}
+
+	private int RollGachaTier(int maxTier)
+	{
+		for (int tier = Mathf.Clamp(maxTier, 1, GachaConfig.MaxTier); tier >= 1; tier--)
 		{
 			if (_gachaRng.Randf() * 100.0f < GachaConfig.TierStopPercent[tier])
 			{
@@ -79,34 +135,41 @@ public partial class PlayerController
 		}
 	}
 
-	// Performs up to `count` draws, stopping when gold is insufficient. Returns
-	// the drawn item ids (with their star/tier applied) for the panel to show.
-	public List<string> DrawGacha(int count)
+	// Performs up to `count` draws at the given cap tier, stopping when gold runs
+	// out. Each draw grants merchant EXP scaled by the star it yielded. Returns the
+	// drawn item ids (with their star/tier applied) for the panel to show.
+	public List<string> DrawGacha(int count, int tierCap)
 	{
 		var results = new List<string>();
 		count = Mathf.Clamp(count, 1, 100);
+		tierCap = ClampGachaTierCap(tierCap);
+		int cost = GachaConfig.DrawCost(tierCap);
 
-		if (Gold < GachaConfig.DrawCost)
+		if (Gold < cost)
 		{
 			PostSystemMessage(LocaleText.T("gacha.not_enough_gold"), new Color(1.0f, 0.62f, 0.48f), GameMessageChannel.Loot);
 			return results;
 		}
 
-		int affordable = Mathf.Min(count, Gold / GachaConfig.DrawCost);
+		int affordable = Mathf.Min(count, Gold / cost);
+		int earnedExp = 0;
 		for (int i = 0; i < affordable; i++)
 		{
-			Gold -= GachaConfig.DrawCost;
-			string itemId = RollGachaItem(RollGachaTier());
+			Gold -= cost;
+			int tier = RollGachaTier(tierCap);
+			string itemId = RollGachaItem(tier);
 			AddInventoryItemSilently(itemId, 1);
 			results.Add(itemId);
+			earnedExp += GachaConfig.DrawExp(tier);
 		}
 
 		if (results.Count > 0)
 		{
 			PostSystemMessage(
-				LocaleText.F("gacha.result_summary", results.Count, results.Count * GachaConfig.DrawCost),
+				LocaleText.F("gacha.result_summary", results.Count, results.Count * cost),
 				new Color(1.0f, 0.86f, 0.4f),
 				GameMessageChannel.Loot);
+			AddGachaMerchantExp(earnedExp);
 			_inventoryPanel?.RefreshAll();
 		}
 

@@ -9,6 +9,11 @@ public partial class GachaPanel : PanelContainer
 	private Label _titleLabel = null!;
 	private Label _goldLabel = null!;
 	private Label _costLabel = null!;
+	private Label _merchantLabel = null!;
+	private ProgressBar _expBar = null!;
+	private Label _tierLabel = null!;
+	private Button _tierMinusButton = null!;
+	private Button _tierPlusButton = null!;
 	private Button _drawOneButton = null!;
 	private Button _drawTenButton = null!;
 	private VBoxContainer _list = null!;
@@ -16,6 +21,8 @@ public partial class GachaPanel : PanelContainer
 	private AudioStreamPlayer _sfxPlayer = null!;
 	private ColorRect _flash = null!;
 	private readonly List<string> _lastResults = new();
+	private int _selectedTier = 1;
+	private int _lastDrawTier = 1;
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -81,16 +88,41 @@ public partial class GachaPanel : PanelContainer
 		{
 			_costLabel.Text = string.Empty;
 			_goldLabel.Text = string.Empty;
+			_merchantLabel.Text = string.Empty;
+			_expBar.Visible = false;
+			_tierLabel.Text = string.Empty;
+			_tierMinusButton.Disabled = true;
+			_tierPlusButton.Disabled = true;
 			_drawOneButton.Disabled = true;
 			_drawTenButton.Disabled = true;
 			return;
 		}
 
-		_costLabel.Text = LocaleText.F("gacha.cost", _player.GachaDrawCost);
+		int unlockedMax = _player.GachaUnlockedMaxTier;
+		_selectedTier = Mathf.Clamp(_selectedTier, 1, unlockedMax);
+		int cost = _player.GachaDrawCost(_selectedTier);
+
+		_merchantLabel.Text = LocaleText.F("gacha.merchant_level", _player.GachaMerchantLevel, unlockedMax);
+		if (_player.GachaMerchantMaxed)
+		{
+			_expBar.Visible = false;
+		}
+		else
+		{
+			_expBar.Visible = true;
+			_expBar.MaxValue = Mathf.Max(_player.GachaMerchantExpToNext, 1);
+			_expBar.Value = _player.GachaMerchantExp;
+		}
+
+		_tierLabel.Text = LocaleText.F("gacha.draw_tier", _selectedTier, unlockedMax);
+		_tierMinusButton.Disabled = _selectedTier <= 1;
+		_tierPlusButton.Disabled = _selectedTier >= unlockedMax;
+
+		_costLabel.Text = LocaleText.F("gacha.cost", cost);
 		_goldLabel.Text = $"{_player.Gold}";
 		_drawOneButton.Text = LocaleText.T("gacha.draw_one");
 		_drawTenButton.Text = LocaleText.T("gacha.draw_ten");
-		bool canDraw = _player.Gold >= _player.GachaDrawCost;
+		bool canDraw = _player.Gold >= cost;
 		_drawOneButton.Disabled = !canDraw;
 		_drawTenButton.Disabled = !canDraw;
 
@@ -175,7 +207,7 @@ public partial class GachaPanel : PanelContainer
 
 		// Draw odds for this tier, right-aligned, so players see how rare the pull was.
 		var rateLabel = MakeLabel(14, new Color(0.72f, 0.80f, 0.88f));
-		rateLabel.Text = LocaleText.F("gacha.win_rate", GachaConfig.TierProbability(rarity) * 100.0f);
+		rateLabel.Text = LocaleText.F("gacha.win_rate", GachaConfig.TierProbability(rarity, _lastDrawTier) * 100.0f);
 		rateLabel.HorizontalAlignment = HorizontalAlignment.Right;
 		content.AddChild(rateLabel);
 	}
@@ -220,6 +252,36 @@ public partial class GachaPanel : PanelContainer
 		_goldLabel = MakeLabel(20, new Color(1.0f, 0.92f, 0.62f));
 		_goldLabel.SizeFlagsVertical = SizeFlags.ShrinkCenter;
 		header.AddChild(_goldLabel);
+
+		// Merchant level + EXP progress toward the next draw-cap unlock.
+		_merchantLabel = MakeLabel(15, new Color(0.72f, 1.0f, 0.82f));
+		root.AddChild(_merchantLabel);
+
+		_expBar = new ProgressBar
+		{
+			CustomMinimumSize = new Vector2(0.0f, 12.0f),
+			ShowPercentage = false,
+		};
+		root.AddChild(_expBar);
+
+		// Draw-tier selector: pick the cap to roll at (1..unlocked); cost scales with it.
+		var tierBar = new HBoxContainer();
+		tierBar.AddThemeConstantOverride("separation", 8);
+		root.AddChild(tierBar);
+
+		_tierMinusButton = new Button { Text = "−", CustomMinimumSize = new Vector2(44.0f, 40.0f) };
+		_tierMinusButton.Pressed += () => ChangeTier(-1);
+		tierBar.AddChild(_tierMinusButton);
+
+		_tierLabel = MakeLabel(16, new Color(0.90f, 0.94f, 1.0f));
+		_tierLabel.HorizontalAlignment = HorizontalAlignment.Center;
+		_tierLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+		_tierLabel.SizeFlagsVertical = SizeFlags.ShrinkCenter;
+		tierBar.AddChild(_tierLabel);
+
+		_tierPlusButton = new Button { Text = "+", CustomMinimumSize = new Vector2(44.0f, 40.0f) };
+		_tierPlusButton.Pressed += () => ChangeTier(1);
+		tierBar.AddChild(_tierPlusButton);
 
 		_costLabel = MakeLabel(16, new Color(0.80f, 0.88f, 0.94f));
 		root.AddChild(_costLabel);
@@ -297,6 +359,17 @@ public partial class GachaPanel : PanelContainer
 		AddChild(_flash);
 	}
 
+	private void ChangeTier(int delta)
+	{
+		if (_player == null)
+		{
+			return;
+		}
+
+		_selectedTier = Mathf.Clamp(_selectedTier + delta, 1, _player.GachaUnlockedMaxTier);
+		RefreshAll();
+	}
+
 	private void OnDraw(int count)
 	{
 		if (_player == null)
@@ -304,7 +377,8 @@ public partial class GachaPanel : PanelContainer
 			return;
 		}
 
-		List<string> results = _player.DrawGacha(count);
+		_lastDrawTier = Mathf.Clamp(_selectedTier, 1, _player.GachaUnlockedMaxTier);
+		List<string> results = _player.DrawGacha(count, _lastDrawTier);
 		if (results.Count == 0)
 		{
 			RefreshAll();
