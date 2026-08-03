@@ -31,7 +31,10 @@ public partial class PlayerController : CharacterBody3D
 				continue;
 			}
 
-			if (BuildCatalog.IsFreeItem(entry.Key) || BuildCatalog.GetItemKind(entry.Key) != InventoryItemKind.SkillGem)
+			// IsSkillCoreItem is a positive catalogue test; GetItemKind's unknown-id
+			// fallback is SkillGem, which would otherwise let loot/materials/crystals
+			// leak into the enhance list as raw, untranslated "cores".
+			if (BuildCatalog.IsFreeItem(entry.Key) || !BuildCatalog.IsSkillCoreItem(entry.Key))
 			{
 				continue;
 			}

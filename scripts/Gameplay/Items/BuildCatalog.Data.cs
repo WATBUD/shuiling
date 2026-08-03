@@ -367,6 +367,29 @@ public static partial class BuildCatalog
 		return id;
 	}
 
+	// Positive test that an id is a real, catalogued skill core (star suffix
+	// tolerated). Unlike GetItemKind — whose unknown-id fallback is SkillGem — this
+	// only returns true for ids actually present in the SkillGems catalogue, so
+	// loot/materials/unknowns are correctly rejected.
+	public static bool IsSkillCoreItem(string id)
+	{
+		if (string.IsNullOrEmpty(id))
+		{
+			return false;
+		}
+
+		string baseId = GetBaseSkillCoreId(id);
+		foreach (SkillGemDefinition gem in SkillGems)
+		{
+			if (gem.Id == baseId)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	public static InventoryItemKind GetItemKind(string id)
 	{
 		string equipmentId = GetBaseEquipmentId(id);
