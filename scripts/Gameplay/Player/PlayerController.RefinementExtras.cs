@@ -17,6 +17,7 @@ public partial class PlayerController
 		foreach (KeyValuePair<string, int> entry in _inventoryItems)
 		{
 			if (entry.Value > 0
+				&& !BuildCatalog.IsFreeItem(entry.Key)
 				&& BuildCatalog.GetItemKind(entry.Key) == InventoryItemKind.Equipment
 				&& BuildCatalog.GetEquipmentStars(entry.Key) >= 1)
 			{

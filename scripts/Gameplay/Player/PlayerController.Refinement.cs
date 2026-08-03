@@ -31,7 +31,9 @@ public partial class PlayerController
 		var ids = new List<string>();
 		foreach (KeyValuePair<string, int> entry in _inventoryItems)
 		{
-			if (entry.Value > 0 && BuildCatalog.GetItemKind(entry.Key) == InventoryItemKind.Equipment)
+			if (entry.Value > 0
+				&& !BuildCatalog.IsFreeItem(entry.Key)
+				&& BuildCatalog.GetItemKind(entry.Key) == InventoryItemKind.Equipment)
 			{
 				ids.Add(entry.Key);
 			}

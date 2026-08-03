@@ -244,8 +244,12 @@ public static partial class BuildCatalog
 
 	public static bool IsFreeItem(string id)
 	{
-		return id is "gem.attribute.none" or "gem.skill.none"
-			|| id.EndsWith(".none", System.StringComparison.Ordinal);
+		// Strip any refine "#N" star suffix first, so a starred empty-slot
+		// placeholder (e.g. "equip.accessory.none#2", which could leak into an old
+		// save) is still recognised as a free/empty item and filtered out.
+		string baseId = GetBaseEquipmentId(id);
+		return baseId is "gem.attribute.none" or "gem.skill.none"
+			|| baseId.EndsWith(".none", System.StringComparison.Ordinal);
 	}
 
 	public static bool IsRetiredSkillCore(string id)

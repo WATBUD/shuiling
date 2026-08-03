@@ -15,6 +15,8 @@ public partial class RefinementPanel : PanelContainer
 	private Button _tabDismantleButton = null!;
 	private Button _tabExchangeButton = null!;
 	private FloatingTooltip _itemInfo = null!;
+	private ScrollContainer _scroll = null!;
+	private GridContainer? _grid;
 	private PanelContainer _detailPanel = null!;
 	private Label _detailLabel = null!;
 	private Button _confirmButton = null!;
@@ -111,6 +113,7 @@ public partial class RefinementPanel : PanelContainer
 		});
 		_itemInfo?.HideTooltip();
 		ClearChildren(_itemList);
+		_grid = null;
 		_detailPanel.Visible = false;
 
 		if (_player == null)
@@ -295,13 +298,23 @@ public partial class RefinementPanel : PanelContainer
 		grid.AddThemeConstantOverride("h_separation", RefineTileGap);
 		grid.AddThemeConstantOverride("v_separation", RefineTileGap);
 		_itemList.AddChild(grid);
-		if (_itemList.GetParent() is Control scroll)
+		_grid = grid;
+		UpdateGridColumns();
+		return grid;
+	}
+
+	// Fit as many tile columns as the scroll allows. On first open the scroll has
+	// no width yet (→ 1 column); the scroll's Resized signal re-runs this once the
+	// layout settles so the grid fills out.
+	private void UpdateGridColumns()
+	{
+		if (_grid == null || !IsInstanceValid(_grid) || _scroll == null)
 		{
-			float available = Mathf.Max(scroll.Size.X, RefineTileWidth);
-			grid.Columns = Mathf.Max(1, Mathf.FloorToInt((available + RefineTileGap) / (RefineTileWidth + RefineTileGap)));
+			return;
 		}
 
-		return grid;
+		float available = Mathf.Max(_scroll.Size.X, RefineTileWidth);
+		_grid.Columns = Mathf.Max(1, Mathf.FloorToInt((available + RefineTileGap) / (RefineTileWidth + RefineTileGap)));
 	}
 
 	// Icon thumbnail tile: click selects (drives the detail panel), hover shows the
@@ -553,16 +566,17 @@ public partial class RefinementPanel : PanelContainer
 		_hintLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
 		root.AddChild(_hintLabel);
 
-		var scroll = new ScrollContainer
+		_scroll = new ScrollContainer
 		{
 			HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
 			SizeFlagsVertical = SizeFlags.ExpandFill,
 		};
-		root.AddChild(scroll);
+		_scroll.Resized += UpdateGridColumns;
+		root.AddChild(_scroll);
 
 		_itemList = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
 		_itemList.AddThemeConstantOverride("separation", 8);
-		scroll.AddChild(_itemList);
+		_scroll.AddChild(_itemList);
 
 		// Fixed detail + confirm strip for the grid tabs (refine / dismantle): the
 		// selected item's cost/yield shows here and the player confirms the action.
