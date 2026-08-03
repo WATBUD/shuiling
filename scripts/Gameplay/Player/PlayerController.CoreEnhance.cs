@@ -97,6 +97,32 @@ public partial class PlayerController : CharacterBody3D
 		return true;
 	}
 
+	// Orbs a pet yields when dismantled: DismantleOrbBase + its rarity.
+	public static int DismantleOrbCount(SimpleActor actor)
+	{
+		return CoreEnhanceConfig.DismantleOrbBase + Mathf.Max(actor.Rarity, 0);
+	}
+
+	// Aggregated orbs (orbId -> count) that dismantling the given pets would grant.
+	// Used by the panel to preview the result below the selection.
+	public Dictionary<string, int> GetDismantleYield(IEnumerable<SimpleActor> actors)
+	{
+		var yield = new Dictionary<string, int>();
+		foreach (SimpleActor actor in actors)
+		{
+			if (!IsInstanceValid(actor) || !_capturedCollection.Contains(actor) || IsInActiveParty(actor))
+			{
+				continue;
+			}
+
+			string orbId = MonsterLootCatalog.GetCoreOrbId(BuildCatalog.GetIdentity(actor).ElementAffinityId, CoreEnhanceConfig.TierForLevel(actor.Level));
+			yield.TryGetValue(orbId, out int current);
+			yield[orbId] = current + DismantleOrbCount(actor);
+		}
+
+		return yield;
+	}
+
 	// Dismantles collected pets into element orbs (element from innate affinity,
 	// tier from level, count = base + rarity). Returns how many were dismantled.
 	public int DismantleCompanions(IEnumerable<SimpleActor> actors)

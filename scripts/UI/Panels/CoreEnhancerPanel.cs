@@ -12,6 +12,7 @@ public partial class CoreEnhancerPanel : PanelContainer
 	private Button _tabEnhanceButton = null!;
 	private Button _tabDismantleButton = null!;
 	private VBoxContainer _list = null!;
+	private VBoxContainer _yieldSummary = null!;
 	private Button _dismantleButton = null!;
 	private FloatingTooltip _tooltip = null!;
 	private int _tab;
@@ -79,17 +80,56 @@ public partial class CoreEnhancerPanel : PanelContainer
 		if (_player == null)
 		{
 			_dismantleButton.Visible = false;
+			_yieldSummary.Visible = false;
 			return;
 		}
 
 		if (_tab == 0)
 		{
 			_dismantleButton.Visible = false;
+			_yieldSummary.Visible = false;
 			RefreshEnhanceTab();
 		}
 		else
 		{
+			_yieldSummary.Visible = true;
 			RefreshDismantleTab();
+			RefreshYieldSummary();
+		}
+	}
+
+	// Fills the "will get" section with the aggregated orbs from the current
+	// selection (item name + quantity), so the player sees the dismantle result
+	// below before confirming.
+	private void RefreshYieldSummary()
+	{
+		if (_yieldSummary == null)
+		{
+			return;
+		}
+
+		ClearChildren(_yieldSummary);
+		if (_player == null || _tab != 1)
+		{
+			return;
+		}
+
+		var title = MakeLabel(15, new Color(1.0f, 0.9f, 0.6f));
+		Dictionary<string, int> yield = _player.GetDismantleYield(_selectedPets);
+		if (yield.Count == 0)
+		{
+			title.Text = LocaleText.T("core_enhancer.dismantle_empty");
+			_yieldSummary.AddChild(title);
+			return;
+		}
+
+		title.Text = LocaleText.T("core_enhancer.dismantle_yield");
+		_yieldSummary.AddChild(title);
+		foreach (KeyValuePair<string, int> entry in yield)
+		{
+			var row = MakeLabel(14, new Color(0.85f, 0.93f, 1.0f));
+			row.Text = $"{MonsterLootCatalog.GetCoreOrbDisplayName(entry.Key)} x{entry.Value}";
+			_yieldSummary.AddChild(row);
 		}
 	}
 
@@ -272,6 +312,7 @@ public partial class CoreEnhancerPanel : PanelContainer
 				_selectedPets.Remove(capturedActor);
 			}
 			_dismantleButton.Disabled = _selectedPets.Count == 0;
+			RefreshYieldSummary();
 		};
 		content.AddChild(checkBox);
 
@@ -287,7 +328,7 @@ public partial class CoreEnhancerPanel : PanelContainer
 		string orbName = MonsterLootCatalog.GetCoreOrbDisplayName(MonsterLootCatalog.GetCoreOrbId(element, tier));
 
 		var yieldLabel = MakeLabel(14, new Color(0.80f, 0.88f, 0.94f));
-		yieldLabel.Text = orbName;
+		yieldLabel.Text = $"{orbName} x{PlayerController.DismantleOrbCount(actor)}";
 		info.AddChild(yieldLabel);
 	}
 
@@ -373,6 +414,12 @@ public partial class CoreEnhancerPanel : PanelContainer
 		_list = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
 		_list.AddThemeConstantOverride("separation", 8);
 		scroll.AddChild(_list);
+
+		// Live "will get" preview of the aggregated orbs from the current selection
+		// (dismantle tab only).
+		_yieldSummary = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		_yieldSummary.AddThemeConstantOverride("separation", 2);
+		root.AddChild(_yieldSummary);
 
 		_dismantleButton = new Button
 		{

@@ -558,6 +558,8 @@
 	"core_enhancer.title": "核心強化",
 	"core_enhancer.enhance": "強化",
 	"core_enhancer.dismantle": "分解選取",
+	"core_enhancer.dismantle_yield": "分解可獲得：",
+	"core_enhancer.dismantle_empty": "勾選寵物以預覽分解產物",
 	"core_enhancer.cost": "{0} x{1}（持有 {2}） · {3} 金",
 	"core_enhancer.max_row": "已達最高星數",
 	"core_enhancer.empty_cores": "背包沒有可強化的核心",

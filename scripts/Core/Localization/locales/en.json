@@ -558,6 +558,8 @@
 	"core_enhancer.title": "Core Enhancement",
 	"core_enhancer.enhance": "Enhance",
 	"core_enhancer.dismantle": "Dismantle Selected",
+	"core_enhancer.dismantle_yield": "You will get:",
+	"core_enhancer.dismantle_empty": "Select pets to preview dismantle rewards",
 	"core_enhancer.cost": "{0} x{1} (have {2}) · {3} gold",
 	"core_enhancer.max_row": "Max stars",
 	"core_enhancer.empty_cores": "No enhanceable cores in bag",
