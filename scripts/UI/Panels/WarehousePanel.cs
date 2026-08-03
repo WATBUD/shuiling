@@ -8,7 +8,6 @@ public partial class WarehousePanel : PanelContainer
 {
 	private enum ItemCategory
 	{
-		All,
 		Equipment,
 		Gems,
 		Materials,
@@ -28,10 +27,7 @@ public partial class WarehousePanel : PanelContainer
 	private FloatingTooltip _companionTooltip = null!;
 	private HBoxContainer _categoryTabs = null!;
 	private readonly Dictionary<ItemCategory, Button> _categoryButtons = new();
-	private ItemCategory _selectedCategory = ItemCategory.All;
-	private const ulong TransferDebounceMsec = 250;
-	private ulong _lastTransferMsec;
-	private string _lastTransferItem = string.Empty;
+	private ItemCategory _selectedCategory = ItemCategory.Equipment;
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -90,7 +86,7 @@ public partial class WarehousePanel : PanelContainer
 		}
 		if (visible)
 		{
-			_selectedCategory = ItemCategory.All;
+			_selectedCategory = ItemCategory.Equipment;
 			RefreshAll();
 		}
 	}
@@ -141,7 +137,6 @@ public partial class WarehousePanel : PanelContainer
 		_categoryTabs = new HBoxContainer();
 		_categoryTabs.AddThemeConstantOverride("separation", 6);
 		root.AddChild(_categoryTabs);
-		AddCategoryButton(ItemCategory.All, "inventory.tab.all");
 		AddCategoryButton(ItemCategory.Equipment, "inventory.tab.equipment");
 		AddCategoryButton(ItemCategory.Gems, "inventory.tab.gems");
 		AddCategoryButton(ItemCategory.Materials, "inventory.tab.materials");
@@ -465,11 +460,6 @@ public partial class WarehousePanel : PanelContainer
 
 	private bool MatchesCategory(string itemId)
 	{
-		if (_selectedCategory == ItemCategory.All)
-		{
-			return true;
-		}
-
 		if (MonsterLootCatalog.IsMonsterLoot(itemId))
 		{
 			return _selectedCategory == ItemCategory.Materials;
@@ -499,15 +489,19 @@ public partial class WarehousePanel : PanelContainer
 		button.IconAlignment = HorizontalAlignment.Center;
 		ItemIconLibrary.AddStackCountBadge(button, count);
 
-		// Double-click or middle-click transfers one across.
+		// A single left- or middle-click transfers the whole stack across. Single
+		// click (not double) so repeatedly clicking the same slot deposits each new
+		// item that slides into it — double-click detection is unreliable across the
+		// grid rebuild, which is what made the second same-slot transfer fail.
+		// AcceptEvent first so the event is marked handled before the rebuild frees
+		// this very button.
 		button.GuiInput += inputEvent =>
 		{
 			if (inputEvent is InputEventMouseButton { Pressed: true } mouse
-				&& ((mouse.ButtonIndex == MouseButton.Left && mouse.DoubleClick)
-					|| mouse.ButtonIndex == MouseButton.Middle))
+				&& (mouse.ButtonIndex == MouseButton.Left || mouse.ButtonIndex == MouseButton.Middle))
 			{
-				Transfer(itemId, inBag);
 				button.AcceptEvent();
+				Transfer(itemId, inBag);
 			}
 		};
 		return button;
@@ -520,20 +514,7 @@ public partial class WarehousePanel : PanelContainer
 			return;
 		}
 
-		// Debounce only a repeated click on the SAME item: transferring the whole
-		// stack empties it, so a fast echo on that now-gone slot would land on a
-		// re-sorted neighbour. Consecutive transfers of DIFFERENT items must always
-		// go through, otherwise depositing several items in a row silently drops all
-		// but the first.
-		ulong now = Time.GetTicksMsec();
-		if (itemId == _lastTransferItem && now - _lastTransferMsec < TransferDebounceMsec)
-		{
-			return;
-		}
-		_lastTransferMsec = now;
-		_lastTransferItem = itemId;
-
-		// Move the whole stack in one action (deterministic; no need to spam).
+		// Move the whole stack in one action.
 		if (fromBag)
 		{
 			_player.WarehouseDeposit(itemId, int.MaxValue);
@@ -543,11 +524,9 @@ public partial class WarehousePanel : PanelContainer
 			_player.WarehouseWithdraw(itemId, int.MaxValue);
 		}
 
-		// Defer the rebuild: refreshing synchronously here frees the very button
-		// whose GuiInput we're inside, which disrupts input dispatch and makes the
-		// NEXT double-click land on nothing (so the second item never transfers).
-		// Rebuilding next frame lets the current gesture finish on a stable tree.
-		CallDeferred(nameof(RefreshAll));
+		// Refresh immediately so the slot shows the next item before the player's
+		// next click; the event is already accepted so freeing buttons here is safe.
+		RefreshAll();
 	}
 
 	private static string GetItemName(string itemId)
