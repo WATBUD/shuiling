@@ -799,25 +799,51 @@ public partial class PlayerController
 		_fallSfxPlayer.Play();
 	}
 
-	// A downward pitch glissando (~520Hz → ~120Hz) with vibrato and a soft second
-	// harmonic — reads as a cartoon "wahhh" tumble. Procedural 16-bit mono PCM.
+	// An ORIGINAL synthesized approximation of the "screaming marmot 啊～～" meme
+	// vibe (NOT the copyrighted clip): a harsh high shriek that snaps up to ~1.2kHz,
+	// warbles with heavy vibrato/tremolo, adds a bright harmonic stack + rasp noise,
+	// and is soft-clipped for a screechy edge. Procedural 16-bit mono PCM.
 	private static AudioStream BuildFallScream()
 	{
 		const int rate = 22050;
-		const float duration = 0.95f;
+		const float duration = 1.1f;
 		int sampleCount = (int)(rate * duration);
 		var data = new byte[sampleCount * 2];
 		double phase = 0.0;
+		uint noiseState = 0x1234567u;
 		for (int i = 0; i < sampleCount; i++)
 		{
 			float frac = i / (float)sampleCount;
 			float t = i / (float)rate;
-			float freq = Mathf.Lerp(520.0f, 120.0f, frac);
-			freq *= 1.0f + 0.07f * Mathf.Sin(t * Mathf.Tau * 11.0f);
+
+			// Fast snap up into a high wavering shriek, easing down at the very end.
+			float rise = Mathf.Min(1.0f, frac / 0.06f);
+			float baseFreq = Mathf.Lerp(720.0f, 1240.0f, rise);
+			if (frac > 0.85f)
+			{
+				baseFreq = Mathf.Lerp(1240.0f, 940.0f, (frac - 0.85f) / 0.15f);
+			}
+
+			float freq = baseFreq * (1.0f + 0.06f * Mathf.Sin(t * Mathf.Tau * 30.0f));
 			phase += freq / rate;
-			float wave = 0.7f * Mathf.Sin((float)(phase * Mathf.Tau)) + 0.3f * Mathf.Sin((float)(phase * 2.0 * Mathf.Tau));
-			float envelope = Mathf.Min(1.0f, frac * 18.0f) * (1.0f - frac);
-			short sample = (short)(Mathf.Clamp(wave * envelope * 0.55f, -1.0f, 1.0f) * 32767.0f);
+			double ph = phase * Mathf.Tau;
+
+			// Bright buzzy harmonic stack + a little rasp for the screech.
+			float tone = 0.60f * Mathf.Sin((float)ph)
+				+ 0.28f * Mathf.Sin((float)(ph * 2.0))
+				+ 0.16f * Mathf.Sin((float)(ph * 3.0))
+				+ 0.09f * Mathf.Sin((float)(ph * 4.0));
+			noiseState = (noiseState * 1664525u) + 1013904223u;
+			float noise = (((noiseState >> 8) / 16777215.0f) * 2.0f - 1.0f) * 0.12f;
+
+			// Warble tremolo + fast attack / short release envelope.
+			float tremolo = 0.78f + 0.22f * Mathf.Sin(t * Mathf.Tau * 26.0f);
+			float attack = Mathf.Min(1.0f, frac / 0.05f);
+			float release = frac > 0.8f ? Mathf.Max(1.0f - ((frac - 0.8f) / 0.2f), 0.0f) : 1.0f;
+			float env = attack * release * tremolo;
+
+			float shaped = Mathf.Clamp((tone + noise) * 1.6f, -1.0f, 1.0f);
+			short sample = (short)(shaped * env * 0.5f * 32767.0f);
 			data[i * 2] = (byte)(sample & 0xFF);
 			data[i * 2 + 1] = (byte)((sample >> 8) & 0xFF);
 		}
