@@ -631,6 +631,14 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
+		// M toggles the world map shut too. It's an open panel, so the guard below
+		// would otherwise swallow the key — handle the close before that guard.
+		if (_worldMapPanel.Visible && @event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.M })
+		{
+			SetWorldMapPanelVisible(false);
+			return;
+		}
+
 		if (_pauseMenuPanel.Visible || _settingsPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _refinementPanel.Visible || _coreEnhancerPanel.Visible || _worldMapPanel.Visible || _gachaPanel.Visible || _warehousePanel.Visible || _mailboxPanel.Visible || _composePanel.Visible || _cardAlbumPanel.Visible)
 		{
 			return;
