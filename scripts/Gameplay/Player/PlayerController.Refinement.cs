@@ -55,7 +55,8 @@ public partial class PlayerController
 			CurrentStars = currentStars,
 			TargetStars = targetStars,
 			CrystalId = MonsterLootCatalog.GetEnhanceCrystalId(targetStars),
-			CrystalCount = targetStars,
+			// Each star tier costs its tier's crystal x10 (1★ = 10x T1, 2★ = 20x T2, …).
+			CrystalCount = targetStars * 10,
 			Gold = RefineGoldCost(targetStars),
 			// 成功率 = 100 - 目前星等×10：1★=100%、2★=90%…10★=10%。
 			SuccessPercent = Mathf.Clamp(100 - currentStars * 10, 10, 100),

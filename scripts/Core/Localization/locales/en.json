@@ -326,6 +326,7 @@
 	"refine.dismantle.empty": "No starred equipment to dismantle",
 	"refine.exchange.hint": "10 lower ⇄ 1 higher",
 	"refine.exchange.up": "Merge 10→1",
+	"refine.exchange.qty": "Qty {0}",
 	"refine.exchange.down": "Split 1→10",
 	"system.refine.max": "This equipment is already at max star.",
 	"system.refine.not_enough": "Not enough materials: needs {1}× {2}.",

@@ -326,6 +326,7 @@
 	"refine.dismantle.empty": "背包沒有可分解的星等裝備",
 	"refine.exchange.hint": "10 個低階 ⇄ 1 個高階",
 	"refine.exchange.up": "合成 10→1",
+	"refine.exchange.qty": "數量 {0}",
 	"refine.exchange.down": "拆解 1→10",
 	"system.refine.max": "此裝備已達最高星等。",
 	"system.refine.not_enough": "精煉材料不足：需要 {2} ×{1}。",

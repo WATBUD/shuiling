@@ -65,25 +65,38 @@ public partial class PlayerController
 	}
 
 	// 10x T{fromTier} -> 1x T{fromTier+1}. Unit of 10; short amounts are refused.
-	public bool TryUpgradeCrystals(int fromTier)
+	// How many upgrade/downgrade conversions the player can currently afford.
+	public int MaxUpgradeUnits(int fromTier)
 	{
-		if (fromTier < 1 || fromTier >= CoreEnhanceConfig.MaxOrbTier)
-		{
-			return false;
-		}
+		return fromTier < 1 || fromTier >= CoreEnhanceConfig.MaxOrbTier
+			? 0
+			: GetInventoryCount(MonsterLootCatalog.GetEnhanceCrystalId(fromTier)) / 10;
+	}
 
-		string fromId = MonsterLootCatalog.GetEnhanceCrystalId(fromTier);
-		string toId = MonsterLootCatalog.GetEnhanceCrystalId(fromTier + 1);
-		if (GetInventoryCount(fromId) < 10)
+	public int MaxDowngradeUnits(int fromTier)
+	{
+		return fromTier <= 1 || fromTier > CoreEnhanceConfig.MaxOrbTier
+			? 0
+			: GetInventoryCount(MonsterLootCatalog.GetEnhanceCrystalId(fromTier));
+	}
+
+	// Convert `units` lots of 10x T{fromTier} -> 1x T{fromTier+1}, clamped to what
+	// the player can afford. Refuses (message) when nothing is affordable.
+	public bool TryUpgradeCrystals(int fromTier, int units)
+	{
+		int actual = Mathf.Min(Mathf.Max(units, 1), MaxUpgradeUnits(fromTier));
+		if (actual <= 0)
 		{
 			PostSystemMessage(LocaleText.T("system.exchange.insufficient"), RefineExtraBadColor, GameMessageChannel.Loot);
 			return false;
 		}
 
-		TryConsumeInventoryItem(fromId, 10);
-		AddInventoryItemSilently(toId, 1);
+		string fromId = MonsterLootCatalog.GetEnhanceCrystalId(fromTier);
+		string toId = MonsterLootCatalog.GetEnhanceCrystalId(fromTier + 1);
+		TryConsumeInventoryItem(fromId, actual * 10);
+		AddInventoryItemSilently(toId, actual);
 		PostSystemMessage(
-			LocaleText.F("system.exchange.done", $"{GetInventoryItemDisplayName(fromId)} x10", $"{GetInventoryItemDisplayName(toId)} x1"),
+			LocaleText.F("system.exchange.done", $"{GetInventoryItemDisplayName(fromId)} x{actual * 10}", $"{GetInventoryItemDisplayName(toId)} x{actual}"),
 			RefineExtraGoodColor,
 			GameMessageChannel.Loot);
 		_inventoryPanel?.RefreshAll();
@@ -92,25 +105,22 @@ public partial class PlayerController
 	}
 
 	// 1x T{fromTier} -> 10x T{fromTier-1}.
-	public bool TryDowngradeCrystals(int fromTier)
+	// Convert `units` lots of 1x T{fromTier} -> 10x T{fromTier-1}, clamped to stock.
+	public bool TryDowngradeCrystals(int fromTier, int units)
 	{
-		if (fromTier <= 1 || fromTier > CoreEnhanceConfig.MaxOrbTier)
-		{
-			return false;
-		}
-
-		string fromId = MonsterLootCatalog.GetEnhanceCrystalId(fromTier);
-		string toId = MonsterLootCatalog.GetEnhanceCrystalId(fromTier - 1);
-		if (GetInventoryCount(fromId) < 1)
+		int actual = Mathf.Min(Mathf.Max(units, 1), MaxDowngradeUnits(fromTier));
+		if (actual <= 0)
 		{
 			PostSystemMessage(LocaleText.T("system.exchange.insufficient"), RefineExtraBadColor, GameMessageChannel.Loot);
 			return false;
 		}
 
-		TryConsumeInventoryItem(fromId, 1);
-		AddInventoryItemSilently(toId, 10);
+		string fromId = MonsterLootCatalog.GetEnhanceCrystalId(fromTier);
+		string toId = MonsterLootCatalog.GetEnhanceCrystalId(fromTier - 1);
+		TryConsumeInventoryItem(fromId, actual);
+		AddInventoryItemSilently(toId, actual * 10);
 		PostSystemMessage(
-			LocaleText.F("system.exchange.done", $"{GetInventoryItemDisplayName(fromId)} x1", $"{GetInventoryItemDisplayName(toId)} x10"),
+			LocaleText.F("system.exchange.done", $"{GetInventoryItemDisplayName(fromId)} x{actual}", $"{GetInventoryItemDisplayName(toId)} x{actual * 10}"),
 			RefineExtraGoodColor,
 			GameMessageChannel.Loot);
 		_inventoryPanel?.RefreshAll();

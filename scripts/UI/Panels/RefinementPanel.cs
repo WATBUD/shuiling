@@ -313,17 +313,40 @@ public partial class RefinementPanel : PanelContainer
 		info.AddChild(detailLabel);
 
 		int capturedTier = tier;
+
+		// Draggable quantity: how many conversions to do at once (RPG-style batch).
+		int maxUnits = Mathf.Max(1, Mathf.Max(_player.MaxUpgradeUnits(tier), _player.MaxDowngradeUnits(tier + 1)));
+		var qtyRow = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		qtyRow.AddThemeConstantOverride("separation", 8);
+		info.AddChild(qtyRow);
+
+		var qtyValue = MakeLabel(14, new Color(1.0f, 0.9f, 0.6f));
+		qtyValue.Text = LocaleText.F("refine.exchange.qty", 1);
+		var qtySlider = new HSlider
+		{
+			MinValue = 1,
+			MaxValue = maxUnits,
+			Step = 1,
+			Value = 1,
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			SizeFlagsVertical = SizeFlags.ShrinkCenter,
+			CustomMinimumSize = new Vector2(160.0f, 0.0f),
+		};
+		qtySlider.ValueChanged += value => qtyValue.Text = LocaleText.F("refine.exchange.qty", (int)value);
+		qtyRow.AddChild(qtySlider);
+		qtyRow.AddChild(qtyValue);
+
 		var upButton = new Button
 		{
 			Text = LocaleText.T("refine.exchange.up"),
 			CustomMinimumSize = new Vector2(140.0f, 48.0f),
-			Disabled = lowCount < 10,
+			Disabled = _player.MaxUpgradeUnits(tier) < 1,
 		};
 		upButton.Pressed += () =>
 		{
 			if (_player != null)
 			{
-				_player.TryUpgradeCrystals(capturedTier);
+				_player.TryUpgradeCrystals(capturedTier, (int)qtySlider.Value);
 				RefreshAll();
 			}
 		};
@@ -333,13 +356,13 @@ public partial class RefinementPanel : PanelContainer
 		{
 			Text = LocaleText.T("refine.exchange.down"),
 			CustomMinimumSize = new Vector2(140.0f, 48.0f),
-			Disabled = highCount < 1,
+			Disabled = _player.MaxDowngradeUnits(tier + 1) < 1,
 		};
 		downButton.Pressed += () =>
 		{
 			if (_player != null)
 			{
-				_player.TryDowngradeCrystals(capturedTier + 1);
+				_player.TryDowngradeCrystals(capturedTier + 1, (int)qtySlider.Value);
 				RefreshAll();
 			}
 		};
