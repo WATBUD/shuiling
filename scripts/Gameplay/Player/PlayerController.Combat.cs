@@ -819,7 +819,7 @@ public partial class PlayerController
 	private static AudioStream BuildFallScream()
 	{
 		const int rate = 22050;
-		const float duration = 1.9f;
+		const float duration = 2.6f;
 		int sampleCount = (int)(rate * duration);
 		var data = new byte[sampleCount * 2];
 		double phase = 0.0;
@@ -881,19 +881,20 @@ public partial class PlayerController
 				voiced += formantA[j] * y;
 			}
 
-			// "Distance": second half falls AWAY — a closing one-pole low-pass muffles
-			// it and the volume drops, so it recedes.
-			float distance = Mathf.Clamp((frac - 0.5f) / 0.5f, 0.0f, 1.0f);
-			float lpCoeff = Mathf.Lerp(0.9f, 0.12f, distance);
+			// "Distance": the later part falls AWAY — a closing one-pole low-pass
+			// muffles it and the volume drops. Kept loud longer (recedes from ~65%).
+			float distance = Mathf.Clamp((frac - 0.65f) / 0.35f, 0.0f, 1.0f);
+			float lpCoeff = Mathf.Lerp(0.9f, 0.14f, distance);
 			lowpassState += (voiced - lowpassState) * lpCoeff;
 
-			float driven = Mathf.Clamp(lowpassState * (2.2f - 0.6f * distance), -1.0f, 1.0f);
+			float driven = Mathf.Clamp(lowpassState * (2.6f - 0.6f * distance), -1.0f, 1.0f);
 			float attack = Mathf.Min(1.0f, frac / 0.02f);
-			float distanceGain = 1.0f - 0.85f * distance;
-			float tail = frac > 0.9f ? Mathf.Max(1.0f - ((frac - 0.9f) / 0.1f), 0.0f) : 1.0f;
+			// Stays loud, only easing to ~40% as he recedes, then a short final tail.
+			float distanceGain = 1.0f - 0.6f * distance;
+			float tail = frac > 0.93f ? Mathf.Max(1.0f - ((frac - 0.93f) / 0.07f), 0.0f) : 1.0f;
 			float env = attack * distanceGain * tail;
 
-			short sample = (short)(driven * env * 0.5f * 32767.0f);
+			short sample = (short)(driven * env * 0.82f * 32767.0f);
 			data[i * 2] = (byte)(sample & 0xFF);
 			data[i * 2 + 1] = (byte)((sample >> 8) & 0xFF);
 		}
