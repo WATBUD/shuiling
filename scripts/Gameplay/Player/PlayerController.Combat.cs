@@ -811,47 +811,65 @@ public partial class PlayerController
 		_fallSfxPlayer.Play();
 	}
 
-	// An ORIGINAL synthesized falling-scream (NOT any external clip): a voice-like
-	// "aaah" in the human range that starts ~560Hz and glides down toward ~230Hz as
-	// it "falls", with a slow ~6Hz human wobble, a vowel-ish harmonic stack, a touch
-	// of breath noise and only light drive so it reads as a voice, not a buzzer.
-	// Procedural 16-bit mono PCM.
+	// An ORIGINAL synthesized human "AAAH" fall scream (NOT any external clip):
+	// additive formant synthesis — a glottal (sawtooth-spectrum) source shaped by
+	// three vocal-tract formants of an "ah" vowel, with a panicked falling pitch
+	// contour, vibrato, pitch jitter and amplitude shimmer + breath noise so it
+	// reads as an organic voice rather than a synth. Procedural 16-bit mono PCM.
 	private static AudioStream BuildFallScream()
 	{
 		const int rate = 22050;
-		const float duration = 1.0f;
+		const float duration = 1.05f;
 		int sampleCount = (int)(rate * duration);
 		var data = new byte[sampleCount * 2];
-		double phase = 0.0;
+		double fundPhase = 0.0;
 		uint noiseState = 0x1234567u;
+		float jitterLp = 0.0f;
+		float shimmerLp = 0.0f;
 		for (int i = 0; i < sampleCount; i++)
 		{
 			float frac = i / (float)sampleCount;
 			float t = i / (float)rate;
 
-			// Quick catch of breath up, then a long downward glide (the drop).
-			float pitch = frac < 0.05f
-				? Mathf.Lerp(430.0f, 600.0f, frac / 0.05f)
-				: Mathf.Lerp(600.0f, 230.0f, (frac - 0.05f) / 0.95f);
-			pitch *= 1.0f + 0.045f * Mathf.Sin(t * Mathf.Tau * 6.0f);
-			phase += pitch / rate;
-			double ph = phase * Mathf.Tau;
+			// Panicked catch-of-breath up, then a long falling glide.
+			float f0 = frac < 0.06f
+				? Mathf.Lerp(520.0f, 780.0f, frac / 0.06f)
+				: Mathf.Lerp(780.0f, 300.0f, (frac - 0.06f) / 0.94f);
+			f0 *= 1.0f + 0.028f * Mathf.Sin(t * Mathf.Tau * 5.5f);
 
-			// Vowel-ish "ah": strong low harmonics with a mid formant bump, plus a
-			// little breath noise.
-			float tone = 0.55f * Mathf.Sin((float)ph)
-				+ 0.30f * Mathf.Sin((float)(ph * 2.0))
-				+ 0.22f * Mathf.Sin((float)(ph * 3.0))
-				+ 0.12f * Mathf.Sin((float)(ph * 5.0));
+			// Pitch jitter: low-passed noise so the pitch wavers like a real voice.
 			noiseState = (noiseState * 1664525u) + 1013904223u;
-			float noise = (((noiseState >> 8) / 16777215.0f) * 2.0f - 1.0f) * 0.08f;
+			float jitterNoise = ((noiseState >> 8) / 16777215.0f) * 2.0f - 1.0f;
+			jitterLp += (jitterNoise - jitterLp) * 0.2f;
+			f0 *= 1.0f + 0.02f * jitterLp;
+			fundPhase += f0 / rate;
 
-			// Light drive keeps it voice-like; fast onset, gentle release fade.
-			float driven = Mathf.Clamp((tone + noise) * 1.35f, -1.0f, 1.0f);
+			// Glottal source (sawtooth ~1/k harmonics) shaped by the "ah" formants.
+			float voiced = 0.0f;
+			for (int k = 1; k <= 26; k++)
+			{
+				float fk = f0 * k;
+				if (fk > 10000.0f)
+				{
+					break;
+				}
+
+				voiced += (1.0f / k) * FormantGain(fk) * Mathf.Sin((float)(fundPhase * k * Mathf.Tau));
+			}
+
+			// Amplitude shimmer + a little breath.
+			noiseState = (noiseState * 1664525u) + 1013904223u;
+			float shimmerNoise = ((noiseState >> 8) / 16777215.0f) * 2.0f - 1.0f;
+			shimmerLp += (shimmerNoise - shimmerLp) * 0.15f;
+			noiseState = (noiseState * 1664525u) + 1013904223u;
+			float breath = (((noiseState >> 8) / 16777215.0f) * 2.0f - 1.0f) * 0.05f;
+
+			float raw = voiced * (1.0f + 0.12f * shimmerLp) + breath;
+			float driven = Mathf.Clamp(raw * 0.62f, -1.0f, 1.0f);
+
 			float attack = Mathf.Min(1.0f, frac / 0.02f);
-			float release = frac > 0.7f ? Mathf.Max(1.0f - ((frac - 0.7f) / 0.3f), 0.0f) : 1.0f;
-			float tremolo = 0.85f + 0.15f * Mathf.Sin(t * Mathf.Tau * 6.0f);
-			float env = attack * release * tremolo;
+			float release = frac > 0.72f ? Mathf.Max(1.0f - ((frac - 0.72f) / 0.28f), 0.0f) : 1.0f;
+			float env = attack * release;
 
 			short sample = (short)(driven * env * 0.5f * 32767.0f);
 			data[i * 2] = (byte)(sample & 0xFF);
@@ -865,6 +883,23 @@ public partial class PlayerController
 			Stereo = false,
 			Data = data,
 		};
+	}
+
+	// Resonant gain of an "ah" vowel's three formants (Lorentzian peaks), so the
+	// harmonic source above takes on a vocal timbre.
+	private static float FormantGain(float freq)
+	{
+		float gain = 0.06f;
+		gain += 1.0f / (1.0f + Formant(freq, 800.0f, 120.0f));
+		gain += 0.70f / (1.0f + Formant(freq, 1150.0f, 150.0f));
+		gain += 0.45f / (1.0f + Formant(freq, 2800.0f, 300.0f));
+		return gain;
+	}
+
+	private static float Formant(float freq, float center, float bandwidth)
+	{
+		float x = (freq - center) / bandwidth;
+		return x * x;
 	}
 
 	private void HandlePlayerDeath()
