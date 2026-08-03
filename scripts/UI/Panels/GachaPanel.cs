@@ -16,6 +16,9 @@ public partial class GachaPanel : PanelContainer
 	private Button _tierPlusButton = null!;
 	private Button _drawOneButton = null!;
 	private Button _drawTenButton = null!;
+	private Button _ratesButton = null!;
+	private VBoxContainer _ratesBox = null!;
+	private bool _showRates;
 	private VBoxContainer _list = null!;
 	private FloatingTooltip _tooltip = null!;
 	private AudioStreamPlayer _sfxPlayer = null!;
@@ -125,6 +128,7 @@ public partial class GachaPanel : PanelContainer
 		bool canDraw = _player.Gold >= cost;
 		_drawOneButton.Disabled = !canDraw;
 		_drawTenButton.Disabled = !canDraw;
+		RefreshRatesTable();
 
 		if (_lastResults.Count == 0)
 		{
@@ -286,6 +290,23 @@ public partial class GachaPanel : PanelContainer
 		_costLabel = MakeLabel(16, new Color(0.80f, 0.88f, 0.94f));
 		root.AddChild(_costLabel);
 
+		// Collapsible per-tier odds table for the current draw cap.
+		_ratesButton = new Button
+		{
+			ToggleMode = true,
+			CustomMinimumSize = new Vector2(0.0f, 34.0f),
+		};
+		_ratesButton.Toggled += pressed =>
+		{
+			_showRates = pressed;
+			RefreshRatesTable();
+		};
+		root.AddChild(_ratesButton);
+
+		_ratesBox = new VBoxContainer { Visible = false };
+		_ratesBox.AddThemeConstantOverride("separation", 2);
+		root.AddChild(_ratesBox);
+
 		var buttonBar = new HBoxContainer();
 		buttonBar.AddThemeConstantOverride("separation", 8);
 		root.AddChild(buttonBar);
@@ -357,6 +378,36 @@ public partial class GachaPanel : PanelContainer
 		};
 		_flash.SetAnchorsPreset(LayoutPreset.FullRect);
 		AddChild(_flash);
+	}
+
+	// Lists each drawable tier (cap..1) with its cascade probability for the
+	// currently selected cap, so the odds shown match what a draw will actually do.
+	private void RefreshRatesTable()
+	{
+		if (_ratesBox == null || _ratesButton == null)
+		{
+			return;
+		}
+
+		_ratesButton.Text = LocaleText.T(_showRates ? "gacha.rates_hide" : "gacha.rates_show");
+		_ratesBox.Visible = _showRates;
+		ClearChildren(_ratesBox);
+		if (!_showRates || _player == null)
+		{
+			return;
+		}
+
+		int cap = Mathf.Clamp(_selectedTier, 1, _player.GachaUnlockedMaxTier);
+		var title = MakeLabel(14, new Color(0.80f, 0.88f, 0.94f));
+		title.Text = LocaleText.F("gacha.rates_title", cap);
+		_ratesBox.AddChild(title);
+
+		for (int tier = cap; tier >= 1; tier--)
+		{
+			var row = MakeLabel(14, RarityColor(tier));
+			row.Text = LocaleText.F("gacha.rates_row", tier, GachaConfig.TierProbability(tier, cap) * 100.0f);
+			_ratesBox.AddChild(row);
+		}
 	}
 
 	private void ChangeTier(int delta)
