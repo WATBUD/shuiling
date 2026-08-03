@@ -271,37 +271,74 @@ public partial class CoreEnhancerPanel : PanelContainer
 		_dismantleButton.Disabled = _selectedPets.Count == 0;
 	}
 
+	private static StyleBoxFlat MakeRowStyle(Color background, Color border, int borderWidth)
+	{
+		var style = new StyleBoxFlat { BgColor = background, BorderColor = border };
+		style.SetBorderWidthAll(borderWidth);
+		style.SetCornerRadiusAll(6);
+		style.SetContentMarginAll(8);
+		return style;
+	}
+
 	private void AddDismantleRow(SimpleActor actor)
 	{
-		var row = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-		var style = new StyleBoxFlat
+		SimpleActor capturedActor = actor;
+		bool selectedInitially = _selectedPets.Contains(actor);
+
+		// The whole row is a toggle button: clicking anywhere selects/deselects.
+		// Godot swaps to the "pressed" (green) stylebox while selected.
+		var row = new Button
 		{
-			BgColor = new Color(0.08f, 0.09f, 0.105f, 0.94f),
-			BorderColor = new Color(0.32f, 0.38f, 0.45f, 0.72f),
+			ToggleMode = true,
+			ButtonPressed = selectedInitially,
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			CustomMinimumSize = new Vector2(0.0f, 54.0f),
+			FocusMode = FocusModeEnum.None,
 		};
-		style.SetBorderWidthAll(1);
-		style.SetCornerRadiusAll(6);
-		row.AddThemeStyleboxOverride("panel", style);
+		var idle = MakeRowStyle(new Color(0.08f, 0.09f, 0.105f, 0.94f), new Color(0.32f, 0.38f, 0.45f, 0.72f), 1);
+		var selected = MakeRowStyle(new Color(0.10f, 0.17f, 0.12f, 0.96f), new Color(0.52f, 0.96f, 0.62f, 1.0f), 2);
+		var hover = MakeRowStyle(new Color(0.11f, 0.13f, 0.16f, 0.96f), new Color(0.5f, 0.6f, 0.7f, 0.9f), 1);
+		row.AddThemeStyleboxOverride("normal", idle);
+		row.AddThemeStyleboxOverride("hover", hover);
+		row.AddThemeStyleboxOverride("pressed", selected);
+		row.AddThemeStyleboxOverride("hover_pressed", selected);
+		row.AddThemeStyleboxOverride("focus", new StyleBoxEmpty());
 		_list.AddChild(row);
 
-		var margin = new MarginContainer();
-		margin.AddThemeConstantOverride("margin_left", 12);
-		margin.AddThemeConstantOverride("margin_right", 12);
-		margin.AddThemeConstantOverride("margin_top", 8);
-		margin.AddThemeConstantOverride("margin_bottom", 8);
-		row.AddChild(margin);
-
-		var content = new HBoxContainer();
-		content.AddThemeConstantOverride("separation", 12);
-		margin.AddChild(content);
-
-		var checkBox = new CheckBox
+		// Content overlay: ignores the mouse so clicks fall through to the button.
+		var content = new HBoxContainer
 		{
-			ButtonPressed = _selectedPets.Contains(actor),
-			SizeFlagsVertical = SizeFlags.ShrinkCenter,
+			MouseFilter = MouseFilterEnum.Ignore,
 		};
-		SimpleActor capturedActor = actor;
-		checkBox.Toggled += pressed =>
+		content.SetAnchorsPreset(LayoutPreset.FullRect);
+		content.AddThemeConstantOverride("separation", 12);
+		content.OffsetLeft = 12;
+		content.OffsetRight = -12;
+		row.AddChild(content);
+
+		var check = MakeLabel(18, new Color(0.62f, 1.0f, 0.72f));
+		check.MouseFilter = MouseFilterEnum.Ignore;
+		check.Text = selectedInitially ? "☑" : "☐";
+		content.AddChild(check);
+
+		var info = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore };
+		content.AddChild(info);
+
+		var nameLabel = MakeLabel(17, new Color(0.96f, 0.98f, 1.0f));
+		nameLabel.MouseFilter = MouseFilterEnum.Ignore;
+		nameLabel.Text = $"{actor.LocalizedDisplayName}  Lv.{actor.Level}";
+		info.AddChild(nameLabel);
+
+		string element = BuildCatalog.GetIdentity(actor).ElementAffinityId;
+		int tier = CoreEnhanceConfig.TierForLevel(actor.Level);
+		string orbName = MonsterLootCatalog.GetCoreOrbDisplayName(MonsterLootCatalog.GetCoreOrbId(element, tier));
+
+		var yieldLabel = MakeLabel(14, new Color(0.80f, 0.88f, 0.94f));
+		yieldLabel.MouseFilter = MouseFilterEnum.Ignore;
+		yieldLabel.Text = $"{orbName} x{PlayerController.DismantleOrbCount(actor)}";
+		info.AddChild(yieldLabel);
+
+		row.Toggled += pressed =>
 		{
 			if (pressed)
 			{
@@ -311,25 +348,10 @@ public partial class CoreEnhancerPanel : PanelContainer
 			{
 				_selectedPets.Remove(capturedActor);
 			}
+			check.Text = pressed ? "☑" : "☐";
 			_dismantleButton.Disabled = _selectedPets.Count == 0;
 			RefreshYieldSummary();
 		};
-		content.AddChild(checkBox);
-
-		var info = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-		content.AddChild(info);
-
-		var nameLabel = MakeLabel(17, new Color(0.96f, 0.98f, 1.0f));
-		nameLabel.Text = $"{actor.LocalizedDisplayName}  Lv.{actor.Level}";
-		info.AddChild(nameLabel);
-
-		string element = BuildCatalog.GetIdentity(actor).ElementAffinityId;
-		int tier = CoreEnhanceConfig.TierForLevel(actor.Level);
-		string orbName = MonsterLootCatalog.GetCoreOrbDisplayName(MonsterLootCatalog.GetCoreOrbId(element, tier));
-
-		var yieldLabel = MakeLabel(14, new Color(0.80f, 0.88f, 0.94f));
-		yieldLabel.Text = $"{orbName} x{PlayerController.DismantleOrbCount(actor)}";
-		info.AddChild(yieldLabel);
 	}
 
 	private void PruneInvalidSelection()
