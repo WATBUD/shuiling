@@ -301,7 +301,8 @@ public partial class RefinementPanel : PanelContainer
 
 		CreateRowShell(out HBoxContainer content);
 
-		var info = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		// Left: the crystal pair + counts on one compact column.
+		var info = new VBoxContainer { CustomMinimumSize = new Vector2(190.0f, 0.0f) };
 		content.AddChild(info);
 
 		var nameLabel = MakeLabel(17, new Color(0.96f, 0.98f, 1.0f));
@@ -314,14 +315,9 @@ public partial class RefinementPanel : PanelContainer
 
 		int capturedTier = tier;
 
-		// Draggable quantity: how many conversions to do at once (RPG-style batch).
+		// Middle: draggable quantity bar (single row) sitting between the text and
+		// the right-hand merge/split buttons.
 		int maxUnits = Mathf.Max(1, Mathf.Max(_player.MaxUpgradeUnits(tier), _player.MaxDowngradeUnits(tier + 1)));
-		var qtyRow = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-		qtyRow.AddThemeConstantOverride("separation", 8);
-		info.AddChild(qtyRow);
-
-		var qtyValue = MakeLabel(14, new Color(1.0f, 0.9f, 0.6f));
-		qtyValue.Text = LocaleText.F("refine.exchange.qty", 1);
 		var qtySlider = new HSlider
 		{
 			MinValue = 1,
@@ -330,11 +326,15 @@ public partial class RefinementPanel : PanelContainer
 			Value = 1,
 			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 			SizeFlagsVertical = SizeFlags.ShrinkCenter,
-			CustomMinimumSize = new Vector2(160.0f, 0.0f),
+			CustomMinimumSize = new Vector2(120.0f, 0.0f),
 		};
+		var qtyValue = MakeLabel(14, new Color(1.0f, 0.9f, 0.6f));
+		qtyValue.CustomMinimumSize = new Vector2(64.0f, 0.0f);
+		qtyValue.VerticalAlignment = VerticalAlignment.Center;
+		qtyValue.Text = LocaleText.F("refine.exchange.qty", 1);
 		qtySlider.ValueChanged += value => qtyValue.Text = LocaleText.F("refine.exchange.qty", (int)value);
-		qtyRow.AddChild(qtySlider);
-		qtyRow.AddChild(qtyValue);
+		content.AddChild(qtySlider);
+		content.AddChild(qtyValue);
 
 		var upButton = new Button
 		{
