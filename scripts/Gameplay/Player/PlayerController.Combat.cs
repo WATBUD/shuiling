@@ -819,7 +819,7 @@ public partial class PlayerController
 	private static AudioStream BuildFallScream()
 	{
 		const int rate = 22050;
-		const float duration = 1.7f;
+		const float duration = 1.9f;
 		int sampleCount = (int)(rate * duration);
 		var data = new byte[sampleCount * 2];
 		double fundPhase = 0.0;
@@ -831,10 +831,11 @@ public partial class PlayerController
 			float frac = i / (float)sampleCount;
 			float t = i / (float)rate;
 
-			// Male range: a panicked gasp up, then a long falling glide.
-			float f0 = frac < 0.05f
-				? Mathf.Lerp(300.0f, 430.0f, frac / 0.05f)
-				: Mathf.Lerp(430.0f, 150.0f, (frac - 0.05f) / 0.95f);
+			// The falling contour: a panicked gasp UP to a high scream, then a long
+			// glide DOWN (male range) — a Doppler-like drop as he plummets away.
+			float f0 = frac < 0.04f
+				? Mathf.Lerp(360.0f, 540.0f, frac / 0.04f)
+				: Mathf.Lerp(540.0f, 120.0f, (frac - 0.04f) / 0.96f);
 			f0 *= 1.0f + 0.03f * Mathf.Sin(t * Mathf.Tau * 5.0f);
 
 			// A brief strained voice-crack partway through the scream.
@@ -850,8 +851,13 @@ public partial class PlayerController
 			f0 *= 1.0f + (0.02f + 0.05f * frac) * jitterLp;
 			fundPhase += f0 / rate;
 
-			// Glottal source (sawtooth ~1/k harmonics) shaped by the "ah" formants,
-			// plus a subharmonic growl for a rough, pained edge.
+			// "Distance": in the second half he's falling AWAY — the sound gets
+			// quieter and muffled (low-pass) so it recedes into the distance.
+			float distance = Mathf.Clamp((frac - 0.5f) / 0.5f, 0.0f, 1.0f);
+			float cutoff = Mathf.Lerp(9000.0f, 1000.0f, distance);
+
+			// Glottal source (sawtooth ~1/k harmonics) shaped by the "ah" formants
+			// and a receding low-pass, plus a subharmonic growl for a pained edge.
 			float voiced = 0.0f;
 			for (int k = 1; k <= 40; k++)
 			{
@@ -861,10 +867,11 @@ public partial class PlayerController
 					break;
 				}
 
-				voiced += (1.0f / k) * FormantGain(fk) * Mathf.Sin((float)(fundPhase * k * Mathf.Tau));
+				float lowpass = 1.0f / (1.0f + (fk / cutoff) * (fk / cutoff));
+				voiced += (1.0f / k) * FormantGain(fk) * lowpass * Mathf.Sin((float)(fundPhase * k * Mathf.Tau));
 			}
 
-			voiced += 0.22f * Mathf.Sin((float)(fundPhase * 0.5 * Mathf.Tau));
+			voiced += 0.18f * Mathf.Sin((float)(fundPhase * 0.5 * Mathf.Tau));
 
 			// Amplitude shimmer + a little breath.
 			noiseState = (noiseState * 1664525u) + 1013904223u;
@@ -878,8 +885,10 @@ public partial class PlayerController
 			float driven = Mathf.Clamp(raw * 1.15f, -1.0f, 1.0f);
 
 			float attack = Mathf.Min(1.0f, frac / 0.02f);
-			float release = frac > 0.80f ? Mathf.Max(1.0f - ((frac - 0.80f) / 0.20f), 0.0f) : 1.0f;
-			float env = attack * release;
+			// Volume fades with distance (down to ~15%), then a final tail to silence.
+			float distanceGain = 1.0f - 0.85f * distance;
+			float tail = frac > 0.9f ? Mathf.Max(1.0f - ((frac - 0.9f) / 0.1f), 0.0f) : 1.0f;
+			float env = attack * distanceGain * tail;
 
 			short sample = (short)(driven * env * 0.5f * 32767.0f);
 			data[i * 2] = (byte)(sample & 0xFF);
