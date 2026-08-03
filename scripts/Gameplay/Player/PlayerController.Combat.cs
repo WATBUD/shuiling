@@ -768,6 +768,10 @@ public partial class PlayerController
 	private AudioStreamPlayer? _fallSfxPlayer;
 	private AudioStream? _fallScreamStream;
 
+	// Drop a licensed audio file here to override the synthesized scream; if it's
+	// absent the procedural fallback is used. .ogg or .wav both work.
+	private const string FallScreamPath = "res://assets/audio/sfx/fall_scream.ogg";
+
 	// Fatal fall off a wild map's open edge: a comedic descending "啊～" then the
 	// normal downed state.
 	private void TriggerFallDeath()
@@ -794,7 +798,14 @@ public partial class PlayerController
 			AddChild(_fallSfxPlayer);
 		}
 
-		_fallScreamStream ??= BuildFallScream();
+		// Prefer a dropped-in audio file; otherwise fall back to the synth scream.
+		if (_fallScreamStream == null)
+		{
+			_fallScreamStream = ResourceLoader.Exists(FallScreamPath)
+				? GD.Load<AudioStream>(FallScreamPath)
+				: BuildFallScream();
+		}
+
 		_fallSfxPlayer.Stream = _fallScreamStream;
 		_fallSfxPlayer.Play();
 	}
