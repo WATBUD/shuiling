@@ -51,12 +51,18 @@ public partial class PlayerController : CharacterBody3D
 
 	public void EquipBuildEquipment(EquipmentSlot slot, string equipmentId)
 	{
-		EquipmentDefinition equipment = BuildCatalog.GetEquipment(equipmentId);
-		if (equipment.Slot == slot)
+		// Store the full item id (keeping any refine "#N" star suffix), matching
+		// SimpleActor.EquipBuildEquipment. Storing the star-stripped base id made the
+		// panel's post-equip verification (equipped == itemId) fail for refined gear,
+		// which surfaced as a bogus "slot full" warning instead of a swap — and also
+		// dropped the player's refine bonus.
+		if (BuildCatalog.GetEquipment(equipmentId).Slot != slot)
 		{
-			BuildLoadout.SetEquipmentId(slot, equipment.Id);
-			MarkPlayerBuildStatsDirty();
+			return;
 		}
+
+		BuildLoadout.SetEquipmentId(slot, equipmentId);
+		MarkPlayerBuildStatsDirty();
 	}
 
 	public void EquipSkillGem(int slotIndex, string gemId)
