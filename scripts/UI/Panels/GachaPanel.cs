@@ -11,9 +11,7 @@ public partial class GachaPanel : PanelContainer
 	private Label _costLabel = null!;
 	private Label _merchantLabel = null!;
 	private ProgressBar _expBar = null!;
-	private Label _tierLabel = null!;
-	private Button _tierMinusButton = null!;
-	private Button _tierPlusButton = null!;
+	private OptionButton _tierOption = null!;
 	private Button _drawOneButton = null!;
 	private Button _drawTenButton = null!;
 	private Button _ratesButton = null!;
@@ -93,9 +91,8 @@ public partial class GachaPanel : PanelContainer
 			_goldLabel.Text = string.Empty;
 			_merchantLabel.Text = string.Empty;
 			_expBar.Visible = false;
-			_tierLabel.Text = string.Empty;
-			_tierMinusButton.Disabled = true;
-			_tierPlusButton.Disabled = true;
+			_tierOption.Clear();
+			_tierOption.Disabled = true;
 			_drawOneButton.Disabled = true;
 			_drawTenButton.Disabled = true;
 			return;
@@ -117,9 +114,7 @@ public partial class GachaPanel : PanelContainer
 			_expBar.Value = _player.GachaMerchantExp;
 		}
 
-		_tierLabel.Text = LocaleText.F("gacha.draw_tier", _selectedTier, unlockedMax);
-		_tierMinusButton.Disabled = _selectedTier <= 1;
-		_tierPlusButton.Disabled = _selectedTier >= unlockedMax;
+		PopulateTierOptions(unlockedMax);
 
 		_costLabel.Text = LocaleText.F("gacha.cost", cost);
 		_goldLabel.Text = $"{_player.Gold}";
@@ -268,24 +263,24 @@ public partial class GachaPanel : PanelContainer
 		};
 		root.AddChild(_expBar);
 
-		// Draw-tier selector: pick the cap to roll at (1..unlocked); cost scales with it.
+		// Draw-tier selector: a dropdown of the unlocked caps (1..merchant Lv+1);
+		// picking a higher cap raises both the reachable tier and the cost.
 		var tierBar = new HBoxContainer();
 		tierBar.AddThemeConstantOverride("separation", 8);
 		root.AddChild(tierBar);
 
-		_tierMinusButton = new Button { Text = "−", CustomMinimumSize = new Vector2(44.0f, 40.0f) };
-		_tierMinusButton.Pressed += () => ChangeTier(-1);
-		tierBar.AddChild(_tierMinusButton);
+		var tierPrefix = MakeLabel(16, new Color(0.80f, 0.88f, 0.94f));
+		tierPrefix.Text = LocaleText.T("gacha.tier_prefix");
+		tierPrefix.SizeFlagsVertical = SizeFlags.ShrinkCenter;
+		tierBar.AddChild(tierPrefix);
 
-		_tierLabel = MakeLabel(16, new Color(0.90f, 0.94f, 1.0f));
-		_tierLabel.HorizontalAlignment = HorizontalAlignment.Center;
-		_tierLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-		_tierLabel.SizeFlagsVertical = SizeFlags.ShrinkCenter;
-		tierBar.AddChild(_tierLabel);
-
-		_tierPlusButton = new Button { Text = "+", CustomMinimumSize = new Vector2(44.0f, 40.0f) };
-		_tierPlusButton.Pressed += () => ChangeTier(1);
-		tierBar.AddChild(_tierPlusButton);
+		_tierOption = new OptionButton
+		{
+			CustomMinimumSize = new Vector2(0.0f, 40.0f),
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		_tierOption.ItemSelected += index => OnTierSelected(index);
+		tierBar.AddChild(_tierOption);
 
 		_costLabel = MakeLabel(16, new Color(0.80f, 0.88f, 0.94f));
 		root.AddChild(_costLabel);
@@ -410,14 +405,34 @@ public partial class GachaPanel : PanelContainer
 		}
 	}
 
-	private void ChangeTier(int delta)
+	// Rebuild the dropdown to list every unlocked cap (1..unlockedMax) with its
+	// per-draw cost, then reselect the current tier. Select() does not re-emit
+	// ItemSelected, so this is safe to call from RebuildAll without recursing.
+	private void PopulateTierOptions(int unlockedMax)
 	{
-		if (_player == null)
+		_tierOption.Disabled = false;
+		_tierOption.Clear();
+		int selectedIndex = 0;
+		for (int tier = 1; tier <= unlockedMax; tier++)
+		{
+			_tierOption.AddItem(LocaleText.F("gacha.tier_option", tier, GachaConfig.DrawCost(tier)), tier);
+			if (tier == _selectedTier)
+			{
+				selectedIndex = _tierOption.ItemCount - 1;
+			}
+		}
+
+		_tierOption.Select(selectedIndex);
+	}
+
+	private void OnTierSelected(long index)
+	{
+		if (_player == null || index < 0)
 		{
 			return;
 		}
 
-		_selectedTier = Mathf.Clamp(_selectedTier + delta, 1, _player.GachaUnlockedMaxTier);
+		_selectedTier = Mathf.Clamp(_tierOption.GetItemId((int)index), 1, _player.GachaUnlockedMaxTier);
 		RefreshAll();
 	}
 
