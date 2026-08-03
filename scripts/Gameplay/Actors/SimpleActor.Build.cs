@@ -20,6 +20,18 @@ public partial class SimpleActor : CharacterBody3D
 		MarkBuildChanged();
 	}
 
+	// Remove all worn gear (keeps skill cores / element). Used when a wild monster
+	// is captured so companions start with no equipment.
+	public void StripEquipment()
+	{
+		BuildLoadout.SetEquipmentId(EquipmentSlot.Helmet, "equip.helmet.none");
+		BuildLoadout.SetEquipmentId(EquipmentSlot.Weapon, "equip.weapon.none");
+		BuildLoadout.SetEquipmentId(EquipmentSlot.Armor, "equip.armor.none");
+		BuildLoadout.SetEquipmentId(EquipmentSlot.Boots, "equip.boots.none");
+		BuildLoadout.SetEquipmentId(EquipmentSlot.Accessory, "equip.accessory.none");
+		MarkBuildChanged();
+	}
+
 	public void ClearBuildLoadout()
 	{
 		_buildLoadout = new CompanionBuildLoadout

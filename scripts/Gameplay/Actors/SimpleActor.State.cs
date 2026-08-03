@@ -25,6 +25,9 @@ public partial class SimpleActor : CharacterBody3D
 		followTarget.AddCollisionExceptionWith(this);
 		RemoveFromGroup(ActorKind == "monster" ? "monsters" : "npcs");
 		AddToGroup("captured_actors");
+		// Captured wild monsters arrive with no equipment (they keep their innate
+		// skill cores / element); the player gears them up themselves.
+		StripEquipment();
 		RefreshNameplate();
 
 		// Celebrate a rare capture — a real power spike worth showing off.

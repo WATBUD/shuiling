@@ -97,10 +97,14 @@ public partial class SimpleActor : CharacterBody3D
 		string bossCrystalId = MonsterLootCatalog.GetEnhanceCrystalId(WorldTierCatalog.ClampTier(WorldTier));
 		SpawnWorldDrop(origin + RandomDropOffset(0.95f), bossCrystalId, _rng.RandiRange(BossConfig.CrystalMinimum, BossConfig.CrystalMaximum), 0);
 
-		// Bosses always drop two high-value equipment pieces and at least one core.
-		for (int index = 0; index < EquipmentConfig.BossGuaranteedDropCount; index++)
+		// Bosses have a 20% chance to drop equipment; when they do, 1..6 pieces.
+		if (_rng.Randf() < EquipmentConfig.BossDropChance)
 		{
-			SpawnWorldDrop(origin + RandomDropOffset(1.25f + index * 0.23f), PickBossEquipmentDropId(), 1, 0);
+			int dropCount = _rng.RandiRange(1, EquipmentConfig.BossMaxDropCount);
+			for (int index = 0; index < dropCount; index++)
+			{
+				SpawnWorldDrop(origin + RandomDropOffset(1.25f + index * 0.23f), PickBossEquipmentDropId(), 1, 0);
+			}
 		}
 		for (int index = 0; index < CoreConfig.BossGuaranteedCoreCount; index++)
 		{
