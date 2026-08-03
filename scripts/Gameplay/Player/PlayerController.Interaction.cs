@@ -318,10 +318,12 @@ public partial class PlayerController
 			return;
 		}
 
-		int affinityReward = GetNpcQuestAffinityReward(questItemId, NpcRecruitQuestItemCount);
+		int affinityReward = _questRng.RandiRange(NpcQuestAffinityMin, NpcQuestAffinityMax);
 		_completedNpcQuests.Add(actor);
 		actor.IncreaseAffinity(affinityReward);
+		AddGold(NpcQuestGoldReward);
 		SpawnWorldCombatEffect(LocaleText.F("effect.affinity_gain", affinityReward), new Color(0.62f, 1.0f, 0.78f, 0.92f), actor.GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 0.85f, 0.62f);
+		PostSystemMessage(LocaleText.F("system.npc.quest_gold", NpcQuestGoldReward), new Color(1.0f, 0.9f, 0.5f), GameMessageChannel.Party);
 		PostSystemMessage(LocaleText.F("system.npc.task_complete", actor.LocalizedDisplayName, actor.Affinity, NpcRecruitAffinityRequirement), new Color(0.78f, 1.0f, 0.82f), GameMessageChannel.Party);
 		if (actor.Affinity >= NpcRecruitAffinityRequirement)
 		{
@@ -353,27 +355,6 @@ public partial class PlayerController
 		_npcQuestDialog.Visible = true;
 		_interactionPromptLabel.Visible = false;
 		UpdateMouseModeForPanels();
-	}
-
-	private static int GetNpcQuestAffinityReward(string questItemId, int amount)
-	{
-		int materialDifficulty = questItemId switch
-		{
-			"loot.slime_mucus" => 8,
-			"loot.soft_fur" => 9,
-			"loot.beast_hide" => 10,
-			"loot.small_bone" => 11,
-			"loot.insect_wing" => 12,
-			"loot.sharp_claw" => 13,
-			"loot.venom_sac" => 16,
-			"loot.water_core" => 18,
-			"loot.cracked_core" => 20,
-			"loot.red_horn" => 22,
-			"loot.dragon_scale" => 28,
-			_ => 10,
-		};
-
-		return Mathf.Clamp(materialDifficulty + Mathf.Max(amount - 1, 0) * 4, 8, 45);
 	}
 
 	private Node3D? GetNearestRevivalNpc()

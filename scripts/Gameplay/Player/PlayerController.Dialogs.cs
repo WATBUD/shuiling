@@ -111,10 +111,9 @@ public partial class PlayerController
 		_pendingQuestNpc = actor;
 		_npcQuestDialogIsNotice = false;
 		string questItemId = GetNpcQuestItemId(actor);
-		int affinityReward = GetNpcQuestAffinityReward(questItemId, NpcRecruitQuestItemCount);
 		_npcQuestTitleLabel.Text = LocaleText.F("quest.dialog.title", actor.LocalizedDisplayName);
 		_npcQuestBodyLabel.Text = LocaleText.F("quest.dialog.body", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, GetInventoryItemDisplayName(questItemId));
-		_npcQuestRewardLabel.Text = LocaleText.F("quest.dialog.reward", affinityReward, NpcRecruitAffinityRequirement);
+		_npcQuestRewardLabel.Text = LocaleText.F("quest.dialog.reward", $"{NpcQuestAffinityMin}~{NpcQuestAffinityMax}", NpcRecruitAffinityRequirement, NpcQuestGoldReward);
 		_npcQuestRewardLabel.Visible = true;
 		_npcQuestAcceptButton.Text = LocaleText.T("quest.button.accept");
 		_npcQuestDeclineButton.Text = LocaleText.T("quest.button.decline");

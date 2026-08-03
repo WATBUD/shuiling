@@ -138,6 +138,11 @@ public partial class PlayerController : CharacterBody3D
 	private const float PlayerVisualScale = 0.88f;
 	private const int NpcRecruitQuestItemCount = 3;
 	private const int NpcRecruitAffinityRequirement = 80;
+	// Gold paid for each completed NPC delivery task, and the random affinity gain.
+	private const int NpcQuestGoldReward = 120;
+	private const int NpcQuestAffinityMin = 3;
+	private const int NpcQuestAffinityMax = 10;
+	private readonly RandomNumberGenerator _questRng = new();
 	// 騎乘夥伴所需的最低親密度。
 	public const int MountAffinityRequirement = 50;
 	private const float MercenaryBrokerInteractRange = 4.6f;
