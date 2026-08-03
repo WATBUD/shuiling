@@ -55,6 +55,47 @@ public partial class World
 		return result;
 	}
 
+	// Normalized world-map cross positions (x,y in 0..1, y down), the single source
+	// of truth shared with WorldMapPanel — used here to point in-world portals in
+	// the same direction a neighbour sits on the cross.
+	private static readonly (string Id, Vector2 Pos)[] WorldMapNodePositions =
+	{
+		("wild_skeleton", new Vector2(0.50f, 0.12f)),
+		("wild_marsh", new Vector2(0.50f, 0.31f)),
+		("wild_snow", new Vector2(0.24f, 0.50f)),
+		("wild_forest", new Vector2(0.50f, 0.50f)),
+		("wild_badlands", new Vector2(0.76f, 0.50f)),
+		("city", new Vector2(0.50f, 0.82f)),
+	};
+
+	private static Vector2 WorldMapNodePos(string mapId)
+	{
+		foreach ((string id, Vector2 pos) in WorldMapNodePositions)
+		{
+			if (id == mapId)
+			{
+				return pos;
+			}
+		}
+
+		return new Vector2(0.5f, 0.5f);
+	}
+
+	// Unit XZ direction from one map toward an adjacent one, matching the world-map
+	// cross (screen y-down → +Z south). Snapped to the dominant axis so the portal
+	// lands on a clean edge: e.g. from the forest, badlands is due east (+X), snow
+	// west (−X), marsh north (−Z), city south (+Z).
+	public Vector3 GetPortalDirection(string fromMap, string toMap)
+	{
+		Vector2 delta = WorldMapNodePos(toMap) - WorldMapNodePos(fromMap);
+		if (Mathf.Abs(delta.X) >= Mathf.Abs(delta.Y))
+		{
+			return new Vector3(Mathf.Sign(delta.X), 0.0f, 0.0f);
+		}
+
+		return new Vector3(0.0f, 0.0f, Mathf.Sign(delta.Y));
+	}
+
 	private static string GetMapNameKey(string mapId)
 	{
 		foreach (WildMapDefinition wildMap in WildMaps)
