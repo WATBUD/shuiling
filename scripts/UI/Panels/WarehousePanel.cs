@@ -31,6 +31,7 @@ public partial class WarehousePanel : PanelContainer
 	private ItemCategory _selectedCategory = ItemCategory.All;
 	private const ulong TransferDebounceMsec = 250;
 	private ulong _lastTransferMsec;
+	private string _lastTransferItem = string.Empty;
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -519,15 +520,18 @@ public partial class WarehousePanel : PanelContainer
 			return;
 		}
 
-		// Debounce: rapid clicks rebuild+re-sort the grids, so a fast second
-		// click would land on a different item. Ignore clicks that arrive too
-		// soon after the last transfer.
+		// Debounce only a repeated click on the SAME item: transferring the whole
+		// stack empties it, so a fast echo on that now-gone slot would land on a
+		// re-sorted neighbour. Consecutive transfers of DIFFERENT items must always
+		// go through, otherwise depositing several items in a row silently drops all
+		// but the first.
 		ulong now = Time.GetTicksMsec();
-		if (now - _lastTransferMsec < TransferDebounceMsec)
+		if (itemId == _lastTransferItem && now - _lastTransferMsec < TransferDebounceMsec)
 		{
 			return;
 		}
 		_lastTransferMsec = now;
+		_lastTransferItem = itemId;
 
 		// Move the whole stack in one action (deterministic; no need to spam).
 		if (fromBag)
