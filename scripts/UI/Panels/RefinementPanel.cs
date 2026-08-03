@@ -281,7 +281,14 @@ public partial class RefinementPanel : PanelContainer
 
 		if (_tab == 0 && !string.IsNullOrEmpty(_selectedRefineId))
 		{
-			_player.TryRefineBagEquipment(_selectedRefineId);
+			// Follow the selection onto the refined result (star +1 on success), so
+			// the player can keep refining the same piece without reselecting it.
+			string refiningId = _selectedRefineId;
+			PlayerController.RefinementQuote quote = _player.GetRefinementQuote(refiningId);
+			bool success = _player.TryRefineBagEquipment(refiningId);
+			_selectedRefineId = success
+				? BuildCatalog.MakeRefinedEquipmentId(quote.BaseId, quote.TargetStars)
+				: refiningId;
 			RefreshAll();
 		}
 		else if (_tab == 1 && !string.IsNullOrEmpty(_selectedDismantleId))
