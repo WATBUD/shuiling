@@ -17,11 +17,6 @@ public partial class RefinementPanel : PanelContainer
 	private FloatingTooltip _itemInfo = null!;
 	private ScrollContainer _scroll = null!;
 	private GridContainer? _grid;
-	private PanelContainer _detailPanel = null!;
-	private Label _detailLabel = null!;
-	private Button _confirmButton = null!;
-	private string _selectedRefineId = string.Empty;
-	private string _selectedDismantleId = string.Empty;
 	private int _tab;
 	private const float RefineTileWidth = 98.0f;
 	private const int RefineTileGap = 8;
@@ -114,7 +109,6 @@ public partial class RefinementPanel : PanelContainer
 		_itemInfo?.HideTooltip();
 		ClearChildren(_itemList);
 		_grid = null;
-		_detailPanel.Visible = false;
 
 		if (_player == null)
 		{
@@ -143,17 +137,11 @@ public partial class RefinementPanel : PanelContainer
 		}
 
 		List<string> ids = _player.GetRefinableBagEquipmentIds();
-		if (!ids.Contains(_selectedRefineId))
-		{
-			_selectedRefineId = string.Empty;
-		}
-
 		if (ids.Count == 0)
 		{
 			var empty = MakeLabel(16, new Color(0.72f, 0.78f, 0.84f));
 			empty.Text = LocaleText.T("refine.empty");
 			_itemList.AddChild(empty);
-			_detailPanel.Visible = false;
 			return;
 		}
 
@@ -161,54 +149,16 @@ public partial class RefinementPanel : PanelContainer
 		foreach (string id in ids)
 		{
 			string capturedId = id;
-			grid.AddChild(MakeItemTile(id, _selectedRefineId == id, () =>
+			PlayerController.RefinementQuote quote = _player.GetRefinementQuote(id);
+			bool disabled = !quote.CanRefine || _player.GetInventoryCount(id) <= 0;
+			grid.AddChild(MakeItemTile(id, "refine.button", disabled, () =>
 			{
-				_selectedRefineId = capturedId;
-				RefreshAll();
+				if (_player != null)
+				{
+					_player.TryRefineBagEquipment(capturedId);
+					RefreshAll();
+				}
 			}));
-		}
-
-		UpdateRefineDetail();
-	}
-
-	private void UpdateRefineDetail()
-	{
-		if (_player == null)
-		{
-			return;
-		}
-
-		_detailPanel.Visible = true;
-		_confirmButton.Text = LocaleText.T("refine.button");
-		if (string.IsNullOrEmpty(_selectedRefineId))
-		{
-			_detailLabel.Text = LocaleText.T("refine.select_hint");
-			_confirmButton.Disabled = true;
-			return;
-		}
-
-		PlayerController.RefinementQuote quote = _player.GetRefinementQuote(_selectedRefineId);
-		int owned = _player.GetInventoryCount(_selectedRefineId);
-		string baseName = LocaleText.T(BuildCatalog.GetItemNameKey(_selectedRefineId)) + BuildCatalog.GetStarSuffix(_selectedRefineId);
-		if (quote.CanRefine)
-		{
-			int ownedCrystals = _player.GetInventoryCount(quote.CrystalId);
-			string crystalName = LocaleText.T(MonsterLootCatalog.GetNameKey(quote.CrystalId));
-			_detailLabel.Text = $"{baseName}\n" + LocaleText.F(
-				"refine.row.detail",
-				quote.CurrentStars,
-				quote.TargetStars,
-				quote.SuccessPercent,
-				quote.Gold,
-				crystalName,
-				quote.CrystalCount,
-				ownedCrystals);
-			_confirmButton.Disabled = owned <= 0;
-		}
-		else
-		{
-			_detailLabel.Text = $"{baseName}\n" + LocaleText.T("refine.row.max");
-			_confirmButton.Disabled = true;
 		}
 	}
 
@@ -220,17 +170,11 @@ public partial class RefinementPanel : PanelContainer
 		}
 
 		List<string> ids = _player.GetDismantlableEquipmentIds();
-		if (!ids.Contains(_selectedDismantleId))
-		{
-			_selectedDismantleId = string.Empty;
-		}
-
 		if (ids.Count == 0)
 		{
 			var empty = MakeLabel(16, new Color(0.72f, 0.78f, 0.84f));
 			empty.Text = LocaleText.T("refine.dismantle.empty");
 			_itemList.AddChild(empty);
-			_detailPanel.Visible = false;
 			return;
 		}
 
@@ -238,63 +182,15 @@ public partial class RefinementPanel : PanelContainer
 		foreach (string id in ids)
 		{
 			string capturedId = id;
-			grid.AddChild(MakeItemTile(id, _selectedDismantleId == id, () =>
+			bool disabled = _player.GetInventoryCount(id) <= 0;
+			grid.AddChild(MakeItemTile(id, "refine.dismantle.button", disabled, () =>
 			{
-				_selectedDismantleId = capturedId;
-				RefreshAll();
+				if (_player != null)
+				{
+					_player.TryDismantleEquipment(capturedId);
+					RefreshAll();
+				}
 			}));
-		}
-
-		UpdateDismantleDetail();
-	}
-
-	private void UpdateDismantleDetail()
-	{
-		if (_player == null)
-		{
-			return;
-		}
-
-		_detailPanel.Visible = true;
-		_confirmButton.Text = LocaleText.T("refine.dismantle.button");
-		if (string.IsNullOrEmpty(_selectedDismantleId))
-		{
-			_detailLabel.Text = LocaleText.T("refine.dismantle.select_hint");
-			_confirmButton.Disabled = true;
-			return;
-		}
-
-		int owned = _player.GetInventoryCount(_selectedDismantleId);
-		int stars = BuildCatalog.GetEquipmentStars(_selectedDismantleId);
-		string baseName = LocaleText.T(BuildCatalog.GetItemNameKey(_selectedDismantleId)) + BuildCatalog.GetStarSuffix(_selectedDismantleId);
-		string crystalName = LocaleText.T(MonsterLootCatalog.GetNameKey(MonsterLootCatalog.GetEnhanceCrystalId(stars)));
-		_detailLabel.Text = $"{baseName}\n" + LocaleText.F("refine.dismantle.yield", _player.GetEquipmentDismantleYield(_selectedDismantleId), crystalName);
-		_confirmButton.Disabled = owned <= 0;
-	}
-
-	private void OnConfirmPressed()
-	{
-		if (_player == null)
-		{
-			return;
-		}
-
-		if (_tab == 0 && !string.IsNullOrEmpty(_selectedRefineId))
-		{
-			// Follow the selection onto the refined result (star +1 on success), so
-			// the player can keep refining the same piece without reselecting it.
-			string refiningId = _selectedRefineId;
-			PlayerController.RefinementQuote quote = _player.GetRefinementQuote(refiningId);
-			bool success = _player.TryRefineBagEquipment(refiningId);
-			_selectedRefineId = success
-				? BuildCatalog.MakeRefinedEquipmentId(quote.BaseId, quote.TargetStars)
-				: refiningId;
-			RefreshAll();
-		}
-		else if (_tab == 1 && !string.IsNullOrEmpty(_selectedDismantleId))
-		{
-			_player.TryDismantleEquipment(_selectedDismantleId);
-			RefreshAll();
 		}
 	}
 
@@ -324,12 +220,12 @@ public partial class RefinementPanel : PanelContainer
 		_grid.Columns = Mathf.Max(1, Mathf.FloorToInt((available + RefineTileGap) / (RefineTileWidth + RefineTileGap)));
 	}
 
-	// Icon thumbnail tile: click selects (drives the detail panel), hover shows the
-	// full stats tooltip. Selected tile gets a gold border.
-	private Control MakeItemTile(string itemId, bool selected, System.Action onClick)
+	// Icon thumbnail tile with its own action button below (精煉/分解), so the
+	// action sits right on the item instead of a far-away confirm bar. Hover shows
+	// the full stats + cost tooltip.
+	private Control MakeItemTile(string itemId, string actionKey, bool actionDisabled, System.Action onAction)
 	{
-		int owned = _player?.GetInventoryCount(itemId) ?? 0;
-		var tile = new PanelContainer { CustomMinimumSize = new Vector2(RefineTileWidth, 118.0f) };
+		var tile = new PanelContainer { CustomMinimumSize = new Vector2(RefineTileWidth, 132.0f) };
 		string capturedId = itemId;
 		tile.MouseEntered += () => ShowItemInfo(capturedId);
 		tile.MouseExited += HideItemInfo;
@@ -337,26 +233,18 @@ public partial class RefinementPanel : PanelContainer
 		var style = new StyleBoxFlat
 		{
 			BgColor = new Color(0.08f, 0.09f, 0.105f, 0.94f),
-			BorderColor = selected ? new Color(1.0f, 0.86f, 0.4f, 0.98f) : new Color(0.32f, 0.38f, 0.45f, 0.72f),
+			BorderColor = new Color(0.32f, 0.38f, 0.45f, 0.72f),
 		};
-		style.SetBorderWidthAll(selected ? 3 : 1);
+		style.SetBorderWidthAll(1);
 		style.SetCornerRadiusAll(6);
 		style.SetContentMarginAll(6);
 		tile.AddThemeStyleboxOverride("panel", style);
-		tile.GuiInput += inputEvent =>
-		{
-			if (inputEvent is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
-			{
-				tile.AcceptEvent();
-				onClick();
-			}
-		};
 
 		var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
 		box.AddThemeConstantOverride("separation", 2);
 		tile.AddChild(box);
 
-		TextureRect icon = ItemIconLibrary.CreateRect(itemId, 58.0f);
+		TextureRect icon = ItemIconLibrary.CreateRect(itemId, 54.0f);
 		icon.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		box.AddChild(icon);
 
@@ -367,11 +255,17 @@ public partial class RefinementPanel : PanelContainer
 		nameLabel.MouseFilter = MouseFilterEnum.Ignore;
 		box.AddChild(nameLabel);
 
-		var countLabel = MakeLabel(12, new Color(0.78f, 0.86f, 0.94f));
-		countLabel.Text = $"×{owned}";
-		countLabel.HorizontalAlignment = HorizontalAlignment.Center;
-		countLabel.MouseFilter = MouseFilterEnum.Ignore;
-		box.AddChild(countLabel);
+		// The action button replaces the old "×count" label (count is in the tooltip).
+		var actionButton = new Button
+		{
+			Text = LocaleText.T(actionKey),
+			Disabled = actionDisabled,
+			CustomMinimumSize = new Vector2(0.0f, 30.0f),
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+		};
+		actionButton.AddThemeFontSizeOverride("font_size", 13);
+		actionButton.Pressed += onAction;
+		box.AddChild(actionButton);
 
 		return tile;
 	}
@@ -585,39 +479,6 @@ public partial class RefinementPanel : PanelContainer
 		_itemList.AddThemeConstantOverride("separation", 8);
 		_scroll.AddChild(_itemList);
 
-		// Fixed detail + confirm strip for the grid tabs (refine / dismantle): the
-		// selected item's cost/yield shows here and the player confirms the action.
-		_detailPanel = new PanelContainer { Visible = false };
-		var detailStyle = new StyleBoxFlat
-		{
-			BgColor = new Color(0.07f, 0.08f, 0.10f, 0.96f),
-			BorderColor = new Color(0.40f, 0.50f, 0.62f, 0.82f),
-		};
-		detailStyle.SetBorderWidthAll(1);
-		detailStyle.SetCornerRadiusAll(6);
-		detailStyle.SetContentMarginAll(10);
-		_detailPanel.AddThemeStyleboxOverride("panel", detailStyle);
-		root.AddChild(_detailPanel);
-
-		var detailRow = new HBoxContainer();
-		detailRow.AddThemeConstantOverride("separation", 12);
-		_detailPanel.AddChild(detailRow);
-
-		_detailLabel = MakeLabel(15, new Color(0.86f, 0.92f, 0.98f));
-		_detailLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-		_detailLabel.SizeFlagsVertical = SizeFlags.ShrinkCenter;
-		_detailLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-		detailRow.AddChild(_detailLabel);
-
-		_confirmButton = new Button
-		{
-			Text = LocaleText.T("refine.button"),
-			CustomMinimumSize = new Vector2(150.0f, 48.0f),
-			SizeFlagsVertical = SizeFlags.ShrinkCenter,
-		};
-		_confirmButton.Pressed += OnConfirmPressed;
-		detailRow.AddChild(_confirmButton);
-
 		var closeButton = new Button
 		{
 			Text = LocaleText.T("dialog.button.cancel"),
@@ -649,6 +510,37 @@ public partial class RefinementPanel : PanelContainer
 		string title = InventoryPanel.BuildItemTooltipTitle(itemId);
 		string body = InventoryPanel.BuildItemTooltipBody(itemId, string.Empty);
 		body += $"\n{LocaleText.F("shop.owned_count", _player.GetInventoryCount(itemId))}";
+
+		// Show the refine cost / dismantle yield inline, since the confirm strip is
+		// gone — the player sees what an action costs before pressing the tile button.
+		if (_tab == 0)
+		{
+			PlayerController.RefinementQuote quote = _player.GetRefinementQuote(itemId);
+			if (quote.CanRefine)
+			{
+				string crystalName = LocaleText.T(MonsterLootCatalog.GetNameKey(quote.CrystalId));
+				body += "\n" + LocaleText.F(
+					"refine.row.detail",
+					quote.CurrentStars,
+					quote.TargetStars,
+					quote.SuccessPercent,
+					quote.Gold,
+					crystalName,
+					quote.CrystalCount,
+					_player.GetInventoryCount(quote.CrystalId));
+			}
+			else
+			{
+				body += "\n" + LocaleText.T("refine.row.max");
+			}
+		}
+		else if (_tab == 1)
+		{
+			int stars = BuildCatalog.GetEquipmentStars(itemId);
+			string crystalName = LocaleText.T(MonsterLootCatalog.GetNameKey(MonsterLootCatalog.GetEnhanceCrystalId(stars)));
+			body += "\n" + LocaleText.F("refine.dismantle.yield", _player.GetEquipmentDismantleYield(itemId), crystalName);
+		}
+
 		_itemInfo.ShowTooltip(title, body, this);
 	}
 
