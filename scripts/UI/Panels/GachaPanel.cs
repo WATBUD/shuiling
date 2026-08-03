@@ -12,11 +12,12 @@ public partial class GachaPanel : PanelContainer
 	private Label _merchantLabel = null!;
 	private ProgressBar _expBar = null!;
 	private OptionButton _tierOption = null!;
-	private Button _drawOneButton = null!;
-	private Button _drawTenButton = null!;
+	private HSlider _countSlider = null!;
+	private Label _countLabel = null!;
+	private Button _drawButton = null!;
 	private Button _ratesButton = null!;
-	private VBoxContainer _ratesBox = null!;
-	private bool _showRates;
+	private Window _ratesWindow = null!;
+	private VBoxContainer _ratesList = null!;
 	private VBoxContainer _list = null!;
 	private FloatingTooltip _tooltip = null!;
 	private AudioStreamPlayer _sfxPlayer = null!;
@@ -62,6 +63,7 @@ public partial class GachaPanel : PanelContainer
 		if (!visible)
 		{
 			_tooltip?.HideTooltip();
+			_ratesWindow?.Hide();
 		}
 		if (visible)
 		{
@@ -93,8 +95,7 @@ public partial class GachaPanel : PanelContainer
 			_expBar.Visible = false;
 			_tierOption.Clear();
 			_tierOption.Disabled = true;
-			_drawOneButton.Disabled = true;
-			_drawTenButton.Disabled = true;
+			_drawButton.Disabled = true;
 			return;
 		}
 
@@ -116,13 +117,8 @@ public partial class GachaPanel : PanelContainer
 
 		PopulateTierOptions(unlockedMax);
 
-		_costLabel.Text = LocaleText.F("gacha.cost", cost);
 		_goldLabel.Text = $"{_player.Gold}";
-		_drawOneButton.Text = LocaleText.T("gacha.draw_one");
-		_drawTenButton.Text = LocaleText.T("gacha.draw_ten");
-		bool canDraw = _player.Gold >= cost;
-		_drawOneButton.Disabled = !canDraw;
-		_drawTenButton.Disabled = !canDraw;
+		UpdateDrawControls();
 		RefreshRatesTable();
 
 		if (_lastResults.Count == 0)
@@ -248,12 +244,23 @@ public partial class GachaPanel : PanelContainer
 		_titleLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		header.AddChild(_titleLabel);
 
+		// Odds table opens in its own window; its button sits beside the title.
+		_ratesButton = new Button
+		{
+			Text = LocaleText.T("gacha.rates_button"),
+			CustomMinimumSize = new Vector2(0.0f, 34.0f),
+		};
+		_ratesButton.SizeFlagsVertical = SizeFlags.ShrinkCenter;
+		_ratesButton.Pressed += OpenRatesWindow;
+		header.AddChild(_ratesButton);
+
 		_goldLabel = MakeLabel(20, new Color(1.0f, 0.92f, 0.62f));
 		_goldLabel.SizeFlagsVertical = SizeFlags.ShrinkCenter;
 		header.AddChild(_goldLabel);
 
 		// Merchant level + EXP progress toward the next draw-cap unlock.
 		_merchantLabel = MakeLabel(15, new Color(0.72f, 1.0f, 0.82f));
+		_merchantLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
 		root.AddChild(_merchantLabel);
 
 		_expBar = new ProgressBar
@@ -263,66 +270,50 @@ public partial class GachaPanel : PanelContainer
 		};
 		root.AddChild(_expBar);
 
-		// Draw-tier selector: a dropdown of the unlocked caps (1..merchant Lv+1);
-		// picking a higher cap raises both the reachable tier and the cost.
-		var tierBar = new HBoxContainer();
-		tierBar.AddThemeConstantOverride("separation", 8);
-		root.AddChild(tierBar);
-
-		var tierPrefix = MakeLabel(16, new Color(0.80f, 0.88f, 0.94f));
-		tierPrefix.Text = LocaleText.T("gacha.tier_prefix");
-		tierPrefix.SizeFlagsVertical = SizeFlags.ShrinkCenter;
-		tierBar.AddChild(tierPrefix);
+		// One row: draw-cap dropdown (left) + a draggable draw-count slider + the
+		// chosen count (right). Picking a higher cap raises the reachable tier and
+		// the per-draw cost; the slider chooses how many draws to fire at once.
+		var controlRow = new HBoxContainer();
+		controlRow.AddThemeConstantOverride("separation", 10);
+		root.AddChild(controlRow);
 
 		_tierOption = new OptionButton
 		{
-			CustomMinimumSize = new Vector2(0.0f, 40.0f),
-			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			CustomMinimumSize = new Vector2(170.0f, 40.0f),
+			SizeFlagsVertical = SizeFlags.ShrinkCenter,
 		};
 		_tierOption.ItemSelected += index => OnTierSelected(index);
-		tierBar.AddChild(_tierOption);
+		controlRow.AddChild(_tierOption);
+
+		_countSlider = new HSlider
+		{
+			MinValue = 1,
+			MaxValue = 100,
+			Step = 1,
+			Value = 1,
+			CustomMinimumSize = new Vector2(0.0f, 40.0f),
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
+			SizeFlagsVertical = SizeFlags.ShrinkCenter,
+		};
+		_countSlider.ValueChanged += _ => UpdateDrawControls();
+		controlRow.AddChild(_countSlider);
+
+		_countLabel = MakeLabel(18, new Color(1.0f, 0.94f, 0.72f));
+		_countLabel.CustomMinimumSize = new Vector2(64.0f, 0.0f);
+		_countLabel.HorizontalAlignment = HorizontalAlignment.Right;
+		_countLabel.SizeFlagsVertical = SizeFlags.ShrinkCenter;
+		controlRow.AddChild(_countLabel);
 
 		_costLabel = MakeLabel(16, new Color(0.80f, 0.88f, 0.94f));
 		root.AddChild(_costLabel);
 
-		// Collapsible per-tier odds table for the current draw cap.
-		_ratesButton = new Button
+		_drawButton = new Button
 		{
-			ToggleMode = true,
-			CustomMinimumSize = new Vector2(0.0f, 34.0f),
-		};
-		_ratesButton.Toggled += pressed =>
-		{
-			_showRates = pressed;
-			RefreshRatesTable();
-		};
-		root.AddChild(_ratesButton);
-
-		_ratesBox = new VBoxContainer { Visible = false };
-		_ratesBox.AddThemeConstantOverride("separation", 2);
-		root.AddChild(_ratesBox);
-
-		var buttonBar = new HBoxContainer();
-		buttonBar.AddThemeConstantOverride("separation", 8);
-		root.AddChild(buttonBar);
-
-		_drawOneButton = new Button
-		{
-			Text = LocaleText.T("gacha.draw_one"),
 			CustomMinimumSize = new Vector2(0.0f, 48.0f),
 			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 		};
-		_drawOneButton.Pressed += () => OnDraw(1);
-		buttonBar.AddChild(_drawOneButton);
-
-		_drawTenButton = new Button
-		{
-			Text = LocaleText.T("gacha.draw_ten"),
-			CustomMinimumSize = new Vector2(0.0f, 48.0f),
-			SizeFlagsHorizontal = SizeFlags.ExpandFill,
-		};
-		_drawTenButton.Pressed += () => OnDraw(10);
-		buttonBar.AddChild(_drawTenButton);
+		_drawButton.Pressed += () => OnDraw((int)_countSlider.Value);
+		root.AddChild(_drawButton);
 
 		var scroll = new ScrollContainer
 		{
@@ -373,36 +364,85 @@ public partial class GachaPanel : PanelContainer
 		};
 		_flash.SetAnchorsPreset(LayoutPreset.FullRect);
 		AddChild(_flash);
+
+		// Odds table lives in its own (embedded) window opened from the header.
+		_ratesWindow = new Window
+		{
+			Name = "GachaRatesWindow",
+			Title = LocaleText.T("gacha.rates_window"),
+			Visible = false,
+			Size = new Vector2I(260, 380),
+			Unresizable = true,
+		};
+		_ratesWindow.CloseRequested += () => _ratesWindow.Hide();
+		var winMargin = new MarginContainer();
+		winMargin.SetAnchorsPreset(LayoutPreset.FullRect);
+		winMargin.AddThemeConstantOverride("margin_left", 14);
+		winMargin.AddThemeConstantOverride("margin_right", 14);
+		winMargin.AddThemeConstantOverride("margin_top", 12);
+		winMargin.AddThemeConstantOverride("margin_bottom", 12);
+		_ratesWindow.AddChild(winMargin);
+		_ratesList = new VBoxContainer();
+		_ratesList.AddThemeConstantOverride("separation", 3);
+		winMargin.AddChild(_ratesList);
+		AddChild(_ratesWindow);
 	}
 
-	// Lists each drawable tier (cap..1) with its cascade probability for the
-	// currently selected cap, so the odds shown match what a draw will actually do.
-	private void RefreshRatesTable()
+	private void OpenRatesWindow()
 	{
-		if (_ratesBox == null || _ratesButton == null)
+		if (_ratesWindow == null)
 		{
 			return;
 		}
 
-		_ratesButton.Text = LocaleText.T(_showRates ? "gacha.rates_hide" : "gacha.rates_show");
-		_ratesBox.Visible = _showRates;
-		ClearChildren(_ratesBox);
-		if (!_showRates || _player == null)
+		RefreshRatesTable();
+		_ratesWindow.PopupCentered(new Vector2I(260, 380));
+	}
+
+	// Fills the odds window with each drawable tier (cap..1) and its cascade
+	// probability for the currently selected cap, so the odds shown match what a
+	// draw will actually do. Cheap enough to refresh whenever the cap changes.
+	private void RefreshRatesTable()
+	{
+		if (_ratesList == null)
+		{
+			return;
+		}
+
+		ClearChildren(_ratesList);
+		if (_player == null)
 		{
 			return;
 		}
 
 		int cap = Mathf.Clamp(_selectedTier, 1, _player.GachaUnlockedMaxTier);
-		var title = MakeLabel(14, new Color(0.80f, 0.88f, 0.94f));
+		var title = MakeLabel(15, new Color(0.82f, 0.90f, 1.0f));
 		title.Text = LocaleText.F("gacha.rates_title", cap);
-		_ratesBox.AddChild(title);
+		_ratesList.AddChild(title);
 
 		for (int tier = cap; tier >= 1; tier--)
 		{
-			var row = MakeLabel(14, RarityColor(tier));
+			var row = MakeLabel(15, RarityColor(tier));
 			row.Text = LocaleText.F("gacha.rates_row", tier, GachaConfig.TierProbability(tier, cap) * 100.0f);
-			_ratesBox.AddChild(row);
+			_ratesList.AddChild(row);
 		}
+	}
+
+	// Updates the count readout, per-draw cost, and draw button from the slider
+	// without rebuilding the results list (called live on every slider tick).
+	private void UpdateDrawControls()
+	{
+		if (_player == null)
+		{
+			return;
+		}
+
+		int count = (int)_countSlider.Value;
+		int cost = _player.GachaDrawCost(_selectedTier);
+		_countLabel.Text = LocaleText.F("gacha.count", count);
+		_costLabel.Text = LocaleText.F("gacha.cost", cost);
+		_drawButton.Text = LocaleText.F("gacha.draw", count, cost * count);
+		_drawButton.Disabled = _player.Gold < cost;
 	}
 
 	// Rebuild the dropdown to list every unlocked cap (1..unlockedMax) with its
