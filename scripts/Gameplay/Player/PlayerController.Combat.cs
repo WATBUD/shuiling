@@ -768,9 +768,10 @@ public partial class PlayerController
 	private AudioStreamPlayer? _fallSfxPlayer;
 	private AudioStream? _fallScreamStream;
 
-	// Drop a licensed audio file here to override the synthesized scream; if it's
-	// absent the procedural fallback is used. .ogg or .wav both work.
-	private const string FallScreamPath = "res://assets/audio/sfx/fall_scream.ogg";
+	// Rendered scream asset (the same synth, baked to a file). If it's missing or
+	// not yet imported, the in-memory procedural fallback is used. Replace this file
+	// to swap the sound with no code change.
+	private const string FallScreamPath = "res://assets/audio/sfx/fall_scream.wav";
 
 	// Fatal fall off a wild map's open edge: a comedic descending "啊～" then the
 	// normal downed state.
