@@ -97,10 +97,20 @@ public partial class PlayerController
 				return MonsterLootCatalog.GetEnhanceCrystalId(tier);
 			case GachaCategory.Weapon:
 			{
-				List<EquipmentDefinition> weapons = BuildCatalog.GetEquipmentDefinitions(EquipmentSlot.Weapon);
+				var weapons = new List<string>();
+				foreach (EquipmentDefinition weapon in BuildCatalog.GetEquipmentDefinitions(EquipmentSlot.Weapon))
+				{
+					// Skip the ".none" empty-slot placeholder, else the player can
+					// draw a "未裝備" weapon.
+					if (!BuildCatalog.IsFreeItem(weapon.Id))
+					{
+						weapons.Add(weapon.Id);
+					}
+				}
+
 				return weapons.Count == 0
 					? MonsterLootCatalog.GetEnhanceCrystalId(tier)
-					: BuildCatalog.MakeRefinedEquipmentId(weapons[_gachaRng.RandiRange(0, weapons.Count - 1)].Id, tier);
+					: BuildCatalog.MakeRefinedEquipmentId(weapons[_gachaRng.RandiRange(0, weapons.Count - 1)], tier);
 			}
 			case GachaCategory.Core:
 			{
@@ -124,7 +134,11 @@ public partial class PlayerController
 				{
 					foreach (EquipmentDefinition equipment in BuildCatalog.GetEquipmentDefinitions(slot))
 					{
-						gear.Add(equipment.Id);
+						// Skip ".none" empty-slot placeholders so no "未裝備" gear drops.
+						if (!BuildCatalog.IsFreeItem(equipment.Id))
+						{
+							gear.Add(equipment.Id);
+						}
 					}
 				}
 
