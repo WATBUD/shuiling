@@ -123,9 +123,12 @@ public partial class QuestTrackerPanel : PanelContainer
 		_titleLabel.Text = LocaleText.T("quest.tracker.title");
 		rows.AddChild(_titleLabel);
 
+		// Pass (not Ignore) so the wheel scrolls the list while hovering the tracker;
+		// unused clicks still propagate through to gameplay. The inner list stays
+		// Ignore so the scroll container beneath it is what receives the wheel.
 		var scroll = new ScrollContainer
 		{
-			MouseFilter = MouseFilterEnum.Ignore,
+			MouseFilter = MouseFilterEnum.Pass,
 			HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
 			SizeFlagsVertical = SizeFlags.ExpandFill,
 		};
