@@ -822,10 +822,27 @@ public partial class PlayerController
 		const float duration = 1.9f;
 		int sampleCount = (int)(rate * duration);
 		var data = new byte[sampleCount * 2];
-		double fundPhase = 0.0;
+		double phase = 0.0;
 		uint noiseState = 0x1234567u;
 		float jitterLp = 0.0f;
-		float shimmerLp = 0.0f;
+		float lowpassState = 0.0f;
+
+		// Source-filter (vocal) model: a glottal buzz + turbulent breath driven
+		// through three resonant formant filters of a male "ah". The resonators ring
+		// naturally, which reads far more throat-like than summed sine harmonics.
+		float[] formantF = { 700.0f, 1150.0f, 2600.0f };
+		float[] formantBw = { 90.0f, 110.0f, 170.0f };
+		float[] formantA = { 1.0f, 0.7f, 0.5f };
+		float[] poleR = new float[3];
+		float[] poleC = new float[3];
+		float[] resY1 = new float[3];
+		float[] resY2 = new float[3];
+		for (int j = 0; j < 3; j++)
+		{
+			poleR[j] = Mathf.Exp(-Mathf.Pi * formantBw[j] / rate);
+			poleC[j] = 2.0f * poleR[j] * Mathf.Cos(Mathf.Tau * formantF[j] / rate);
+		}
+
 		for (int i = 0; i < sampleCount; i++)
 		{
 			float frac = i / (float)sampleCount;
@@ -837,55 +854,41 @@ public partial class PlayerController
 				? Mathf.Lerp(360.0f, 540.0f, frac / 0.04f)
 				: Mathf.Lerp(540.0f, 120.0f, (frac - 0.04f) / 0.96f);
 			f0 *= 1.0f + 0.03f * Mathf.Sin(t * Mathf.Tau * 5.0f);
-
-			// A brief strained voice-crack partway through the scream.
 			if (frac > 0.30f && frac < 0.36f)
 			{
-				f0 *= 1.14f;
+				f0 *= 1.14f; // strained voice-crack
 			}
 
-			// Pitch jitter grows toward the end (voice straining) for a pained waver.
 			noiseState = (noiseState * 1664525u) + 1013904223u;
 			float jitterNoise = ((noiseState >> 8) / 16777215.0f) * 2.0f - 1.0f;
 			jitterLp += (jitterNoise - jitterLp) * 0.22f;
 			f0 *= 1.0f + (0.02f + 0.05f * frac) * jitterLp;
-			fundPhase += f0 / rate;
+			phase += f0 / rate;
 
-			// "Distance": in the second half he's falling AWAY — the sound gets
-			// quieter and muffled (low-pass) so it recedes into the distance.
-			float distance = Mathf.Clamp((frac - 0.5f) / 0.5f, 0.0f, 1.0f);
-			float cutoff = Mathf.Lerp(9000.0f, 1000.0f, distance);
+			// Glottal buzz (sawtooth) + turbulent aspiration that rises as he strains.
+			float saw = (float)(phase - System.Math.Floor(phase)) * 2.0f - 1.0f;
+			noiseState = (noiseState * 1664525u) + 1013904223u;
+			float breath = ((noiseState >> 8) / 16777215.0f) * 2.0f - 1.0f;
+			float source = (saw * 0.85f) + (breath * (0.28f + 0.30f * frac));
 
-			// Glottal source (sawtooth ~1/k harmonics) shaped by the "ah" formants
-			// and a receding low-pass, plus a subharmonic growl for a pained edge.
+			// Run the source through the three formant resonators.
 			float voiced = 0.0f;
-			for (int k = 1; k <= 40; k++)
+			for (int j = 0; j < 3; j++)
 			{
-				float fk = f0 * k;
-				if (fk > 10000.0f)
-				{
-					break;
-				}
-
-				float lowpass = 1.0f / (1.0f + (fk / cutoff) * (fk / cutoff));
-				voiced += (1.0f / k) * FormantGain(fk) * lowpass * Mathf.Sin((float)(fundPhase * k * Mathf.Tau));
+				float y = ((1.0f - poleR[j]) * source) + (poleC[j] * resY1[j]) - (poleR[j] * poleR[j] * resY2[j]);
+				resY2[j] = resY1[j];
+				resY1[j] = y;
+				voiced += formantA[j] * y;
 			}
 
-			voiced += 0.18f * Mathf.Sin((float)(fundPhase * 0.5 * Mathf.Tau));
+			// "Distance": second half falls AWAY — a closing one-pole low-pass muffles
+			// it and the volume drops, so it recedes.
+			float distance = Mathf.Clamp((frac - 0.5f) / 0.5f, 0.0f, 1.0f);
+			float lpCoeff = Mathf.Lerp(0.9f, 0.12f, distance);
+			lowpassState += (voiced - lowpassState) * lpCoeff;
 
-			// Amplitude shimmer + a little breath.
-			noiseState = (noiseState * 1664525u) + 1013904223u;
-			float shimmerNoise = ((noiseState >> 8) / 16777215.0f) * 2.0f - 1.0f;
-			shimmerLp += (shimmerNoise - shimmerLp) * 0.15f;
-			noiseState = (noiseState * 1664525u) + 1013904223u;
-			float breath = (((noiseState >> 8) / 16777215.0f) * 2.0f - 1.0f) * 0.06f;
-
-			// Heavier drive so the voice clips into a strained, pained rasp.
-			float raw = voiced * (1.0f + 0.16f * shimmerLp) + breath;
-			float driven = Mathf.Clamp(raw * 1.15f, -1.0f, 1.0f);
-
+			float driven = Mathf.Clamp(lowpassState * (2.2f - 0.6f * distance), -1.0f, 1.0f);
 			float attack = Mathf.Min(1.0f, frac / 0.02f);
-			// Volume fades with distance (down to ~15%), then a final tail to silence.
 			float distanceGain = 1.0f - 0.85f * distance;
 			float tail = frac > 0.9f ? Mathf.Max(1.0f - ((frac - 0.9f) / 0.1f), 0.0f) : 1.0f;
 			float env = attack * distanceGain * tail;
@@ -904,22 +907,6 @@ public partial class PlayerController
 		};
 	}
 
-	// Resonant gain of a (male) "ah" vowel's three formants (Lorentzian peaks), so
-	// the harmonic source above takes on a vocal timbre.
-	private static float FormantGain(float freq)
-	{
-		float gain = 0.06f;
-		gain += 1.0f / (1.0f + Formant(freq, 700.0f, 110.0f));
-		gain += 0.75f / (1.0f + Formant(freq, 1100.0f, 130.0f));
-		gain += 0.50f / (1.0f + Formant(freq, 2600.0f, 280.0f));
-		return gain;
-	}
-
-	private static float Formant(float freq, float center, float bandwidth)
-	{
-		float x = (freq - center) / bandwidth;
-		return x * x;
-	}
 
 	private void HandlePlayerDeath()
 	{
