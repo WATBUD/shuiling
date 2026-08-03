@@ -8,15 +8,26 @@ using System.Collections.Generic;
 // CoreEnhancerPanel. World is reached via the player's parent (same as MinimapPanel).
 public partial class WorldMapPanel : PanelContainer
 {
-	// Fixed normalized layout (x,y in 0..1, y down) resembling a winding overworld path.
+	// Fixed normalized layout (x,y in 0..1, y down): a cross centred on the forest
+	// hub — skeleton/marsh north, snow west, badlands east, city south-east.
 	private static readonly (string Id, Vector2 Pos)[] NodeLayout =
 	{
-		("city", new Vector2(0.14f, 0.82f)),
-		("wild_forest", new Vector2(0.30f, 0.50f)),
-		("wild_marsh", new Vector2(0.48f, 0.66f)),
-		("wild_badlands", new Vector2(0.64f, 0.38f)),
-		("wild_snow", new Vector2(0.80f, 0.58f)),
-		("wild_skeleton", new Vector2(0.90f, 0.28f)),
+		("wild_skeleton", new Vector2(0.50f, 0.12f)),
+		("wild_marsh", new Vector2(0.50f, 0.31f)),
+		("wild_snow", new Vector2(0.24f, 0.50f)),
+		("wild_forest", new Vector2(0.50f, 0.50f)),
+		("wild_badlands", new Vector2(0.76f, 0.50f)),
+		("city", new Vector2(0.82f, 0.82f)),
+	};
+
+	// Dashed links between nodes (forest is the hub; marsh continues north to skeleton).
+	private static readonly (string A, string B)[] NodeEdges =
+	{
+		("wild_forest", "wild_marsh"),
+		("wild_marsh", "wild_skeleton"),
+		("wild_forest", "wild_snow"),
+		("wild_forest", "wild_badlands"),
+		("wild_forest", "city"),
 	};
 
 	private PlayerController? _player;
@@ -134,18 +145,30 @@ public partial class WorldMapPanel : PanelContainer
 		}
 
 		Vector2 areaSize = _mapArea.Size;
-		var connectorPoints = new List<Vector2>();
+		var pointById = new Dictionary<string, Vector2>();
+		var nodePoints = new List<Vector2>();
 		foreach ((string id, Vector2 normalized) in NodeLayout)
 		{
 			Vector2 point = normalized * areaSize;
-			connectorPoints.Add(point);
+			pointById[id] = point;
+			nodePoints.Add(point);
 			if (_nodeButtons.TryGetValue(id, out Button? button))
 			{
 				button.Position = point - button.Size * 0.5f;
 			}
 		}
 
-		_mapArea.ConnectorPoints = connectorPoints;
+		var edges = new List<(Vector2 A, Vector2 B)>();
+		foreach ((string a, string b) in NodeEdges)
+		{
+			if (pointById.TryGetValue(a, out Vector2 pa) && pointById.TryGetValue(b, out Vector2 pb))
+			{
+				edges.Add((pa, pb));
+			}
+		}
+
+		_mapArea.Connectors = edges;
+		_mapArea.NodePoints = nodePoints;
 		_mapArea.QueueRedraw();
 	}
 
@@ -290,18 +313,19 @@ public partial class WorldMapCanvas : Control
 	private const float DashLength = 10.0f;
 	private const float GapLength = 8.0f;
 
-	public IReadOnlyList<Vector2> ConnectorPoints { get; set; } = System.Array.Empty<Vector2>();
+	public IReadOnlyList<(Vector2 A, Vector2 B)> Connectors { get; set; } = System.Array.Empty<(Vector2, Vector2)>();
+	public IReadOnlyList<Vector2> NodePoints { get; set; } = System.Array.Empty<Vector2>();
 
 	public override void _Draw()
 	{
 		var dashColor = new Color(0.42f, 0.48f, 0.56f, 0.72f);
-		for (int index = 0; index + 1 < ConnectorPoints.Count; index++)
+		foreach ((Vector2 a, Vector2 b) in Connectors)
 		{
-			DrawDashedSegment(ConnectorPoints[index], ConnectorPoints[index + 1], dashColor);
+			DrawDashedSegment(a, b, dashColor);
 		}
 
 		// Faint station discs under each node button, so nodes read as stops on the path.
-		foreach (Vector2 point in ConnectorPoints)
+		foreach (Vector2 point in NodePoints)
 		{
 			DrawCircle(point, 6.0f, new Color(0.20f, 0.26f, 0.32f, 0.6f));
 		}
