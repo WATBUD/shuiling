@@ -15,6 +15,7 @@ public partial class RefinementPanel : PanelContainer
 	private Button _tabDismantleButton = null!;
 	private Button _tabExchangeButton = null!;
 	private FloatingTooltip _itemInfo = null!;
+	private FloatingTooltip _costInfo = null!;
 	private ScrollContainer _scroll = null!;
 	private GridContainer? _grid;
 	private int _tab;
@@ -40,6 +41,10 @@ public partial class RefinementPanel : PanelContainer
 		if (_itemInfo != null && _itemInfo.Visible)
 		{
 			_itemInfo.PositionNearMouse(this);
+		}
+		if (_costInfo != null && _costInfo.Visible)
+		{
+			_costInfo.PositionNearMouse(this);
 		}
 	}
 
@@ -78,6 +83,7 @@ public partial class RefinementPanel : PanelContainer
 		if (!visible)
 		{
 			_itemInfo?.HideTooltip();
+			_costInfo?.HideTooltip();
 		}
 		if (visible)
 		{
@@ -107,6 +113,7 @@ public partial class RefinementPanel : PanelContainer
 			_ => "refine.hint",
 		});
 		_itemInfo?.HideTooltip();
+		_costInfo?.HideTooltip();
 		ClearChildren(_itemList);
 		_grid = null;
 
@@ -151,32 +158,22 @@ public partial class RefinementPanel : PanelContainer
 			string capturedId = id;
 			PlayerController.RefinementQuote quote = _player.GetRefinementQuote(id);
 			bool disabled = !quote.CanRefine || _player.GetInventoryCount(id) <= 0;
-			string tip;
-			if (quote.CanRefine)
+			grid.AddChild(MakeItemTile(id, "refine.button", disabled, BuildRefineTip(id), () =>
 			{
-				string crystalName = LocaleText.T(MonsterLootCatalog.GetNameKey(quote.CrystalId));
-				tip = LocaleText.F(
-					"refine.row.detail",
-					quote.CurrentStars,
-					quote.TargetStars,
-					quote.SuccessPercent,
-					quote.Gold,
-					crystalName,
-					quote.CrystalCount,
-					_player.GetInventoryCount(quote.CrystalId));
-			}
-			else
-			{
-				tip = LocaleText.T("refine.row.max");
-			}
-
-			grid.AddChild(MakeItemTile(id, "refine.button", disabled, tip, () =>
-			{
-				if (_player != null)
+				if (_player == null)
 				{
-					_player.TryRefineBagEquipment(capturedId);
-					RefreshAll();
+					return;
 				}
+
+				// Follow to the refined result so the cost tooltip immediately shows
+				// the NEXT star's requirement without needing a re-hover.
+				PlayerController.RefinementQuote q = _player.GetRefinementQuote(capturedId);
+				bool success = _player.TryRefineBagEquipment(capturedId);
+				RefreshAll();
+				string nextId = success
+					? BuildCatalog.MakeRefinedEquipmentId(q.BaseId, q.TargetStars)
+					: capturedId;
+				ShowActionCost("refine.button", BuildRefineTip(nextId));
 			}));
 		}
 	}
@@ -202,15 +199,18 @@ public partial class RefinementPanel : PanelContainer
 		{
 			string capturedId = id;
 			bool disabled = _player.GetInventoryCount(id) <= 0;
-			int stars = BuildCatalog.GetEquipmentStars(id);
-			string crystalName = LocaleText.T(MonsterLootCatalog.GetNameKey(MonsterLootCatalog.GetEnhanceCrystalId(stars)));
-			string tip = LocaleText.F("refine.dismantle.yield", _player.GetEquipmentDismantleYield(id), crystalName);
-			grid.AddChild(MakeItemTile(id, "refine.dismantle.button", disabled, tip, () =>
+			grid.AddChild(MakeItemTile(id, "refine.dismantle.button", disabled, BuildDismantleTip(id), () =>
 			{
-				if (_player != null)
+				if (_player == null)
 				{
-					_player.TryDismantleEquipment(capturedId);
-					RefreshAll();
+					return;
+				}
+
+				_player.TryDismantleEquipment(capturedId);
+				RefreshAll();
+				if (_player.GetInventoryCount(capturedId) > 0)
+				{
+					ShowActionCost("refine.dismantle.button", BuildDismantleTip(capturedId));
 				}
 			}));
 		}
@@ -284,12 +284,15 @@ public partial class RefinementPanel : PanelContainer
 			Disabled = actionDisabled,
 			CustomMinimumSize = new Vector2(0.0f, 30.0f),
 			SizeFlagsHorizontal = SizeFlags.ExpandFill,
-			// Its own independent tooltip: required materials (refine) / yield
-			// (dismantle), separate from the icon's item-stats tooltip.
-			TooltipText = actionTooltip,
 			MouseDefaultCursorShape = CursorShape.PointingHand,
 		};
 		actionButton.AddThemeFontSizeOverride("font_size", 13);
+		// Its own instant tooltip: required materials (refine) / yield (dismantle),
+		// separate from the icon's item-stats tooltip. Shown on hover with no delay.
+		string tipTitleKey = actionKey;
+		string tipText = actionTooltip;
+		actionButton.MouseEntered += () => _costInfo.ShowTooltip(LocaleText.T(tipTitleKey), tipText, this);
+		actionButton.MouseExited += () => _costInfo.HideTooltip();
 		actionButton.Pressed += onAction;
 		box.AddChild(actionButton);
 
@@ -524,6 +527,61 @@ public partial class RefinementPanel : PanelContainer
 			ZIndex = 100,
 		};
 		AddChild(_itemInfo);
+
+		// Separate, instant tooltip for the action button's cost / yield.
+		_costInfo = new FloatingTooltip
+		{
+			Name = "RefinementCostInfo",
+			MaxWidth = 460.0f,
+			MinWidth = 240.0f,
+			MaxWidthRatio = 0.55f,
+			MaxHeightRatio = 0.58f,
+			MinBodyHeight = 48.0f,
+			ZIndex = 101,
+		};
+		AddChild(_costInfo);
+	}
+
+	private string BuildRefineTip(string itemId)
+	{
+		if (_player == null)
+		{
+			return string.Empty;
+		}
+
+		PlayerController.RefinementQuote quote = _player.GetRefinementQuote(itemId);
+		if (!quote.CanRefine)
+		{
+			return LocaleText.T("refine.row.max");
+		}
+
+		string crystalName = LocaleText.T(MonsterLootCatalog.GetNameKey(quote.CrystalId));
+		return LocaleText.F(
+			"refine.row.detail",
+			quote.CurrentStars,
+			quote.TargetStars,
+			quote.SuccessPercent,
+			quote.Gold,
+			crystalName,
+			quote.CrystalCount,
+			_player.GetInventoryCount(quote.CrystalId));
+	}
+
+	private string BuildDismantleTip(string itemId)
+	{
+		if (_player == null)
+		{
+			return string.Empty;
+		}
+
+		int stars = BuildCatalog.GetEquipmentStars(itemId);
+		string crystalName = LocaleText.T(MonsterLootCatalog.GetNameKey(MonsterLootCatalog.GetEnhanceCrystalId(stars)));
+		return LocaleText.F("refine.dismantle.yield", _player.GetEquipmentDismantleYield(itemId), crystalName);
+	}
+
+	private void ShowActionCost(string titleKey, string tip)
+	{
+		_costInfo?.ShowTooltip(LocaleText.T(titleKey), tip, this);
 	}
 
 	private void ShowItemInfo(string itemId)
