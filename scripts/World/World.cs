@@ -636,6 +636,7 @@ public partial class World : Node3D
 		{
 			new("name.npc.item_merchant", RingFrontOffset(30.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(30.0f, shopRadius)), 0.8f, "Support"),
 			new("name.npc.refiner", RingFrontOffset(90.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(90.0f, shopRadius)), 0.7f, "Tank"),
+			new("name.npc.core_enhancer", RingFrontOffset(150.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(150.0f, shopRadius)), 0.7f, "Support"),
 			// 傭兵仲介已移除：傭兵清單併入「夥伴招募所」(pet_trainer) 的傭兵分頁。
 			new("name.npc.pet_trainer", RingFrontOffset(210.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(210.0f, shopRadius)), 0.7f, "Support"),
 			new("name.npc.warehouse_keeper", RingFrontOffset(270.0f, shopRadius, frontDistance), YawFacingCenter(RingOffset(270.0f, shopRadius)), 0.8f, "Support"),

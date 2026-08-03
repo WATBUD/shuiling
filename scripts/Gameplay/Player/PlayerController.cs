@@ -266,6 +266,7 @@ public partial class PlayerController : CharacterBody3D
 	private MerchantShopPanel _merchantShopPanel = null!;
 	private MercenaryShopPanel _mercenaryShopPanel = null!;
 	private RefinementPanel _refinementPanel = null!;
+	private CoreEnhancerPanel _coreEnhancerPanel = null!;
 	private QuestLogPanel _questLogPanel = null!;
 	private WarehousePanel _warehousePanel = null!;
 	private MailboxPanel _mailboxPanel = null!;
@@ -401,6 +402,7 @@ public partial class PlayerController : CharacterBody3D
 		CreateMerchantShopPanel();
 		CreateMercenaryShopPanel();
 		CreateRefinementPanel();
+		CreateCoreEnhancerPanel();
 		CreateQuestLogPanel();
 		CreateWarehousePanel();
 		CreateMailboxPanel();
@@ -561,6 +563,10 @@ public partial class PlayerController : CharacterBody3D
 			{
 				SetRefinementPanelVisible(false);
 			}
+			else if (_coreEnhancerPanel.Visible)
+			{
+				SetCoreEnhancerPanelVisible(false);
+			}
 			else if (_warehousePanel.Visible)
 			{
 				SetWarehousePanelVisible(false);
@@ -598,7 +604,7 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
-		if (_pauseMenuPanel.Visible || _settingsPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _refinementPanel.Visible || _warehousePanel.Visible || _mailboxPanel.Visible || _composePanel.Visible || _cardAlbumPanel.Visible)
+		if (_pauseMenuPanel.Visible || _settingsPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _refinementPanel.Visible || _coreEnhancerPanel.Visible || _warehousePanel.Visible || _mailboxPanel.Visible || _composePanel.Visible || _cardAlbumPanel.Visible)
 		{
 			return;
 		}

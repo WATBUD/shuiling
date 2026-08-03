@@ -151,6 +151,14 @@ public partial class PlayerController
 			return;
 		}
 
+		SimpleActor? coreEnhancer = GetNearestCoreEnhancer();
+		if (coreEnhancer != null)
+		{
+			_interactionPromptLabel.Visible = true;
+			_interactionPromptLabel.Text = LocaleText.F("prompt.core_enhancer", "E", coreEnhancer.LocalizedDisplayName);
+			return;
+		}
+
 		SimpleActor? recruitNpc = GetNearestRecruitableNpc();
 		_interactionPromptLabel.Visible = recruitNpc != null;
 		if (recruitNpc == null)
@@ -233,6 +241,12 @@ public partial class PlayerController
 		if (GetNearestRefiner() != null)
 		{
 			SetRefinementPanelVisible(true);
+			return;
+		}
+
+		if (GetNearestCoreEnhancer() != null)
+		{
+			SetCoreEnhancerPanelVisible(true);
 			return;
 		}
 
@@ -512,6 +526,7 @@ public partial class PlayerController
 			&& !IsMercenaryBroker(actor)
 			&& !IsWarehouseKeeper(actor)
 			&& !IsRefiner(actor)
+			&& !IsCoreEnhancer(actor)
 			&& actor.IsNpcRecruitCandidate
 			&& actor.MapId == "city"
 			&& actor.IsActiveWorldTarget;
@@ -566,6 +581,38 @@ public partial class PlayerController
 		foreach (SimpleActor actor in SimpleActor.ActiveActors)
 		{
 			if (!IsRefiner(actor) || !actor.IsActiveWorldTarget)
+			{
+				continue;
+			}
+
+			float distance = GlobalPosition.DistanceTo(actor.GlobalPosition);
+			if (distance <= nearestDistance)
+			{
+				nearest = actor;
+				nearestDistance = distance;
+			}
+		}
+
+		return nearest;
+	}
+
+	private static bool IsCoreEnhancer(SimpleActor actor)
+	{
+		return IsInstanceValid(actor) && actor.DisplayName == "name.npc.core_enhancer";
+	}
+
+	private SimpleActor? GetNearestCoreEnhancer()
+	{
+		if (!IsInCityMap())
+		{
+			return null;
+		}
+
+		SimpleActor? nearest = null;
+		float nearestDistance = MerchantInteractRange;
+		foreach (SimpleActor actor in SimpleActor.ActiveActors)
+		{
+			if (!IsCoreEnhancer(actor) || !actor.IsActiveWorldTarget)
 			{
 				continue;
 			}
