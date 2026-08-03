@@ -11,6 +11,7 @@ public static class CityNpcConfig
 		["name.npc.pet_trainer"] = ExternalModelLibrary.KenneyBlockyRoot + "character-m.glb",
 		["name.npc.item_merchant"] = ExternalModelLibrary.KenneyBlockyRoot + "character-p.glb",
 		["name.npc.warehouse_keeper"] = ExternalModelLibrary.KenneyBlockyRoot + "character-q.glb",
+		["name.npc.gacha"] = ExternalModelLibrary.KenneyBlockyRoot + "character-p.glb",
 	};
 
 	public static string GetShopModel(string npcNameKey)

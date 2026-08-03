@@ -159,6 +159,14 @@ public partial class PlayerController
 			return;
 		}
 
+		SimpleActor? gachaMerchant = GetNearestGachaMerchant();
+		if (gachaMerchant != null)
+		{
+			_interactionPromptLabel.Visible = true;
+			_interactionPromptLabel.Text = LocaleText.F("prompt.gacha", "E", gachaMerchant.LocalizedDisplayName);
+			return;
+		}
+
 		SimpleActor? recruitNpc = GetNearestRecruitableNpc();
 		_interactionPromptLabel.Visible = recruitNpc != null;
 		if (recruitNpc == null)
@@ -247,6 +255,12 @@ public partial class PlayerController
 		if (GetNearestCoreEnhancer() != null)
 		{
 			SetCoreEnhancerPanelVisible(true);
+			return;
+		}
+
+		if (GetNearestGachaMerchant() != null)
+		{
+			SetGachaPanelVisible(true);
 			return;
 		}
 
@@ -527,6 +541,7 @@ public partial class PlayerController
 			&& !IsWarehouseKeeper(actor)
 			&& !IsRefiner(actor)
 			&& !IsCoreEnhancer(actor)
+			&& !IsGachaMerchant(actor)
 			&& actor.IsNpcRecruitCandidate
 			&& actor.MapId == "city"
 			&& actor.IsActiveWorldTarget;
@@ -613,6 +628,38 @@ public partial class PlayerController
 		foreach (SimpleActor actor in SimpleActor.ActiveActors)
 		{
 			if (!IsCoreEnhancer(actor) || !actor.IsActiveWorldTarget)
+			{
+				continue;
+			}
+
+			float distance = GlobalPosition.DistanceTo(actor.GlobalPosition);
+			if (distance <= nearestDistance)
+			{
+				nearest = actor;
+				nearestDistance = distance;
+			}
+		}
+
+		return nearest;
+	}
+
+	private static bool IsGachaMerchant(SimpleActor actor)
+	{
+		return IsInstanceValid(actor) && actor.DisplayName == "name.npc.gacha";
+	}
+
+	private SimpleActor? GetNearestGachaMerchant()
+	{
+		if (!IsInCityMap())
+		{
+			return null;
+		}
+
+		SimpleActor? nearest = null;
+		float nearestDistance = MerchantInteractRange;
+		foreach (SimpleActor actor in SimpleActor.ActiveActors)
+		{
+			if (!IsGachaMerchant(actor) || !actor.IsActiveWorldTarget)
 			{
 				continue;
 			}
