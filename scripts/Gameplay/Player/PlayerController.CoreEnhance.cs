@@ -107,7 +107,9 @@ public partial class PlayerController : CharacterBody3D
 
 		foreach (SimpleActor actor in new List<SimpleActor>(actors))
 		{
-			if (!IsInstanceValid(actor) || !_capturedCollection.Contains(actor))
+			// Deployed (active-party) pets can't be dismantled — only undeployed /
+			// collection ones. (The panel hides them; this guards other callers.)
+			if (!IsInstanceValid(actor) || !_capturedCollection.Contains(actor) || IsInActiveParty(actor))
 			{
 				continue;
 			}

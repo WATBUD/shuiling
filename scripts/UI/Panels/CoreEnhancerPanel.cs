@@ -208,7 +208,9 @@ public partial class CoreEnhancerPanel : PanelContainer
 		int shown = 0;
 		foreach (SimpleActor actor in _player.CapturedCollection)
 		{
-			if (!IsInstanceValid(actor) || !actor.IsCaptured || actor.IsDefeated)
+			// Only undeployed / collection pets can be dismantled; a pet currently
+			// fighting in the active party is excluded.
+			if (!IsInstanceValid(actor) || !actor.IsCaptured || actor.IsDefeated || _player.IsInActiveParty(actor))
 			{
 				continue;
 			}
@@ -295,7 +297,8 @@ public partial class CoreEnhancerPanel : PanelContainer
 		foreach (SimpleActor actor in _selectedPets)
 		{
 			if (!IsInstanceValid(actor) || !actor.IsCaptured || actor.IsDefeated
-				|| _player == null || !_player.CapturedCollection.Contains(actor))
+				|| _player == null || !_player.CapturedCollection.Contains(actor)
+				|| _player.IsInActiveParty(actor))
 			{
 				stale.Add(actor);
 			}
