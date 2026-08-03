@@ -811,90 +811,25 @@ public partial class PlayerController
 		_fallSfxPlayer.Play();
 	}
 
-	// An ORIGINAL synthesized human "AAAH" fall scream (NOT any external clip):
-	// additive formant synthesis — a glottal (sawtooth-spectrum) source shaped by
-	// three vocal-tract formants of an "ah" vowel, with a panicked falling pitch
-	// contour, vibrato, pitch jitter and amplitude shimmer + breath noise so it
-	// reads as an organic voice rather than a synth. Procedural 16-bit mono PCM.
+	// A downward pitch glissando (~520Hz → ~120Hz) with vibrato and a soft second
+	// harmonic — reads as a cartoon "wahhh" tumble. Procedural 16-bit mono PCM.
 	private static AudioStream BuildFallScream()
 	{
 		const int rate = 22050;
-		const float duration = 2.6f;
+		const float duration = 0.95f;
 		int sampleCount = (int)(rate * duration);
 		var data = new byte[sampleCount * 2];
 		double phase = 0.0;
-		uint noiseState = 0x1234567u;
-		float jitterLp = 0.0f;
-		float lowpassState = 0.0f;
-
-		// Source-filter (vocal) model: a glottal buzz + turbulent breath driven
-		// through three resonant formant filters of a male "ah". The resonators ring
-		// naturally, which reads far more throat-like than summed sine harmonics.
-		float[] formantF = { 700.0f, 1150.0f, 2600.0f };
-		float[] formantBw = { 90.0f, 110.0f, 170.0f };
-		float[] formantA = { 1.0f, 0.7f, 0.5f };
-		float[] poleR = new float[3];
-		float[] poleC = new float[3];
-		float[] resY1 = new float[3];
-		float[] resY2 = new float[3];
-		for (int j = 0; j < 3; j++)
-		{
-			poleR[j] = Mathf.Exp(-Mathf.Pi * formantBw[j] / rate);
-			poleC[j] = 2.0f * poleR[j] * Mathf.Cos(Mathf.Tau * formantF[j] / rate);
-		}
-
 		for (int i = 0; i < sampleCount; i++)
 		{
 			float frac = i / (float)sampleCount;
 			float t = i / (float)rate;
-
-			// The falling contour: a panicked gasp UP to a high scream, then a long
-			// glide DOWN (male range) — a Doppler-like drop as he plummets away.
-			float f0 = frac < 0.04f
-				? Mathf.Lerp(360.0f, 540.0f, frac / 0.04f)
-				: Mathf.Lerp(540.0f, 120.0f, (frac - 0.04f) / 0.96f);
-			f0 *= 1.0f + 0.03f * Mathf.Sin(t * Mathf.Tau * 5.0f);
-			if (frac > 0.30f && frac < 0.36f)
-			{
-				f0 *= 1.14f; // strained voice-crack
-			}
-
-			noiseState = (noiseState * 1664525u) + 1013904223u;
-			float jitterNoise = ((noiseState >> 8) / 16777215.0f) * 2.0f - 1.0f;
-			jitterLp += (jitterNoise - jitterLp) * 0.22f;
-			f0 *= 1.0f + (0.02f + 0.05f * frac) * jitterLp;
-			phase += f0 / rate;
-
-			// Glottal buzz (sawtooth) + turbulent aspiration that rises as he strains.
-			float saw = (float)(phase - System.Math.Floor(phase)) * 2.0f - 1.0f;
-			noiseState = (noiseState * 1664525u) + 1013904223u;
-			float breath = ((noiseState >> 8) / 16777215.0f) * 2.0f - 1.0f;
-			float source = (saw * 0.85f) + (breath * (0.28f + 0.30f * frac));
-
-			// Run the source through the three formant resonators.
-			float voiced = 0.0f;
-			for (int j = 0; j < 3; j++)
-			{
-				float y = ((1.0f - poleR[j]) * source) + (poleC[j] * resY1[j]) - (poleR[j] * poleR[j] * resY2[j]);
-				resY2[j] = resY1[j];
-				resY1[j] = y;
-				voiced += formantA[j] * y;
-			}
-
-			// "Distance": the later part falls AWAY — a closing one-pole low-pass
-			// muffles it and the volume drops. Kept loud longer (recedes from ~65%).
-			float distance = Mathf.Clamp((frac - 0.65f) / 0.35f, 0.0f, 1.0f);
-			float lpCoeff = Mathf.Lerp(0.9f, 0.14f, distance);
-			lowpassState += (voiced - lowpassState) * lpCoeff;
-
-			float driven = Mathf.Clamp(lowpassState * (2.6f - 0.6f * distance), -1.0f, 1.0f);
-			float attack = Mathf.Min(1.0f, frac / 0.02f);
-			// Stays loud, only easing to ~40% as he recedes, then a short final tail.
-			float distanceGain = 1.0f - 0.6f * distance;
-			float tail = frac > 0.93f ? Mathf.Max(1.0f - ((frac - 0.93f) / 0.07f), 0.0f) : 1.0f;
-			float env = attack * distanceGain * tail;
-
-			short sample = (short)(driven * env * 0.82f * 32767.0f);
+			float freq = Mathf.Lerp(520.0f, 120.0f, frac);
+			freq *= 1.0f + 0.07f * Mathf.Sin(t * Mathf.Tau * 11.0f);
+			phase += freq / rate;
+			float wave = 0.7f * Mathf.Sin((float)(phase * Mathf.Tau)) + 0.3f * Mathf.Sin((float)(phase * 2.0 * Mathf.Tau));
+			float envelope = Mathf.Min(1.0f, frac * 18.0f) * (1.0f - frac);
+			short sample = (short)(Mathf.Clamp(wave * envelope * 0.55f, -1.0f, 1.0f) * 32767.0f);
 			data[i * 2] = (byte)(sample & 0xFF);
 			data[i * 2 + 1] = (byte)((sample >> 8) & 0xFF);
 		}
