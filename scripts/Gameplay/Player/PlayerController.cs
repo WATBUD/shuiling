@@ -267,6 +267,7 @@ public partial class PlayerController : CharacterBody3D
 	private MercenaryShopPanel _mercenaryShopPanel = null!;
 	private RefinementPanel _refinementPanel = null!;
 	private CoreEnhancerPanel _coreEnhancerPanel = null!;
+	private WorldMapPanel _worldMapPanel = null!;
 	private GachaPanel _gachaPanel = null!;
 	private QuestLogPanel _questLogPanel = null!;
 	private WarehousePanel _warehousePanel = null!;
@@ -404,6 +405,7 @@ public partial class PlayerController : CharacterBody3D
 		CreateMercenaryShopPanel();
 		CreateRefinementPanel();
 		CreateCoreEnhancerPanel();
+		CreateWorldMapPanel();
 		CreateGachaPanel();
 		CreateQuestLogPanel();
 		CreateWarehousePanel();
@@ -569,6 +571,10 @@ public partial class PlayerController : CharacterBody3D
 			{
 				SetCoreEnhancerPanelVisible(false);
 			}
+			else if (_worldMapPanel.Visible)
+			{
+				SetWorldMapPanelVisible(false);
+			}
 			else if (_gachaPanel.Visible)
 			{
 				SetGachaPanelVisible(false);
@@ -610,7 +616,7 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
-		if (_pauseMenuPanel.Visible || _settingsPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _refinementPanel.Visible || _coreEnhancerPanel.Visible || _gachaPanel.Visible || _warehousePanel.Visible || _mailboxPanel.Visible || _composePanel.Visible || _cardAlbumPanel.Visible)
+		if (_pauseMenuPanel.Visible || _settingsPanel.Visible || _merchantShopPanel.Visible || _mercenaryShopPanel.Visible || _refinementPanel.Visible || _coreEnhancerPanel.Visible || _worldMapPanel.Visible || _gachaPanel.Visible || _warehousePanel.Visible || _mailboxPanel.Visible || _composePanel.Visible || _cardAlbumPanel.Visible)
 		{
 			return;
 		}
@@ -768,11 +774,12 @@ public partial class PlayerController : CharacterBody3D
 			TryUseTownPortalScroll();
 		}
 
-		// M opens the world map guide (same tiers/locks/boss view as the portal),
-		// usable from anywhere as a quick-travel + overview screen.
+		// M opens the world-map panel: the six maps as a connected node chain with
+		// fast-travel to reachable nodes. (ToggleWorldMapGuide/_mapTravelDialog remain
+		// for the city gate portal interaction.)
 		if (@event is InputEventKey { Pressed: true, Echo: false, Keycode: Key.M })
 		{
-			ToggleWorldMapGuide();
+			SetWorldMapPanelVisible(!_worldMapPanel.Visible);
 		}
 	}
 
@@ -786,7 +793,7 @@ public partial class PlayerController : CharacterBody3D
 			return;
 		}
 
-		if (_settingsPanel.Visible || _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _npcQuestDialog.Visible)
+		if (_settingsPanel.Visible || _partyPanel.Visible || _inventoryPanel.Visible || _formationPanel.Visible || _worldMapPanel.Visible || _npcQuestDialog.Visible)
 		{
 			Velocity = SlowPlayerToStop(Velocity, (float)delta);
 			MoveAndSlide();

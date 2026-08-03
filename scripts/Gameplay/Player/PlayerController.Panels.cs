@@ -108,6 +108,21 @@ public partial class PlayerController
 		_coreEnhancerPanel.CloseRequested = () => SetCoreEnhancerPanelVisible(false);
 	}
 
+	private void CreateWorldMapPanel()
+	{
+		var layer = new CanvasLayer
+		{
+			Name = "WorldMapLayer",
+			Layer = 46,
+		};
+
+		AddChild(layer);
+		_worldMapPanel = new WorldMapPanel();
+		layer.AddChild(_worldMapPanel);
+		_worldMapPanel.Bind(this);
+		_worldMapPanel.CloseRequested = () => SetWorldMapPanelVisible(false);
+	}
+
 	private void CreateGachaPanel()
 	{
 		var layer = new CanvasLayer
@@ -303,6 +318,7 @@ public partial class PlayerController
 			_mercenaryShopPanel.SetPanelVisible(false);
 			_warehousePanel.SetPanelVisible(false);
 			_coreEnhancerPanel.SetPanelVisible(false);
+			_worldMapPanel.SetPanelVisible(false);
 			_gachaPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
@@ -345,6 +361,7 @@ public partial class PlayerController
 			_mercenaryShopPanel.SetPanelVisible(false);
 			_warehousePanel.SetPanelVisible(false);
 			_coreEnhancerPanel.SetPanelVisible(false);
+			_worldMapPanel.SetPanelVisible(false);
 			_gachaPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
@@ -367,6 +384,7 @@ public partial class PlayerController
 			_mercenaryShopPanel.SetPanelVisible(false);
 			_warehousePanel.SetPanelVisible(false);
 			_coreEnhancerPanel.SetPanelVisible(false);
+			_worldMapPanel.SetPanelVisible(false);
 			_gachaPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
@@ -389,6 +407,7 @@ public partial class PlayerController
 			_mercenaryShopPanel.SetPanelVisible(false);
 			_warehousePanel.SetPanelVisible(false);
 			_coreEnhancerPanel.SetPanelVisible(false);
+			_worldMapPanel.SetPanelVisible(false);
 			_gachaPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
@@ -411,6 +430,7 @@ public partial class PlayerController
 			_mercenaryShopPanel.SetPanelVisible(false);
 			_warehousePanel.SetPanelVisible(false);
 			_coreEnhancerPanel.SetPanelVisible(false);
+			_worldMapPanel.SetPanelVisible(false);
 			_gachaPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
@@ -433,6 +453,7 @@ public partial class PlayerController
 			_settingsPanel.SetPanelVisible(false);
 			_warehousePanel.SetPanelVisible(false);
 			_coreEnhancerPanel.SetPanelVisible(false);
+			_worldMapPanel.SetPanelVisible(false);
 			_gachaPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
@@ -456,6 +477,7 @@ public partial class PlayerController
 			_warehousePanel.SetPanelVisible(false);
 			_refinementPanel.SetPanelVisible(false);
 			_coreEnhancerPanel.SetPanelVisible(false);
+			_worldMapPanel.SetPanelVisible(false);
 			_gachaPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
@@ -479,6 +501,7 @@ public partial class PlayerController
 			_settingsPanel.SetPanelVisible(false);
 			_warehousePanel.SetPanelVisible(false);
 			_coreEnhancerPanel.SetPanelVisible(false);
+			_worldMapPanel.SetPanelVisible(false);
 			_gachaPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
@@ -502,6 +525,31 @@ public partial class PlayerController
 			_settingsPanel.SetPanelVisible(false);
 			_warehousePanel.SetPanelVisible(false);
 			_refinementPanel.SetPanelVisible(false);
+			_worldMapPanel.SetPanelVisible(false);
+			_gachaPanel.SetPanelVisible(false);
+			CloseNpcQuestDialog();
+			CloseMapTravelDialog();
+		}
+
+		UpdateMouseModeForPanels();
+	}
+
+	private void SetWorldMapPanelVisible(bool visible)
+	{
+		_worldMapPanel.SetPanelVisible(visible);
+		if (visible)
+		{
+			SetPauseMenuVisible(false, false);
+			_partyPanel.SetPanelVisible(false);
+			_inventoryPanel.SetPanelVisible(false);
+			_questLogPanel.SetPanelVisible(false);
+			_formationPanel.SetPanelVisible(false);
+			_merchantShopPanel.SetPanelVisible(false);
+			_mercenaryShopPanel.SetPanelVisible(false);
+			_settingsPanel.SetPanelVisible(false);
+			_warehousePanel.SetPanelVisible(false);
+			_refinementPanel.SetPanelVisible(false);
+			_coreEnhancerPanel.SetPanelVisible(false);
 			_gachaPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
@@ -526,6 +574,7 @@ public partial class PlayerController
 			_warehousePanel.SetPanelVisible(false);
 			_refinementPanel.SetPanelVisible(false);
 			_coreEnhancerPanel.SetPanelVisible(false);
+			_worldMapPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
 		}
@@ -548,6 +597,7 @@ public partial class PlayerController
 			_refinementPanel.SetPanelVisible(false);
 			_warehousePanel.SetPanelVisible(false);
 			_coreEnhancerPanel.SetPanelVisible(false);
+			_worldMapPanel.SetPanelVisible(false);
 			_gachaPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
@@ -570,6 +620,7 @@ public partial class PlayerController
 			_mercenaryShopPanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
 			_coreEnhancerPanel.SetPanelVisible(false);
+			_worldMapPanel.SetPanelVisible(false);
 			_gachaPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
@@ -594,6 +645,7 @@ public partial class PlayerController
 			_composePanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
 			_coreEnhancerPanel.SetPanelVisible(false);
+			_worldMapPanel.SetPanelVisible(false);
 			_gachaPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
@@ -617,6 +669,7 @@ public partial class PlayerController
 			_warehousePanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
 			_coreEnhancerPanel.SetPanelVisible(false);
+			_worldMapPanel.SetPanelVisible(false);
 			_gachaPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
@@ -647,6 +700,7 @@ public partial class PlayerController
 			_composePanel.SetPanelVisible(false);
 			_settingsPanel.SetPanelVisible(false);
 			_coreEnhancerPanel.SetPanelVisible(false);
+			_worldMapPanel.SetPanelVisible(false);
 			_gachaPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
@@ -669,6 +723,7 @@ public partial class PlayerController
 			_settingsPanel.SetPanelVisible(false);
 			_warehousePanel.SetPanelVisible(false);
 			_coreEnhancerPanel.SetPanelVisible(false);
+			_worldMapPanel.SetPanelVisible(false);
 			_gachaPanel.SetPanelVisible(false);
 			CloseNpcQuestDialog();
 			CloseMapTravelDialog();
