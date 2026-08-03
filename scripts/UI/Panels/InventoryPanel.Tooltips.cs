@@ -158,10 +158,10 @@ public partial class InventoryPanel : PanelContainer
 	private static void AppendSkillGemTooltip(List<string> lines, SkillGemDefinition item)
 	{
 		AddSummaryLine(lines, item.SummaryKey);
-		if (!string.IsNullOrEmpty(item.DamageElementNameKey))
-		{
-			lines.Add(LocaleText.F("tooltip.element", LocaleText.T(item.DamageElementNameKey)));
-		}
+		// Every core is tagged with an element; cores without a damage element
+		// (support cores, whirlwind, ...) read as 無屬性 via element.physical.
+		string elementKey = string.IsNullOrEmpty(item.DamageElementNameKey) ? "element.physical" : item.DamageElementNameKey;
+		lines.Add(LocaleText.F("tooltip.element", LocaleText.T(elementKey)));
 		if (BuildCatalog.IsProjectileSupportGem(item.Id))
 		{
 			lines.Add(LocaleText.T("tooltip.requires_ranged_skill"));

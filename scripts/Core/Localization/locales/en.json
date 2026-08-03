@@ -511,7 +511,7 @@
 	"build.slot.support_core_plain": "Support Core",
 	"build.slot.main_core": "Core Skill",
 	"build.core_chain": "[Core] {0}",
-	"element.physical": "Physical",
+	"element.physical": "None",
 	"element.fire": "Fire",
 	"element.water": "Water",
 	"element.lightning": "Lightning",

@@ -511,7 +511,7 @@
 	"build.slot.support_core_plain": "輔助核心",
 	"build.slot.main_core": "核心技能",
 	"build.core_chain": "[核心] {0}",
-	"element.physical": "物理",
+	"element.physical": "無屬性",
 	"element.fire": "火焰",
 	"element.water": "水",
 	"element.lightning": "雷電",
