@@ -68,22 +68,13 @@ public partial class World
 		return mapId == "city" ? "map.city" : mapId;
 	}
 
-	// City fast-travel rule: from the main city you may travel to any visited wild
-	// map (plus the first map as the always-open entry). Returning to the city is
-	// always allowed from anywhere. You can't fast-travel to where you already are.
+	// Fast-travel rule: from the main city you may travel to any visited wild map
+	// (plus the first map as the always-open entry). You can NOT fast-travel back
+	// to the city — returning is only via the forest's south portal or a town
+	// portal scroll. You can't fast-travel to where you already are.
 	public bool CanFastTravelTo(string mapId)
 	{
-		if (mapId == _activeMapId)
-		{
-			return false;
-		}
-
-		if (mapId == "city")
-		{
-			return true;
-		}
-
-		if (!IsWildMapId(mapId))
+		if (mapId == _activeMapId || mapId == "city" || !IsWildMapId(mapId))
 		{
 			return false;
 		}
