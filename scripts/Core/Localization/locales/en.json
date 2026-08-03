@@ -528,6 +528,8 @@
 	"system.dismantle.done": "Dismantled {0}, gained {1} x{2}",
 	"system.exchange.done": "Exchanged: {0} → {1}",
 	"system.exchange.insufficient": "Not enough (need 10)",
+	"gacha.not_enough_gold": "Not enough gold to draw",
+	"gacha.result_summary": "Drew {0} time(s), spent {1} gold",
 	"name.npc.core_enhancer": "Core Enhancer",
 	"prompt.core_enhancer": "{0}  Talk to {1} to enhance cores",
 	"core_enhancer.title": "Core Enhancement",

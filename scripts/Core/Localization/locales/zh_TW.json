@@ -528,6 +528,8 @@
 	"system.dismantle.done": "分解 {0}，獲得 {1} x{2}",
 	"system.exchange.done": "兌換：{0} → {1}",
 	"system.exchange.insufficient": "數量不足（需 10 個）",
+	"gacha.not_enough_gold": "金幣不足，無法抽獎",
+	"gacha.result_summary": "抽獎 {0} 次，花費 {1} 金",
 	"name.npc.core_enhancer": "核心強化師",
 	"prompt.core_enhancer": "{0}  找 {1} 強化核心",
 	"core_enhancer.title": "核心強化",
