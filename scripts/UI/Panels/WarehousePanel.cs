@@ -360,6 +360,19 @@ public partial class WarehousePanel : PanelContainer
 		return row;
 	}
 
+	private void ShowItemTooltip(string itemId, int count)
+	{
+		if (_companionTooltip == null)
+		{
+			return;
+		}
+
+		string title = InventoryPanel.BuildItemTooltipTitle(itemId);
+		string body = InventoryPanel.BuildItemTooltipBody(itemId, string.Empty);
+		body += $"\n{LocaleText.F("shop.owned_count", count)}";
+		_companionTooltip.ShowTooltip(title, body, this);
+	}
+
 	private void ShowCompanionTooltip(SimpleActor actor)
 	{
 		if (!IsInstanceValid(actor))
@@ -472,13 +485,17 @@ public partial class WarehousePanel : PanelContainer
 			Text = string.Empty,
 			CustomMinimumSize = new Vector2(ItemIconLibrary.InventorySlotWidth, 58.0f),
 			ClipText = true,
-			TooltipText = count > 1
-				? $"{InventoryPanel.BuildItemTooltipTitle(itemId)} x{count}"
-				: InventoryPanel.BuildItemTooltipTitle(itemId),
 		};
 		ItemIconLibrary.Apply(button, itemId, 42);
 		button.IconAlignment = HorizontalAlignment.Center;
 		ItemIconLibrary.AddStackCountBadge(button, count);
+
+		// Full detail tooltip on hover (title + stats), matching the inventory bag —
+		// not just the "[#id] name" line the native TooltipText showed.
+		string capturedId = itemId;
+		int capturedCount = count;
+		button.MouseEntered += () => ShowItemTooltip(capturedId, capturedCount);
+		button.MouseExited += () => _companionTooltip.HideTooltip();
 
 		// A single left- or middle-click transfers the whole stack across. Single
 		// click (not double) so repeatedly clicking the same slot deposits each new
