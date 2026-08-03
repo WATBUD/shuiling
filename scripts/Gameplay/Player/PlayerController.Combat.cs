@@ -799,15 +799,15 @@ public partial class PlayerController
 		_fallSfxPlayer.Play();
 	}
 
-	// An ORIGINAL synthesized approximation of the "screaming marmot 啊～～" vibe
-	// (NOT the copyrighted clip): an instant, punchy, raspy shriek — a buzzy
-	// sawtooth that hits full volume at once near ~1.3kHz, warbles hard, glides
-	// down as it trails, driven through hard-clip distortion with a noise rasp and
-	// an exponential decay. Procedural 16-bit mono PCM.
+	// An ORIGINAL synthesized falling-scream (NOT any external clip): a voice-like
+	// "aaah" in the human range that starts ~560Hz and glides down toward ~230Hz as
+	// it "falls", with a slow ~6Hz human wobble, a vowel-ish harmonic stack, a touch
+	// of breath noise and only light drive so it reads as a voice, not a buzzer.
+	// Procedural 16-bit mono PCM.
 	private static AudioStream BuildFallScream()
 	{
 		const int rate = 22050;
-		const float duration = 0.85f;
+		const float duration = 1.0f;
 		int sampleCount = (int)(rate * duration);
 		var data = new byte[sampleCount * 2];
 		double phase = 0.0;
@@ -817,23 +817,29 @@ public partial class PlayerController
 			float frac = i / (float)sampleCount;
 			float t = i / (float)rate;
 
-			// A quick blip up, then a long glide down — the classic "AAAH" fall-off.
-			float pitch = frac < 0.04f
-				? Mathf.Lerp(1050.0f, 1360.0f, frac / 0.04f)
-				: Mathf.Lerp(1360.0f, 640.0f, (frac - 0.04f) / 0.96f);
-			pitch *= 1.0f + 0.08f * Mathf.Sin(t * Mathf.Tau * 34.0f);
+			// Quick catch of breath up, then a long downward glide (the drop).
+			float pitch = frac < 0.05f
+				? Mathf.Lerp(430.0f, 600.0f, frac / 0.05f)
+				: Mathf.Lerp(600.0f, 230.0f, (frac - 0.05f) / 0.95f);
+			pitch *= 1.0f + 0.045f * Mathf.Sin(t * Mathf.Tau * 6.0f);
 			phase += pitch / rate;
+			double ph = phase * Mathf.Tau;
 
-			// Raw sawtooth (rich, buzzy) + rasp noise, then hard-clipped for a harsh
-			// animal-screech edge.
-			float saw = (float)(phase - System.Math.Floor(phase)) * 2.0f - 1.0f;
+			// Vowel-ish "ah": strong low harmonics with a mid formant bump, plus a
+			// little breath noise.
+			float tone = 0.55f * Mathf.Sin((float)ph)
+				+ 0.30f * Mathf.Sin((float)(ph * 2.0))
+				+ 0.22f * Mathf.Sin((float)(ph * 3.0))
+				+ 0.12f * Mathf.Sin((float)(ph * 5.0));
 			noiseState = (noiseState * 1664525u) + 1013904223u;
-			float noise = (((noiseState >> 8) / 16777215.0f) * 2.0f - 1.0f) * 0.20f;
-			float driven = Mathf.Clamp((saw * 0.82f + noise) * 3.0f, -1.0f, 1.0f);
+			float noise = (((noiseState >> 8) / 16777215.0f) * 2.0f - 1.0f) * 0.08f;
 
-			// Instant onset (tiny 3ms fade to kill the click), warble, exp decay.
-			float tremolo = 0.82f + 0.18f * Mathf.Sin(t * Mathf.Tau * 30.0f);
-			float env = Mathf.Min(1.0f, frac / 0.0035f) * Mathf.Exp(-3.2f * frac) * tremolo;
+			// Light drive keeps it voice-like; fast onset, gentle release fade.
+			float driven = Mathf.Clamp((tone + noise) * 1.35f, -1.0f, 1.0f);
+			float attack = Mathf.Min(1.0f, frac / 0.02f);
+			float release = frac > 0.7f ? Mathf.Max(1.0f - ((frac - 0.7f) / 0.3f), 0.0f) : 1.0f;
+			float tremolo = 0.85f + 0.15f * Mathf.Sin(t * Mathf.Tau * 6.0f);
+			float env = attack * release * tremolo;
 
 			short sample = (short)(driven * env * 0.5f * 32767.0f);
 			data[i * 2] = (byte)(sample & 0xFF);
