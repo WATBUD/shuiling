@@ -18,7 +18,9 @@ public partial class GachaPanel : PanelContainer
 	private Button _ratesButton = null!;
 	private Window _ratesWindow = null!;
 	private VBoxContainer _ratesList = null!;
-	private VBoxContainer _list = null!;
+	private GridContainer _list = null!;
+	private const float ResultTileWidth = 98.0f;
+	private const int ResultTileGap = 8;
 	private FloatingTooltip _tooltip = null!;
 	private AudioStreamPlayer _sfxPlayer = null!;
 	private ColorRect _flash = null!;
@@ -123,15 +125,21 @@ public partial class GachaPanel : PanelContainer
 
 		if (_lastResults.Count == 0)
 		{
+			_list.Columns = 1;
 			var hint = MakeLabel(16, new Color(0.72f, 0.78f, 0.84f));
 			hint.Text = LocaleText.T("gacha.pull_hint");
 			_list.AddChild(hint);
 			return;
 		}
 
+		if (_list.GetParent() is Control scroll)
+		{
+			UpdateResultColumns(scroll);
+		}
+
 		foreach (string id in _lastResults)
 		{
-			AddResultRow(id, animate);
+			AddResultTile(id, animate);
 		}
 	}
 
@@ -147,19 +155,22 @@ public partial class GachaPanel : PanelContainer
 		_tooltip.ShowTooltip(title, body, this);
 	}
 
-	private void AddResultRow(string itemId, bool animate)
+	// One result rendered as a compact thumbnail tile: item icon, star tier, and
+	// draw odds. Hovering shows the full stats tooltip (name, #id, values) so a big
+	// batch stays browsable without a name on every row.
+	private void AddResultTile(string itemId, bool animate)
 	{
 		int rarity = RewardTier(itemId);
 		Color rarityColor = RarityColor(rarity);
-		var row = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		var tile = new PanelContainer { CustomMinimumSize = new Vector2(ResultTileWidth, 120.0f) };
 		// Hover shows the item's full stats so the player needn't open the bag.
 		string hoverId = itemId;
-		row.MouseEntered += () => ShowResultInfo(hoverId);
-		row.MouseExited += () => _tooltip?.HideTooltip();
+		tile.MouseEntered += () => ShowResultInfo(hoverId);
+		tile.MouseExited += () => _tooltip?.HideTooltip();
 		if (animate)
 		{
 			// Start hidden; the reveal tween fades/shines it in.
-			row.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+			tile.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
 		}
 
 		var style = new StyleBoxFlat
@@ -169,42 +180,42 @@ public partial class GachaPanel : PanelContainer
 		};
 		style.SetBorderWidthAll(rarity >= 7 ? 2 : 1);
 		style.SetCornerRadiusAll(6);
-		row.AddThemeStyleboxOverride("panel", style);
-		_list.AddChild(row);
+		style.SetContentMarginAll(6);
+		tile.AddThemeStyleboxOverride("panel", style);
+		_list.AddChild(tile);
 
-		var margin = new MarginContainer();
-		margin.AddThemeConstantOverride("margin_left", 12);
-		margin.AddThemeConstantOverride("margin_right", 12);
-		margin.AddThemeConstantOverride("margin_top", 8);
-		margin.AddThemeConstantOverride("margin_bottom", 8);
-		row.AddChild(margin);
+		var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+		box.AddThemeConstantOverride("separation", 2);
+		tile.AddChild(box);
 
-		var content = new HBoxContainer();
-		content.AddThemeConstantOverride("separation", 12);
-		margin.AddChild(content);
+		TextureRect icon = ItemIconLibrary.CreateRect(itemId, 58.0f);
+		icon.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+		box.AddChild(icon);
 
-		var rarityLabel = MakeLabel(17, rarityColor);
-		rarityLabel.Text = $"★{rarity}";
-		content.AddChild(rarityLabel);
+		var starLabel = MakeLabel(14, rarityColor);
+		starLabel.Text = $"★{rarity}";
+		starLabel.HorizontalAlignment = HorizontalAlignment.Center;
+		starLabel.MouseFilter = MouseFilterEnum.Ignore;
+		box.AddChild(starLabel);
 
-		var nameLabel = MakeLabel(17, rarity >= 7 ? rarityColor : new Color(0.96f, 0.98f, 1.0f));
-		nameLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-		int crystalTier = MonsterLootCatalog.GetEnhanceCrystalTier(itemId);
-		if (crystalTier > 0)
-		{
-			nameLabel.Text = LocaleText.T(MonsterLootCatalog.GetNameKey(itemId));
-		}
-		else
-		{
-			nameLabel.Text = LocaleText.T(BuildCatalog.GetItemNameKey(itemId)) + BuildCatalog.GetStarSuffix(itemId);
-		}
-		content.AddChild(nameLabel);
-
-		// Draw odds for this tier, right-aligned, so players see how rare the pull was.
-		var rateLabel = MakeLabel(14, new Color(0.72f, 0.80f, 0.88f));
+		// Draw odds for this tier so players see how rare the pull was.
+		var rateLabel = MakeLabel(11, new Color(0.72f, 0.80f, 0.88f));
 		rateLabel.Text = LocaleText.F("gacha.win_rate", GachaConfig.TierProbability(rarity, _lastDrawTier) * 100.0f);
-		rateLabel.HorizontalAlignment = HorizontalAlignment.Right;
-		content.AddChild(rateLabel);
+		rateLabel.HorizontalAlignment = HorizontalAlignment.Center;
+		rateLabel.MouseFilter = MouseFilterEnum.Ignore;
+		box.AddChild(rateLabel);
+	}
+
+	// Fit as many thumbnail columns as the results viewport allows.
+	private void UpdateResultColumns(Control viewport)
+	{
+		if (_list == null)
+		{
+			return;
+		}
+
+		float available = Mathf.Max(viewport.Size.X, ResultTileWidth);
+		_list.Columns = Mathf.Max(1, Mathf.FloorToInt((available + ResultTileGap) / (ResultTileWidth + ResultTileGap)));
 	}
 
 	private void BuildPanel()
@@ -322,9 +333,13 @@ public partial class GachaPanel : PanelContainer
 		};
 		root.AddChild(scroll);
 
-		_list = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-		_list.AddThemeConstantOverride("separation", 8);
+		// Results render as a responsive grid of thumbnail tiles so a big batch
+		// stays browsable; columns recompute as the viewport resizes.
+		_list = new GridContainer { Columns = 5, SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		_list.AddThemeConstantOverride("h_separation", ResultTileGap);
+		_list.AddThemeConstantOverride("v_separation", ResultTileGap);
 		scroll.AddChild(_list);
+		scroll.Resized += () => UpdateResultColumns(scroll);
 
 		var closeButton = new Button
 		{
