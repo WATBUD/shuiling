@@ -324,32 +324,24 @@ public partial class WarehousePanel : PanelContainer
 
 	private Control MakeCompanionRow(SimpleActor actor, bool deposit)
 	{
-		var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-		row.AddThemeConstantOverride("separation", 8);
-		var info = new Label
+		// The whole row is clickable (like item tiles): click to deposit a party pet
+		// into the collection, or click a collection pet to bring it back — no
+		// separate text button.
+		bool blocked = deposit && (_player == null || _player.IsMountedCompanion(actor));
+		var row = new Button
 		{
 			Text = $"{actor.LocalizedDisplayName}  Lv.{actor.Level}",
-			SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
-			VerticalAlignment = VerticalAlignment.Center,
-			MouseFilter = MouseFilterEnum.Stop,
-			MouseDefaultCursorShape = CursorShape.PointingHand,
-		};
-		info.AddThemeFontSizeOverride("font_size", 15);
-		info.AddThemeColorOverride("font_color", new Color(0.9f, 0.94f, 1.0f));
-		row.AddChild(info);
-		row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
-
-		bool blocked = deposit && (_player == null || _player.IsMountedCompanion(actor));
-		var action = new Button
-		{
-			Text = LocaleText.T(deposit ? "warehouse.deposit_companion" : "warehouse.withdraw_companion"),
-			CustomMinimumSize = new Vector2(92.0f, 44.0f),
+			Alignment = HorizontalAlignment.Left,
+			CustomMinimumSize = new Vector2(0.0f, 44.0f),
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 			Disabled = blocked,
 			TooltipText = blocked ? LocaleText.T("warehouse.mounted_blocked") : string.Empty,
+			MouseDefaultCursorShape = CursorShape.PointingHand,
 		};
-		info.MouseEntered += () => ShowCompanionTooltip(actor);
-		info.MouseExited += () => _companionTooltip.HideTooltip();
-		action.Pressed += () =>
+		row.AddThemeFontSizeOverride("font_size", 15);
+		row.MouseEntered += () => ShowCompanionTooltip(actor);
+		row.MouseExited += () => _companionTooltip.HideTooltip();
+		row.Pressed += () =>
 		{
 			if (_player == null)
 			{
@@ -365,7 +357,6 @@ public partial class WarehousePanel : PanelContainer
 			}
 			RefreshAll();
 		};
-		row.AddChild(action);
 		return row;
 	}
 
