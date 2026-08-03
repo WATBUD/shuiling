@@ -108,11 +108,27 @@ public partial class GachaPanel : PanelContainer
 		}
 	}
 
+	private void ShowResultInfo(string itemId)
+	{
+		if (_tooltip == null)
+		{
+			return;
+		}
+
+		string title = InventoryPanel.BuildItemTooltipTitle(itemId);
+		string body = InventoryPanel.BuildItemTooltipBody(itemId, string.Empty);
+		_tooltip.ShowTooltip(title, body, this);
+	}
+
 	private void AddResultRow(string itemId, bool animate)
 	{
 		int rarity = RewardTier(itemId);
 		Color rarityColor = RarityColor(rarity);
 		var row = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		// Hover shows the item's full stats so the player needn't open the bag.
+		string hoverId = itemId;
+		row.MouseEntered += () => ShowResultInfo(hoverId);
+		row.MouseExited += () => _tooltip?.HideTooltip();
 		if (animate)
 		{
 			// Start hidden; the reveal tween fades/shines it in.
