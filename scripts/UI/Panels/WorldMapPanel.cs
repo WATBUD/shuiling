@@ -9,7 +9,7 @@ using System.Collections.Generic;
 public partial class WorldMapPanel : PanelContainer
 {
 	// Fixed normalized layout (x,y in 0..1, y down): a cross centred on the forest
-	// hub — skeleton/marsh north, snow west, badlands east, city south-east.
+	// hub — skeleton/marsh north, snow west, badlands east, city directly south.
 	private static readonly (string Id, Vector2 Pos)[] NodeLayout =
 	{
 		("wild_skeleton", new Vector2(0.50f, 0.12f)),
@@ -17,7 +17,7 @@ public partial class WorldMapPanel : PanelContainer
 		("wild_snow", new Vector2(0.24f, 0.50f)),
 		("wild_forest", new Vector2(0.50f, 0.50f)),
 		("wild_badlands", new Vector2(0.76f, 0.50f)),
-		("city", new Vector2(0.82f, 0.82f)),
+		("city", new Vector2(0.50f, 0.82f)),
 	};
 
 	// Dashed links between nodes (forest is the hub; marsh continues north to skeleton).
