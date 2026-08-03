@@ -137,7 +137,7 @@ public partial class World : Node3D
 		// that neighbour sits on the world-map cross (e.g. from the forest, badlands
 		// is the far east edge, snow the west, marsh the north, city the south).
 		// Reaching a biome on foot marks it visited for later city fast-travel.
-		float edgeDistance = MapSize * 0.5f - 10.0f;
+		float edgeDistance = MapSize * 0.5f - 14.0f;
 		foreach (string neighborId in GetAdjacentMaps(wildMap.Id))
 		{
 			Vector3 dir = GetPortalDirection(wildMap.Id, neighborId);

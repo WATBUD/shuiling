@@ -1155,8 +1155,9 @@ public partial class World : Node3D
 			return;
 		}
 
+		string sourceMapId = _activeMapId;
 		SetMapVisibility(targetMapId);
-		Vector3 spawnPosition = targetMapId == "city" ? CityPortalArrivalPosition : _wildSpawnPosition;
+		Vector3 spawnPosition = targetMapId == "city" ? CityPortalArrivalPosition : ComputeWildSpawn(sourceMapId, targetMapId);
 		if (_player != null && IsInstanceValid(_player))
 		{
 			_player.TeleportPartyTo(spawnPosition + new Vector3(0.0f, 0.2f, 0.0f));
@@ -1169,6 +1170,42 @@ public partial class World : Node3D
 		{
 			_player.RefreshBossWorldStatus(true);
 		}
+	}
+
+	// Where the player appears when arriving in a wild map: at the edge by the
+	// portal they conceptually came through, so the entry side always matches the
+	// world-map direction. Walking in from an adjacent map uses that source; a
+	// city fast-travel uses the map's hub-side entry neighbour (e.g. the badlands
+	// connect to the forest on their west, so you arrive on the left). Placed a bit
+	// inside the portal so it's in view and doesn't instantly re-trigger.
+	private Vector3 ComputeWildSpawn(string sourceMapId, string targetMapId)
+	{
+		string entryNeighbor = IsWildMapId(sourceMapId) && GetAdjacentMaps(targetMapId).Contains(sourceMapId)
+			? sourceMapId
+			: GetEntryNeighbor(targetMapId);
+		if (string.IsNullOrEmpty(entryNeighbor))
+		{
+			return _wildSpawnPosition;
+		}
+
+		Vector3 dir = GetPortalDirection(targetMapId, entryNeighbor);
+		float dist = MapSize * 0.5f - 28.0f;
+		return new Vector3(dir.X * dist, _wildSpawnPosition.Y, dir.Z * dist);
+	}
+
+	// The adjacent map on the path back toward the city (the hub-side neighbour),
+	// used to pick the entry edge when there's no explicit on-foot source.
+	private static string GetEntryNeighbor(string mapId)
+	{
+		return mapId switch
+		{
+			"wild_forest" => "city",
+			"wild_marsh" => "wild_forest",
+			"wild_snow" => "wild_forest",
+			"wild_badlands" => "wild_forest",
+			"wild_skeleton" => "wild_marsh",
+			_ => string.Empty,
+		};
 	}
 
 	public SaveGameData ExportSaveData()
