@@ -205,6 +205,21 @@ public partial class World
 
 	// A client's companion hit one of our monsters; host applies real damage.
 	// The killer gets XP/gold credit via a direct reward RPC.
+	// Spawns a single world drop on this machine — used by the party-loot RPC so a
+	// diced-out drop appears only on its owner's client.
+	public void SpawnLootDrop(Vector3 position, string itemId, int amount, int goldAmount)
+	{
+		Node parent = GetTree().CurrentScene ?? this;
+		if (goldAmount > 0)
+		{
+			WorldDropFactory.SpawnGold(parent, position, goldAmount);
+		}
+		else
+		{
+			WorldDropFactory.SpawnItem(parent, position, itemId, amount);
+		}
+	}
+
 	public void ApplyNetworkMonsterDamage(int netId, int rawDamage, long attackerPeerId)
 	{
 		if (!IsNetworkHostWorld
@@ -216,6 +231,7 @@ public partial class World
 		}
 
 		_netLastDamagePeerByNetId[netId] = attackerPeerId;
+		info.Actor.RegisterLootContributor(attackerPeerId);
 		info.Actor.ReceiveDamage(Mathf.Clamp(rawDamage, 1, 99999), null);
 		if (info.Actor.IsDefeated)
 		{

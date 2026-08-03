@@ -3,6 +3,20 @@ using System.Collections.Generic;
 
 public partial class SimpleActor : CharacterBody3D
 {
+	// Player peers that have dealt damage to this monster — the eligible pool for
+	// party loot. Non-contributors get nothing; drops are diced among these.
+	private readonly HashSet<long> _lootContributors = new();
+
+	public IReadOnlyCollection<long> LootContributors => _lootContributors;
+
+	public void RegisterLootContributor(long peerId)
+	{
+		if (peerId != 0)
+		{
+			_lootContributors.Add(peerId);
+		}
+	}
+
 	public int ReceiveDamage(int rawDamage, SimpleActor? attacker, PlayerController? playerAttacker = null)
 	{
 		if (IsInvulnerable)
@@ -38,6 +52,14 @@ public partial class SimpleActor : CharacterBody3D
 			SpawnCombatEffect(string.Empty, new Color(0.35f, 0.78f, 1.0f, 0.78f), GlobalPosition + new Vector3(0.0f, 1.0f, 0.0f), 0.28f, 0.82f);
 		}
 		RememberAttacker(attacker);
+		// A local player-side hit (own attack or a companion's) credits the local
+		// peer as a loot participant. Remote peers are credited in
+		// World.ApplyNetworkMonsterDamage, which calls ReceiveDamage with both null.
+		if (attacker != null || playerAttacker != null)
+		{
+			RegisterLootContributor(NetworkManager.Instance?.LocalPeerId ?? 1L);
+		}
+
 		// Attacking a passive newbie monster provokes it into fighting back.
 		if (_isPassive)
 		{

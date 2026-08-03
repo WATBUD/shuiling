@@ -120,6 +120,22 @@ public partial class SimpleActor : CharacterBody3D
 
 	private void SpawnWorldDrop(Vector3 position, string itemId, int amount, int goldAmount)
 	{
+		NetworkManager? net = NetworkManager.Instance;
+		// Single-player (or non-host): spawn locally, exactly as before.
+		if (net == null || !net.IsOnline || !net.IsHost)
+		{
+			SpawnWorldDropLocal(position, itemId, amount, goldAmount);
+			return;
+		}
+
+		// Online party: the host dice-assigns each drop to one participating peer, so
+		// only that player's client spawns (and sees) it. Non-participants get none.
+		long ownerPeer = PickLootOwnerPeer(net);
+		net.SendLootDropTo(ownerPeer, position, itemId ?? string.Empty, amount, goldAmount);
+	}
+
+	private void SpawnWorldDropLocal(Vector3 position, string itemId, int amount, int goldAmount)
+	{
 		Node parent = GetTree().CurrentScene ?? GetParent();
 		if (goldAmount > 0)
 		{
@@ -129,6 +145,19 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			WorldDropFactory.SpawnItem(parent, position, itemId, amount);
 		}
+	}
+
+	// Random participant to receive this drop (dice split). Empty pool falls back to
+	// the local host so loot is never silently lost.
+	private long PickLootOwnerPeer(NetworkManager net)
+	{
+		if (_lootContributors.Count == 0)
+		{
+			return net.LocalPeerId;
+		}
+
+		var pool = new System.Collections.Generic.List<long>(_lootContributors);
+		return pool[_rng.RandiRange(0, pool.Count - 1)];
 	}
 
 	private Vector3 RandomDropOffset(float radius)

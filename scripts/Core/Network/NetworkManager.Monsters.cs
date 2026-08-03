@@ -235,6 +235,34 @@ public partial class NetworkManager : Node
 		}
 	}
 
+	// Host → owner client: a party-loot drop diced to this participant. The host's
+	// own share (peer 1) spawns locally; everyone else receives it over RPC so only
+	// the owner sees their loot.
+	public void SendLootDropTo(long peerId, Vector3 position, string itemId, int amount, int goldAmount)
+	{
+		if (!IsHost)
+		{
+			return;
+		}
+
+		if (peerId == 1)
+		{
+			ActiveWorld?.SpawnLootDrop(position, itemId ?? string.Empty, amount, goldAmount);
+			return;
+		}
+
+		RpcId(peerId, MethodName.ClientReceiveLootDrop, position, itemId ?? string.Empty, amount, goldAmount);
+	}
+
+	[Rpc(MultiplayerApi.RpcMode.Authority, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+	private void ClientReceiveLootDrop(Vector3 position, string itemId, int amount, int goldAmount)
+	{
+		if (ActiveWorld != null && IsInstanceValid(ActiveWorld))
+		{
+			ActiveWorld.SpawnLootDrop(position, itemId, amount, goldAmount);
+		}
+	}
+
 	// Host → killer client: reward for a monster your damage finished off.
 	public void SendKillRewardTo(long peerId, string monsterName, int experience, int gold, int sourceLevel)
 	{
