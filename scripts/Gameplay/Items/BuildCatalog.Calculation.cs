@@ -56,7 +56,7 @@ public static partial class BuildCatalog
 			{
 				stats.ActiveRangedSkillId = gem.Id;
 			}
-			ApplySkillGem(stats, gem);
+			ApplySkillGem(stats, gem, GetSkillCoreStarMultiplier(loadout.SkillGemIds[slot]));
 			AccumulateBehavior(stats.Behavior, gem, loadout.GetSkillGemLevel(slot));
 		}
 
@@ -112,7 +112,7 @@ public static partial class BuildCatalog
 			{
 				stats.ActiveRangedSkillId = gem.Id;
 			}
-			ApplySkillGem(stats, gem);
+			ApplySkillGem(stats, gem, GetSkillCoreStarMultiplier(loadout.SkillGemIds[slot]));
 			AccumulateBehavior(stats.Behavior, gem, loadout.GetSkillGemLevel(slot));
 		}
 
@@ -215,7 +215,9 @@ public static partial class BuildCatalog
 		stats.CritChance += equipment.CritChanceBonus * bonusMultiplier;
 	}
 
-	private static void ApplySkillGem(BuildStats stats, SkillGemDefinition gem)
+	// bonusFactor scales the core's contribution by its star enhancement
+	// (1.0 = unstarred, so behavior is unchanged for a 0-star core).
+	private static void ApplySkillGem(BuildStats stats, SkillGemDefinition gem, float bonusFactor = 1.0f)
 	{
 		if (!string.IsNullOrEmpty(gem.DamageElementId))
 		{
@@ -224,17 +226,17 @@ public static partial class BuildCatalog
 			stats.AttackColor = gem.AttackColor;
 		}
 
-		stats.MaxHealth += gem.MaxHealthBonus;
-		stats.Attack += gem.AttackBonus;
-		stats.Defense += gem.DefenseBonus;
-		stats.MoveSpeedMultiplier += gem.MoveSpeedBonus;
-		stats.AttackCooldownMultiplier -= gem.AttackCooldownReduction;
-		stats.AttackRangeBonus += gem.AttackRangeBonus;
-		stats.DetectionRadiusBonus += gem.DetectionRadiusBonus;
-		stats.CritChance += gem.CritChanceBonus;
-		stats.LifeStealPercent += gem.LifeStealPercent;
-		stats.ControlChance += gem.ControlChanceBonus;
-		stats.DamageMultiplier *= gem.DamageMultiplier;
+		stats.MaxHealth += Mathf.RoundToInt(gem.MaxHealthBonus * bonusFactor);
+		stats.Attack += Mathf.RoundToInt(gem.AttackBonus * bonusFactor);
+		stats.Defense += Mathf.RoundToInt(gem.DefenseBonus * bonusFactor);
+		stats.MoveSpeedMultiplier += gem.MoveSpeedBonus * bonusFactor;
+		stats.AttackCooldownMultiplier -= gem.AttackCooldownReduction * bonusFactor;
+		stats.AttackRangeBonus += gem.AttackRangeBonus * bonusFactor;
+		stats.DetectionRadiusBonus += gem.DetectionRadiusBonus * bonusFactor;
+		stats.CritChance += gem.CritChanceBonus * bonusFactor;
+		stats.LifeStealPercent += gem.LifeStealPercent * bonusFactor;
+		stats.ControlChance += gem.ControlChanceBonus * bonusFactor;
+		stats.DamageMultiplier *= 1.0f + (gem.DamageMultiplier - 1.0f) * bonusFactor;
 		stats.ProjectileSpeedMultiplier *= gem.ProjectileSpeedMultiplier;
 		stats.HasHealSkill |= gem.EnablesHeal;
 		stats.HasShieldSkill |= gem.EnablesShield;

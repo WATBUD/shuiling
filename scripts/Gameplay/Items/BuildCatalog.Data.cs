@@ -114,9 +114,10 @@ public static partial class BuildCatalog
 
 	public static SkillGemDefinition GetSkillGem(string id)
 	{
+		string baseId = GetBaseSkillCoreId(id);
 		foreach (SkillGemDefinition gem in SkillGems)
 		{
-			if (gem.Id == id)
+			if (gem.Id == baseId)
 			{
 				return gem;
 			}
@@ -351,7 +352,7 @@ public static partial class BuildCatalog
 
 		foreach (SkillGemDefinition gem in SkillGems)
 		{
-			if (gem.Id == id)
+			if (gem.Id == equipmentId)
 			{
 				return gem.NameKey;
 			}
@@ -386,7 +387,7 @@ public static partial class BuildCatalog
 
 		foreach (SkillGemDefinition gem in SkillGems)
 		{
-			if (gem.Id == id)
+			if (gem.Id == equipmentId)
 			{
 				return InventoryItemKind.SkillGem;
 			}
@@ -478,7 +479,7 @@ public static partial class BuildCatalog
 
 	public static bool IsMainAttackCore(string gemId)
 	{
-		return IsRangedActiveSkillGem(gemId) || gemId == "gem.skill.whirlwind";
+		return IsRangedActiveSkillGem(gemId) || GetBaseSkillCoreId(gemId) == "gem.skill.whirlwind";
 	}
 
 	public static bool IsSupportCore(string gemId)
