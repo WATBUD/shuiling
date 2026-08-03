@@ -83,6 +83,10 @@ public partial class World : Node3D
 	// Whether leaving this world (to menu or app close) saves automatically.
 	public bool AutoSaveOnExit => _autoSaveOnExit;
 	private readonly List<Vector3> _obstaclePositions = new();
+	// Keep a clear ring around each map portal so scattered props/rocks never
+	// block the walkway up to it.
+	private readonly List<Vector3> _portalPositions = new();
+	private const float PortalClearanceRadius = 9.0f;
 	private readonly List<Vector3> _wildObstaclePositions = new();
 	private readonly Dictionary<string, Node3D> _wildMapRootsById = new();
 	private readonly Dictionary<string, List<Vector3>> _wildObstaclePositionsById = new();
@@ -1119,6 +1123,14 @@ public partial class World : Node3D
 
 	private bool IsPositionClear(Vector3 position, float minDistance)
 	{
+		foreach (Vector3 portalPosition in _portalPositions)
+		{
+			if (portalPosition.DistanceTo(position) < PortalClearanceRadius)
+			{
+				return false;
+			}
+		}
+
 		foreach (Vector3 obstaclePosition in _obstaclePositions)
 		{
 			if (obstaclePosition.DistanceTo(position) < minDistance)

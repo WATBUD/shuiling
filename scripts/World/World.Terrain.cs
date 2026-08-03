@@ -111,6 +111,20 @@ public partial class World : Node3D
 	{
 		_obstaclePositions.Clear();
 		_currentThemeMapId = wildMap.Id;
+
+		// Resolve portal edge positions up front so every scatter pass below keeps a
+		// clear ring around them (IsPositionClear consults _portalPositions).
+		float portalEdgeDistance = MapSize * 0.5f - 14.0f;
+		var portalPlacements = new List<(string NeighborId, Vector3 Pos)>();
+		_portalPositions.Clear();
+		foreach (string neighborId in GetAdjacentMaps(wildMap.Id))
+		{
+			Vector3 dir = GetPortalDirection(wildMap.Id, neighborId);
+			var pos = new Vector3(dir.X * portalEdgeDistance, _wildSpawnPosition.Y, dir.Z * portalEdgeDistance);
+			portalPlacements.Add((neighborId, pos));
+			_portalPositions.Add(pos);
+		}
+
 		_wildMapRoot = new Node3D { Name = wildMap.RootName };
 		_mapsRoot.AddChild(_wildMapRoot);
 		_wildMapRootsById[wildMap.Id] = _wildMapRoot;
@@ -136,12 +150,10 @@ public partial class World : Node3D
 		// One portal per adjacent map, placed on the map edge in the same direction
 		// that neighbour sits on the world-map cross (e.g. from the forest, badlands
 		// is the far east edge, snow the west, marsh the north, city the south).
+		// Positions were resolved above so the scatter passes kept them clear.
 		// Reaching a biome on foot marks it visited for later city fast-travel.
-		float edgeDistance = MapSize * 0.5f - 14.0f;
-		foreach (string neighborId in GetAdjacentMaps(wildMap.Id))
+		foreach ((string neighborId, Vector3 portalPos) in portalPlacements)
 		{
-			Vector3 dir = GetPortalDirection(wildMap.Id, neighborId);
-			var portalPos = new Vector3(dir.X * edgeDistance, _wildSpawnPosition.Y, dir.Z * edgeDistance);
 			string labelKey = neighborId == "city" ? "portal.return_city" : GetMapNameKey(neighborId);
 			CreateMapPortal($"Portal_{neighborId}", portalPos, neighborId, labelKey);
 		}
@@ -162,6 +174,7 @@ public partial class World : Node3D
 	private void BuildCityMapScene()
 	{
 		_obstaclePositions.Clear();
+		_portalPositions.Clear();
 		_currentThemeMapId = "city";
 		_cityMapRoot = new Node3D { Name = "MainCityMap" };
 		_mapsRoot.AddChild(_cityMapRoot);
