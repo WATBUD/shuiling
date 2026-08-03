@@ -1185,6 +1185,7 @@ public partial class World : Node3D
 			Player = _player.ExportSaveData(),
 			UnlockedMapTiers = new Dictionary<string, int>(_wildMapUnlockedTiersById),
 			SelectedMapTiers = new Dictionary<string, int>(_wildMapSelectedTiersById),
+			VisitedMaps = new List<string>(_visitedMapIds),
 			PendingMail = NetworkManager.Instance?.ExportPendingMail() ?? new List<PendingMailSaveData>(),
 		};
 	}
@@ -1254,6 +1255,18 @@ public partial class World : Node3D
 				}
 			}
 		}
+		_visitedMapIds.Clear();
+		_visitedMapIds.Add("city");
+		if (data.VisitedMaps != null)
+		{
+			foreach (string visited in data.VisitedMaps)
+			{
+				if (visited == "city" || IsWildMapId(visited))
+				{
+					_visitedMapIds.Add(visited);
+				}
+			}
+		}
 		foreach (WildMapDefinition wildMap in WildMaps)
 		{
 			EnsureWildInstancePopulated(wildMap.Id, GetSelectedTier(wildMap.Id), LocalGroupId());
@@ -1306,6 +1319,7 @@ public partial class World : Node3D
 	private void SetMapVisibility(string mapId)
 	{
 		_activeMapId = mapId;
+		MarkMapVisited(mapId);
 		_mapTravelCooldownRemaining = MapTravelCooldownSeconds;
 		ApplyMapAtmosphere(mapId);
 		_musicPlayer?.PlayForMap(mapId);

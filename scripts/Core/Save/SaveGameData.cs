@@ -16,6 +16,8 @@ public sealed class SaveGameData
 	// World Tier progression per wild map id (docs/world_progression.md).
 	public Dictionary<string, int> UnlockedMapTiers { get; set; } = new();
 	public Dictionary<string, int> SelectedMapTiers { get; set; } = new();
+	// Map ids the player has physically visited; gates city fast-travel.
+	public List<string> VisitedMaps { get; set; } = new();
 	// Host-only: gift mail addressed to players who were not connected when it was
 	// sent. Delivered when that player next joins this host (keyed by name).
 	public List<PendingMailSaveData> PendingMail { get; set; } = new();

@@ -157,6 +157,7 @@
 	"prompt.npc.quest_progress": "{0}  任務素材 {1}/{2}  親密度 {3}/{4}",
 	"portal.return_city": "返回主城",
 	"portal.travel_wild": "前往野怪地圖",
+	"portal.travel_next": "前往下一區域",
 	"portal.enter_cave": "進入幽暗洞穴",
 	"portal.leave_cave": "離開洞穴",
 	"portal.cave_back": "返回上一層",

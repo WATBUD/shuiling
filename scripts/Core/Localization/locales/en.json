@@ -157,6 +157,7 @@
 	"prompt.npc.quest_progress": "{0}  Task items {1}/{2}  Affinity {3}/{4}",
 	"portal.return_city": "Return to Main City",
 	"portal.travel_wild": "Travel to Wild Map",
+	"portal.travel_next": "Travel to Next Region",
 	"portal.enter_cave": "Enter the Gloom Cave",
 	"portal.leave_cave": "Leave the Cave",
 	"portal.cave_back": "Return to Previous Depth",
