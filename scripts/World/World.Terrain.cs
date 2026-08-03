@@ -137,7 +137,11 @@ public partial class World : Node3D
 		// each map reads as its ecosystem (e.g. snow = all white).
 		_wildGroundPalette = BuildWildGroundPalette(wildMap.Id);
 		BeginVegetationBatch(_propsRoot);
-		CreateStaticBox(_mapRoot, "Ground", new Vector3(0.0f, -0.5f, 0.0f), new Vector3(MapSize, 1.0f, MapSize), _wildGroundPalette.Base);
+		// Wild maps get a floor 50% larger than the gameplay MapSize: the boundary
+		// wall sits at that extended edge, leaving open runoff beyond the portals so
+		// nothing crowds the walk up to them (portals stay on the original edge).
+		float wildFloor = MapSize * WildBoundaryScale;
+		CreateStaticBox(_mapRoot, "Ground", new Vector3(0.0f, -0.5f, 0.0f), new Vector3(wildFloor, 1.0f, wildFloor), _wildGroundPalette.Base);
 		CreatePrototypeGround(wildMap.Id);
 		CreateBoundaries();
 		CreateLandmarks();
@@ -295,10 +299,15 @@ public partial class World : Node3D
 		const float wallHeight = 5.0f;
 		const float wallThickness = 2.0f;
 
-		CreateStaticBox(_mapRoot, "NorthWall", new Vector3(0.0f, wallHeight * 0.5f, -half), new Vector3(MapSize, wallHeight, wallThickness), _matWall);
-		CreateStaticBox(_mapRoot, "SouthWall", new Vector3(0.0f, wallHeight * 0.5f, half), new Vector3(MapSize, wallHeight, wallThickness), _matWall);
-		CreateStaticBox(_mapRoot, "WestWall", new Vector3(-half, wallHeight * 0.5f, 0.0f), new Vector3(wallThickness, wallHeight, MapSize), _matWall);
-		CreateStaticBox(_mapRoot, "EastWall", new Vector3(half, wallHeight * 0.5f, 0.0f), new Vector3(wallThickness, wallHeight, MapSize), _matWall);
+		// Wild maps have no perimeter walls: the floor extends 50% as open runoff and
+		// stepping off the far edge is a fatal fall. Only the city stays walled in.
+		if (!IsWildMapId(_currentThemeMapId))
+		{
+			CreateStaticBox(_mapRoot, "NorthWall", new Vector3(0.0f, wallHeight * 0.5f, -half), new Vector3(MapSize, wallHeight, wallThickness), _matWall);
+			CreateStaticBox(_mapRoot, "SouthWall", new Vector3(0.0f, wallHeight * 0.5f, half), new Vector3(MapSize, wallHeight, wallThickness), _matWall);
+			CreateStaticBox(_mapRoot, "WestWall", new Vector3(-half, wallHeight * 0.5f, 0.0f), new Vector3(wallThickness, wallHeight, MapSize), _matWall);
+			CreateStaticBox(_mapRoot, "EastWall", new Vector3(half, wallHeight * 0.5f, 0.0f), new Vector3(wallThickness, wallHeight, MapSize), _matWall);
+		}
 	}
 
 	private void CreateLandmarks()

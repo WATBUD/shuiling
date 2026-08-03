@@ -61,6 +61,12 @@ public partial class World : Node3D
 	};
 
 	[Export] public float MapSize { get; set; } = 150.0f;
+
+	// Wild-map floor extends 50% beyond MapSize as open runoff (no walls); the edge
+	// portals stay on the original MapSize boundary. Walking off the extended floor
+	// is fatal (handled in the player fall-death check).
+	private const float WildBoundaryScale = 1.5f;
+	public float WildBoundaryHalfExtent => MapSize * 0.5f * WildBoundaryScale;
 	[Export] public int PropCount { get; set; } = 110;
 	// Total initial monster population shared evenly by all wild maps.
 	// Five maps receive 18 monsters each (90 total).
