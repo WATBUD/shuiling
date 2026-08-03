@@ -816,7 +816,7 @@ public partial class PlayerController
 	private static AudioStream BuildFallScream()
 	{
 		const int rate = 22050;
-		const float duration = 0.95f;
+		const float duration = 2.0f;
 		int sampleCount = (int)(rate * duration);
 		var data = new byte[sampleCount * 2];
 		double phase = 0.0;
