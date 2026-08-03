@@ -13,6 +13,8 @@ public partial class GachaPanel : PanelContainer
 	private Button _drawTenButton = null!;
 	private VBoxContainer _list = null!;
 	private FloatingTooltip _tooltip = null!;
+	private AudioStreamPlayer _sfxPlayer = null!;
+	private ColorRect _flash = null!;
 	private readonly List<string> _lastResults = new();
 
 	public System.Action? CloseRequested { get; set; }
@@ -61,6 +63,11 @@ public partial class GachaPanel : PanelContainer
 
 	public void RefreshAll()
 	{
+		RebuildAll(false);
+	}
+
+	private void RebuildAll(bool animate)
+	{
 		if (_list == null)
 		{
 			return;
@@ -97,19 +104,27 @@ public partial class GachaPanel : PanelContainer
 
 		foreach (string id in _lastResults)
 		{
-			AddResultRow(id);
+			AddResultRow(id, animate);
 		}
 	}
 
-	private void AddResultRow(string itemId)
+	private void AddResultRow(string itemId, bool animate)
 	{
+		int rarity = RewardTier(itemId);
+		Color rarityColor = RarityColor(rarity);
 		var row = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		if (animate)
+		{
+			// Start hidden; the reveal tween fades/shines it in.
+			row.Modulate = new Color(1.0f, 1.0f, 1.0f, 0.0f);
+		}
+
 		var style = new StyleBoxFlat
 		{
 			BgColor = new Color(0.08f, 0.09f, 0.105f, 0.94f),
-			BorderColor = new Color(0.32f, 0.38f, 0.45f, 0.72f),
+			BorderColor = new Color(rarityColor.R, rarityColor.G, rarityColor.B, rarity >= 5 ? 0.95f : 0.6f),
 		};
-		style.SetBorderWidthAll(1);
+		style.SetBorderWidthAll(rarity >= 7 ? 2 : 1);
 		style.SetCornerRadiusAll(6);
 		row.AddThemeStyleboxOverride("panel", style);
 		_list.AddChild(row);
@@ -125,15 +140,11 @@ public partial class GachaPanel : PanelContainer
 		content.AddThemeConstantOverride("separation", 12);
 		margin.AddChild(content);
 
-		int tier = Mathf.Max(
-			BuildCatalog.GetEquipmentStars(itemId),
-			Mathf.Max(BuildCatalog.GetSkillCoreStars(itemId), MonsterLootCatalog.GetEnhanceCrystalTier(itemId)));
-
-		var rarityLabel = MakeLabel(17, new Color(1.0f, 0.86f, 0.42f));
-		rarityLabel.Text = $"★{tier}";
+		var rarityLabel = MakeLabel(17, rarityColor);
+		rarityLabel.Text = $"★{rarity}";
 		content.AddChild(rarityLabel);
 
-		var nameLabel = MakeLabel(17, new Color(0.96f, 0.98f, 1.0f));
+		var nameLabel = MakeLabel(17, rarity >= 7 ? rarityColor : new Color(0.96f, 0.98f, 1.0f));
 		nameLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
 		int crystalTier = MonsterLootCatalog.GetEnhanceCrystalTier(itemId);
 		if (crystalTier > 0)
@@ -201,15 +212,7 @@ public partial class GachaPanel : PanelContainer
 			CustomMinimumSize = new Vector2(0.0f, 48.0f),
 			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 		};
-		_drawOneButton.Pressed += () =>
-		{
-			if (_player != null)
-			{
-				_lastResults.Clear();
-				_lastResults.AddRange(_player.DrawGacha(1));
-				RefreshAll();
-			}
-		};
+		_drawOneButton.Pressed += () => OnDraw(1);
 		buttonBar.AddChild(_drawOneButton);
 
 		_drawTenButton = new Button
@@ -218,15 +221,7 @@ public partial class GachaPanel : PanelContainer
 			CustomMinimumSize = new Vector2(0.0f, 48.0f),
 			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 		};
-		_drawTenButton.Pressed += () =>
-		{
-			if (_player != null)
-			{
-				_lastResults.Clear();
-				_lastResults.AddRange(_player.DrawGacha(10));
-				RefreshAll();
-			}
-		};
+		_drawTenButton.Pressed += () => OnDraw(10);
 		buttonBar.AddChild(_drawTenButton);
 
 		var scroll = new ScrollContainer
@@ -259,6 +254,197 @@ public partial class GachaPanel : PanelContainer
 			ZIndex = 100,
 		};
 		AddChild(_tooltip);
+
+		_sfxPlayer = new AudioStreamPlayer
+		{
+			Name = "GachaSfx",
+			Bus = AudioSettings.SfxBus,
+			ProcessMode = ProcessModeEnum.Always,
+		};
+		AddChild(_sfxPlayer);
+
+		// Full-panel rarity flash overlay; transparent until a draw reveals.
+		_flash = new ColorRect
+		{
+			Name = "GachaFlash",
+			Color = new Color(1.0f, 1.0f, 1.0f, 0.0f),
+			MouseFilter = MouseFilterEnum.Ignore,
+			ZIndex = 90,
+		};
+		_flash.SetAnchorsPreset(LayoutPreset.FullRect);
+		AddChild(_flash);
+	}
+
+	private void OnDraw(int count)
+	{
+		if (_player == null)
+		{
+			return;
+		}
+
+		List<string> results = _player.DrawGacha(count);
+		if (results.Count == 0)
+		{
+			RefreshAll();
+			return;
+		}
+
+		_lastResults.Clear();
+		_lastResults.AddRange(results);
+		int best = 1;
+		foreach (string id in results)
+		{
+			best = Mathf.Max(best, RewardTier(id));
+		}
+
+		RebuildAll(true); // rows start transparent
+		PlayRoll();
+		BeginReveal(best);
+	}
+
+	// Staggered shine-in of each result row, then a rarity flash + reveal chime
+	// once the suspense roll has played out.
+	private void BeginReveal(int bestTier)
+	{
+		const float rollDelay = 0.45f;
+		const float step = 0.07f;
+		int index = 0;
+		foreach (Node child in _list.GetChildren())
+		{
+			if (child is not Control row)
+			{
+				continue;
+			}
+
+			Tween tween = CreateTween();
+			tween.TweenInterval(rollDelay + index * step);
+			tween.TweenProperty(row, "modulate", new Color(1.7f, 1.7f, 1.7f, 1.0f), 0.12f);
+			tween.TweenProperty(row, "modulate", Colors.White, 0.20f);
+			index++;
+		}
+
+		SceneTreeTimer timer = GetTree().CreateTimer(rollDelay);
+		timer.Timeout += () =>
+		{
+			FlashScreen(bestTier);
+			PlayReveal(bestTier);
+		};
+	}
+
+	private void FlashScreen(int tier)
+	{
+		Color color = RarityColor(tier);
+		float peak = tier >= 8 ? 0.7f : (tier >= 5 ? 0.45f : 0.28f);
+		float duration = tier >= 8 ? 0.6f : 0.4f;
+		_flash.Color = new Color(color.R, color.G, color.B, peak);
+		Tween tween = CreateTween();
+		tween.TweenProperty(_flash, "color:a", 0.0f, duration)
+			.SetTrans(Tween.TransitionType.Sine)
+			.SetEase(Tween.EaseType.Out);
+	}
+
+	private static int RewardTier(string itemId)
+	{
+		return Mathf.Max(
+			BuildCatalog.GetEquipmentStars(itemId),
+			Mathf.Max(BuildCatalog.GetSkillCoreStars(itemId), MonsterLootCatalog.GetEnhanceCrystalTier(itemId)));
+	}
+
+	private static Color RarityColor(int tier)
+	{
+		return tier switch
+		{
+			>= 10 => new Color(1.0f, 0.55f, 0.2f),
+			>= 9 => new Color(1.0f, 0.84f, 0.3f),
+			>= 7 => new Color(0.78f, 0.5f, 1.0f),
+			>= 5 => new Color(0.45f, 0.7f, 1.0f),
+			>= 3 => new Color(0.5f, 0.95f, 0.6f),
+			_ => new Color(0.85f, 0.88f, 0.94f),
+		};
+	}
+
+	// Rising tick sequence — the "rolling" suspense before the reveal.
+	private void PlayRoll()
+	{
+		const int mixRate = 22050;
+		const float duration = 0.45f;
+		int sampleCount = Mathf.RoundToInt(mixRate * duration);
+		byte[] data = new byte[sampleCount * 2];
+		const int ticks = 9;
+		for (int i = 0; i < sampleCount; i++)
+		{
+			float t = i / (float)mixRate;
+			float pos = t / duration;
+			int tick = Mathf.Clamp((int)(pos * ticks), 0, ticks - 1);
+			float local = pos * ticks - tick;
+			float freq = Mathf.Lerp(420.0f, 1150.0f, tick / (float)(ticks - 1));
+			float env = Mathf.Exp(-local * 9.0f);
+			float sample = Mathf.Sin(Mathf.Tau * freq * t) * env * 0.16f;
+			WritePcm16(data, i * 2, Mathf.Clamp(sample, -0.9f, 0.9f));
+		}
+
+		PlayWav(data, mixRate);
+	}
+
+	// Ascending chime whose length/brightness scales with the best rarity drawn.
+	private void PlayReveal(int tier)
+	{
+		const int mixRate = 22050;
+		int notes = Mathf.Clamp(2 + tier / 2, 2, 6);
+		float duration = 0.35f + notes * 0.12f;
+		int sampleCount = Mathf.RoundToInt(mixRate * duration);
+		byte[] data = new byte[sampleCount * 2];
+		float baseFreq = Mathf.Lerp(392.0f, 659.0f, Mathf.Clamp(tier / 10.0f, 0.0f, 1.0f));
+		float[] ratios = { 1.0f, 1.122f, 1.335f, 1.5f, 1.682f, 2.0f };
+		for (int i = 0; i < sampleCount; i++)
+		{
+			float t = i / (float)mixRate;
+			float sample = 0.0f;
+			for (int k = 0; k < notes; k++)
+			{
+				float start = k * 0.10f;
+				float length = 0.5f + (k == notes - 1 ? 0.4f : 0.0f);
+				float lt = t - start;
+				if (lt < 0.0f || lt >= length)
+				{
+					continue;
+				}
+
+				float p = lt / length;
+				float env = Mathf.Min(p * 16.0f, 1.0f) * Mathf.Exp(-p * (k == notes - 1 ? 1.4f : 2.8f));
+				float phase = Mathf.Tau * baseFreq * ratios[k] * t;
+				sample += (Mathf.Sin(phase) + 0.25f * Mathf.Sin(phase * 2.0f)) * env * 0.16f;
+			}
+
+			if (tier >= 8)
+			{
+				sample += Mathf.Sin(Mathf.Tau * 1760.0f * t) * Mathf.Exp(-t * 2.5f) * 0.05f * Mathf.Sin(Mathf.Tau * 9.0f * t);
+			}
+
+			WritePcm16(data, i * 2, Mathf.Clamp(sample, -0.95f, 0.95f));
+		}
+
+		PlayWav(data, mixRate);
+	}
+
+	private void PlayWav(byte[] data, int mixRate)
+	{
+		_sfxPlayer.Stop();
+		_sfxPlayer.Stream = new AudioStreamWav
+		{
+			Format = AudioStreamWav.FormatEnum.Format16Bits,
+			MixRate = mixRate,
+			Stereo = false,
+			Data = data,
+		};
+		_sfxPlayer.Play();
+	}
+
+	private static void WritePcm16(byte[] data, int offset, float sample)
+	{
+		short value = (short)Mathf.Clamp(Mathf.RoundToInt(sample * 32767.0f), short.MinValue, short.MaxValue);
+		data[offset] = (byte)(value & 0xFF);
+		data[offset + 1] = (byte)((value >> 8) & 0xFF);
 	}
 
 	private static Label MakeLabel(int fontSize, Color color)
