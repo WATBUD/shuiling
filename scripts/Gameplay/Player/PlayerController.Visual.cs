@@ -346,6 +346,14 @@ public partial class PlayerController
 			return;
 		}
 
+		// Wild maps have no walls — stepping off the extended edge is a fatal tumble
+		// (with a little "啊～" scream). The walled city just recovers to safe ground.
+		if (GetParent() is World world && world.IsWildMap(world.ActiveMapId))
+		{
+			TriggerFallDeath();
+			return;
+		}
+
 		TeleportToSafePosition();
 	}
 

@@ -765,6 +765,72 @@ public partial class PlayerController
 	// and their deployed pets stand guard and grieve (invincible, can't fight). The
 	// player stays down — with a "you died / return?" prompt — until THEY choose to
 	// return to the city. No auto-respawn.
+	private AudioStreamPlayer? _fallSfxPlayer;
+	private AudioStream? _fallScreamStream;
+
+	// Fatal fall off a wild map's open edge: a comedic descending "啊～" then the
+	// normal downed state.
+	private void TriggerFallDeath()
+	{
+		if (_isDead)
+		{
+			return;
+		}
+
+		PlayFallScream();
+		HandlePlayerDeath();
+	}
+
+	private void PlayFallScream()
+	{
+		if (_fallSfxPlayer == null)
+		{
+			_fallSfxPlayer = new AudioStreamPlayer
+			{
+				Name = "FallScreamSfx",
+				Bus = AudioSettings.SfxBus,
+				ProcessMode = ProcessModeEnum.Always,
+			};
+			AddChild(_fallSfxPlayer);
+		}
+
+		_fallScreamStream ??= BuildFallScream();
+		_fallSfxPlayer.Stream = _fallScreamStream;
+		_fallSfxPlayer.Play();
+	}
+
+	// A downward pitch glissando (~520Hz → ~120Hz) with vibrato and a soft second
+	// harmonic — reads as a cartoon "wahhh" tumble. Procedural 16-bit mono PCM.
+	private static AudioStream BuildFallScream()
+	{
+		const int rate = 22050;
+		const float duration = 0.95f;
+		int sampleCount = (int)(rate * duration);
+		var data = new byte[sampleCount * 2];
+		double phase = 0.0;
+		for (int i = 0; i < sampleCount; i++)
+		{
+			float frac = i / (float)sampleCount;
+			float t = i / (float)rate;
+			float freq = Mathf.Lerp(520.0f, 120.0f, frac);
+			freq *= 1.0f + 0.07f * Mathf.Sin(t * Mathf.Tau * 11.0f);
+			phase += freq / rate;
+			float wave = 0.7f * Mathf.Sin((float)(phase * Mathf.Tau)) + 0.3f * Mathf.Sin((float)(phase * 2.0 * Mathf.Tau));
+			float envelope = Mathf.Min(1.0f, frac * 18.0f) * (1.0f - frac);
+			short sample = (short)(Mathf.Clamp(wave * envelope * 0.55f, -1.0f, 1.0f) * 32767.0f);
+			data[i * 2] = (byte)(sample & 0xFF);
+			data[i * 2 + 1] = (byte)((sample >> 8) & 0xFF);
+		}
+
+		return new AudioStreamWav
+		{
+			Format = AudioStreamWav.FormatEnum.Format16Bits,
+			MixRate = rate,
+			Stereo = false,
+			Data = data,
+		};
+	}
+
 	private void HandlePlayerDeath()
 	{
 		if (_isDead)
