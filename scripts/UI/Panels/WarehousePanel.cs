@@ -543,7 +543,11 @@ public partial class WarehousePanel : PanelContainer
 			_player.WarehouseWithdraw(itemId, int.MaxValue);
 		}
 
-		RefreshAll();
+		// Defer the rebuild: refreshing synchronously here frees the very button
+		// whose GuiInput we're inside, which disrupts input dispatch and makes the
+		// NEXT double-click land on nothing (so the second item never transfers).
+		// Rebuilding next frame lets the current gesture finish on a stable tree.
+		CallDeferred(nameof(RefreshAll));
 	}
 
 	private static string GetItemName(string itemId)
