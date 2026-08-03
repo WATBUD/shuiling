@@ -104,6 +104,14 @@ public partial class PlayerController
 	private Vector3 ClampCameraInsideMap(Vector3 position)
 	{
 		float halfExtent = Mathf.Max(CameraWorldHalfExtent, 8.0f);
+		// Wild maps have no walls and a 50%-larger floor; let the camera roam out to
+		// that extended edge so it keeps following the player near the boundary
+		// instead of being pinned at the old map edge.
+		if (GetParent() is World world && world.IsWildMap(world.ActiveMapId))
+		{
+			halfExtent = Mathf.Max(halfExtent, world.WildBoundaryHalfExtent);
+		}
+
 		position.X = Mathf.Clamp(position.X, -halfExtent, halfExtent);
 		position.Z = Mathf.Clamp(position.Z, -halfExtent, halfExtent);
 		position.Y = Mathf.Max(position.Y, GlobalPosition.Y + 2.8f);

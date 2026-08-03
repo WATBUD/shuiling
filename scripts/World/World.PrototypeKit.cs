@@ -48,7 +48,10 @@ public partial class World
 			return;
 		}
 
-		int tilesPerSide = Mathf.CeilToInt(MapSize / tileSize);
+		// Wild maps tile the full extended floor (50% larger), so the runoff out to
+		// the fatal edge keeps the same block pattern instead of flat colour.
+		float groundExtent = IsWildMapId(mapId) ? MapSize * WildBoundaryScale : MapSize;
+		int tilesPerSide = Mathf.CeilToInt(groundExtent / tileSize);
 		float start = -tilesPerSide * tileSize * 0.5f + tileSize * 0.5f;
 		var lightTiles = new List<Transform3D>();
 		var darkTiles = new List<Transform3D>();
