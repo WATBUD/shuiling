@@ -29,6 +29,14 @@ public partial class InventoryPanel : PanelContainer
 					LocaleText.T(BuildCatalog.IsMainAttackCore(itemId)
 						? "tooltip.core_role.attack"
 						: "tooltip.core_role.support")));
+			int coreStars = BuildCatalog.GetSkillCoreStars(itemId);
+			if (coreStars > 0)
+			{
+				lines.Add(LocaleText.F(
+					"tooltip.core_stars",
+					coreStars,
+					Mathf.RoundToInt((BuildCatalog.GetSkillCoreStarMultiplier(itemId) - 1.0f) * 100.0f)));
+			}
 		}
 		else if (BuildCatalog.GetItemKind(itemId) == InventoryItemKind.AttributeGem)
 		{
@@ -54,7 +62,7 @@ public partial class InventoryPanel : PanelContainer
 				AppendAttributeGemTooltip(lines, BuildCatalog.GetAttributeGem(itemId));
 				break;
 			case InventoryItemKind.SkillGem:
-				AppendSkillGemTooltip(lines, BuildCatalog.GetSkillGem(itemId));
+				AppendSkillGemTooltip(lines, BuildCatalog.GetSkillGem(itemId), BuildCatalog.GetSkillCoreStarMultiplier(itemId));
 				break;
 		}
 
@@ -155,7 +163,9 @@ public partial class InventoryPanel : PanelContainer
 		AddDecimalLine(lines, "tooltip.knockback", item.KnockbackForce);
 	}
 
-	private static void AppendSkillGemTooltip(List<string> lines, SkillGemDefinition item)
+	// starMultiplier 反映核心強化星等（每星 +CoreStarBonusPerStar）；與 ApplySkillGem 的
+	// bonusFactor 一致，只縮放實際會被星等放大的數值（跟隨距離與投射速度不受影響）。
+	private static void AppendSkillGemTooltip(List<string> lines, SkillGemDefinition item, float starMultiplier = 1.0f)
 	{
 		AddSummaryLine(lines, item.SummaryKey);
 		// Every core is tagged with an element; cores without a damage element
@@ -166,19 +176,19 @@ public partial class InventoryPanel : PanelContainer
 		{
 			lines.Add(LocaleText.T("tooltip.requires_ranged_skill"));
 		}
-		AddStatLine(lines, "stat.health", item.MaxHealthBonus);
-		AddStatLine(lines, "stat.attack", item.AttackBonus);
-		AddStatLine(lines, "stat.defense", item.DefenseBonus);
-		AddPercentLine(lines, "tooltip.move_speed", item.MoveSpeedBonus);
-		AddPercentLine(lines, "stat.attack_speed", item.AttackCooldownReduction);
-		AddDecimalLine(lines, "tooltip.attack_range", item.AttackRangeBonus);
-		AddDecimalLine(lines, "tooltip.detection_radius", item.DetectionRadiusBonus);
+		AddStatLine(lines, "stat.health", Mathf.RoundToInt(item.MaxHealthBonus * starMultiplier));
+		AddStatLine(lines, "stat.attack", Mathf.RoundToInt(item.AttackBonus * starMultiplier));
+		AddStatLine(lines, "stat.defense", Mathf.RoundToInt(item.DefenseBonus * starMultiplier));
+		AddPercentLine(lines, "tooltip.move_speed", item.MoveSpeedBonus * starMultiplier);
+		AddPercentLine(lines, "stat.attack_speed", item.AttackCooldownReduction * starMultiplier);
+		AddDecimalLine(lines, "tooltip.attack_range", item.AttackRangeBonus * starMultiplier);
+		AddDecimalLine(lines, "tooltip.detection_radius", item.DetectionRadiusBonus * starMultiplier);
 		AddPercentLine(lines, "tooltip.follow_distance", item.FollowDistanceMultiplier - 1.0f);
-		AddPercentLine(lines, "tooltip.crit_chance", item.CritChanceBonus);
-		AddPercentLine(lines, "tooltip.life_steal", item.LifeStealPercent);
-		AddPercentLine(lines, "tooltip.damage_multiplier", item.DamageMultiplier - 1.0f);
+		AddPercentLine(lines, "tooltip.crit_chance", item.CritChanceBonus * starMultiplier);
+		AddPercentLine(lines, "tooltip.life_steal", item.LifeStealPercent * starMultiplier);
+		AddPercentLine(lines, "tooltip.damage_multiplier", (item.DamageMultiplier - 1.0f) * starMultiplier);
 		AddPercentLine(lines, "tooltip.projectile_speed", item.ProjectileSpeedMultiplier - 1.0f);
-		AddPercentLine(lines, "tooltip.control_chance", item.ControlChanceBonus);
+		AddPercentLine(lines, "tooltip.control_chance", item.ControlChanceBonus * starMultiplier);
 	}
 
 	private static void AddSummaryLine(List<string> lines, string summaryKey)

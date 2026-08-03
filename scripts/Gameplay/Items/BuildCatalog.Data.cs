@@ -269,9 +269,10 @@ public static partial class BuildCatalog
 				return equipment.UniqueId;
 			}
 		}
+		string skillCoreId = GetBaseSkillCoreId(id);
 		foreach (SkillGemDefinition gem in SkillGems)
 		{
-			if (gem.Id == id)
+			if (gem.Id == skillCoreId)
 			{
 				return gem.UniqueId;
 			}

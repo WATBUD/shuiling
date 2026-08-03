@@ -172,6 +172,12 @@ public partial class GachaPanel : PanelContainer
 			nameLabel.Text = LocaleText.T(BuildCatalog.GetItemNameKey(itemId)) + BuildCatalog.GetStarSuffix(itemId);
 		}
 		content.AddChild(nameLabel);
+
+		// Draw odds for this tier, right-aligned, so players see how rare the pull was.
+		var rateLabel = MakeLabel(14, new Color(0.72f, 0.80f, 0.88f));
+		rateLabel.Text = LocaleText.F("gacha.win_rate", GachaConfig.TierProbability(rarity) * 100.0f);
+		rateLabel.HorizontalAlignment = HorizontalAlignment.Right;
+		content.AddChild(rateLabel);
 	}
 
 	private void BuildPanel()
