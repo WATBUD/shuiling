@@ -30,6 +30,9 @@ public partial class WorldMapPanel : PanelContainer
 		("wild_forest", "city"),
 	};
 
+	// Per-node lit state (visited or current) — drives which nodes/routes glow.
+	private readonly Dictionary<string, bool> _litById = new();
+
 	private PlayerController? _player;
 	private Label _titleLabel = null!;
 	private Label _hintLabel = null!;
@@ -91,8 +94,10 @@ public partial class WorldMapPanel : PanelContainer
 			return;
 		}
 
+		_litById.Clear();
 		foreach (World.WorldMapNode node in world.GetWorldMapNodes())
 		{
+			_litById[node.Id] = node.Visited || node.IsCurrent;
 			if (!_nodeButtons.TryGetValue(node.Id, out Button? button))
 			{
 				continue;
@@ -146,24 +151,25 @@ public partial class WorldMapPanel : PanelContainer
 
 		Vector2 areaSize = _mapArea.Size;
 		var pointById = new Dictionary<string, Vector2>();
-		var nodePoints = new List<Vector2>();
+		var nodePoints = new List<(Vector2 P, bool Lit)>();
 		foreach ((string id, Vector2 normalized) in NodeLayout)
 		{
 			Vector2 point = normalized * areaSize;
 			pointById[id] = point;
-			nodePoints.Add(point);
+			nodePoints.Add((point, _litById.GetValueOrDefault(id)));
 			if (_nodeButtons.TryGetValue(id, out Button? button))
 			{
 				button.Position = point - button.Size * 0.5f;
 			}
 		}
 
-		var edges = new List<(Vector2 A, Vector2 B)>();
+		var edges = new List<(Vector2 A, Vector2 B, bool Lit)>();
 		foreach ((string a, string b) in NodeEdges)
 		{
 			if (pointById.TryGetValue(a, out Vector2 pa) && pointById.TryGetValue(b, out Vector2 pb))
 			{
-				edges.Add((pa, pb));
+				bool lit = _litById.GetValueOrDefault(a) && _litById.GetValueOrDefault(b);
+				edges.Add((pa, pb, lit));
 			}
 		}
 
@@ -313,21 +319,26 @@ public partial class WorldMapCanvas : Control
 	private const float DashLength = 10.0f;
 	private const float GapLength = 8.0f;
 
-	public IReadOnlyList<(Vector2 A, Vector2 B)> Connectors { get; set; } = System.Array.Empty<(Vector2, Vector2)>();
-	public IReadOnlyList<Vector2> NodePoints { get; set; } = System.Array.Empty<Vector2>();
+	public IReadOnlyList<(Vector2 A, Vector2 B, bool Lit)> Connectors { get; set; } = System.Array.Empty<(Vector2, Vector2, bool)>();
+	public IReadOnlyList<(Vector2 P, bool Lit)> NodePoints { get; set; } = System.Array.Empty<(Vector2, bool)>();
 
 	public override void _Draw()
 	{
-		var dashColor = new Color(0.42f, 0.48f, 0.56f, 0.72f);
-		foreach ((Vector2 a, Vector2 b) in Connectors)
+		// Explored routes glow; unexplored ones stay dim gray so the map visibly
+		// lights up as the player discovers each map.
+		var litColor = new Color(0.70f, 0.86f, 1.0f, 0.95f);
+		var dimColor = new Color(0.34f, 0.38f, 0.45f, 0.55f);
+		foreach ((Vector2 a, Vector2 b, bool lit) in Connectors)
 		{
-			DrawDashedSegment(a, b, dashColor);
+			DrawDashedSegment(a, b, lit ? litColor : dimColor);
 		}
 
-		// Faint station discs under each node button, so nodes read as stops on the path.
-		foreach (Vector2 point in NodePoints)
+		// Station discs under each node: brighter for explored stops.
+		foreach ((Vector2 point, bool lit) in NodePoints)
 		{
-			DrawCircle(point, 6.0f, new Color(0.20f, 0.26f, 0.32f, 0.6f));
+			DrawCircle(point, lit ? 7.0f : 5.0f, lit
+				? new Color(0.55f, 0.72f, 0.95f, 0.85f)
+				: new Color(0.20f, 0.24f, 0.30f, 0.55f));
 		}
 	}
 
