@@ -78,6 +78,12 @@ public partial class SimpleActor : CharacterBody3D
 			string colorName = LocaleText.T(IsBoss ? "rarity.color.gold" : MonsterRarity.ColorNameKey(Rarity));
 			_nameplate.Text = $"[{colorName}][LV{Level}][{LocalizedDisplayName}]{rebirthSuffix}{captureTag}{capturedText}";
 		}
+		else if (ActorKind == "npc")
+		{
+			// Town service NPCs (merchants, refiner, gacha, ...) are non-combat, so
+			// their nameplate shows only the name — no misleading combat level.
+			_nameplate.Text = LocalizedDisplayName;
+		}
 		else
 		{
 			_nameplate.Text = $"{LocaleText.T("actor.level_prefix")}{Level} {LocalizedDisplayName}{rebirthSuffix}{captureTag}{capturedText}";
