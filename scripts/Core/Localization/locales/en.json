@@ -110,7 +110,7 @@
 	"shortcut.mouse_look": "Mouse Look",
 	"worldmap.title": "World Map",
 	"worldmap.here": "(You are here)",
-	"worldmap.hint": "Click a visited location to travel",
+	"worldmap.hint": "Choose your destination at the main-city portal (visited areas are lit)",
 	"worldmap.city_only": "Fast-travel is only available from the main city",
 	"worldmap.locked": "Unexplored",
 	"combat.range.melee": "Melee",

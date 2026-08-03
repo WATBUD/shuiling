@@ -110,7 +110,7 @@
 	"shortcut.mouse_look": "滑鼠上下左右",
 	"worldmap.title": "世界地圖",
 	"worldmap.here": "（目前位置）",
-	"worldmap.hint": "點選踩過的地點即可傳送",
+	"worldmap.hint": "從主城的傳送點選擇要前往的地圖（踩過的地點會亮起）",
 	"worldmap.city_only": "只能在主城使用快速傳送",
 	"worldmap.locked": "未探索",
 	"combat.range.melee": "近戰",

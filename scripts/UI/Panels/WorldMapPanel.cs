@@ -114,7 +114,6 @@ public partial class WorldMapPanel : PanelContainer
 				label += "\n" + LocaleText.T("worldmap.locked");
 			}
 			button.Text = label;
-			button.Disabled = !node.CanTravel;
 			ApplyNodeStyle(button, node);
 		}
 
@@ -123,21 +122,6 @@ public partial class WorldMapPanel : PanelContainer
 			: LocaleText.T("worldmap.hint");
 
 		LayoutNodes();
-	}
-
-	private void OnNodePressed(string mapId)
-	{
-		World? world = _player?.GetParent() as World;
-		if (world == null)
-		{
-			return;
-		}
-
-		if (world.CanFastTravelTo(mapId))
-		{
-			world.RequestMapTravel(mapId);
-			CloseRequested?.Invoke();
-		}
 	}
 
 	// Buttons live directly on the canvas, so they must be re-centered on their node
@@ -235,15 +219,17 @@ public partial class WorldMapPanel : PanelContainer
 
 		foreach ((string id, Vector2 _) in NodeLayout)
 		{
-			string mapId = id;
+			// View-only nodes: the world map only shows layout / visited state; actual
+			// travel is chosen at the main-city portal. Non-interactive on purpose.
 			var button = new Button
 			{
 				CustomMinimumSize = new Vector2(150.0f, 46.0f),
 				Size = new Vector2(150.0f, 46.0f),
 				AutowrapMode = TextServer.AutowrapMode.Off,
+				MouseFilter = MouseFilterEnum.Ignore,
+				FocusMode = FocusModeEnum.None,
 			};
 			button.AddThemeFontSizeOverride("font_size", 13);
-			button.Pressed += () => OnNodePressed(mapId);
 			_mapArea.AddChild(button);
 			_nodeButtons[id] = button;
 		}

@@ -261,6 +261,14 @@ public partial class PlayerController
 		// gate portal they act as travel buttons.
 		foreach ((string id, string label) in world.GetWildMapList())
 		{
+			// Travel mode (city gate): only list maps that are unlocked — the entry
+			// forest plus any biome already reached on foot. The read-only guide still
+			// lists every biome. Unlocked maps appear here once discovered.
+			if (!guideOnly && !world.CanFastTravelTo(id))
+			{
+				continue;
+			}
+
 			_mapTravelButtonList.AddChild(BuildMapTierSection(world, id, label));
 		}
 
