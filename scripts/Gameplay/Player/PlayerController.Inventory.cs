@@ -364,6 +364,11 @@ public partial class PlayerController
 
 	private static string GetInventoryItemDisplayName(string itemId)
 	{
+		if (MonsterLootCatalog.IsCoreOrb(itemId))
+		{
+			return MonsterLootCatalog.GetCoreOrbDisplayName(itemId);
+		}
+
 		if (MonsterLootCatalog.IsMonsterLoot(itemId))
 		{
 			return LocaleText.T(MonsterLootCatalog.GetNameKey(itemId));
