@@ -25,18 +25,47 @@ public partial class World
 		return _visitedMapIds.Contains(mapId);
 	}
 
-	// The next wild biome in the fixed chain, or "" past the last one.
-	public string GetNextWildMapId(string mapId)
+	// Map adjacency matching the world-map cross (forest is the hub). Single source
+	// of truth for both the in-world portals and the panel's dashed links.
+	private static readonly (string A, string B)[] MapConnections =
 	{
-		for (int index = 0; index < WildMaps.Length - 1; index++)
+		("city", "wild_forest"),
+		("wild_forest", "wild_marsh"),
+		("wild_forest", "wild_snow"),
+		("wild_forest", "wild_badlands"),
+		("wild_marsh", "wild_skeleton"),
+	};
+
+	// Maps directly reachable on foot from mapId (both directions of each link).
+	public List<string> GetAdjacentMaps(string mapId)
+	{
+		var result = new List<string>();
+		foreach ((string a, string b) in MapConnections)
 		{
-			if (WildMaps[index].Id == mapId)
+			if (a == mapId)
 			{
-				return WildMaps[index + 1].Id;
+				result.Add(b);
+			}
+			else if (b == mapId)
+			{
+				result.Add(a);
 			}
 		}
 
-		return string.Empty;
+		return result;
+	}
+
+	private static string GetMapNameKey(string mapId)
+	{
+		foreach (WildMapDefinition wildMap in WildMaps)
+		{
+			if (wildMap.Id == mapId)
+			{
+				return wildMap.NameKey;
+			}
+		}
+
+		return mapId == "city" ? "map.city" : mapId;
 	}
 
 	// City fast-travel rule: from the main city you may travel to any visited wild

@@ -133,13 +133,16 @@ public partial class World : Node3D
 		CreateWildMapThemeDressing(wildMap.Id);
 		CreatePrototypeArchitecture(wildMap.Id);
 		CreateWildernessCaveEntrance(wildMap.Id);
-		CreateMapPortal("ReturnToCityPortal", _wildSpawnPosition + new Vector3(0.0f, 0.0f, 5.0f), "city", "portal.return_city");
-		// Chain portal to the next biome, so the 5 maps form a walkable sequence
-		// (reaching a biome marks it visited for later city fast-travel).
-		string nextBiomeId = GetNextWildMapId(wildMap.Id);
-		if (!string.IsNullOrEmpty(nextBiomeId))
+		// One portal per adjacent map, matching the world-map cross (forest is the
+		// hub). Fanned out in front of the spawn so they don't overlap. Reaching a
+		// biome on foot marks it visited for later city fast-travel.
+		List<string> neighbors = GetAdjacentMaps(wildMap.Id);
+		for (int index = 0; index < neighbors.Count; index++)
 		{
-			CreateMapPortal("NextBiomePortal", _wildSpawnPosition + new Vector3(6.0f, 0.0f, 5.0f), nextBiomeId, "portal.travel_next");
+			string neighborId = neighbors[index];
+			float offsetX = (index - (neighbors.Count - 1) * 0.5f) * 5.0f;
+			string labelKey = neighborId == "city" ? "portal.return_city" : GetMapNameKey(neighborId);
+			CreateMapPortal($"Portal_{neighborId}", _wildSpawnPosition + new Vector3(offsetX, 0.0f, 5.0f), neighborId, labelKey);
 		}
 		ScatterProps();
 		ScatterDetailProps();
