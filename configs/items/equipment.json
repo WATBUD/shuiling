@@ -890,9 +890,9 @@
 		},
 		{
 			"uniqueId": 133,
-			"id": "equip.accessory.steel_pendant",
-			"nameKey": "equip.accessory.steel_pendant",
-			"summaryKey": "equip.summary.gen_accessory_steel_pendant",
+			"id": "equip.accessory.steel_ring",
+			"nameKey": "equip.accessory.steel_ring",
+			"summaryKey": "equip.summary.gen_accessory_steel_ring",
 			"slot": "Accessory",
 			"defenseBonus": 9,
 			"maxHealthBonus": 16
@@ -907,9 +907,9 @@
 		},
 		{
 			"uniqueId": 135,
-			"id": "equip.accessory.mithril_pendant",
-			"nameKey": "equip.accessory.mithril_pendant",
-			"summaryKey": "equip.summary.gen_accessory_mithril_pendant",
+			"id": "equip.accessory.mithril_ring",
+			"nameKey": "equip.accessory.mithril_ring",
+			"summaryKey": "equip.summary.gen_accessory_mithril_ring",
 			"slot": "Accessory",
 			"attackBonus": 14
 		},
@@ -932,9 +932,9 @@
 		},
 		{
 			"uniqueId": 138,
-			"id": "equip.accessory.dragon_pendant",
-			"nameKey": "equip.accessory.dragon_pendant",
-			"summaryKey": "equip.summary.gen_accessory_dragon_pendant",
+			"id": "equip.accessory.dragon_ring",
+			"nameKey": "equip.accessory.dragon_ring",
+			"summaryKey": "equip.summary.gen_accessory_dragon_ring",
 			"slot": "Accessory",
 			"moveSpeedBonus": 0.06,
 			"damageElementId": "fire",
@@ -952,9 +952,9 @@
 		},
 		{
 			"uniqueId": 140,
-			"id": "equip.accessory.frost_pendant",
-			"nameKey": "equip.accessory.frost_pendant",
-			"summaryKey": "equip.summary.gen_accessory_frost_pendant",
+			"id": "equip.accessory.frost_ring",
+			"nameKey": "equip.accessory.frost_ring",
+			"summaryKey": "equip.summary.gen_accessory_frost_ring",
 			"slot": "Accessory",
 			"critChanceBonus": 0.06,
 			"damageElementId": "ice",
@@ -981,9 +981,9 @@
 		},
 		{
 			"uniqueId": 143,
-			"id": "equip.accessory.radiant_pendant",
-			"nameKey": "equip.accessory.radiant_pendant",
-			"summaryKey": "equip.summary.gen_accessory_radiant_pendant",
+			"id": "equip.accessory.radiant_ring",
+			"nameKey": "equip.accessory.radiant_ring",
+			"summaryKey": "equip.summary.gen_accessory_radiant_ring",
 			"slot": "Accessory",
 			"attackBonus": 30,
 			"damageElementId": "light",
@@ -999,9 +999,9 @@
 		},
 		{
 			"uniqueId": 145,
-			"id": "equip.accessory.royal_pendant",
-			"nameKey": "equip.accessory.royal_pendant",
-			"summaryKey": "equip.summary.gen_accessory_royal_pendant",
+			"id": "equip.accessory.royal_ring",
+			"nameKey": "equip.accessory.royal_ring",
+			"summaryKey": "equip.summary.gen_accessory_royal_ring",
 			"slot": "Accessory",
 			"defenseBonus": 33,
 			"maxHealthBonus": 52
