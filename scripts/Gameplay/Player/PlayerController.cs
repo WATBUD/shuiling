@@ -187,7 +187,7 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float WalkSpeed { get; set; } = 7.8f;
 	[Export] public float SprintSpeed { get; set; } = 12.8f;
 	// Stamina drains while actively sprinting and regenerates otherwise. Base pool is
-	// 20 (BuildStats.MaxStamina); the 疾行 set widens it and speeds sprinting up.
+	// 20 (BuildStats.MaxStamina); the 迅捷 set widens it and speeds sprinting up.
 	[Export] public float SprintStaminaDrainPerSecond { get; set; } = 8.0f;
 	[Export] public float StaminaRegenPerSecond { get; set; } = 11.0f;
 	[Export] public float JumpVelocity { get; set; } = EquipmentConfig.PlayerBaseJumpVelocity;
