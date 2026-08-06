@@ -1237,5 +1237,7 @@
 	"equip.accessory.radiant_pendant": "Radiant Pendant",
 	"equip.summary.gen_accessory_radiant_pendant": "A radiant pendant. +30 ATK. +18% Light damage (needs matching skill element).",
 	"equip.accessory.ancient_ring": "Ancient Ring",
-	"equip.summary.gen_accessory_ancient_ring": "A ancient ring. +4% crit."
+	"equip.summary.gen_accessory_ancient_ring": "A ancient ring. +4% crit.",
+	"set.progress": "{0} set {1}/{2}",
+	"set.progress_active": "{0} set {1}/{2} ✓ active"
 }

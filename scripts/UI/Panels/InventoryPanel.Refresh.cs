@@ -365,6 +365,7 @@ public partial class InventoryPanel : PanelContainer
 			_companionInfoCard.SetPlayer(_player);
 			_buildSummaryLabel.Text = LocaleText.F("build.core_chain", BuildCatalog.LocalizedSkillGems(_player.BuildLoadout));
 			_buildSummaryLabel.AddThemeColorOverride("font_color", new Color(0.74f, 0.83f, 0.90f));
+			UpdateSetProgressLabel(_player.BuildLoadout);
 			return;
 		}
 
@@ -372,6 +373,7 @@ public partial class InventoryPanel : PanelContainer
 		{
 			_companionInfoCard.SetActor(null);
 			_buildSummaryLabel.Text = string.Empty;
+			UpdateSetProgressLabel(null);
 			return;
 		}
 
@@ -381,6 +383,33 @@ public partial class InventoryPanel : PanelContainer
 			"build.core_chain",
 			string.IsNullOrEmpty(coreChain) ? LocaleText.T("gem.skill.none") : coreChain);
 		_buildSummaryLabel.AddThemeColorOverride("font_color", new Color(0.74f, 0.83f, 0.90f));
+		UpdateSetProgressLabel(_selectedActor.BuildLoadout);
+	}
+
+	// Shows the dominant set's collection progress (e.g. "鐵套裝 3/5"), turning
+	// green with a ✓ once the full five-piece bonus is active.
+	private void UpdateSetProgressLabel(CompanionBuildLoadout? loadout)
+	{
+		if (loadout == null)
+		{
+			_setProgressLabel.Text = string.Empty;
+			return;
+		}
+
+		(EquipmentSetJson? set, int count) = BuildCatalog.GetEquipmentSetProgress(loadout);
+		if (set == null || count <= 0)
+		{
+			_setProgressLabel.Text = string.Empty;
+			return;
+		}
+
+		bool active = count >= BuildCatalog.EquipmentSetSize;
+		_setProgressLabel.Text = LocaleText.F(
+			active ? "set.progress_active" : "set.progress",
+			LocaleText.T(set.NameKey),
+			count,
+			BuildCatalog.EquipmentSetSize);
+		_setProgressLabel.AddThemeColorOverride("font_color", active ? new Color(0.5f, 1.0f, 0.6f) : new Color(1.0f, 0.86f, 0.42f));
 	}
 
 	private void AddItemListMessage(string key)

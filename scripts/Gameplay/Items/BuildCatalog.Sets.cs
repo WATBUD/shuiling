@@ -70,6 +70,39 @@ public static partial class BuildCatalog
 		return GetActiveEquipmentSet(loadout)?.NameKey ?? string.Empty;
 	}
 
+	// A full set is five matching pieces.
+	public const int EquipmentSetSize = 5;
+
+	// Progress toward the best (most-worn) set in this loadout: the dominant set and
+	// how many of the five slots belong to it (0 if no set pieces are worn).
+	public static (EquipmentSetJson? Set, int Count) GetEquipmentSetProgress(CompanionBuildLoadout loadout)
+	{
+		string[] worn = { loadout.HelmetId, loadout.WeaponId, loadout.ArmorId, loadout.BootsId, loadout.AccessoryId };
+		var counts = new Dictionary<string, int>(System.StringComparer.Ordinal);
+		foreach (string id in worn)
+		{
+			string theme = GetEquipmentSetTheme(id);
+			if (!string.IsNullOrEmpty(theme) && SetsByTheme.ContainsKey(theme))
+			{
+				counts.TryGetValue(theme, out int n);
+				counts[theme] = n + 1;
+			}
+		}
+
+		string bestTheme = string.Empty;
+		int bestCount = 0;
+		foreach (KeyValuePair<string, int> pair in counts)
+		{
+			if (pair.Value > bestCount)
+			{
+				bestCount = pair.Value;
+				bestTheme = pair.Key;
+			}
+		}
+
+		return bestCount == 0 ? (null, 0) : (SetsByTheme[bestTheme], bestCount);
+	}
+
 	// The set an individual equipment piece belongs to (for tooltips), or null.
 	public static EquipmentSetJson? GetSetForEquipment(string equipmentId)
 	{

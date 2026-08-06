@@ -79,6 +79,10 @@ public partial class InventoryPanel : PanelContainer
 		_buildSummaryLabel = MakeLabel(13, new Color(0.74f, 0.83f, 0.90f));
 		buildSection.AddChild(_buildSummaryLabel);
 
+		_setProgressLabel = MakeLabel(13, new Color(1.0f, 0.86f, 0.42f));
+		_setProgressLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		buildSection.AddChild(_setProgressLabel);
+
 		var slotGrid = new GridContainer { Columns = 3 };
 		slotGrid.AddThemeConstantOverride("h_separation", 8);
 		slotGrid.AddThemeConstantOverride("v_separation", 8);

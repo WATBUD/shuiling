@@ -49,6 +49,7 @@ public partial class InventoryPanel : PanelContainer
 	private Label _titleLabel = null!;
 	private Label _goldLabel = null!;
 	private Label _buildSummaryLabel = null!;
+	private Label _setProgressLabel = null!;
 	private CompanionInfoCard _companionInfoCard = null!;
 	private Label _bagCountLabel = null!;
 	private Label _sortLabel = null!;

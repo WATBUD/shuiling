@@ -1237,5 +1237,7 @@
 	"equip.accessory.radiant_pendant": "聖光墜飾",
 	"equip.summary.gen_accessory_radiant_pendant": "聖光墜飾，+30 攻擊。光屬性攻擊 +18%（需技能屬性相符）。",
 	"equip.accessory.ancient_ring": "遠古戒指",
-	"equip.summary.gen_accessory_ancient_ring": "遠古戒指，暴擊 +4%。"
+	"equip.summary.gen_accessory_ancient_ring": "遠古戒指，暴擊 +4%。",
+	"set.progress": "套裝 {0} {1}/{2}",
+	"set.progress_active": "套裝 {0} {1}/{2} ✓ 啟用"
 }
