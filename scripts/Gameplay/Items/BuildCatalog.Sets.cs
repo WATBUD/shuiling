@@ -103,6 +103,26 @@ public static partial class BuildCatalog
 		return bestCount == 0 ? (null, 0) : (SetsByTheme[bestTheme], bestCount);
 	}
 
+	// How many of the five worn pieces belong to the given set theme.
+	public static int GetWornSetPieceCount(CompanionBuildLoadout loadout, string theme)
+	{
+		if (string.IsNullOrEmpty(theme))
+		{
+			return 0;
+		}
+
+		int count = 0;
+		foreach (string id in new[] { loadout.HelmetId, loadout.WeaponId, loadout.ArmorId, loadout.BootsId, loadout.AccessoryId })
+		{
+			if (GetEquipmentSetTheme(id) == theme)
+			{
+				count++;
+			}
+		}
+
+		return count;
+	}
+
 	// The set an individual equipment piece belongs to (for tooltips), or null.
 	public static EquipmentSetJson? GetSetForEquipment(string equipmentId)
 	{

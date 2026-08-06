@@ -134,6 +134,14 @@ public partial class InventoryPanel : PanelContainer
 		if (set != null)
 		{
 			lines.Add(LocaleText.F("tooltip.set_member", LocaleText.T(set.NameKey)));
+			EquipmentSetBonusJson sb = set.Bonus;
+			lines.Add(LocaleText.F(
+				"set.full_bonus",
+				sb.MaxHealthBonus,
+				sb.AttackBonus,
+				sb.DefenseBonus,
+				Mathf.RoundToInt(sb.MoveSpeedBonus * 100.0f),
+				Mathf.RoundToInt(sb.CritChanceBonus * 100.0f)));
 		}
 		AddStatLine(lines, "stat.health", Mathf.RoundToInt(item.MaxHealthBonus * starMultiplier));
 		AddStatLine(lines, "stat.attack", Mathf.RoundToInt(item.AttackBonus * starMultiplier));

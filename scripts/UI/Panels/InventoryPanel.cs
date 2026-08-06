@@ -49,7 +49,6 @@ public partial class InventoryPanel : PanelContainer
 	private Label _titleLabel = null!;
 	private Label _goldLabel = null!;
 	private Label _buildSummaryLabel = null!;
-	private Label _setProgressLabel = null!;
 	private CompanionInfoCard _companionInfoCard = null!;
 	private Label _bagCountLabel = null!;
 	private Label _sortLabel = null!;
@@ -906,7 +905,20 @@ public partial class InventoryPanel : PanelContainer
 			return;
 		}
 
-		_tooltip.ShowTooltip(BuildItemTooltipTitle(itemId), BuildItemTooltipBody(itemId, slotName), this);
+		string body = BuildItemTooltipBody(itemId, slotName);
+
+		// Loadout-aware set collection progress for the hovered equipment piece,
+		// appended here (the static body can't know what's currently equipped).
+		CompanionBuildLoadout? loadout = GetSelectedLoadout();
+		EquipmentSetJson? set = BuildCatalog.GetSetForEquipment(itemId);
+		if (loadout != null && set != null)
+		{
+			int count = BuildCatalog.GetWornSetPieceCount(loadout, BuildCatalog.GetEquipmentSetTheme(itemId));
+			bool active = count >= BuildCatalog.EquipmentSetSize;
+			body += "\n" + LocaleText.F(active ? "tooltip.set_progress_active" : "tooltip.set_progress", count, BuildCatalog.EquipmentSetSize);
+		}
+
+		_tooltip.ShowTooltip(BuildItemTooltipTitle(itemId), body, this);
 	}
 
 	private void HideItemTooltip()
