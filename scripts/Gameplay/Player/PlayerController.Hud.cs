@@ -22,7 +22,7 @@ public partial class PlayerController
 			AnchorBottom = 1.0f,
 			OffsetLeft = -235.0f,
 			OffsetRight = 235.0f,
-			OffsetTop = -88.0f,
+			OffsetTop = -116.0f,
 			OffsetBottom = -22.0f,
 		};
 		var panelStyle = new StyleBoxFlat
@@ -60,8 +60,28 @@ public partial class PlayerController
 			new Color(0.40f, 0.055f, 0.12f),
 			out _playerHealthHudBar,
 			out _playerHealthHudValueLabel));
+		rows.AddChild(CreatePlayerStatusBarRow(
+			"SP",
+			new Color(0.36f, 0.82f, 1.0f),
+			new Color(0.06f, 0.20f, 0.34f),
+			out _playerStaminaHudBar,
+			out _playerStaminaHudValueLabel));
 		CreateBottomExperienceHud(layer);
 		UpdatePlayerHealthHud();
+		UpdatePlayerStaminaHud();
+	}
+
+	private void UpdatePlayerStaminaHud()
+	{
+		if (_playerStaminaHudBar == null || !IsInstanceValid(_playerStaminaHudBar))
+		{
+			return;
+		}
+
+		int maximum = Mathf.Max(CurrentBuildStats.MaxStamina, 1);
+		int current = Mathf.Clamp(Mathf.RoundToInt(_currentStamina), 0, maximum);
+		_playerStaminaHudValueLabel.Text = $"{current} / {maximum}";
+		_playerStaminaHudBar.Value = current / (double)maximum * 100.0;
 	}
 
 	private void CreateBottomExperienceHud(CanvasLayer layer)

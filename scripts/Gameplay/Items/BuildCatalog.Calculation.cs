@@ -215,6 +215,9 @@ public static partial class BuildCatalog
 		stats.Attack += b.AttackBonus;
 		stats.Defense += b.DefenseBonus;
 		stats.MoveSpeedMultiplier += b.MoveSpeedBonus;
+		stats.SprintSpeedMultiplier += b.SprintSpeedBonus;
+		stats.MaxStamina += b.MaxStaminaBonus;
+		stats.JumpPower += b.JumpPowerBonus;
 		stats.CritChance += b.CritChanceBonus;
 		stats.CritDamageMultiplier += b.CritDamageBonus;
 		stats.AttackRangeBonus += b.AttackRangeBonus;

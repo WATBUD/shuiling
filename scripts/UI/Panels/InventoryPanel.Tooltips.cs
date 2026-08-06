@@ -127,6 +127,24 @@ public partial class InventoryPanel : PanelContainer
 	}
 
 	// starMultiplier 反映精煉星等（每星 +8%）；插槽數不受影響。
+	// Only the stats a set actually grants are listed, joined with the locale's list
+	// separator, so movement sets don't show "+0 ATK" clutter.
+	private static string BuildSetBonusSummary(EquipmentSetBonusJson sb)
+	{
+		var parts = new List<string>();
+		if (sb.MaxHealthBonus != 0) parts.Add(LocaleText.F("set.part.health", sb.MaxHealthBonus));
+		if (sb.AttackBonus != 0) parts.Add(LocaleText.F("set.part.attack", sb.AttackBonus));
+		if (sb.DefenseBonus != 0) parts.Add(LocaleText.F("set.part.defense", sb.DefenseBonus));
+		if (sb.MoveSpeedBonus > 0.0f) parts.Add(LocaleText.F("set.part.move", Mathf.RoundToInt(sb.MoveSpeedBonus * 100.0f)));
+		if (sb.SprintSpeedBonus > 0.0f) parts.Add(LocaleText.F("set.part.sprint", Mathf.RoundToInt(sb.SprintSpeedBonus * 100.0f)));
+		if (sb.MaxStaminaBonus != 0) parts.Add(LocaleText.F("set.part.stamina", sb.MaxStaminaBonus));
+		if (sb.JumpPowerBonus != 0) parts.Add(LocaleText.F("set.part.jump", sb.JumpPowerBonus));
+		if (sb.CritChanceBonus > 0.0f) parts.Add(LocaleText.F("set.part.crit", Mathf.RoundToInt(sb.CritChanceBonus * 100.0f)));
+		if (sb.CritDamageBonus > 0.0f) parts.Add(LocaleText.F("set.part.crit_dmg", Mathf.RoundToInt(sb.CritDamageBonus * 100.0f)));
+		if (sb.AttackRangeBonus > 0.0f) parts.Add(LocaleText.F("set.part.range", sb.AttackRangeBonus.ToString("0.0")));
+		return string.Join(LocaleText.T("punctuation.list_sep"), parts);
+	}
+
 	private static void AppendEquipmentTooltip(List<string> lines, EquipmentDefinition item, float starMultiplier = 1.0f)
 	{
 		AddSummaryLine(lines, item.SummaryKey);
@@ -134,18 +152,7 @@ public partial class InventoryPanel : PanelContainer
 		if (set != null)
 		{
 			lines.Add(LocaleText.F("tooltip.set_member", LocaleText.T(set.NameKey)));
-			EquipmentSetBonusJson sb = set.Bonus;
-			lines.Add(LocaleText.F(
-				"set.full_bonus",
-				sb.MaxHealthBonus,
-				sb.AttackBonus,
-				sb.DefenseBonus,
-				Mathf.RoundToInt(sb.MoveSpeedBonus * 100.0f),
-				Mathf.RoundToInt(sb.CritChanceBonus * 100.0f)));
-			if (sb.CritDamageBonus > 0.0f)
-			{
-				lines.Add(LocaleText.F("set.crit_damage_bonus", Mathf.RoundToInt(sb.CritDamageBonus * 100.0f)));
-			}
+			lines.Add(LocaleText.F("set.full_bonus", BuildSetBonusSummary(set.Bonus)));
 		}
 		AddStatLine(lines, "stat.health", Mathf.RoundToInt(item.MaxHealthBonus * starMultiplier));
 		AddStatLine(lines, "stat.attack", Mathf.RoundToInt(item.AttackBonus * starMultiplier));

@@ -180,6 +180,11 @@ public sealed class BuildStats
 	public float AttackDisplayValue { get; set; }
 	public float DefenseDisplayValue { get; set; }
 	public float MoveSpeedMultiplier { get; set; } = 1.0f;
+	// Sprint-speed multiplier layered on top of MoveSpeedMultiplier — only the
+	// 疾行 (swift) set and swift gear raise it above 1.0.
+	public float SprintSpeedMultiplier { get; set; } = 1.0f;
+	// Max stamina for the sprint pool. Base 20 for everyone; the 疾行 set adds more.
+	public int MaxStamina { get; set; } = 20;
 	public int JumpPower { get; set; } = EquipmentConfig.BaseJumpPower;
 	public float AttackCooldownMultiplier { get; set; } = 1.0f;
 	public float AttackRangeBonus { get; set; }

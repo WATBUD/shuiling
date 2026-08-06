@@ -186,6 +186,10 @@ public partial class PlayerController : CharacterBody3D
 
 	[Export] public float WalkSpeed { get; set; } = 7.8f;
 	[Export] public float SprintSpeed { get; set; } = 12.8f;
+	// Stamina drains while actively sprinting and regenerates otherwise. Base pool is
+	// 20 (BuildStats.MaxStamina); the 疾行 set widens it and speeds sprinting up.
+	[Export] public float SprintStaminaDrainPerSecond { get; set; } = 8.0f;
+	[Export] public float StaminaRegenPerSecond { get; set; } = 11.0f;
 	[Export] public float JumpVelocity { get; set; } = EquipmentConfig.PlayerBaseJumpVelocity;
 	[Export] public float ThirdPersonDistance { get; set; } = 6.2f;
 	[Export] public float ThirdPersonCameraHeight { get; set; } = 3.35f;
@@ -309,6 +313,12 @@ public partial class PlayerController : CharacterBody3D
 	private Label _playerHealthHudNameLabel = null!;
 	private Label _playerHealthHudValueLabel = null!;
 	private ProgressBar _playerHealthHudBar = null!;
+	private Label _playerStaminaHudValueLabel = null!;
+	private ProgressBar _playerStaminaHudBar = null!;
+	private float _currentStamina = 20.0f;
+	// Once stamina bottoms out the player must regen back to ~30% before sprinting
+	// re-enables, so speed doesn't flicker one frame at a time near empty.
+	private bool _staminaExhausted;
 	private Label _playerExperienceHudValueLabel = null!;
 	private ProgressBar _playerExperienceHudBar = null!;
 	private CaptureRhythmPanel _captureRhythmPanel = null!;
@@ -868,12 +878,20 @@ public partial class PlayerController : CharacterBody3D
 		{
 			direction = approachDirection;
 		}
-		float targetSpeed = Input.IsActionPressed("sprint") ? SprintSpeed : WalkSpeed;
+		bool moving = direction.LengthSquared() > 0.01f;
+		bool mounted = MountedCompanion is SimpleActor;
+		// On foot, sprinting needs stamina in the pool and no active exhaustion lock;
+		// mounts ride on the mount's own speed and never touch the stamina pool.
+		bool sprinting = Input.IsActionPressed("sprint") && (mounted || (!_staminaExhausted && _currentStamina > 0.0f));
+		UpdateStamina(sprinting && moving && !mounted, step);
+		float targetSpeed = sprinting
+			? SprintSpeed * CurrentBuildStats.SprintSpeedMultiplier
+			: WalkSpeed;
 		targetSpeed *= CurrentBuildStats.MoveSpeedMultiplier;
 		if (MountedCompanion is SimpleActor mount)
 		{
 			targetSpeed = mount.EffectiveMoveSpeed;
-			if (Input.IsActionPressed("sprint"))
+			if (sprinting)
 			{
 				targetSpeed *= SprintSpeed / Mathf.Max(WalkSpeed, 0.01f);
 			}
@@ -892,6 +910,31 @@ public partial class PlayerController : CharacterBody3D
 		UpdateMovementEffects(step, targetSpeed);
 		UpdateSafeGroundPosition();
 		RecoverIfOutOfWorld();
+	}
+
+	// Drains the stamina pool while actively sprinting, regenerates it otherwise, and
+	// keeps the HUD bar in sync. Clamped to the loadout's MaxStamina (base 20).
+	private void UpdateStamina(bool draining, float step)
+	{
+		float maxStamina = Mathf.Max(CurrentBuildStats.MaxStamina, 1);
+		_currentStamina = Mathf.Clamp(_currentStamina, 0.0f, maxStamina);
+		if (draining)
+		{
+			_currentStamina = Mathf.Max(_currentStamina - SprintStaminaDrainPerSecond * step, 0.0f);
+			if (_currentStamina <= 0.0f)
+			{
+				_staminaExhausted = true;
+			}
+		}
+		else
+		{
+			_currentStamina = Mathf.Min(_currentStamina + StaminaRegenPerSecond * step, maxStamina);
+			if (_staminaExhausted && _currentStamina >= maxStamina * 0.30f)
+			{
+				_staminaExhausted = false;
+			}
+		}
+		UpdatePlayerStaminaHud();
 	}
 
 	private static void EnsureInputActions()

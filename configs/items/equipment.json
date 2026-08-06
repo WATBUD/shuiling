@@ -436,6 +436,17 @@
 			"defenseBonus": 38
 		},
 		{
+			"uniqueId": 148,
+			"id": "equip.helmet.swift",
+			"nameKey": "equip.helmet.swift",
+			"summaryKey": "equip.summary.swift_helmet",
+			"slot": "Helmet",
+			"maxHealthBonus": 24,
+			"defenseBonus": 8,
+			"moveSpeedBonus": 0.04,
+			"jumpPowerBonus": 2
+		},
+		{
 			"uniqueId": 88,
 			"id": "equip.weapon.iron_blade",
 			"nameKey": "equip.weapon.iron_blade",
@@ -547,6 +558,16 @@
 			"attackBonus": 30,
 			"attackSpeed": 74,
 			"critChanceBonus": 0.12
+		},
+		{
+			"uniqueId": 149,
+			"id": "equip.weapon.swift_edge",
+			"nameKey": "equip.weapon.swift_edge",
+			"summaryKey": "equip.summary.swift_edge",
+			"slot": "Weapon",
+			"attackBonus": 14,
+			"attackSpeed": 70,
+			"critChanceBonus": 0.04
 		},
 		{
 			"uniqueId": 98,
@@ -725,6 +746,16 @@
 			"defenseBonus": 40
 		},
 		{
+			"uniqueId": 150,
+			"id": "equip.armor.swift",
+			"nameKey": "equip.armor.swift",
+			"summaryKey": "equip.summary.swift_armor",
+			"slot": "Armor",
+			"maxHealthBonus": 40,
+			"defenseBonus": 12,
+			"moveSpeedBonus": 0.08
+		},
+		{
 			"uniqueId": 115,
 			"id": "equip.boots.iron",
 			"nameKey": "equip.boots.iron",
@@ -884,6 +915,16 @@
 			"defenseBonus": 17,
 			"moveSpeedBonus": 0.21,
 			"jumpPowerBonus": 38
+		},
+		{
+			"uniqueId": 151,
+			"id": "equip.boots.swift",
+			"nameKey": "equip.boots.swift",
+			"summaryKey": "equip.summary.swift_boots",
+			"slot": "Boots",
+			"defenseBonus": 6,
+			"moveSpeedBonus": 0.18,
+			"jumpPowerBonus": 3
 		},
 		{
 			"uniqueId": 131,

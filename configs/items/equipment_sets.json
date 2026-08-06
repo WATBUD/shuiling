@@ -132,6 +132,17 @@
 				"critChanceBonus": 0.15,
 				"critDamageBonus": 0.5
 			}
+		},
+		{
+			"id": "set.swift",
+			"nameKey": "set.swift",
+			"theme": "swift",
+			"bonus": {
+				"moveSpeedBonus": 0.1,
+				"sprintSpeedBonus": 0.2,
+				"maxStaminaBonus": 20,
+				"jumpPowerBonus": 4
+			}
 		}
 	]
 }
