@@ -65,6 +65,18 @@ public partial class PlayerController : CharacterBody3D
 		MarkPlayerBuildStatsDirty();
 	}
 
+	// Equip a ring into one of the four accessory slots (keeps the full id).
+	public void EquipBuildAccessory(int index, string accessoryId)
+	{
+		if (BuildCatalog.GetEquipment(accessoryId).Slot != EquipmentSlot.Accessory)
+		{
+			return;
+		}
+
+		BuildLoadout.SetAccessoryId(index, accessoryId);
+		MarkPlayerBuildStatsDirty();
+	}
+
 	public void EquipSkillGem(int slotIndex, string gemId)
 	{
 		BuildLoadout.EnsureSkillSlots();

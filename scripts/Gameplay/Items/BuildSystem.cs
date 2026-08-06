@@ -178,6 +178,7 @@ public static partial class BuildCatalog
 	// The historical name is retained because this value is serialized as the skill
 	// core array length throughout the existing save system.
 	public const int SupportCoreSlotCount = CoreConfig.SupportCoreSlotCount;
+	public const int AccessorySlotCount = 4;
 
 	// Unlock levels for the core skill, then support cores 1 through 6.
 	private static readonly int[] SupportCoreUnlockLevels = CoreConfig.SupportCoreUnlockLevels;

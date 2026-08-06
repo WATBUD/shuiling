@@ -46,6 +46,7 @@ public partial class SimpleActor : CharacterBody3D
 				ArmorId = loadout.ArmorId,
 				BootsId = loadout.BootsId,
 				AccessoryId = loadout.AccessoryId,
+				AccessoryIds = (string[])loadout.AccessoryIds.Clone(),
 				AttributeGemId = "gem.attribute.none",
 				SkillGemIds = MakeSkillGemIdArray(loadout),
 				SkillGemLevels = MakeSkillGemLevelArray(loadout),
@@ -118,7 +119,7 @@ public partial class SimpleActor : CharacterBody3D
 			WeaponId = data.BuildLoadout.WeaponId,
 			ArmorId = data.BuildLoadout.ArmorId,
 			BootsId = string.IsNullOrWhiteSpace(data.BuildLoadout.BootsId) ? "equip.boots.traveler" : data.BuildLoadout.BootsId,
-			AccessoryId = data.BuildLoadout.AccessoryId,
+			AccessoryIds = data.BuildLoadout.ResolveAccessoryIds(),
 			// Migrate legacy elemental gems to the element carried by the active core.
 			AttributeGemId = "gem.attribute.none",
 			SkillGemIds = data.BuildLoadout.SkillGemIds is { Length: > 0 } savedIds

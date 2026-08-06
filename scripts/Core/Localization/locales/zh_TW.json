@@ -1240,5 +1240,6 @@
 	"equip.accessory.radiant_ring": "聖光戒指",
 	"equip.summary.gen_accessory_radiant_ring": "聖光戒指，+30 攻擊。光屬性攻擊 +18%（需技能屬性相符）。",
 	"equip.accessory.royal_ring": "皇家戒指",
-	"equip.summary.gen_accessory_royal_ring": "皇家戒指，+33 防禦、+52 生命。"
+	"equip.summary.gen_accessory_royal_ring": "皇家戒指，+33 防禦、+52 生命。",
+	"build.slot.accessory_n": "飾品 {0}"
 }

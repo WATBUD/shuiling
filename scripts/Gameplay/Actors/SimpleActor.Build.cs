@@ -28,7 +28,24 @@ public partial class SimpleActor : CharacterBody3D
 		BuildLoadout.SetEquipmentId(EquipmentSlot.Weapon, "equip.weapon.none");
 		BuildLoadout.SetEquipmentId(EquipmentSlot.Armor, "equip.armor.none");
 		BuildLoadout.SetEquipmentId(EquipmentSlot.Boots, "equip.boots.none");
-		BuildLoadout.SetEquipmentId(EquipmentSlot.Accessory, "equip.accessory.none");
+		for (int i = 0; i < BuildCatalog.AccessorySlotCount; i++)
+		{
+			BuildLoadout.SetAccessoryId(i, "equip.accessory.none");
+		}
+
+		MarkBuildChanged();
+	}
+
+	// Equip a ring into one of the four accessory slots (keeps the full id incl.
+	// refine stars, mirroring EquipBuildEquipment).
+	public void EquipBuildAccessory(int index, string accessoryId)
+	{
+		if (BuildCatalog.GetEquipment(accessoryId).Slot != EquipmentSlot.Accessory)
+		{
+			return;
+		}
+
+		BuildLoadout.SetAccessoryId(index, accessoryId);
 		MarkBuildChanged();
 	}
 

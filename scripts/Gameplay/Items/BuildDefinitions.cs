@@ -211,7 +211,22 @@ public sealed class CompanionBuildLoadout
 	public string WeaponId { get; set; } = "equip.weapon.sword";
 	public string ArmorId { get; set; } = "equip.armor.scout";
 	public string BootsId { get; set; } = "equip.boots.traveler";
-	public string AccessoryId { get; set; } = "equip.accessory.swift_ring";
+
+	// Four accessory (ring) slots. AccessoryId is a back-compat view of slot 0.
+	public string[] AccessoryIds { get; set; } =
+	{
+		"equip.accessory.swift_ring",
+		"equip.accessory.none",
+		"equip.accessory.none",
+		"equip.accessory.none",
+	};
+
+	public string AccessoryId
+	{
+		get => GetAccessoryId(0);
+		set => SetAccessoryId(0, value);
+	}
+
 	public string AttributeGemId { get; set; } = "gem.attribute.none";
 	public string[] SkillGemIds { get; set; } =
 	{
@@ -238,6 +253,37 @@ public sealed class CompanionBuildLoadout
 	{
 		EnsureSkillSlots();
 		return index >= 0 && index < SkillGemIds.Length ? SkillGemIds[index] : "gem.skill.none";
+	}
+
+	public string GetAccessoryId(int index)
+	{
+		EnsureAccessorySlots();
+		return index >= 0 && index < AccessoryIds.Length ? AccessoryIds[index] : "equip.accessory.none";
+	}
+
+	public void SetAccessoryId(int index, string id)
+	{
+		EnsureAccessorySlots();
+		if (index >= 0 && index < AccessoryIds.Length)
+		{
+			AccessoryIds[index] = string.IsNullOrEmpty(id) ? "equip.accessory.none" : id;
+		}
+	}
+
+	public void EnsureAccessorySlots()
+	{
+		int target = BuildCatalog.AccessorySlotCount;
+		if (AccessoryIds != null && AccessoryIds.Length == target)
+		{
+			return;
+		}
+
+		string[] previous = AccessoryIds ?? System.Array.Empty<string>();
+		AccessoryIds = new string[target];
+		for (int index = 0; index < target; index++)
+		{
+			AccessoryIds[index] = index < previous.Length && !string.IsNullOrEmpty(previous[index]) ? previous[index] : "equip.accessory.none";
+		}
 	}
 
 	public string GetEquipmentId(EquipmentSlot slot)

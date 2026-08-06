@@ -61,7 +61,8 @@ public partial class InventoryPanel : PanelContainer
 	private Button _weaponButton = null!;
 	private Button _armorButton = null!;
 	private Button _bootsButton = null!;
-	private Button _accessoryButton = null!;
+	private readonly List<Button> _accessoryButtons = new();
+	private int _selectedAccessoryIndex;
 	private Button _attributeButton = null!;
 	private readonly List<Button> _supportButtons = new();
 	private FloatingTooltip _tooltip = null!;
@@ -148,6 +149,42 @@ public partial class InventoryPanel : PanelContainer
 	{
 		_selectedSupportIndex = index;
 		SelectTarget(EquipTarget.SupportCore);
+	}
+
+	private void SelectAccessorySlot(int index)
+	{
+		_selectedAccessoryIndex = index;
+		SelectTarget(EquipTarget.Accessory);
+	}
+
+	private void ShowAccessoryTooltip(int index)
+	{
+		CompanionBuildLoadout? loadout = GetSelectedLoadout();
+		if (loadout == null)
+		{
+			return;
+		}
+
+		ShowItemTooltip(loadout.GetAccessoryId(index), GetTargetName(EquipTarget.Accessory));
+	}
+
+	private void EquipAccessoryToSlot(string itemId, int index)
+	{
+		if (_player == null || GetSelectedLoadout() == null
+			|| !_player.HasInventoryItem(itemId) || !IsCompatibleItemForTarget(itemId, EquipTarget.Accessory))
+		{
+			return;
+		}
+
+		_selectedAccessoryIndex = index;
+		_selectedTarget = EquipTarget.Accessory;
+		PerformEquip(itemId);
+	}
+
+	private void UnequipAccessorySlot(int index)
+	{
+		_selectedAccessoryIndex = index;
+		UnequipSlot(EquipTarget.Accessory);
 	}
 
 	private void ShowSupportTooltip(int index)
@@ -272,10 +309,13 @@ public partial class InventoryPanel : PanelContainer
 			case EquipTarget.Weapon:
 			case EquipTarget.Armor:
 			case EquipTarget.Boots:
-			case EquipTarget.Accessory:
 				EquipmentSlot slot = ToEquipmentSlot(target);
 				if (_selectingPlayer) _player?.EquipBuildEquipment(slot, GetEmptyEquipmentId(slot));
 				else _selectedActor!.EquipBuildEquipment(slot, GetEmptyEquipmentId(slot));
+				break;
+			case EquipTarget.Accessory:
+				if (_selectingPlayer) _player?.EquipBuildAccessory(_selectedAccessoryIndex, "equip.accessory.none");
+				else _selectedActor!.EquipBuildAccessory(_selectedAccessoryIndex, "equip.accessory.none");
 				break;
 			case EquipTarget.AttributeGem:
 				if (_selectingPlayer) _player?.EquipAttributeGem("gem.attribute.none");
@@ -439,7 +479,13 @@ public partial class InventoryPanel : PanelContainer
 		switch (BuildCatalog.GetItemKind(itemId))
 		{
 			case InventoryItemKind.Equipment:
-				_selectedTarget = EquipTargetForSlot(BuildCatalog.GetEquipment(itemId).Slot);
+				EquipmentSlot equipSlot = BuildCatalog.GetEquipment(itemId).Slot;
+				_selectedTarget = EquipTargetForSlot(equipSlot);
+				if (equipSlot == EquipmentSlot.Accessory)
+				{
+					_selectedAccessoryIndex = FindFirstOpenAccessorySlot(selectedLoadout);
+				}
+
 				return true;
 			case InventoryItemKind.AttributeGem:
 				if (!BuildCatalog.IsMainCoreUnlocked(GetSelectedLevel()))
@@ -521,6 +567,21 @@ public partial class InventoryPanel : PanelContainer
 		}
 
 		return -1;
+	}
+
+	// First empty ring slot, or 0 if all four are filled (equipping there swaps).
+	private int FindFirstOpenAccessorySlot(CompanionBuildLoadout loadout)
+	{
+		loadout.EnsureAccessorySlots();
+		for (int index = 0; index < loadout.AccessoryIds.Length; index++)
+		{
+			if (loadout.GetAccessoryId(index) == "equip.accessory.none")
+			{
+				return index;
+			}
+		}
+
+		return 0;
 	}
 
 	private static string GetEmptyEquipmentId(EquipmentSlot slot)
@@ -767,7 +828,7 @@ public partial class InventoryPanel : PanelContainer
 					_player.EquipBuildEquipment(EquipmentSlot.Boots, itemId);
 					break;
 				case EquipTarget.Accessory:
-					_player.EquipBuildEquipment(EquipmentSlot.Accessory, itemId);
+					_player.EquipBuildAccessory(_selectedAccessoryIndex, itemId);
 					break;
 				case EquipTarget.AttributeGem:
 					_player.EquipAttributeGem(itemId);
@@ -794,7 +855,7 @@ public partial class InventoryPanel : PanelContainer
 				_selectedActor!.EquipBuildEquipment(EquipmentSlot.Boots, itemId);
 				break;
 			case EquipTarget.Accessory:
-				_selectedActor!.EquipBuildEquipment(EquipmentSlot.Accessory, itemId);
+				_selectedActor!.EquipBuildAccessory(_selectedAccessoryIndex, itemId);
 				break;
 			case EquipTarget.AttributeGem:
 				_selectedActor!.EquipAttributeGem(itemId);
@@ -890,7 +951,7 @@ public partial class InventoryPanel : PanelContainer
 			EquipTarget.Weapon => loadout.WeaponId,
 			EquipTarget.Armor => loadout.ArmorId,
 			EquipTarget.Boots => loadout.BootsId,
-			EquipTarget.Accessory => loadout.AccessoryId,
+			EquipTarget.Accessory => loadout.GetAccessoryId(_selectedAccessoryIndex),
 			EquipTarget.AttributeGem => loadout.AttributeGemId,
 			EquipTarget.SupportCore => loadout.GetSkillGemId(_selectedSupportIndex),
 			_ => string.Empty,

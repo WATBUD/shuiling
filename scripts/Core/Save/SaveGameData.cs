@@ -156,7 +156,10 @@ public sealed class CompanionBuildSaveData
 	public string WeaponId { get; set; } = "equip.weapon.sword";
 	public string ArmorId { get; set; } = "equip.armor.scout";
 	public string BootsId { get; set; } = "equip.boots.traveler";
+	// Legacy single accessory (pre-4-slot saves); still written for back-compat.
 	public string AccessoryId { get; set; } = "equip.accessory.swift_ring";
+	// Four accessory slots. Null on old saves — migrated from AccessoryId.
+	public string[]? AccessoryIds { get; set; }
 	public string AttributeGemId { get; set; } = "gem.attribute.none";
 	public string[] SkillGemIds { get; set; } =
 	{
@@ -165,6 +168,26 @@ public sealed class CompanionBuildSaveData
 		"gem.skill.none",
 	};
 	public int[] SkillGemLevels { get; set; } = { 1, 1, 1 };
+
+	// Normalized four-slot accessory list: prefer AccessoryIds, else migrate the
+	// single legacy AccessoryId into slot 0.
+	public string[] ResolveAccessoryIds()
+	{
+		var result = new[] { "equip.accessory.none", "equip.accessory.none", "equip.accessory.none", "equip.accessory.none" };
+		if (AccessoryIds is { Length: > 0 } saved)
+		{
+			for (int i = 0; i < result.Length && i < saved.Length; i++)
+			{
+				result[i] = string.IsNullOrEmpty(saved[i]) ? "equip.accessory.none" : saved[i];
+			}
+		}
+		else if (!string.IsNullOrEmpty(AccessoryId))
+		{
+			result[0] = AccessoryId;
+		}
+
+		return result;
+	}
 }
 
 public sealed class SaveVector3

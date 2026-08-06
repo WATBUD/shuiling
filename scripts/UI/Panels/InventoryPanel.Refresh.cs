@@ -76,14 +76,18 @@ public partial class InventoryPanel : PanelContainer
 			_weaponButton.Visible = true;
 			_armorButton.Visible = true;
 			_bootsButton.Visible = true;
-			_accessoryButton.Visible = true;
 			_attributeButton.Visible = true;
 			SetSlotsDisabled(false);
 			SetSlotButton(_helmetButton, EquipTarget.Helmet, playerLoadout.HelmetId, BuildCatalog.GetEquipment(playerLoadout.HelmetId).NameKey);
 			SetSlotButton(_weaponButton, EquipTarget.Weapon, playerLoadout.WeaponId, BuildCatalog.GetEquipment(playerLoadout.WeaponId).NameKey);
 			SetSlotButton(_armorButton, EquipTarget.Armor, playerLoadout.ArmorId, BuildCatalog.GetEquipment(playerLoadout.ArmorId).NameKey);
 			SetSlotButton(_bootsButton, EquipTarget.Boots, playerLoadout.BootsId, BuildCatalog.GetEquipment(playerLoadout.BootsId).NameKey);
-			SetSlotButton(_accessoryButton, EquipTarget.Accessory, playerLoadout.AccessoryId, BuildCatalog.GetEquipment(playerLoadout.AccessoryId).NameKey);
+			for (int index = 0; index < _accessoryButtons.Count; index++)
+			{
+				_accessoryButtons[index].Visible = true;
+				SetAccessorySlotButton(_accessoryButtons[index], index, playerLoadout);
+			}
+
 			SetSlotButton(_attributeButton, EquipTarget.AttributeGem, playerLoadout.AttributeGemId, BuildCatalog.GetAttributeGem(playerLoadout.AttributeGemId).NameKey);
 			int unlocked = BuildCatalog.GetUnlockedSupportCoreCount(_player.Level);
 			int playerVisibleSupport = Mathf.Min(Mathf.Max(unlocked + 1, 2), _supportButtons.Count);
@@ -102,7 +106,11 @@ public partial class InventoryPanel : PanelContainer
 		_weaponButton.Visible = true;
 		_armorButton.Visible = true;
 		_bootsButton.Visible = true;
-		_accessoryButton.Visible = true;
+		foreach (Button accessoryButton in _accessoryButtons)
+		{
+			accessoryButton.Visible = true;
+		}
+
 		if (_selectedActor == null || !IsInstanceValid(_selectedActor))
 		{
 			SetSlotsDisabled(true);
@@ -115,7 +123,11 @@ public partial class InventoryPanel : PanelContainer
 		SetSlotButton(_weaponButton, EquipTarget.Weapon, loadout.WeaponId, BuildCatalog.GetEquipment(loadout.WeaponId).NameKey);
 		SetSlotButton(_armorButton, EquipTarget.Armor, loadout.ArmorId, BuildCatalog.GetEquipment(loadout.ArmorId).NameKey);
 		SetSlotButton(_bootsButton, EquipTarget.Boots, loadout.BootsId, BuildCatalog.GetEquipment(loadout.BootsId).NameKey);
-		SetSlotButton(_accessoryButton, EquipTarget.Accessory, loadout.AccessoryId, BuildCatalog.GetEquipment(loadout.AccessoryId).NameKey);
+		for (int index = 0; index < _accessoryButtons.Count; index++)
+		{
+			SetAccessorySlotButton(_accessoryButtons[index], index, loadout);
+		}
+
 		SetSlotButton(_attributeButton, EquipTarget.AttributeGem, loadout.AttributeGemId, BuildCatalog.GetAttributeGem(loadout.AttributeGemId).NameKey);
 
 		// Show the unlocked support cores plus one locked preview of the next slot; the
@@ -176,6 +188,15 @@ public partial class InventoryPanel : PanelContainer
 		button.AddThemeColorOverride("font_color", selected ? new Color(1.0f, 0.92f, 0.50f) : new Color(0.92f, 0.96f, 1.0f));
 	}
 
+	private void SetAccessorySlotButton(Button button, int index, CompanionBuildLoadout loadout)
+	{
+		string ringId = loadout.GetAccessoryId(index);
+		button.Text = $"{LocaleText.F("build.slot.accessory_n", index + 1)}\n{LocaleText.T(BuildCatalog.GetEquipment(ringId).NameKey)}";
+		ItemIconLibrary.Apply(button, ringId, 26);
+		bool selected = _selectedTarget == EquipTarget.Accessory && _selectedAccessoryIndex == index;
+		button.AddThemeColorOverride("font_color", selected ? new Color(1.0f, 0.92f, 0.50f) : new Color(0.92f, 0.96f, 1.0f));
+	}
+
 	private bool ShowLockedSlot(Button button, EquipTarget target)
 	{
 		if (IsSlotUnlocked(target))
@@ -191,7 +212,8 @@ public partial class InventoryPanel : PanelContainer
 
 	private void SetSlotsDisabled(bool disabled)
 	{
-		var buttons = new List<Button> { _helmetButton, _weaponButton, _armorButton, _bootsButton, _accessoryButton, _attributeButton };
+		var buttons = new List<Button> { _helmetButton, _weaponButton, _armorButton, _bootsButton, _attributeButton };
+		buttons.AddRange(_accessoryButtons);
 		buttons.AddRange(_supportButtons);
 		foreach (Button button in buttons)
 		{

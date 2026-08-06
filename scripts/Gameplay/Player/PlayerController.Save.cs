@@ -235,6 +235,7 @@ public partial class PlayerController
 			ArmorId = BuildLoadout.ArmorId,
 			BootsId = BuildLoadout.BootsId,
 			AccessoryId = BuildLoadout.AccessoryId,
+			AccessoryIds = (string[])BuildLoadout.AccessoryIds.Clone(),
 			AttributeGemId = "gem.attribute.none",
 			SkillGemIds = (string[])BuildLoadout.SkillGemIds.Clone(),
 			SkillGemLevels = (int[])BuildLoadout.SkillGemLevels.Clone(),
@@ -250,7 +251,7 @@ public partial class PlayerController
 			WeaponId = data.WeaponId,
 			ArmorId = data.ArmorId,
 			BootsId = data.BootsId,
-			AccessoryId = data.AccessoryId,
+			AccessoryIds = data.ResolveAccessoryIds(),
 			// Pure attribute gems were retired; active cores now own their element.
 			AttributeGemId = "gem.attribute.none",
 			SkillGemIds = data.SkillGemIds is { Length: > 0 } ? (string[])data.SkillGemIds.Clone() : new[] { "gem.skill.none", "gem.skill.none", "gem.skill.none" },

@@ -84,15 +84,20 @@ public partial class InventoryPanel : PanelContainer
 		slotGrid.AddThemeConstantOverride("v_separation", 8);
 		buildSection.AddChild(slotGrid);
 
-		// Row 1: helmet, weapon, core skill. Row 2: armor, accessory, boots.
+		// Gear first (helmet/weapon/armor/boots + four accessory rings), then the
+		// main core and support cores.
 		_supportButtons.Clear();
+		_accessoryButtons.Clear();
 		_helmetButton = AddSlotButton(slotGrid, EquipTarget.Helmet);
 		_weaponButton = AddSlotButton(slotGrid, EquipTarget.Weapon);
-		_supportButtons.Add(AddSupportSlotButton(slotGrid, 0));
 		_armorButton = AddSlotButton(slotGrid, EquipTarget.Armor);
-		_accessoryButton = AddSlotButton(slotGrid, EquipTarget.Accessory);
 		_bootsButton = AddSlotButton(slotGrid, EquipTarget.Boots);
+		_supportButtons.Add(AddSupportSlotButton(slotGrid, 0));
 		_supportButtons.Add(AddSupportSlotButton(slotGrid, 1));
+		for (int index = 0; index < BuildCatalog.AccessorySlotCount; index++)
+		{
+			_accessoryButtons.Add(AddAccessorySlotButton(slotGrid, index));
+		}
 		// Legacy attribute core remains in save/combat data for compatibility, but it is
 		// no longer an equipment-grid slot. The visible core layout is exactly one main
 		// core plus six freely chosen support-core slots.
@@ -265,6 +270,33 @@ public partial class InventoryPanel : PanelContainer
 			if (inputEvent is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left, DoubleClick: true })
 			{
 				UnequipSupportSlot(index);
+				button.AcceptEvent();
+			}
+		};
+		parent.AddChild(button);
+		return button;
+	}
+
+	// One of the four accessory (ring) slots, addressed by index.
+	private Button AddAccessorySlotButton(GridContainer parent, int index)
+	{
+		var button = new InventoryEquipDropButton
+		{
+			Text = string.Empty,
+			CanAcceptItem = itemId => IsCompatibleItemForTarget(itemId, EquipTarget.Accessory),
+			ItemDropped = itemId => EquipAccessoryToSlot(itemId, index),
+		};
+		ApplyButtonStyle(button);
+		button.CustomMinimumSize = new Vector2(0.0f, 42.0f);
+		button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		button.Pressed += () => SelectAccessorySlot(index);
+		button.MouseEntered += () => ShowAccessoryTooltip(index);
+		button.MouseExited += HideItemTooltip;
+		button.GuiInput += inputEvent =>
+		{
+			if (inputEvent is InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left, DoubleClick: true })
+			{
+				UnequipAccessorySlot(index);
 				button.AcceptEvent();
 			}
 		};

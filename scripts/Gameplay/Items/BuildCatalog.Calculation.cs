@@ -25,7 +25,7 @@ public static partial class BuildCatalog
 		ApplyEquipment(stats, GetEquipment(loadout.WeaponId), GetEquipmentStarMultiplier(loadout.WeaponId));
 		ApplyEquipment(stats, GetEquipment(loadout.ArmorId), GetEquipmentStarMultiplier(loadout.ArmorId));
 		ApplyEquipment(stats, GetEquipment(loadout.BootsId), GetEquipmentStarMultiplier(loadout.BootsId));
-		ApplyEquipment(stats, GetEquipment(loadout.AccessoryId), GetEquipmentStarMultiplier(loadout.AccessoryId));
+		ApplyAccessories(stats, loadout);
 		ApplyEquipmentSetBonus(stats, loadout);
 
 		// The active core owns its damage type; support cores only alter compatible
@@ -97,7 +97,7 @@ public static partial class BuildCatalog
 		ApplyEquipment(stats, GetEquipment(loadout.WeaponId), GetEquipmentStarMultiplier(loadout.WeaponId));
 		ApplyEquipment(stats, GetEquipment(loadout.ArmorId), GetEquipmentStarMultiplier(loadout.ArmorId));
 		ApplyEquipment(stats, GetEquipment(loadout.BootsId), GetEquipmentStarMultiplier(loadout.BootsId));
-		ApplyEquipment(stats, GetEquipment(loadout.AccessoryId), GetEquipmentStarMultiplier(loadout.AccessoryId));
+		ApplyAccessories(stats, loadout);
 		ApplyEquipmentSetBonus(stats, loadout);
 
 		int unlocked = GetUnlockedSupportCoreCount(player.Level);
@@ -230,8 +230,11 @@ public static partial class BuildCatalog
 			return;
 		}
 
+		loadout.EnsureAccessorySlots();
+		var worn = new System.Collections.Generic.List<string> { loadout.HelmetId, loadout.WeaponId, loadout.ArmorId, loadout.BootsId };
+		worn.AddRange(loadout.AccessoryIds);
 		float bonus = 0.0f;
-		foreach (string id in new[] { loadout.HelmetId, loadout.WeaponId, loadout.ArmorId, loadout.BootsId, loadout.AccessoryId })
+		foreach (string id in worn)
 		{
 			EquipmentDefinition equipment = GetEquipment(id);
 			if (!string.IsNullOrEmpty(equipment.DamageElementId) && equipment.DamageElementId == stats.DamageElementId)
@@ -243,6 +246,15 @@ public static partial class BuildCatalog
 		if (bonus > 0.0f)
 		{
 			stats.Attack = Mathf.Max(Mathf.RoundToInt(stats.Attack * (1.0f + bonus)), 1);
+		}
+	}
+
+	private static void ApplyAccessories(BuildStats stats, CompanionBuildLoadout loadout)
+	{
+		loadout.EnsureAccessorySlots();
+		foreach (string id in loadout.AccessoryIds)
+		{
+			ApplyEquipment(stats, GetEquipment(id), GetEquipmentStarMultiplier(id));
 		}
 	}
 

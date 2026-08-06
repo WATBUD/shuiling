@@ -46,22 +46,8 @@ public static partial class BuildCatalog
 	// share one theme that has a defined set.
 	public static EquipmentSetJson? GetActiveEquipmentSet(CompanionBuildLoadout loadout)
 	{
-		string theme = GetEquipmentSetTheme(loadout.HelmetId);
-		if (string.IsNullOrEmpty(theme))
-		{
-			return null;
-		}
-
-		string[] worn = { loadout.HelmetId, loadout.WeaponId, loadout.ArmorId, loadout.BootsId, loadout.AccessoryId };
-		foreach (string id in worn)
-		{
-			if (GetEquipmentSetTheme(id) != theme)
-			{
-				return null;
-			}
-		}
-
-		return SetsByTheme.TryGetValue(theme, out EquipmentSetJson? set) ? set : null;
+		(EquipmentSetJson? set, int count) = GetEquipmentSetProgress(loadout);
+		return count >= EquipmentSetSize ? set : null;
 	}
 
 	// Locale name key of the active set, or empty when no full set is worn.
@@ -70,40 +56,52 @@ public static partial class BuildCatalog
 		return GetActiveEquipmentSet(loadout)?.NameKey ?? string.Empty;
 	}
 
-	// A full set is five matching pieces.
+	// A full set is five slot types: helmet, weapon, armor, boots, and accessory.
+	// The four accessory slots count as ONE piece (matched if any ring matches).
 	public const int EquipmentSetSize = 5;
 
-	// Progress toward the best (most-worn) set in this loadout: the dominant set and
-	// how many of the five slots belong to it (0 if no set pieces are worn).
+	// Progress toward the best (most-worn) set: the dominant set and how many of the
+	// five slot types belong to it (0 if none).
 	public static (EquipmentSetJson? Set, int Count) GetEquipmentSetProgress(CompanionBuildLoadout loadout)
 	{
-		string[] worn = { loadout.HelmetId, loadout.WeaponId, loadout.ArmorId, loadout.BootsId, loadout.AccessoryId };
-		var counts = new Dictionary<string, int>(System.StringComparer.Ordinal);
-		foreach (string id in worn)
+		var candidates = new HashSet<string>(System.StringComparer.Ordinal);
+		foreach (string id in new[] { loadout.HelmetId, loadout.WeaponId, loadout.ArmorId, loadout.BootsId })
 		{
 			string theme = GetEquipmentSetTheme(id);
 			if (!string.IsNullOrEmpty(theme) && SetsByTheme.ContainsKey(theme))
 			{
-				counts.TryGetValue(theme, out int n);
-				counts[theme] = n + 1;
+				candidates.Add(theme);
+			}
+		}
+
+		loadout.EnsureAccessorySlots();
+		foreach (string id in loadout.AccessoryIds)
+		{
+			string theme = GetEquipmentSetTheme(id);
+			if (!string.IsNullOrEmpty(theme) && SetsByTheme.ContainsKey(theme))
+			{
+				candidates.Add(theme);
 			}
 		}
 
 		string bestTheme = string.Empty;
 		int bestCount = 0;
-		foreach (KeyValuePair<string, int> pair in counts)
+		foreach (string theme in candidates)
 		{
-			if (pair.Value > bestCount)
+			int count = GetWornSetPieceCount(loadout, theme);
+			if (count > bestCount)
 			{
-				bestCount = pair.Value;
-				bestTheme = pair.Key;
+				bestCount = count;
+				bestTheme = theme;
 			}
 		}
 
 		return bestCount == 0 ? (null, 0) : (SetsByTheme[bestTheme], bestCount);
 	}
 
-	// How many of the five worn pieces belong to the given set theme.
+	// Set-piece count for a theme: one per matching base slot (helmet/weapon/armor/
+	// boots) plus one if ANY of the four accessory slots matches (accessories are a
+	// single set piece however many rings you wear). Max EquipmentSetSize.
 	public static int GetWornSetPieceCount(CompanionBuildLoadout loadout, string theme)
 	{
 		if (string.IsNullOrEmpty(theme))
@@ -112,11 +110,21 @@ public static partial class BuildCatalog
 		}
 
 		int count = 0;
-		foreach (string id in new[] { loadout.HelmetId, loadout.WeaponId, loadout.ArmorId, loadout.BootsId, loadout.AccessoryId })
+		foreach (string id in new[] { loadout.HelmetId, loadout.WeaponId, loadout.ArmorId, loadout.BootsId })
 		{
 			if (GetEquipmentSetTheme(id) == theme)
 			{
 				count++;
+			}
+		}
+
+		loadout.EnsureAccessorySlots();
+		foreach (string id in loadout.AccessoryIds)
+		{
+			if (GetEquipmentSetTheme(id) == theme)
+			{
+				count++;
+				break;
 			}
 		}
 
