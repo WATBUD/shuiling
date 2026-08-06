@@ -1239,5 +1239,6 @@
 	"equip.accessory.ancient_ring": "遠古戒指",
 	"equip.summary.gen_accessory_ancient_ring": "遠古戒指，暴擊 +4%。",
 	"set.progress": "套裝 {0} {1}/{2}",
-	"set.progress_active": "套裝 {0} {1}/{2} ✓ 啟用"
+	"set.progress_active": "套裝 {0} {1}/{2} ✓ 啟用",
+	"set.full_bonus": "集滿加成：生命+{0}、攻擊+{1}、防禦+{2}、移速+{3}%、暴擊+{4}%"
 }

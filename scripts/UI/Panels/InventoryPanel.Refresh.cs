@@ -404,11 +404,21 @@ public partial class InventoryPanel : PanelContainer
 		}
 
 		bool active = count >= BuildCatalog.EquipmentSetSize;
-		_setProgressLabel.Text = LocaleText.F(
+		EquipmentSetBonusJson b = set.Bonus;
+		string progress = LocaleText.F(
 			active ? "set.progress_active" : "set.progress",
 			LocaleText.T(set.NameKey),
 			count,
 			BuildCatalog.EquipmentSetSize);
+		// Always show the full-set bonus so the player knows the payoff at any count.
+		string bonus = LocaleText.F(
+			"set.full_bonus",
+			b.MaxHealthBonus,
+			b.AttackBonus,
+			b.DefenseBonus,
+			Mathf.RoundToInt(b.MoveSpeedBonus * 100.0f),
+			Mathf.RoundToInt(b.CritChanceBonus * 100.0f));
+		_setProgressLabel.Text = progress + "\n" + bonus;
 		_setProgressLabel.AddThemeColorOverride("font_color", active ? new Color(0.5f, 1.0f, 0.6f) : new Color(1.0f, 0.86f, 0.42f));
 	}
 
