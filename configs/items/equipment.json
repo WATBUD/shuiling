@@ -1,275 +1,972 @@
-﻿{
-    "system":  "equipment",
-    "items":  [
-                  {
-                      "uniqueId":  1,
-                      "id":  "equip.helmet.none",
-                      "nameKey":  "equipment.none",
-                      "summaryKey":  "gem.summary.none",
-                      "slot":  "Helmet"
-                  },
-                  {
-                      "uniqueId":  2,
-                      "id":  "equip.weapon.none",
-                      "nameKey":  "equipment.none",
-                      "summaryKey":  "gem.summary.none",
-                      "slot":  "Weapon"
-                  },
-                  {
-                      "uniqueId":  3,
-                      "id":  "equip.armor.none",
-                      "nameKey":  "equipment.none",
-                      "summaryKey":  "gem.summary.none",
-                      "slot":  "Armor"
-                  },
-                  {
-                      "uniqueId":  4,
-                      "id":  "equip.boots.none",
-                      "nameKey":  "equipment.none",
-                      "summaryKey":  "gem.summary.none",
-                      "slot":  "Boots"
-                  },
-                  {
-                      "uniqueId":  5,
-                      "id":  "equip.accessory.none",
-                      "nameKey":  "equipment.none",
-                      "summaryKey":  "gem.summary.none",
-                      "slot":  "Accessory"
-                  },
-                  {
-                      "uniqueId":  6,
-                      "id":  "equip.helmet.traveler",
-                      "nameKey":  "equip.helmet.traveler",
-                      "summaryKey":  "equip.summary.traveler_helmet",
-                      "slot":  "Helmet",
-                      "maxHealthBonus":  10,
-                      "defenseBonus":  3
-                  },
-                  {
-                      "uniqueId":  7,
-                      "id":  "equip.helmet.guardian",
-                      "nameKey":  "equip.helmet.guardian",
-                      "summaryKey":  "equip.summary.guardian_helmet",
-                      "slot":  "Helmet",
-                      "maxHealthBonus":  26,
-                      "defenseBonus":  8
-                  },
-                  {
-                      "uniqueId":  8,
-                      "id":  "equip.helmet.mystic",
-                      "nameKey":  "equip.helmet.mystic",
-                      "summaryKey":  "equip.summary.mystic_hood",
-                      "slot":  "Helmet",
-                      "maxHealthBonus":  12,
-                      "defenseBonus":  4,
-                      "attackCooldownReduction":  0.07,
-                      "attackRangeBonus":  0.6
-                  },
-                  {
-                      "uniqueId":  9,
-                      "id":  "equip.weapon.sword",
-                      "nameKey":  "equip.weapon.sword",
-                      "summaryKey":  "equip.summary.sword",
-                      "slot":  "Weapon",
-                      "attackBonus":  10,
-                      "attackSpeed":  54
-                  },
-                  {
-                      "uniqueId":  10,
-                      "id":  "equip.weapon.short_sword",
-                      "nameKey":  "equip.weapon.short_sword",
-                      "summaryKey":  "equip.summary.short_sword",
-                      "slot":  "Weapon",
-                      "attackBonus":  8,
-                      "attackSpeed":  60,
-                      "critChanceBonus":  0.03
-                  },
-                  {
-                      "uniqueId":  11,
-                      "id":  "equip.weapon.dagger",
-                      "nameKey":  "equip.weapon.dagger",
-                      "summaryKey":  "equip.summary.dagger",
-                      "slot":  "Weapon",
-                      "attackBonus":  6,
-                      "attackSpeed":  68,
-                      "critChanceBonus":  0.10
-                  },
-                  {
-                      "uniqueId":  12,
-                      "id":  "equip.weapon.longbow",
-                      "nameKey":  "equip.weapon.longbow",
-                      "summaryKey":  "equip.summary.longbow",
-                      "slot":  "Weapon",
-                      "attackBonus":  9,
-                      "attackRangeBonus":  3.2,
-                      "attackSpeed":  52,
-                      "critChanceBonus":  0.04
-                  },
-                  {
-                      "uniqueId":  13,
-                      "id":  "equip.weapon.spear",
-                      "nameKey":  "equip.weapon.spear",
-                      "summaryKey":  "equip.summary.spear",
-                      "slot":  "Weapon",
-                      "attackBonus":  12,
-                      "defenseBonus":  3,
-                      "attackRangeBonus":  1.4,
-                      "attackSpeed":  50
-                  },
-                  {
-                      "uniqueId":  14,
-                      "id":  "equip.weapon.warhammer",
-                      "nameKey":  "equip.weapon.warhammer",
-                      "summaryKey":  "equip.summary.warhammer",
-                      "slot":  "Weapon",
-                      "attackBonus":  20,
-                      "defenseBonus":  4,
-                      "attackSpeed":  38
-                  },
-                  {
-                      "uniqueId":  15,
-                      "id":  "equip.weapon.scepter",
-                      "nameKey":  "equip.weapon.scepter",
-                      "summaryKey":  "equip.summary.scepter",
-                      "slot":  "Weapon",
-                      "attackBonus":  8,
-                      "defenseBonus":  5,
-                      "attackRangeBonus":  1.6,
-                      "attackSpeed":  55
-                  },
-                  {
-                      "uniqueId":  16,
-                      "id":  "equip.weapon.staff",
-                      "nameKey":  "equip.weapon.staff",
-                      "summaryKey":  "equip.summary.staff",
-                      "slot":  "Weapon",
-                      "attackBonus":  7,
-                      "attackRangeBonus":  2.0,
-                      "attackSpeed":  58
-                  },
-                  {
-                      "uniqueId":  17,
-                      "id":  "equip.weapon.great_axe",
-                      "nameKey":  "equip.weapon.great_axe",
-                      "summaryKey":  "equip.summary.great_axe",
-                      "slot":  "Weapon",
-                      "attackBonus":  18,
-                      "defenseBonus":  2,
-                      "attackSpeed":  42
-                  },
-                  {
-                      "uniqueId":  18,
-                      "id":  "equip.weapon.claws",
-                      "nameKey":  "equip.weapon.claws",
-                      "summaryKey":  "equip.summary.claws",
-                      "slot":  "Weapon",
-                      "attackBonus":  8,
-                      "attackSpeed":  66,
-                      "critChanceBonus":  0.06
-                  },
-                  {
-                      "uniqueId":  19,
-                      "id":  "equip.armor.scout",
-                      "nameKey":  "equip.armor.scout",
-                      "summaryKey":  "equip.summary.scout_armor",
-                      "slot":  "Armor",
-                      "maxHealthBonus":  18,
-                      "defenseBonus":  5,
-                      "moveSpeedBonus":  0.05
-                  },
-                  {
-                      "uniqueId":  20,
-                      "id":  "equip.armor.plate",
-                      "nameKey":  "equip.armor.plate",
-                      "summaryKey":  "equip.summary.plate_armor",
-                      "slot":  "Armor",
-                      "maxHealthBonus":  44,
-                      "defenseBonus":  16,
-                      "moveSpeedBonus":  -0.05
-                  },
-                  {
-                      "uniqueId":  21,
-                      "id":  "equip.armor.spirit_robe",
-                      "nameKey":  "equip.armor.spirit_robe",
-                      "summaryKey":  "equip.summary.spirit_robe",
-                      "slot":  "Armor",
-                      "maxHealthBonus":  24,
-                      "defenseBonus":  7,
-                      "attackCooldownReduction":  0.10,
-                      "attackRangeBonus":  0.7
-                  },
-                  {
-                      "uniqueId":  22,
-                      "id":  "equip.boots.traveler",
-                      "nameKey":  "equip.boots.traveler",
-                      "summaryKey":  "equip.summary.traveler_shoes",
-                      "slot":  "Boots",
-                      "defenseBonus":  1,
-                      "moveSpeedBonus":  0.07
-                  },
-                  {
-                      "uniqueId":  23,
-                      "id":  "equip.boots.reinforced",
-                      "nameKey":  "equip.boots.reinforced",
-                      "summaryKey":  "equip.summary.reinforced_boots",
-                      "slot":  "Boots",
-                      "maxHealthBonus":  10,
-                      "defenseBonus":  5,
-                      "moveSpeedBonus":  0.03
-                  },
-                  {
-                      "uniqueId":  24,
-                      "id":  "equip.boots.windrunner",
-                      "nameKey":  "equip.boots.windrunner",
-                      "summaryKey":  "equip.summary.windrunner_boots",
-                      "slot":  "Boots",
-                      "defenseBonus":  2,
-                      "moveSpeedBonus":  0.15
-                  },
-                  {
-                      "uniqueId":  25,
-                      "id":  "equip.boots.gravity",
-                      "nameKey":  "equip.boots.gravity",
-                      "summaryKey":  "equip.summary.gravity_boots",
-                      "slot":  "Boots",
-                      "defenseBonus":  2,
-                      "jumpPowerBonus":  100
-                  },
-                  {
-                      "uniqueId":  26,
-                      "id":  "equip.accessory.swift_ring",
-                      "nameKey":  "equip.accessory.swift_ring",
-					  "summaryKey":  "equip.summary.swift_ring",
-					  "slot":  "Accessory",
-					  "attackCooldownReduction":  0.05
-                  },
-                  {
-                      "uniqueId":  27,
-                      "id":  "equip.accessory.crit_charm",
-                      "nameKey":  "equip.accessory.crit_charm",
-                      "summaryKey":  "equip.summary.crit_charm",
-                      "slot":  "Accessory",
-                      "attackBonus":  4,
-                      "critChanceBonus":  0.12
-                  },
-                  {
-                      "uniqueId":  28,
-                      "id":  "equip.accessory.turtle_amulet",
-                      "nameKey":  "equip.accessory.turtle_amulet",
-                      "summaryKey":  "equip.summary.turtle_amulet",
-                      "slot":  "Accessory",
-                      "maxHealthBonus":  34,
-                      "defenseBonus":  8,
-                      "moveSpeedBonus":  -0.03
-                  },
-                  {
-                      "uniqueId":  29,
-                      "id":  "equip.accessory.focus_lens",
-                      "nameKey":  "equip.accessory.focus_lens",
-                      "summaryKey":  "equip.summary.focus_lens",
-                      "slot":  "Accessory",
-                      "attackRangeBonus":  1.4,
-                      "critChanceBonus":  0.06
-                  }
-              ]
+{
+	"system": "equipment",
+	"items": [
+		{
+			"uniqueId": 1,
+			"id": "equip.helmet.none",
+			"nameKey": "equipment.none",
+			"summaryKey": "gem.summary.none",
+			"slot": "Helmet"
+		},
+		{
+			"uniqueId": 2,
+			"id": "equip.weapon.none",
+			"nameKey": "equipment.none",
+			"summaryKey": "gem.summary.none",
+			"slot": "Weapon"
+		},
+		{
+			"uniqueId": 3,
+			"id": "equip.armor.none",
+			"nameKey": "equipment.none",
+			"summaryKey": "gem.summary.none",
+			"slot": "Armor"
+		},
+		{
+			"uniqueId": 4,
+			"id": "equip.boots.none",
+			"nameKey": "equipment.none",
+			"summaryKey": "gem.summary.none",
+			"slot": "Boots"
+		},
+		{
+			"uniqueId": 5,
+			"id": "equip.accessory.none",
+			"nameKey": "equipment.none",
+			"summaryKey": "gem.summary.none",
+			"slot": "Accessory"
+		},
+		{
+			"uniqueId": 6,
+			"id": "equip.helmet.traveler",
+			"nameKey": "equip.helmet.traveler",
+			"summaryKey": "equip.summary.traveler_helmet",
+			"slot": "Helmet",
+			"maxHealthBonus": 10,
+			"defenseBonus": 3
+		},
+		{
+			"uniqueId": 7,
+			"id": "equip.helmet.guardian",
+			"nameKey": "equip.helmet.guardian",
+			"summaryKey": "equip.summary.guardian_helmet",
+			"slot": "Helmet",
+			"maxHealthBonus": 26,
+			"defenseBonus": 8
+		},
+		{
+			"uniqueId": 8,
+			"id": "equip.helmet.mystic",
+			"nameKey": "equip.helmet.mystic",
+			"summaryKey": "equip.summary.mystic_hood",
+			"slot": "Helmet",
+			"maxHealthBonus": 12,
+			"defenseBonus": 4,
+			"attackCooldownReduction": 0.07,
+			"attackRangeBonus": 0.6
+		},
+		{
+			"uniqueId": 9,
+			"id": "equip.weapon.sword",
+			"nameKey": "equip.weapon.sword",
+			"summaryKey": "equip.summary.sword",
+			"slot": "Weapon",
+			"attackBonus": 10,
+			"attackSpeed": 54
+		},
+		{
+			"uniqueId": 10,
+			"id": "equip.weapon.short_sword",
+			"nameKey": "equip.weapon.short_sword",
+			"summaryKey": "equip.summary.short_sword",
+			"slot": "Weapon",
+			"attackBonus": 8,
+			"attackSpeed": 60,
+			"critChanceBonus": 0.03
+		},
+		{
+			"uniqueId": 11,
+			"id": "equip.weapon.dagger",
+			"nameKey": "equip.weapon.dagger",
+			"summaryKey": "equip.summary.dagger",
+			"slot": "Weapon",
+			"attackBonus": 6,
+			"attackSpeed": 68,
+			"critChanceBonus": 0.1
+		},
+		{
+			"uniqueId": 12,
+			"id": "equip.weapon.longbow",
+			"nameKey": "equip.weapon.longbow",
+			"summaryKey": "equip.summary.longbow",
+			"slot": "Weapon",
+			"attackBonus": 9,
+			"attackRangeBonus": 3.2,
+			"attackSpeed": 52,
+			"critChanceBonus": 0.04
+		},
+		{
+			"uniqueId": 13,
+			"id": "equip.weapon.spear",
+			"nameKey": "equip.weapon.spear",
+			"summaryKey": "equip.summary.spear",
+			"slot": "Weapon",
+			"attackBonus": 12,
+			"defenseBonus": 3,
+			"attackRangeBonus": 1.4,
+			"attackSpeed": 50
+		},
+		{
+			"uniqueId": 14,
+			"id": "equip.weapon.warhammer",
+			"nameKey": "equip.weapon.warhammer",
+			"summaryKey": "equip.summary.warhammer",
+			"slot": "Weapon",
+			"attackBonus": 20,
+			"defenseBonus": 4,
+			"attackSpeed": 38
+		},
+		{
+			"uniqueId": 15,
+			"id": "equip.weapon.scepter",
+			"nameKey": "equip.weapon.scepter",
+			"summaryKey": "equip.summary.scepter",
+			"slot": "Weapon",
+			"attackBonus": 8,
+			"defenseBonus": 5,
+			"attackRangeBonus": 1.6,
+			"attackSpeed": 55
+		},
+		{
+			"uniqueId": 16,
+			"id": "equip.weapon.staff",
+			"nameKey": "equip.weapon.staff",
+			"summaryKey": "equip.summary.staff",
+			"slot": "Weapon",
+			"attackBonus": 7,
+			"attackRangeBonus": 2.0,
+			"attackSpeed": 58
+		},
+		{
+			"uniqueId": 17,
+			"id": "equip.weapon.great_axe",
+			"nameKey": "equip.weapon.great_axe",
+			"summaryKey": "equip.summary.great_axe",
+			"slot": "Weapon",
+			"attackBonus": 18,
+			"defenseBonus": 2,
+			"attackSpeed": 42
+		},
+		{
+			"uniqueId": 18,
+			"id": "equip.weapon.claws",
+			"nameKey": "equip.weapon.claws",
+			"summaryKey": "equip.summary.claws",
+			"slot": "Weapon",
+			"attackBonus": 8,
+			"attackSpeed": 66,
+			"critChanceBonus": 0.06
+		},
+		{
+			"uniqueId": 19,
+			"id": "equip.armor.scout",
+			"nameKey": "equip.armor.scout",
+			"summaryKey": "equip.summary.scout_armor",
+			"slot": "Armor",
+			"maxHealthBonus": 18,
+			"defenseBonus": 5,
+			"moveSpeedBonus": 0.05
+		},
+		{
+			"uniqueId": 20,
+			"id": "equip.armor.plate",
+			"nameKey": "equip.armor.plate",
+			"summaryKey": "equip.summary.plate_armor",
+			"slot": "Armor",
+			"maxHealthBonus": 44,
+			"defenseBonus": 16,
+			"moveSpeedBonus": -0.05
+		},
+		{
+			"uniqueId": 21,
+			"id": "equip.armor.spirit_robe",
+			"nameKey": "equip.armor.spirit_robe",
+			"summaryKey": "equip.summary.spirit_robe",
+			"slot": "Armor",
+			"maxHealthBonus": 24,
+			"defenseBonus": 7,
+			"attackCooldownReduction": 0.1,
+			"attackRangeBonus": 0.7
+		},
+		{
+			"uniqueId": 22,
+			"id": "equip.boots.traveler",
+			"nameKey": "equip.boots.traveler",
+			"summaryKey": "equip.summary.traveler_shoes",
+			"slot": "Boots",
+			"defenseBonus": 1,
+			"moveSpeedBonus": 0.07
+		},
+		{
+			"uniqueId": 23,
+			"id": "equip.boots.reinforced",
+			"nameKey": "equip.boots.reinforced",
+			"summaryKey": "equip.summary.reinforced_boots",
+			"slot": "Boots",
+			"maxHealthBonus": 10,
+			"defenseBonus": 5,
+			"moveSpeedBonus": 0.03
+		},
+		{
+			"uniqueId": 24,
+			"id": "equip.boots.windrunner",
+			"nameKey": "equip.boots.windrunner",
+			"summaryKey": "equip.summary.windrunner_boots",
+			"slot": "Boots",
+			"defenseBonus": 2,
+			"moveSpeedBonus": 0.15
+		},
+		{
+			"uniqueId": 25,
+			"id": "equip.boots.gravity",
+			"nameKey": "equip.boots.gravity",
+			"summaryKey": "equip.summary.gravity_boots",
+			"slot": "Boots",
+			"defenseBonus": 2,
+			"jumpPowerBonus": 100
+		},
+		{
+			"uniqueId": 26,
+			"id": "equip.accessory.swift_ring",
+			"nameKey": "equip.accessory.swift_ring",
+			"summaryKey": "equip.summary.swift_ring",
+			"slot": "Accessory",
+			"attackCooldownReduction": 0.05
+		},
+		{
+			"uniqueId": 27,
+			"id": "equip.accessory.crit_charm",
+			"nameKey": "equip.accessory.crit_charm",
+			"summaryKey": "equip.summary.crit_charm",
+			"slot": "Accessory",
+			"attackBonus": 4,
+			"critChanceBonus": 0.12
+		},
+		{
+			"uniqueId": 28,
+			"id": "equip.accessory.turtle_amulet",
+			"nameKey": "equip.accessory.turtle_amulet",
+			"summaryKey": "equip.summary.turtle_amulet",
+			"slot": "Accessory",
+			"maxHealthBonus": 34,
+			"defenseBonus": 8,
+			"moveSpeedBonus": -0.03
+		},
+		{
+			"uniqueId": 29,
+			"id": "equip.accessory.focus_lens",
+			"nameKey": "equip.accessory.focus_lens",
+			"summaryKey": "equip.summary.focus_lens",
+			"slot": "Accessory",
+			"attackRangeBonus": 1.4,
+			"critChanceBonus": 0.06
+		},
+		{
+			"uniqueId": 71,
+			"id": "equip.helmet.iron",
+			"nameKey": "equip.helmet.iron",
+			"summaryKey": "equip.summary.gen_helmet_iron",
+			"slot": "Helmet",
+			"maxHealthBonus": 18,
+			"defenseBonus": 6
+		},
+		{
+			"uniqueId": 72,
+			"id": "equip.helmet.bronze",
+			"nameKey": "equip.helmet.bronze",
+			"summaryKey": "equip.summary.gen_helmet_bronze",
+			"slot": "Helmet",
+			"maxHealthBonus": 22,
+			"defenseBonus": 8
+		},
+		{
+			"uniqueId": 73,
+			"id": "equip.helmet.steel",
+			"nameKey": "equip.helmet.steel",
+			"summaryKey": "equip.summary.gen_helmet_steel",
+			"slot": "Helmet",
+			"maxHealthBonus": 26,
+			"defenseBonus": 10
+		},
+		{
+			"uniqueId": 74,
+			"id": "equip.helmet.silver",
+			"nameKey": "equip.helmet.silver",
+			"summaryKey": "equip.summary.gen_helmet_silver",
+			"slot": "Helmet",
+			"maxHealthBonus": 30,
+			"defenseBonus": 12
+		},
+		{
+			"uniqueId": 75,
+			"id": "equip.helmet.mithril",
+			"nameKey": "equip.helmet.mithril",
+			"summaryKey": "equip.summary.gen_helmet_mithril",
+			"slot": "Helmet",
+			"maxHealthBonus": 34,
+			"defenseBonus": 14
+		},
+		{
+			"uniqueId": 76,
+			"id": "equip.helmet.crystal",
+			"nameKey": "equip.helmet.crystal",
+			"summaryKey": "equip.summary.gen_helmet_crystal",
+			"slot": "Helmet",
+			"maxHealthBonus": 38,
+			"defenseBonus": 16
+		},
+		{
+			"uniqueId": 77,
+			"id": "equip.helmet.obsidian",
+			"nameKey": "equip.helmet.obsidian",
+			"summaryKey": "equip.summary.gen_helmet_obsidian",
+			"slot": "Helmet",
+			"maxHealthBonus": 42,
+			"defenseBonus": 18
+		},
+		{
+			"uniqueId": 78,
+			"id": "equip.helmet.dragon",
+			"nameKey": "equip.helmet.dragon",
+			"summaryKey": "equip.summary.gen_helmet_dragon",
+			"slot": "Helmet",
+			"maxHealthBonus": 46,
+			"defenseBonus": 20
+		},
+		{
+			"uniqueId": 79,
+			"id": "equip.helmet.phoenix",
+			"nameKey": "equip.helmet.phoenix",
+			"summaryKey": "equip.summary.gen_helmet_phoenix",
+			"slot": "Helmet",
+			"maxHealthBonus": 50,
+			"defenseBonus": 22
+		},
+		{
+			"uniqueId": 80,
+			"id": "equip.helmet.frost",
+			"nameKey": "equip.helmet.frost",
+			"summaryKey": "equip.summary.gen_helmet_frost",
+			"slot": "Helmet",
+			"maxHealthBonus": 54,
+			"defenseBonus": 24
+		},
+		{
+			"uniqueId": 81,
+			"id": "equip.helmet.storm",
+			"nameKey": "equip.helmet.storm",
+			"summaryKey": "equip.summary.gen_helmet_storm",
+			"slot": "Helmet",
+			"maxHealthBonus": 58,
+			"defenseBonus": 26
+		},
+		{
+			"uniqueId": 82,
+			"id": "equip.helmet.shadow",
+			"nameKey": "equip.helmet.shadow",
+			"summaryKey": "equip.summary.gen_helmet_shadow",
+			"slot": "Helmet",
+			"maxHealthBonus": 62,
+			"defenseBonus": 28
+		},
+		{
+			"uniqueId": 83,
+			"id": "equip.helmet.radiant",
+			"nameKey": "equip.helmet.radiant",
+			"summaryKey": "equip.summary.gen_helmet_radiant",
+			"slot": "Helmet",
+			"maxHealthBonus": 66,
+			"defenseBonus": 30
+		},
+		{
+			"uniqueId": 84,
+			"id": "equip.helmet.ancient",
+			"nameKey": "equip.helmet.ancient",
+			"summaryKey": "equip.summary.gen_helmet_ancient",
+			"slot": "Helmet",
+			"maxHealthBonus": 70,
+			"defenseBonus": 32
+		},
+		{
+			"uniqueId": 85,
+			"id": "equip.helmet.royal",
+			"nameKey": "equip.helmet.royal",
+			"summaryKey": "equip.summary.gen_helmet_royal",
+			"slot": "Helmet",
+			"maxHealthBonus": 74,
+			"defenseBonus": 34
+		},
+		{
+			"uniqueId": 86,
+			"id": "equip.helmet.verdant",
+			"nameKey": "equip.helmet.verdant",
+			"summaryKey": "equip.summary.gen_helmet_verdant",
+			"slot": "Helmet",
+			"maxHealthBonus": 78,
+			"defenseBonus": 36
+		},
+		{
+			"uniqueId": 87,
+			"id": "equip.helmet.abyssal",
+			"nameKey": "equip.helmet.abyssal",
+			"summaryKey": "equip.summary.gen_helmet_abyssal",
+			"slot": "Helmet",
+			"maxHealthBonus": 82,
+			"defenseBonus": 38
+		},
+		{
+			"uniqueId": 88,
+			"id": "equip.weapon.iron_blade",
+			"nameKey": "equip.weapon.iron_blade",
+			"summaryKey": "equip.summary.gen_weapon_iron_blade",
+			"slot": "Weapon",
+			"attackBonus": 9,
+			"attackSpeed": 46,
+			"critChanceBonus": 0.02,
+			"attackRangeBonus": 0.4
+		},
+		{
+			"uniqueId": 89,
+			"id": "equip.weapon.bronze_axe",
+			"nameKey": "equip.weapon.bronze_axe",
+			"summaryKey": "equip.summary.gen_weapon_bronze_axe",
+			"slot": "Weapon",
+			"attackBonus": 12,
+			"attackSpeed": 47
+		},
+		{
+			"uniqueId": 90,
+			"id": "equip.weapon.steel_bow",
+			"nameKey": "equip.weapon.steel_bow",
+			"summaryKey": "equip.summary.gen_weapon_steel_bow",
+			"slot": "Weapon",
+			"attackBonus": 15,
+			"attackSpeed": 48
+		},
+		{
+			"uniqueId": 91,
+			"id": "equip.weapon.silver_spear",
+			"nameKey": "equip.weapon.silver_spear",
+			"summaryKey": "equip.summary.gen_weapon_silver_spear",
+			"slot": "Weapon",
+			"attackBonus": 18,
+			"attackSpeed": 49,
+			"critChanceBonus": 0.05
+		},
+		{
+			"uniqueId": 92,
+			"id": "equip.weapon.mithril_mace",
+			"nameKey": "equip.weapon.mithril_mace",
+			"summaryKey": "equip.summary.gen_weapon_mithril_mace",
+			"slot": "Weapon",
+			"attackBonus": 21,
+			"attackSpeed": 50,
+			"attackRangeBonus": 0.4
+		},
+		{
+			"uniqueId": 93,
+			"id": "equip.weapon.crystal_glaive",
+			"nameKey": "equip.weapon.crystal_glaive",
+			"summaryKey": "equip.summary.gen_weapon_crystal_glaive",
+			"slot": "Weapon",
+			"attackBonus": 24,
+			"attackSpeed": 51
+		},
+		{
+			"uniqueId": 94,
+			"id": "equip.weapon.obsidian_rod",
+			"nameKey": "equip.weapon.obsidian_rod",
+			"summaryKey": "equip.summary.gen_weapon_obsidian_rod",
+			"slot": "Weapon",
+			"attackBonus": 27,
+			"attackSpeed": 52,
+			"critChanceBonus": 0.03
+		},
+		{
+			"uniqueId": 95,
+			"id": "equip.weapon.dragon_dirk",
+			"nameKey": "equip.weapon.dragon_dirk",
+			"summaryKey": "equip.summary.gen_weapon_dragon_dirk",
+			"slot": "Weapon",
+			"attackBonus": 30,
+			"attackSpeed": 53
+		},
+		{
+			"uniqueId": 96,
+			"id": "equip.weapon.phoenix_saber",
+			"nameKey": "equip.weapon.phoenix_saber",
+			"summaryKey": "equip.summary.gen_weapon_phoenix_saber",
+			"slot": "Weapon",
+			"attackBonus": 33,
+			"attackSpeed": 54,
+			"attackRangeBonus": 0.4
+		},
+		{
+			"uniqueId": 97,
+			"id": "equip.weapon.frost_halberd",
+			"nameKey": "equip.weapon.frost_halberd",
+			"summaryKey": "equip.summary.gen_weapon_frost_halberd",
+			"slot": "Weapon",
+			"attackBonus": 36,
+			"attackSpeed": 55,
+			"critChanceBonus": 0.06
+		},
+		{
+			"uniqueId": 98,
+			"id": "equip.armor.iron",
+			"nameKey": "equip.armor.iron",
+			"summaryKey": "equip.summary.gen_armor_iron",
+			"slot": "Armor",
+			"maxHealthBonus": 24,
+			"defenseBonus": 8
+		},
+		{
+			"uniqueId": 99,
+			"id": "equip.armor.bronze",
+			"nameKey": "equip.armor.bronze",
+			"summaryKey": "equip.summary.gen_armor_bronze",
+			"slot": "Armor",
+			"maxHealthBonus": 29,
+			"defenseBonus": 10,
+			"moveSpeedBonus": 0.02
+		},
+		{
+			"uniqueId": 100,
+			"id": "equip.armor.steel",
+			"nameKey": "equip.armor.steel",
+			"summaryKey": "equip.summary.gen_armor_steel",
+			"slot": "Armor",
+			"maxHealthBonus": 34,
+			"defenseBonus": 12,
+			"moveSpeedBonus": 0.04
+		},
+		{
+			"uniqueId": 101,
+			"id": "equip.armor.silver",
+			"nameKey": "equip.armor.silver",
+			"summaryKey": "equip.summary.gen_armor_silver",
+			"slot": "Armor",
+			"maxHealthBonus": 39,
+			"defenseBonus": 14,
+			"moveSpeedBonus": 0.06
+		},
+		{
+			"uniqueId": 102,
+			"id": "equip.armor.mithril",
+			"nameKey": "equip.armor.mithril",
+			"summaryKey": "equip.summary.gen_armor_mithril",
+			"slot": "Armor",
+			"maxHealthBonus": 44,
+			"defenseBonus": 16
+		},
+		{
+			"uniqueId": 103,
+			"id": "equip.armor.crystal",
+			"nameKey": "equip.armor.crystal",
+			"summaryKey": "equip.summary.gen_armor_crystal",
+			"slot": "Armor",
+			"maxHealthBonus": 49,
+			"defenseBonus": 18,
+			"moveSpeedBonus": 0.02
+		},
+		{
+			"uniqueId": 104,
+			"id": "equip.armor.obsidian",
+			"nameKey": "equip.armor.obsidian",
+			"summaryKey": "equip.summary.gen_armor_obsidian",
+			"slot": "Armor",
+			"maxHealthBonus": 54,
+			"defenseBonus": 20,
+			"moveSpeedBonus": 0.04
+		},
+		{
+			"uniqueId": 105,
+			"id": "equip.armor.dragon",
+			"nameKey": "equip.armor.dragon",
+			"summaryKey": "equip.summary.gen_armor_dragon",
+			"slot": "Armor",
+			"maxHealthBonus": 59,
+			"defenseBonus": 22,
+			"moveSpeedBonus": 0.06
+		},
+		{
+			"uniqueId": 106,
+			"id": "equip.armor.phoenix",
+			"nameKey": "equip.armor.phoenix",
+			"summaryKey": "equip.summary.gen_armor_phoenix",
+			"slot": "Armor",
+			"maxHealthBonus": 64,
+			"defenseBonus": 24
+		},
+		{
+			"uniqueId": 107,
+			"id": "equip.armor.frost",
+			"nameKey": "equip.armor.frost",
+			"summaryKey": "equip.summary.gen_armor_frost",
+			"slot": "Armor",
+			"maxHealthBonus": 69,
+			"defenseBonus": 26,
+			"moveSpeedBonus": 0.02
+		},
+		{
+			"uniqueId": 108,
+			"id": "equip.armor.storm",
+			"nameKey": "equip.armor.storm",
+			"summaryKey": "equip.summary.gen_armor_storm",
+			"slot": "Armor",
+			"maxHealthBonus": 74,
+			"defenseBonus": 28,
+			"moveSpeedBonus": 0.04
+		},
+		{
+			"uniqueId": 109,
+			"id": "equip.armor.shadow",
+			"nameKey": "equip.armor.shadow",
+			"summaryKey": "equip.summary.gen_armor_shadow",
+			"slot": "Armor",
+			"maxHealthBonus": 79,
+			"defenseBonus": 30,
+			"moveSpeedBonus": 0.06
+		},
+		{
+			"uniqueId": 110,
+			"id": "equip.armor.radiant",
+			"nameKey": "equip.armor.radiant",
+			"summaryKey": "equip.summary.gen_armor_radiant",
+			"slot": "Armor",
+			"maxHealthBonus": 84,
+			"defenseBonus": 32
+		},
+		{
+			"uniqueId": 111,
+			"id": "equip.armor.ancient",
+			"nameKey": "equip.armor.ancient",
+			"summaryKey": "equip.summary.gen_armor_ancient",
+			"slot": "Armor",
+			"maxHealthBonus": 89,
+			"defenseBonus": 34,
+			"moveSpeedBonus": 0.02
+		},
+		{
+			"uniqueId": 112,
+			"id": "equip.armor.royal",
+			"nameKey": "equip.armor.royal",
+			"summaryKey": "equip.summary.gen_armor_royal",
+			"slot": "Armor",
+			"maxHealthBonus": 94,
+			"defenseBonus": 36,
+			"moveSpeedBonus": 0.04
+		},
+		{
+			"uniqueId": 113,
+			"id": "equip.armor.verdant",
+			"nameKey": "equip.armor.verdant",
+			"summaryKey": "equip.summary.gen_armor_verdant",
+			"slot": "Armor",
+			"maxHealthBonus": 99,
+			"defenseBonus": 38,
+			"moveSpeedBonus": 0.06
+		},
+		{
+			"uniqueId": 114,
+			"id": "equip.armor.abyssal",
+			"nameKey": "equip.armor.abyssal",
+			"summaryKey": "equip.summary.gen_armor_abyssal",
+			"slot": "Armor",
+			"maxHealthBonus": 104,
+			"defenseBonus": 40
+		},
+		{
+			"uniqueId": 115,
+			"id": "equip.boots.iron",
+			"nameKey": "equip.boots.iron",
+			"summaryKey": "equip.summary.gen_boots_iron",
+			"slot": "Boots",
+			"defenseBonus": 2,
+			"moveSpeedBonus": 0.06,
+			"jumpPowerBonus": 8
+		},
+		{
+			"uniqueId": 116,
+			"id": "equip.boots.bronze",
+			"nameKey": "equip.boots.bronze",
+			"summaryKey": "equip.summary.gen_boots_bronze",
+			"slot": "Boots",
+			"defenseBonus": 3,
+			"moveSpeedBonus": 0.07
+		},
+		{
+			"uniqueId": 117,
+			"id": "equip.boots.steel",
+			"nameKey": "equip.boots.steel",
+			"summaryKey": "equip.summary.gen_boots_steel",
+			"slot": "Boots",
+			"defenseBonus": 4,
+			"moveSpeedBonus": 0.08
+		},
+		{
+			"uniqueId": 118,
+			"id": "equip.boots.silver",
+			"nameKey": "equip.boots.silver",
+			"summaryKey": "equip.summary.gen_boots_silver",
+			"slot": "Boots",
+			"defenseBonus": 5,
+			"moveSpeedBonus": 0.09,
+			"jumpPowerBonus": 14
+		},
+		{
+			"uniqueId": 119,
+			"id": "equip.boots.mithril",
+			"nameKey": "equip.boots.mithril",
+			"summaryKey": "equip.summary.gen_boots_mithril",
+			"slot": "Boots",
+			"defenseBonus": 6,
+			"moveSpeedBonus": 0.1
+		},
+		{
+			"uniqueId": 120,
+			"id": "equip.boots.crystal",
+			"nameKey": "equip.boots.crystal",
+			"summaryKey": "equip.summary.gen_boots_crystal",
+			"slot": "Boots",
+			"defenseBonus": 7,
+			"moveSpeedBonus": 0.11
+		},
+		{
+			"uniqueId": 121,
+			"id": "equip.boots.obsidian",
+			"nameKey": "equip.boots.obsidian",
+			"summaryKey": "equip.summary.gen_boots_obsidian",
+			"slot": "Boots",
+			"defenseBonus": 8,
+			"moveSpeedBonus": 0.12,
+			"jumpPowerBonus": 20
+		},
+		{
+			"uniqueId": 122,
+			"id": "equip.boots.dragon",
+			"nameKey": "equip.boots.dragon",
+			"summaryKey": "equip.summary.gen_boots_dragon",
+			"slot": "Boots",
+			"defenseBonus": 9,
+			"moveSpeedBonus": 0.13
+		},
+		{
+			"uniqueId": 123,
+			"id": "equip.boots.phoenix",
+			"nameKey": "equip.boots.phoenix",
+			"summaryKey": "equip.summary.gen_boots_phoenix",
+			"slot": "Boots",
+			"defenseBonus": 10,
+			"moveSpeedBonus": 0.14
+		},
+		{
+			"uniqueId": 124,
+			"id": "equip.boots.frost",
+			"nameKey": "equip.boots.frost",
+			"summaryKey": "equip.summary.gen_boots_frost",
+			"slot": "Boots",
+			"defenseBonus": 11,
+			"moveSpeedBonus": 0.15,
+			"jumpPowerBonus": 26
+		},
+		{
+			"uniqueId": 125,
+			"id": "equip.boots.storm",
+			"nameKey": "equip.boots.storm",
+			"summaryKey": "equip.summary.gen_boots_storm",
+			"slot": "Boots",
+			"defenseBonus": 12,
+			"moveSpeedBonus": 0.16
+		},
+		{
+			"uniqueId": 126,
+			"id": "equip.boots.shadow",
+			"nameKey": "equip.boots.shadow",
+			"summaryKey": "equip.summary.gen_boots_shadow",
+			"slot": "Boots",
+			"defenseBonus": 13,
+			"moveSpeedBonus": 0.17
+		},
+		{
+			"uniqueId": 127,
+			"id": "equip.boots.radiant",
+			"nameKey": "equip.boots.radiant",
+			"summaryKey": "equip.summary.gen_boots_radiant",
+			"slot": "Boots",
+			"defenseBonus": 14,
+			"moveSpeedBonus": 0.18,
+			"jumpPowerBonus": 32
+		},
+		{
+			"uniqueId": 128,
+			"id": "equip.boots.ancient",
+			"nameKey": "equip.boots.ancient",
+			"summaryKey": "equip.summary.gen_boots_ancient",
+			"slot": "Boots",
+			"defenseBonus": 15,
+			"moveSpeedBonus": 0.19
+		},
+		{
+			"uniqueId": 129,
+			"id": "equip.boots.royal",
+			"nameKey": "equip.boots.royal",
+			"summaryKey": "equip.summary.gen_boots_royal",
+			"slot": "Boots",
+			"defenseBonus": 16,
+			"moveSpeedBonus": 0.2
+		},
+		{
+			"uniqueId": 130,
+			"id": "equip.boots.verdant",
+			"nameKey": "equip.boots.verdant",
+			"summaryKey": "equip.summary.gen_boots_verdant",
+			"slot": "Boots",
+			"defenseBonus": 17,
+			"moveSpeedBonus": 0.21,
+			"jumpPowerBonus": 38
+		},
+		{
+			"uniqueId": 131,
+			"id": "equip.accessory.iron_ring",
+			"nameKey": "equip.accessory.iron_ring",
+			"summaryKey": "equip.summary.gen_accessory_iron_ring",
+			"slot": "Accessory",
+			"attackBonus": 6
+		},
+		{
+			"uniqueId": 132,
+			"id": "equip.accessory.bronze_amulet",
+			"nameKey": "equip.accessory.bronze_amulet",
+			"summaryKey": "equip.summary.gen_accessory_bronze_amulet",
+			"slot": "Accessory",
+			"critChanceBonus": 0.04
+		},
+		{
+			"uniqueId": 133,
+			"id": "equip.accessory.steel_charm",
+			"nameKey": "equip.accessory.steel_charm",
+			"summaryKey": "equip.summary.gen_accessory_steel_charm",
+			"slot": "Accessory",
+			"defenseBonus": 9,
+			"maxHealthBonus": 16
+		},
+		{
+			"uniqueId": 134,
+			"id": "equip.accessory.silver_talisman",
+			"nameKey": "equip.accessory.silver_talisman",
+			"summaryKey": "equip.summary.gen_accessory_silver_talisman",
+			"slot": "Accessory",
+			"moveSpeedBonus": 0.08
+		},
+		{
+			"uniqueId": 135,
+			"id": "equip.accessory.mithril_pendant",
+			"nameKey": "equip.accessory.mithril_pendant",
+			"summaryKey": "equip.summary.gen_accessory_mithril_pendant",
+			"slot": "Accessory",
+			"attackBonus": 14
+		},
+		{
+			"uniqueId": 136,
+			"id": "equip.accessory.crystal_ring",
+			"nameKey": "equip.accessory.crystal_ring",
+			"summaryKey": "equip.summary.gen_accessory_crystal_ring",
+			"slot": "Accessory",
+			"critChanceBonus": 0.08
+		},
+		{
+			"uniqueId": 137,
+			"id": "equip.accessory.obsidian_amulet",
+			"nameKey": "equip.accessory.obsidian_amulet",
+			"summaryKey": "equip.summary.gen_accessory_obsidian_amulet",
+			"slot": "Accessory",
+			"defenseBonus": 17,
+			"maxHealthBonus": 28
+		},
+		{
+			"uniqueId": 138,
+			"id": "equip.accessory.dragon_charm",
+			"nameKey": "equip.accessory.dragon_charm",
+			"summaryKey": "equip.summary.gen_accessory_dragon_charm",
+			"slot": "Accessory",
+			"moveSpeedBonus": 0.06
+		},
+		{
+			"uniqueId": 139,
+			"id": "equip.accessory.phoenix_talisman",
+			"nameKey": "equip.accessory.phoenix_talisman",
+			"summaryKey": "equip.summary.gen_accessory_phoenix_talisman",
+			"slot": "Accessory",
+			"attackBonus": 22
+		},
+		{
+			"uniqueId": 140,
+			"id": "equip.accessory.frost_pendant",
+			"nameKey": "equip.accessory.frost_pendant",
+			"summaryKey": "equip.summary.gen_accessory_frost_pendant",
+			"slot": "Accessory",
+			"critChanceBonus": 0.06
+		},
+		{
+			"uniqueId": 141,
+			"id": "equip.accessory.storm_ring",
+			"nameKey": "equip.accessory.storm_ring",
+			"summaryKey": "equip.summary.gen_accessory_storm_ring",
+			"slot": "Accessory",
+			"defenseBonus": 25,
+			"maxHealthBonus": 40
+		},
+		{
+			"uniqueId": 142,
+			"id": "equip.accessory.shadow_amulet",
+			"nameKey": "equip.accessory.shadow_amulet",
+			"summaryKey": "equip.summary.gen_accessory_shadow_amulet",
+			"slot": "Accessory",
+			"moveSpeedBonus": 0.1
+		},
+		{
+			"uniqueId": 143,
+			"id": "equip.accessory.radiant_charm",
+			"nameKey": "equip.accessory.radiant_charm",
+			"summaryKey": "equip.summary.gen_accessory_radiant_charm",
+			"slot": "Accessory",
+			"attackBonus": 30
+		},
+		{
+			"uniqueId": 144,
+			"id": "equip.accessory.ancient_talisman",
+			"nameKey": "equip.accessory.ancient_talisman",
+			"summaryKey": "equip.summary.gen_accessory_ancient_talisman",
+			"slot": "Accessory",
+			"critChanceBonus": 0.04
+		},
+		{
+			"uniqueId": 145,
+			"id": "equip.accessory.royal_pendant",
+			"nameKey": "equip.accessory.royal_pendant",
+			"summaryKey": "equip.summary.gen_accessory_royal_pendant",
+			"slot": "Accessory",
+			"defenseBonus": 33,
+			"maxHealthBonus": 52
+		},
+		{
+			"uniqueId": 146,
+			"id": "equip.accessory.verdant_ring",
+			"nameKey": "equip.accessory.verdant_ring",
+			"summaryKey": "equip.summary.gen_accessory_verdant_ring",
+			"slot": "Accessory",
+			"moveSpeedBonus": 0.08
+		}
+	]
 }
