@@ -178,6 +178,31 @@ public partial class PlayerController
 		return true;
 	}
 
+	// Benches deployed companions beyond the current deploy cap (e.g. after a rebirth
+	// resets Level to 1, or when loading legacy data). Overflow is stored from the tail
+	// of the active list so the earliest-deployed stay in the field. Returns how many
+	// were benched.
+	public int EnforceActivePartyLimit()
+	{
+		int limit = ActivePartyLimit;
+		int benched = 0;
+		while (_activeParty.Count > limit && _activeParty.Count > 0)
+		{
+			StoreCompanion(_activeParty[_activeParty.Count - 1]);
+			benched++;
+		}
+
+		if (benched > 0)
+		{
+			PostSystemMessage(
+				LocaleText.F("system.party.limit_overflow_benched", limit, benched),
+				new Color(1.0f, 0.72f, 0.5f),
+				GameMessageChannel.Party);
+		}
+
+		return benched;
+	}
+
 	public void OnCompanionFallen(SimpleActor actor)
 	{
 		if (!IsInstanceValid(actor) || !_capturedCollection.Contains(actor))
@@ -402,12 +427,12 @@ public partial class PlayerController
 			return;
 		}
 
-		int count = Mathf.Clamp(DevConfig.DeadTestPets, 0, ActivePartyLimit);
+		int count = Mathf.Clamp(DevConfig.DeadTestPets, 0, CompanionCollectionLimit);
 		string[] species = { "name.monster.rat", "name.monster.bunny", "name.monster.fox", "name.monster.crab" };
 		int granted = 0;
 		for (int index = 0; index < count; index++)
 		{
-			if (_capturedCollection.Count >= ActivePartyLimit)
+			if (_capturedCollection.Count >= CompanionCollectionLimit)
 			{
 				break;
 			}

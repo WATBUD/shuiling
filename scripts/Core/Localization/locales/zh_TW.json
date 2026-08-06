@@ -1264,5 +1264,11 @@
 	"set.part.jump": "跳躍+{0}",
 	"set.part.crit": "暴擊+{0}%",
 	"set.part.crit_dmg": "暴傷+{0}%",
-	"set.part.range": "攻擊距離+{0}"
+	"set.part.range": "攻擊距離+{0}",
+	"party.tip.full_growth": "出戰隊伍已滿（上限 {0}，玩家 Lv.{1} 可再 +1）",
+	"party.next_slot": "（Lv.{0} 解鎖下一格）",
+	"system.party.limit_increased": "夥伴出戰上限提升至 {0}！",
+	"system.party.limit_overflow_benched": "出戰上限降為 {0}，已將 {1} 隻夥伴移至待命。",
+	"system.party.captured_benched": "出戰名額已滿（上限 {0}），新夥伴已進入收藏待命。",
+	"system.party.captured_benched_growth": "出戰名額已滿（上限 {0}），新夥伴已進入收藏；玩家 Lv.{1} 可再 +1 名額。"
 }

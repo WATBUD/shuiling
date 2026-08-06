@@ -227,7 +227,17 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float DetectionRadius { get; set; } = 18.0f;
 	[Export] public float CritChance { get; set; } = 0.05f;
 	[Export] public float AttackCooldown { get; set; } = 1.0f;
-	[Export] public int ActivePartyLimit { get; set; } = 20;
+	// 出戰上限隨玩家等級成長：初始 3，每 5 等 +1，最高 20。收藏（可擁有的夥伴總數）
+	// 另有固定上限 CompanionCollectionLimit，不受等級影響。
+	public const int BaseActivePartyLimit = 3;
+	public const int MaxActivePartyLimit = 20;
+	public const int PlayerLevelsPerPartySlot = 5;
+	public const int CompanionCollectionLimit = 20;
+	public int ActivePartyLimit => Mathf.Min(BaseActivePartyLimit + Level / PlayerLevelsPerPartySlot, MaxActivePartyLimit);
+	// 下一個出戰名額所需的玩家等級（已達最高上限時為 0）。
+	public int NextPartySlotLevel => ActivePartyLimit >= MaxActivePartyLimit
+		? 0
+		: (ActivePartyLimit - BaseActivePartyLimit + 1) * PlayerLevelsPerPartySlot;
 	[Export] public float DamageFlashDuration { get; set; } = 0.32f;
 
 	private readonly List<SimpleActor> _capturedCollection = new();

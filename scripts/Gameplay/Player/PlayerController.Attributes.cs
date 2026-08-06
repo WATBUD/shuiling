@@ -134,6 +134,8 @@ public partial class PlayerController
 		Defense = BasePlayerDefense + PlayerRebirthCount * RebirthDefenseBonus;
 		MarkPlayerBuildStatsDirty();
 		CurrentHealth = EffectiveMaxHealth;
+		// Level dropped back to 1, so the deploy cap shrank to 3 — bench any pets over it.
+		EnforceActivePartyLimit();
 		ShowPlayerLevelUpFeedback();
 		PostSystemMessage(
 			LocaleText.F("system.player_rebirth.done", PlayerRebirthCount, RebirthHealthBonus, RebirthAttackBonus, RebirthDefenseBonus),

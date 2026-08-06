@@ -114,6 +114,10 @@ public partial class PartyPanel : PanelContainer
 		}
 
 		_titleLabel.Text = LocaleText.F("party.title", _player.ActiveParty.Count, _player.ActivePartyLimit, _player.AvailableCompanionCount);
+		if (_player.NextPartySlotLevel > 0)
+		{
+			_titleLabel.Text += "  " + LocaleText.F("party.next_slot", _player.NextPartySlotLevel);
+		}
 		AddMemberButton(FormatPlayerListText(), _selected == _player, () => SelectMember(_player), null);
 
 		AddHeader(LocaleText.T("party.active"));
@@ -440,7 +444,11 @@ public partial class PartyPanel : PanelContainer
 		}
 		else if (_player.ActiveParty.Count >= _player.ActivePartyLimit)
 		{
-			_player.PostSystemMessage(LocaleText.F("party.tip.full", _player.ActivePartyLimit), new Color(1.0f, 0.78f, 0.55f));
+			_player.PostSystemMessage(
+				_player.NextPartySlotLevel > 0
+					? LocaleText.F("party.tip.full_growth", _player.ActivePartyLimit, _player.NextPartySlotLevel)
+					: LocaleText.F("party.tip.full", _player.ActivePartyLimit),
+				new Color(1.0f, 0.78f, 0.55f));
 			return;
 		}
 		else

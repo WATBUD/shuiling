@@ -1264,5 +1264,11 @@
 	"set.part.jump": "jump+{0}",
 	"set.part.crit": "crit+{0}%",
 	"set.part.crit_dmg": "crit DMG+{0}%",
-	"set.part.range": "range+{0}"
+	"set.part.range": "range+{0}",
+	"party.tip.full_growth": "Battle party full (max {0}; +1 at player Lv.{1})",
+	"party.next_slot": "(next slot at Lv.{0})",
+	"system.party.limit_increased": "Companion deploy limit raised to {0}!",
+	"system.party.limit_overflow_benched": "Deploy limit dropped to {0}; benched {1} companion(s).",
+	"system.party.captured_benched": "Deploy slots full (max {0}); the new companion is benched in your collection.",
+	"system.party.captured_benched_growth": "Deploy slots full (max {0}); new companion benched. +1 slot at player Lv.{1}."
 }

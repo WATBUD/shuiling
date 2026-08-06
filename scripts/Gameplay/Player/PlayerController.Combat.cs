@@ -392,9 +392,9 @@ public partial class PlayerController
 
 	public bool BeginCaptureChallenge(SimpleActor actor)
 	{
-		if (_capturedCollection.Count >= ActivePartyLimit)
+		if (_capturedCollection.Count >= CompanionCollectionLimit)
 		{
-			PostSystemMessage(LocaleText.F("system.capture.collection_full", ActivePartyLimit), new Color(1.0f, 0.72f, 0.5f), GameMessageChannel.Party);
+			PostSystemMessage(LocaleText.F("system.capture.collection_full", CompanionCollectionLimit), new Color(1.0f, 0.72f, 0.5f), GameMessageChannel.Party);
 			return false;
 		}
 
@@ -456,7 +456,7 @@ public partial class PlayerController
 
 	public bool AcceptNetworkCapturedActor(SimpleActor actor, ActorSaveData data)
 	{
-		if (!IsInstanceValid(actor) || _capturedCollection.Count >= ActivePartyLimit)
+		if (!IsInstanceValid(actor) || _capturedCollection.Count >= CompanionCollectionLimit)
 		{
 			return false;
 		}
@@ -656,9 +656,9 @@ public partial class PlayerController
 		}
 
 		// 收藏上限 20（含已死亡的夥伴）；額滿就無法再撿取。
-		if (_capturedCollection.Count >= ActivePartyLimit)
+		if (_capturedCollection.Count >= CompanionCollectionLimit)
 		{
-			PostSystemMessage(LocaleText.F("system.capture.collection_full", ActivePartyLimit), new Color(1.0f, 0.72f, 0.5f), GameMessageChannel.Party);
+			PostSystemMessage(LocaleText.F("system.capture.collection_full", CompanionCollectionLimit), new Color(1.0f, 0.72f, 0.5f), GameMessageChannel.Party);
 			return false;
 		}
 
@@ -673,6 +673,13 @@ public partial class PlayerController
 		else
 		{
 			actor.StoreInCollection();
+			// 出戰名額已滿：夥伴進了收藏但未上場，提示玩家名額會隨等級成長。
+			PostSystemMessage(
+				NextPartySlotLevel > 0
+					? LocaleText.F("system.party.captured_benched_growth", ActivePartyLimit, NextPartySlotLevel)
+					: LocaleText.F("system.party.captured_benched", ActivePartyLimit),
+				new Color(1.0f, 0.82f, 0.5f),
+				GameMessageChannel.Party);
 		}
 
 		_partyPanel.RefreshParty();
@@ -744,6 +751,14 @@ public partial class PlayerController
 		{
 			MarkPlayerBuildStatsDirty();
 			ShowPlayerLevelUpFeedback();
+			int limitBefore = Mathf.Min(BaseActivePartyLimit + playerLevelBefore / PlayerLevelsPerPartySlot, MaxActivePartyLimit);
+			if (ActivePartyLimit > limitBefore)
+			{
+				PostSystemMessage(
+					LocaleText.F("system.party.limit_increased", ActivePartyLimit),
+					new Color(0.62f, 1.0f, 0.78f),
+					GameMessageChannel.Party);
+			}
 		}
 
 		foreach (SimpleActor actor in _activeParty)
