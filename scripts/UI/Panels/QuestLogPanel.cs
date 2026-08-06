@@ -196,9 +196,6 @@ public partial class QuestLogPanel : PanelContainer
 		itemLabel.Text = LocaleText.F("quest.log.items", entry.QuestItemName, entry.ItemCount, entry.ItemRequired);
 		info.AddChild(itemLabel);
 
-		var affinityLabel = MakeLabel(14, new Color(1.0f, 0.82f, 0.86f));
-		affinityLabel.Text = LocaleText.F("quest.log.affinity", entry.Affinity, entry.AffinityRequired);
-		info.AddChild(affinityLabel);
 	}
 
 	private static Color StatusColor(string statusKey)

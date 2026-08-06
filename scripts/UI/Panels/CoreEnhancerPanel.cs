@@ -15,8 +15,13 @@ public partial class CoreEnhancerPanel : PanelContainer
 	private VBoxContainer _yieldSummary = null!;
 	private Button _dismantleButton = null!;
 	private FloatingTooltip _tooltip = null!;
+	private FloatingTooltip _costTooltip = null!;
+	private ScrollContainer _scroll = null!;
+	private GridContainer? _grid;
 	private int _tab;
 	private readonly HashSet<SimpleActor> _selectedPets = new();
+	private const float EnhanceTileWidth = 98.0f;
+	private const int EnhanceTileGap = 8;
 
 	public System.Action? CloseRequested { get; set; }
 
@@ -38,6 +43,10 @@ public partial class CoreEnhancerPanel : PanelContainer
 		{
 			_tooltip.PositionNearMouse(this);
 		}
+		if (_costTooltip != null && _costTooltip.Visible)
+		{
+			_costTooltip.PositionNearMouse(this);
+		}
 	}
 
 	public void Bind(PlayerController player)
@@ -55,6 +64,7 @@ public partial class CoreEnhancerPanel : PanelContainer
 		if (!visible)
 		{
 			_tooltip?.HideTooltip();
+			_costTooltip?.HideTooltip();
 		}
 		if (visible)
 		{
@@ -75,7 +85,9 @@ public partial class CoreEnhancerPanel : PanelContainer
 		_tabEnhanceButton.ButtonPressed = _tab == 0;
 		_tabDismantleButton.ButtonPressed = _tab == 1;
 		_tooltip?.HideTooltip();
+		_costTooltip?.HideTooltip();
 		ClearChildren(_list);
+		_grid = null;
 
 		if (_player == null)
 		{
@@ -149,22 +161,42 @@ public partial class CoreEnhancerPanel : PanelContainer
 			return;
 		}
 
+		GridContainer grid = AddEnhanceGrid();
 		foreach (string id in ids)
 		{
-			AddEnhanceRow(id);
+			grid.AddChild(MakeEnhanceTile(id));
 		}
 	}
 
-	private void AddEnhanceRow(string itemId)
+	private GridContainer AddEnhanceGrid()
 	{
-		if (_player == null)
+		var grid = new GridContainer { Columns = 5, SizeFlagsHorizontal = SizeFlags.ExpandFill };
+		grid.AddThemeConstantOverride("h_separation", EnhanceTileGap);
+		grid.AddThemeConstantOverride("v_separation", EnhanceTileGap);
+		_list.AddChild(grid);
+		_grid = grid;
+		UpdateGridColumns();
+		return grid;
+	}
+
+	private void UpdateGridColumns()
+	{
+		if (_grid == null || !IsInstanceValid(_grid) || _scroll == null)
 		{
 			return;
 		}
 
-		PlayerController.CoreEnhanceQuote quote = _player.GetCoreEnhanceQuote(itemId);
+		float available = Mathf.Max(_scroll.Size.X, EnhanceTileWidth);
+		_grid.Columns = Mathf.Max(1, Mathf.FloorToInt((available + EnhanceTileGap) / (EnhanceTileWidth + EnhanceTileGap)));
+	}
 
-		var row = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+	private Control MakeEnhanceTile(string itemId)
+	{
+		PlayerController.CoreEnhanceQuote quote = _player!.GetCoreEnhanceQuote(itemId);
+		string capturedId = itemId;
+		var tile = new PanelContainer { CustomMinimumSize = new Vector2(EnhanceTileWidth, 132.0f) };
+		tile.MouseEntered += () => ShowCoreInfo(capturedId);
+		tile.MouseExited += () => _tooltip.HideTooltip();
 		var style = new StyleBoxFlat
 		{
 			BgColor = new Color(0.08f, 0.09f, 0.105f, 0.94f),
@@ -172,59 +204,37 @@ public partial class CoreEnhancerPanel : PanelContainer
 		};
 		style.SetBorderWidthAll(1);
 		style.SetCornerRadiusAll(6);
-		row.AddThemeStyleboxOverride("panel", style);
-		_list.AddChild(row);
+		style.SetContentMarginAll(6);
+		tile.AddThemeStyleboxOverride("panel", style);
 
-		var margin = new MarginContainer();
-		margin.AddThemeConstantOverride("margin_left", 12);
-		margin.AddThemeConstantOverride("margin_right", 12);
-		margin.AddThemeConstantOverride("margin_top", 8);
-		margin.AddThemeConstantOverride("margin_bottom", 8);
-		row.AddChild(margin);
+		var box = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+		box.AddThemeConstantOverride("separation", 2);
+		tile.AddChild(box);
 
-		var content = new HBoxContainer();
-		content.AddThemeConstantOverride("separation", 12);
-		margin.AddChild(content);
-
-		var info = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-		content.AddChild(info);
+		TextureRect icon = ItemIconLibrary.CreateRect(itemId, 54.0f);
+		icon.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+		box.AddChild(icon);
 
 		string coreName = LocaleText.T(BuildCatalog.GetItemNameKey(itemId)) + BuildCatalog.GetStarSuffix(itemId);
-		string elementId = BuildCatalog.GetSkillGem(itemId).DamageElementId;
-		if (string.IsNullOrEmpty(elementId))
-		{
-			elementId = "physical";
-		}
-		string elementName = LocaleText.T($"element.{elementId}");
+		var nameLabel = MakeLabel(13, new Color(0.96f, 0.98f, 1.0f));
+		nameLabel.Text = coreName;
+		nameLabel.HorizontalAlignment = HorizontalAlignment.Center;
+		nameLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+		nameLabel.MouseFilter = MouseFilterEnum.Ignore;
+		box.AddChild(nameLabel);
 
-		var nameLabel = MakeLabel(17, new Color(0.96f, 0.98f, 1.0f));
-		nameLabel.Text = $"{coreName}  ·  {elementName}";
-		info.AddChild(nameLabel);
-
-		var detailLabel = MakeLabel(14, new Color(0.80f, 0.88f, 0.94f));
-		if (quote.IsMax)
-		{
-			detailLabel.Text = LocaleText.T("core_enhancer.max_row");
-		}
-		else
-		{
-			string cost = LocaleText.F(
-				"core_enhancer.cost",
-				MonsterLootCatalog.GetCoreOrbDisplayName(quote.OrbId),
-				quote.OrbCount,
-				quote.OrbHave,
-				quote.Gold);
-			detailLabel.Text = $"{cost}  →  ★{quote.TargetStars}";
-		}
-		info.AddChild(detailLabel);
-
-		string capturedId = itemId;
 		var enhanceButton = new Button
 		{
 			Text = LocaleText.T("core_enhancer.enhance"),
-			CustomMinimumSize = new Vector2(140.0f, 48.0f),
+			CustomMinimumSize = new Vector2(0.0f, 30.0f),
+			SizeFlagsHorizontal = SizeFlags.ExpandFill,
 			Disabled = !_player.CanAffordCoreEnhance(quote),
+			MouseDefaultCursorShape = CursorShape.PointingHand,
 		};
+		enhanceButton.AddThemeFontSizeOverride("font_size", 13);
+		enhanceButton.MouseEntered += () => _costTooltip.ShowTooltip(
+			LocaleText.T("core_enhancer.enhance"), BuildEnhanceTip(capturedId), this);
+		enhanceButton.MouseExited += () => _costTooltip.HideTooltip();
 		enhanceButton.Pressed += () =>
 		{
 			if (_player != null)
@@ -233,7 +243,41 @@ public partial class CoreEnhancerPanel : PanelContainer
 				RefreshAll();
 			}
 		};
-		content.AddChild(enhanceButton);
+		box.AddChild(enhanceButton);
+		return tile;
+	}
+
+	private string BuildEnhanceTip(string itemId)
+	{
+		if (_player == null)
+		{
+			return string.Empty;
+		}
+
+		PlayerController.CoreEnhanceQuote quote = _player.GetCoreEnhanceQuote(itemId);
+		if (quote.IsMax)
+		{
+			return LocaleText.T("core_enhancer.max_row");
+		}
+
+		return LocaleText.F(
+			"core_enhancer.cost",
+			MonsterLootCatalog.GetCoreOrbDisplayName(quote.OrbId),
+			quote.OrbCount,
+			quote.OrbHave,
+			quote.Gold);
+	}
+
+	private void ShowCoreInfo(string itemId)
+	{
+		if (_player == null)
+		{
+			return;
+		}
+
+		string body = InventoryPanel.BuildItemTooltipBody(itemId, string.Empty);
+		body += $"\n{LocaleText.F("shop.owned_count", _player.GetInventoryCount(itemId))}";
+		_tooltip.ShowTooltip(InventoryPanel.BuildItemTooltipTitle(itemId), body, this);
 	}
 
 	private void RefreshDismantleTab()
@@ -426,16 +470,17 @@ public partial class CoreEnhancerPanel : PanelContainer
 		};
 		_tabBar.AddChild(_tabDismantleButton);
 
-		var scroll = new ScrollContainer
+		_scroll = new ScrollContainer
 		{
 			HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
 			SizeFlagsVertical = SizeFlags.ExpandFill,
 		};
-		root.AddChild(scroll);
+		_scroll.Resized += UpdateGridColumns;
+		root.AddChild(_scroll);
 
 		_list = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
 		_list.AddThemeConstantOverride("separation", 8);
-		scroll.AddChild(_list);
+		_scroll.AddChild(_list);
 
 		// Live "will get" preview of the aggregated orbs from the current selection
 		// (dismantle tab only).
@@ -479,6 +524,18 @@ public partial class CoreEnhancerPanel : PanelContainer
 			ZIndex = 100,
 		};
 		AddChild(_tooltip);
+
+		_costTooltip = new FloatingTooltip
+		{
+			Name = "CoreEnhancerCostTooltip",
+			MaxWidth = 460.0f,
+			MinWidth = 240.0f,
+			MaxWidthRatio = 0.55f,
+			MaxHeightRatio = 0.58f,
+			MinBodyHeight = 48.0f,
+			ZIndex = 101,
+		};
+		AddChild(_costTooltip);
 	}
 
 	private static Button CreateTabButton(string textKey)

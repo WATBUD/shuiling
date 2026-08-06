@@ -86,6 +86,7 @@ public sealed class PlayerSaveData
 	public Dictionary<string, int> StorageItems { get; set; } = new();
 	public List<string> AcceptedNpcQuestNames { get; set; } = new();
 	public List<string> CompletedNpcQuestNames { get; set; } = new();
+	public Dictionary<string, int> NpcQuestRounds { get; set; } = new();
 	public double MercenaryNextRefreshUnix { get; set; }
 	public double CompanionRecruitNextRefreshUnix { get; set; }
 	public double MerchantNextRefreshUnix { get; set; }

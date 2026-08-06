@@ -8,6 +8,7 @@ public partial class PlayerController
 	{
 		_acceptedNpcQuests.Clear();
 		_completedNpcQuests.Clear();
+		_npcQuestRounds.Clear();
 		RemoveRecruitedVillageNpcDuplicates();
 		foreach (SimpleActor actor in SimpleActor.ActiveActors)
 		{
@@ -24,6 +25,19 @@ public partial class PlayerController
 			if (data.CompletedNpcQuestNames.Contains(actor.DisplayName))
 			{
 				_completedNpcQuests.Add(actor);
+			}
+
+			if (data.NpcQuestRounds.TryGetValue(actor.DisplayName, out int round) && round > 0)
+			{
+				_npcQuestRounds[actor] = round;
+			}
+
+			// Older saves kept a completed task in the accepted set, which enabled
+			// repeated turn-ins. Migrate it to the next, newly generated round.
+			if (_completedNpcQuests.Contains(actor))
+			{
+				_acceptedNpcQuests.Remove(actor);
+				_npcQuestRounds[actor] = Mathf.Max(GetNpcQuestRound(actor), 1);
 			}
 		}
 	}
@@ -63,9 +77,26 @@ public partial class PlayerController
 		}
 	}
 
-	private static string GetNpcQuestItemId(SimpleActor actor)
+	private string GetNpcQuestItemId(SimpleActor actor)
 	{
-		return MonsterLootCatalog.GetQuestItemIdForNpc(actor.DisplayName);
+		return MonsterLootCatalog.GetQuestItemIdForNpc(actor.DisplayName, GetNpcQuestRound(actor));
+	}
+
+	private int GetNpcQuestRound(SimpleActor actor)
+	{
+		return _npcQuestRounds.TryGetValue(actor, out int round) ? Mathf.Max(round, 0) : 0;
+	}
+
+	private int GetNpcQuestItemCount(SimpleActor actor)
+	{
+		return NpcRecruitQuestItemCount + Mathf.Min(GetNpcQuestRound(actor), 7);
+	}
+
+	private void CompleteNpcQuestRound(SimpleActor actor)
+	{
+		_completedNpcQuests.Add(actor);
+		_acceptedNpcQuests.Remove(actor);
+		_npcQuestRounds[actor] = GetNpcQuestRound(actor) + 1;
 	}
 
 	private void UpdateInteractionPrompt(float step)
@@ -175,17 +206,18 @@ public partial class PlayerController
 		}
 
 		string questItemId = GetNpcQuestItemId(recruitNpc);
-		if (!_acceptedNpcQuests.Contains(recruitNpc))
+		int questItemCount = GetNpcQuestItemCount(recruitNpc);
+		if (_completedNpcQuests.Contains(recruitNpc) && recruitNpc.Affinity >= NpcRecruitAffinityRequirement)
+		{
+			_interactionPromptLabel.Text = LocaleText.F("prompt.npc.invite", "E", recruitNpc.LocalizedDisplayName);
+		}
+		else if (!_acceptedNpcQuests.Contains(recruitNpc))
 		{
 			_interactionPromptLabel.Text = LocaleText.F("prompt.npc.accept_task", "E", recruitNpc.LocalizedDisplayName);
 		}
-		else if (GetInventoryCount(questItemId) >= NpcRecruitQuestItemCount)
+		else if (GetInventoryCount(questItemId) >= questItemCount)
 		{
 			_interactionPromptLabel.Text = LocaleText.F("prompt.npc.deliver_task", "E", recruitNpc.LocalizedDisplayName);
-		}
-		else if (_completedNpcQuests.Contains(recruitNpc) && recruitNpc.Affinity >= NpcRecruitAffinityRequirement)
-		{
-			_interactionPromptLabel.Text = LocaleText.F("prompt.npc.invite", "E", recruitNpc.LocalizedDisplayName);
 		}
 		else if (recruitNpc.Affinity < NpcRecruitAffinityRequirement && HasCard(GetNpcWantedCardKey(recruitNpc)))
 		{
@@ -193,7 +225,7 @@ public partial class PlayerController
 		}
 		else
 		{
-			_interactionPromptLabel.Text = LocaleText.F("prompt.npc.quest_progress", "E", GetInventoryCount(questItemId), NpcRecruitQuestItemCount, recruitNpc.Affinity, NpcRecruitAffinityRequirement);
+			_interactionPromptLabel.Text = LocaleText.F("prompt.npc.quest_progress", "E", GetInventoryCount(questItemId), questItemCount, recruitNpc.Affinity, NpcRecruitAffinityRequirement);
 		}
 	}
 
@@ -291,14 +323,15 @@ public partial class PlayerController
 		}
 
 		string questItemId = GetNpcQuestItemId(actor);
-		if (!TryConsumeInventoryItem(questItemId, NpcRecruitQuestItemCount))
+		int questItemCount = GetNpcQuestItemCount(actor);
+		if (!TryConsumeInventoryItem(questItemId, questItemCount))
 		{
 			// Fallback: hand over the specific monster card this NPC collects
 			// (卡片交換). Consuming it lowers the team card bonus, so it's a choice.
 			string wantedCard = GetNpcWantedCardKey(actor);
 			if (!string.IsNullOrEmpty(wantedCard) && TryConsumeCard(wantedCard))
 			{
-				_completedNpcQuests.Add(actor);
+				CompleteNpcQuestRound(actor);
 				actor.IncreaseAffinity(CardConfig.NpcExchangeAffinityReward);
 				SpawnWorldCombatEffect(LocaleText.F("effect.affinity_gain", CardConfig.NpcExchangeAffinityReward), new Color(0.62f, 1.0f, 0.78f, 0.92f), actor.GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 0.85f, 0.62f);
 				PostSystemMessage(LocaleText.F("system.npc.card_accepted", ExternalModelLibrary.LocalizedCardName(wantedCard), actor.LocalizedDisplayName), new Color(0.72f, 0.92f, 1.0f), GameMessageChannel.Party);
@@ -314,12 +347,12 @@ public partial class PlayerController
 				return;
 			}
 
-			PostSystemMessage(LocaleText.F("system.npc.waiting_items", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, GetInventoryItemDisplayName(questItemId)), new Color(0.86f, 0.84f, 0.72f), GameMessageChannel.Party);
+			PostSystemMessage(LocaleText.F("system.npc.waiting_items", actor.LocalizedDisplayName, questItemCount, GetInventoryItemDisplayName(questItemId)), new Color(0.86f, 0.84f, 0.72f), GameMessageChannel.Party);
 			return;
 		}
 
 		int affinityReward = _questRng.RandiRange(NpcQuestAffinityMin, NpcQuestAffinityMax);
-		_completedNpcQuests.Add(actor);
+		CompleteNpcQuestRound(actor);
 		actor.IncreaseAffinity(affinityReward);
 		AddGold(NpcQuestGoldReward);
 		SpawnWorldCombatEffect(LocaleText.F("effect.affinity_gain", affinityReward), new Color(0.62f, 1.0f, 0.78f, 0.92f), actor.GlobalPosition + new Vector3(0.0f, 1.65f, 0.0f), 0.85f, 0.62f);

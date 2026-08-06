@@ -288,11 +288,11 @@ public partial class SimpleActor : CharacterBody3D
 	private float _cardHealthMultiplier = 1.0f;
 	private bool _bossEnraged;
 	private int _bossAttackCounter;
-	private Vector3 _bossLastChasePosition;
-	private Vector3 _bossAvoidDirection;
-	private float _bossStuckTime;
-	private float _bossAvoidRemaining;
-	private float _bossAvoidSide = 1.0f;
+	private Vector3 _lastChasePosition;
+	private Vector3 _chaseAvoidDirection;
+	private float _chaseStuckTime;
+	private float _chaseAvoidRemaining;
+	private float _chaseAvoidSide = 1.0f;
 	// Capture readiness (削弱→硬直→捕捉). Stagger builds from hits (combo finisher)
 	// and breaks the monster's guard; low HP also opens the capture window.
 	private float _staggerValue;
@@ -738,7 +738,7 @@ public partial class SimpleActor : CharacterBody3D
 
 		if (!chasing)
 		{
-			ResetBossObstacleAvoidance();
+			ResetChaseObstacleAvoidance();
 			_waitTime = Mathf.Max(_waitTime - step, 0.0f);
 			if (_waitTime > 0.0f)
 			{
@@ -761,7 +761,7 @@ public partial class SimpleActor : CharacterBody3D
 			Vector3 direction = toDestination.Normalized();
 			if (chasing && IsBoss)
 			{
-				direction = GetBossChaseDirection(direction, step);
+				direction = GetChaseDirection(direction, step);
 			}
 			float activeSpeed = EffectiveMoveSpeed * (chasing ? 1.35f : 1.0f);
 			velocity.X = Mathf.MoveToward(velocity.X, direction.X * activeSpeed, activeSpeed * 6.0f * step);
@@ -873,7 +873,7 @@ public partial class SimpleActor : CharacterBody3D
 		BossPrimaryLootId = primaryLootId;
 		_bossEnraged = false;
 		_bossAttackCounter = 0;
-		ResetBossObstacleAvoidance();
+		ResetChaseObstacleAvoidance();
 		ChaseRadius = Mathf.Max(ChaseRadius, 28.0f);
 		WanderRadius = Mathf.Max(WanderRadius, 14.0f);
 		RefreshNameplate();
@@ -1037,6 +1037,7 @@ public partial class SimpleActor : CharacterBody3D
 		if (target == null)
 		{
 			_combatTarget = null;
+			ResetChaseObstacleAvoidance();
 			return false;
 		}
 
@@ -1046,18 +1047,20 @@ public partial class SimpleActor : CharacterBody3D
 		if (distance > EffectiveDetectionRadius * 1.25f)
 		{
 			_combatTarget = null;
+			ResetChaseObstacleAvoidance();
 			return false;
 		}
 
 		if (distance <= EffectiveAttackRange)
 		{
+			ResetChaseObstacleAvoidance();
 			velocity = SlowToStop(velocity, step);
 			FaceDirection(toTarget, step);
 			AttackActor(target);
 			return true;
 		}
 
-		Vector3 direction = toTarget.Normalized();
+		Vector3 direction = GetChaseDirection(toTarget.Normalized(), step);
 		float combatSpeed = Mathf.Max(EffectiveMoveSpeed * 2.05f, 4.2f);
 		velocity.X = Mathf.MoveToward(velocity.X, direction.X * combatSpeed, combatSpeed * 8.0f * step);
 		velocity.Z = Mathf.MoveToward(velocity.Z, direction.Z * combatSpeed, combatSpeed * 8.0f * step);

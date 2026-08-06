@@ -34,10 +34,42 @@ public static class ItemIconLibrary
 		["equip.boots.reinforced"] = "boots_reinforced.png",
 		["equip.boots.windrunner"] = "boots_windrunner.png",
 		["equip.boots.gravity"] = "boots_gravity.png",
+		["equip.boots.iron"] = "boots_iron.png",
+		["equip.boots.bronze"] = "boots_bronze.png",
+		["equip.boots.steel"] = "boots_steel.png",
+		["equip.boots.silver"] = "boots_silver.png",
+		["equip.boots.mithril"] = "boots_mithril.png",
+		["equip.boots.crystal"] = "boots_crystal.png",
+		["equip.boots.obsidian"] = "boots_obsidian.png",
+		["equip.boots.dragon"] = "boots_dragon.png",
+		["equip.boots.phoenix"] = "boots_phoenix.png",
+		["equip.boots.frost"] = "boots_frost.png",
+		["equip.boots.storm"] = "boots_storm.png",
+		["equip.boots.shadow"] = "boots_shadow.png",
+		["equip.boots.radiant"] = "boots_radiant.png",
+		["equip.boots.ancient"] = "boots_ancient.png",
+		["equip.boots.royal"] = "boots_royal.png",
+		["equip.boots.swift"] = "boots_swift.png",
 		["equip.accessory.swift_ring"] = "accessory_swift_ring.png",
 		["equip.accessory.crit_charm"] = "accessory_crit_charm.png",
 		["equip.accessory.turtle_amulet"] = "accessory_guard.png",
 		["equip.accessory.focus_lens"] = "accessory_focus_lens.png",
+		["equip.accessory.iron_ring"] = "accessory_iron_ring.png",
+		["equip.accessory.bronze_ring"] = "accessory_bronze_ring.png",
+		["equip.accessory.steel_ring"] = "accessory_steel_ring.png",
+		["equip.accessory.silver_ring"] = "accessory_silver_ring.png",
+		["equip.accessory.mithril_ring"] = "accessory_mithril_ring.png",
+		["equip.accessory.crystal_ring"] = "accessory_crystal_ring.png",
+		["equip.accessory.obsidian_ring"] = "accessory_obsidian_ring.png",
+		["equip.accessory.dragon_ring"] = "accessory_dragon_ring.png",
+		["equip.accessory.phoenix_ring"] = "accessory_phoenix_ring.png",
+		["equip.accessory.frost_ring"] = "accessory_frost_ring.png",
+		["equip.accessory.storm_ring"] = "accessory_storm_ring.png",
+		["equip.accessory.shadow_ring"] = "accessory_shadow_ring.png",
+		["equip.accessory.radiant_ring"] = "accessory_radiant_ring.png",
+		["equip.accessory.ancient_ring"] = "accessory_ancient_ring.png",
+		["equip.accessory.royal_ring"] = "accessory_royal_ring.png",
+		["equip.accessory.verdant_ring"] = "accessory_verdant_ring.png",
 		["gem.skill.fireball"] = "gem_01.png",
 		["gem.skill.whirlwind"] = "gem_06.png",
 		["gem.skill.meteor"] = "gem_01.png",
@@ -303,6 +335,86 @@ public static class ItemIconLibrary
 		}
 
 		return ImageTexture.CreateFromImage(image);
+	}
+
+	private static void DrawUniqueBootsIcon(Image image, Color tint, Color dark, Color edge, uint design)
+	{
+		int shaftLeft = 20 + (int)(design % 5u);
+		int shaftRight = 38 + (int)((design >> 3) % 6u);
+		int shaftTop = 7 + (int)((design >> 6) % 8u);
+		int toeRight = 48 + (int)((design >> 9) % 9u);
+		int soleHeight = 3 + (int)((design >> 13) % 3u);
+
+		FillRect(image, shaftLeft, shaftTop, shaftRight, 47, tint);
+		FillRect(image, shaftLeft, 43, toeRight, 57, tint);
+		FillRect(image, shaftLeft - 2, 57 - soleHeight, toeRight + 2, 58, dark);
+		FillRect(image, shaftLeft - 2, shaftTop, shaftRight + 2, shaftTop + 4, edge);
+
+		// Each hash bit controls a visible construction detail: crossed laces,
+		// plated shin, wing tab, toe cap and heel spur produce distinct silhouettes.
+		if ((design & 1u) != 0)
+		{
+			for (int y = shaftTop + 8; y < 42; y += 7)
+			{
+				FillRect(image, shaftLeft + 3, y, shaftRight - 3, y + 2, edge);
+			}
+		}
+		else
+		{
+			FillRect(image, shaftLeft + 3, shaftTop + 6, shaftLeft + 6, 44, edge);
+		}
+
+		if ((design & 2u) != 0)
+		{
+			FillRect(image, shaftRight, shaftTop + 8, shaftRight + 5, 31, dark);
+			FillRect(image, shaftRight + 4, shaftTop + 11, shaftRight + 9, 18, edge);
+		}
+		if ((design & 4u) != 0)
+		{
+			FillRect(image, toeRight - 10, 46, toeRight, 52, edge);
+		}
+		if ((design & 8u) != 0)
+		{
+			FillRect(image, shaftLeft - 6, 47, shaftLeft, 54, dark);
+		}
+	}
+
+	private static void DrawUniqueRingIcon(Image image, Color tint, Color dark, Color edge, uint design)
+	{
+		int centerX = 29 + (int)(design % 7u);
+		int centerY = 38 + (int)((design >> 3) % 4u);
+		int outerRadius = 14 + (int)((design >> 5) % 4u);
+		int bandThickness = 4 + (int)((design >> 8) % 3u);
+		FillCircle(image, centerX, centerY, outerRadius, tint);
+		FillCircle(image, centerX, centerY, outerRadius - bandThickness, new Color(0, 0, 0, 0));
+
+		int gemY = centerY - outerRadius - 3;
+		int gemSize = 4 + (int)((design >> 10) % 4u);
+		if ((design & 1u) == 0)
+		{
+			FillCircle(image, centerX, gemY, gemSize, edge);
+			FillCircle(image, centerX, gemY, Mathf.Max(gemSize - 3, 2), tint.Lightened(0.55f));
+		}
+		else
+		{
+			// Square/diamond cut contrasts with the round-cut variants.
+			for (int row = -gemSize; row <= gemSize; row++)
+			{
+				int halfWidth = gemSize - Mathf.Abs(row);
+				FillRect(image, centerX - halfWidth, gemY + row, centerX + halfWidth + 1, gemY + row + 1, row == 0 ? edge : tint.Lightened(0.42f));
+			}
+		}
+
+		if ((design & 2u) != 0)
+		{
+			FillCircle(image, centerX - gemSize - 4, gemY + 3, 2, edge);
+			FillCircle(image, centerX + gemSize + 4, gemY + 3, 2, edge);
+		}
+		if ((design & 4u) != 0)
+		{
+			FillRect(image, centerX - outerRadius, centerY - 2, centerX - outerRadius + 4, centerY + 5, dark);
+			FillRect(image, centerX + outerRadius - 3, centerY - 2, centerX + outerRadius + 1, centerY + 5, dark);
+		}
 	}
 
 	// A simple 2D parchment-scroll icon: parchment sheet, two rolled ends, ink

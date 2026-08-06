@@ -111,8 +111,9 @@ public partial class PlayerController
 		_pendingQuestNpc = actor;
 		_npcQuestDialogIsNotice = false;
 		string questItemId = GetNpcQuestItemId(actor);
+		int questItemCount = GetNpcQuestItemCount(actor);
 		_npcQuestTitleLabel.Text = LocaleText.F("quest.dialog.title", actor.LocalizedDisplayName);
-		_npcQuestBodyLabel.Text = LocaleText.F("quest.dialog.body", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, GetInventoryItemDisplayName(questItemId));
+		_npcQuestBodyLabel.Text = LocaleText.F("quest.dialog.body", actor.LocalizedDisplayName, questItemCount, GetInventoryItemDisplayName(questItemId));
 		_npcQuestRewardLabel.Text = LocaleText.F("quest.dialog.reward", $"{NpcQuestAffinityMin}~{NpcQuestAffinityMax}", NpcRecruitAffinityRequirement, NpcQuestGoldReward);
 		_npcQuestRewardLabel.Visible = true;
 		_npcQuestAcceptButton.Text = LocaleText.T("quest.button.accept");
@@ -140,7 +141,7 @@ public partial class PlayerController
 
 		_acceptedNpcQuests.Add(actor);
 		string questItemId = GetNpcQuestItemId(actor);
-		PostSystemMessage(LocaleText.F("system.npc.task_posted", actor.LocalizedDisplayName, NpcRecruitQuestItemCount, GetInventoryItemDisplayName(questItemId)), new Color(0.82f, 0.92f, 1.0f), GameMessageChannel.Party);
+		PostSystemMessage(LocaleText.F("system.npc.task_posted", actor.LocalizedDisplayName, GetNpcQuestItemCount(actor), GetInventoryItemDisplayName(questItemId)), new Color(0.82f, 0.92f, 1.0f), GameMessageChannel.Party);
 		CloseNpcQuestDialog();
 	}
 

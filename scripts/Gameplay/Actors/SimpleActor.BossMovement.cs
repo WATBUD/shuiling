@@ -2,36 +2,39 @@ using Godot;
 
 public partial class SimpleActor : CharacterBody3D
 {
-	private Vector3 GetBossChaseDirection(Vector3 directDirection, float step)
+	// Bosses and captured companions share the same collision-based chase steering.
+	// Slide normals select a wall tangent; lack of progress flips the tangent so an
+	// actor can recover from corners instead of repeatedly pushing at its target.
+	private Vector3 GetChaseDirection(Vector3 directDirection, float step)
 	{
-		if (!IsBoss || directDirection.LengthSquared() <= 0.001f)
+		if ((!IsBoss && !_isCaptured) || directDirection.LengthSquared() <= 0.001f)
 		{
 			return directDirection;
 		}
 
 		Vector3 planarPosition = GlobalPosition;
 		planarPosition.Y = 0.0f;
-		if (_bossLastChasePosition == Vector3.Zero)
+		if (_lastChasePosition == Vector3.Zero)
 		{
-			_bossLastChasePosition = planarPosition;
+			_lastChasePosition = planarPosition;
 		}
 
-		float progress = planarPosition.DistanceTo(_bossLastChasePosition);
-		_bossLastChasePosition = planarPosition;
-		_bossAvoidRemaining = Mathf.Max(_bossAvoidRemaining - step, 0.0f);
+		float progress = planarPosition.DistanceTo(_lastChasePosition);
+		_lastChasePosition = planarPosition;
+		_chaseAvoidRemaining = Mathf.Max(_chaseAvoidRemaining - step, 0.0f);
 		if (progress < 0.035f)
 		{
-			_bossStuckTime += step;
+			_chaseStuckTime += step;
 		}
 		else
 		{
-			_bossStuckTime = Mathf.Max(_bossStuckTime - step * 2.5f, 0.0f);
+			_chaseStuckTime = Mathf.Max(_chaseStuckTime - step * 2.5f, 0.0f);
 		}
 
-		Vector3 wallNormal = GetBossBlockingWallNormal();
+		Vector3 wallNormal = GetBlockingWallNormal();
 		bool blockedByWall = wallNormal.LengthSquared() > 0.001f;
-		bool stuck = _bossStuckTime >= 0.32f;
-		if ((blockedByWall && _bossAvoidRemaining <= 0.0f) || stuck)
+		bool stuck = _chaseStuckTime >= 0.32f;
+		if ((blockedByWall && _chaseAvoidRemaining <= 0.0f) || stuck)
 		{
 			if (blockedByWall)
 			{
@@ -41,38 +44,38 @@ public partial class SimpleActor : CharacterBody3D
 				float scoreB = tangentB.Dot(directDirection);
 				if (Mathf.Abs(scoreA - scoreB) < 0.08f)
 				{
-					_bossAvoidDirection = _bossAvoidSide > 0.0f ? tangentA : tangentB;
+					_chaseAvoidDirection = _chaseAvoidSide > 0.0f ? tangentA : tangentB;
 				}
 				else
 				{
-					_bossAvoidDirection = scoreA > scoreB ? tangentA : tangentB;
-					_bossAvoidSide = _bossAvoidDirection == tangentA ? 1.0f : -1.0f;
+					_chaseAvoidDirection = scoreA > scoreB ? tangentA : tangentB;
+					_chaseAvoidSide = _chaseAvoidDirection == tangentA ? 1.0f : -1.0f;
 				}
 
 				// A small outward component keeps the enlarged boss collider from
 				// continuously scraping the same tree or building corner.
-				_bossAvoidDirection = (_bossAvoidDirection + wallNormal * 0.24f).Normalized();
+				_chaseAvoidDirection = (_chaseAvoidDirection + wallNormal * 0.24f).Normalized();
 			}
 			else
 			{
-				_bossAvoidSide *= -1.0f;
-				Vector3 side = new Vector3(-directDirection.Z, 0.0f, directDirection.X) * _bossAvoidSide;
-				_bossAvoidDirection = (side * 0.92f + directDirection * 0.22f).Normalized();
+				_chaseAvoidSide *= -1.0f;
+				Vector3 side = new Vector3(-directDirection.Z, 0.0f, directDirection.X) * _chaseAvoidSide;
+				_chaseAvoidDirection = (side * 0.92f + directDirection * 0.22f).Normalized();
 			}
 
-			_bossAvoidRemaining = stuck ? 0.95f : 0.72f;
-			_bossStuckTime = 0.0f;
+			_chaseAvoidRemaining = stuck ? 0.95f : 0.72f;
+			_chaseStuckTime = 0.0f;
 		}
 
-		if (_bossAvoidRemaining > 0.0f && _bossAvoidDirection.LengthSquared() > 0.001f)
+		if (_chaseAvoidRemaining > 0.0f && _chaseAvoidDirection.LengthSquared() > 0.001f)
 		{
-			return (_bossAvoidDirection * 0.88f + directDirection * 0.42f).Normalized();
+			return (_chaseAvoidDirection * 0.88f + directDirection * 0.42f).Normalized();
 		}
 
 		return directDirection;
 	}
 
-	private Vector3 GetBossBlockingWallNormal()
+	private Vector3 GetBlockingWallNormal()
 	{
 		for (int index = 0; index < GetSlideCollisionCount(); index++)
 		{
@@ -88,16 +91,11 @@ public partial class SimpleActor : CharacterBody3D
 		return Vector3.Zero;
 	}
 
-	private void ResetBossObstacleAvoidance()
+	private void ResetChaseObstacleAvoidance()
 	{
-		if (!IsBoss)
-		{
-			return;
-		}
-
-		_bossLastChasePosition = Vector3.Zero;
-		_bossAvoidDirection = Vector3.Zero;
-		_bossStuckTime = 0.0f;
-		_bossAvoidRemaining = 0.0f;
+		_lastChasePosition = Vector3.Zero;
+		_chaseAvoidDirection = Vector3.Zero;
+		_chaseStuckTime = 0.0f;
+		_chaseAvoidRemaining = 0.0f;
 	}
 }

@@ -26,29 +26,21 @@ public partial class PlayerController
 			}
 
 			string questItemId = GetNpcQuestItemId(npc);
+			int requiredCount = GetNpcQuestItemCount(npc);
 			int itemCount = GetInventoryCount(questItemId);
-			bool delivered = _completedNpcQuests.Contains(npc);
-
-			string statusKey;
-			if (!delivered)
-			{
-				statusKey = itemCount >= NpcRecruitQuestItemCount
-					? "quest.status.ready_deliver"
-					: "quest.status.gathering";
-			}
-			else
-			{
-				statusKey = npc.Affinity >= NpcRecruitAffinityRequirement
-					? "quest.status.ready_invite"
-					: "quest.status.need_affinity";
-			}
+			// This collection contains only currently accepted quest rounds. The
+			// completed set means the NPC has had any prior delivery, not that this
+			// newly generated round is complete.
+			string statusKey = itemCount >= requiredCount
+				? "quest.status.ready_deliver"
+				: "quest.status.gathering";
 
 			entries.Add(new QuestLogEntry
 			{
 				NpcName = npc.LocalizedDisplayName,
 				QuestItemName = GetInventoryItemDisplayName(questItemId),
-				ItemCount = Mathf.Min(itemCount, NpcRecruitQuestItemCount),
-				ItemRequired = NpcRecruitQuestItemCount,
+				ItemCount = Mathf.Min(itemCount, requiredCount),
+				ItemRequired = requiredCount,
 				Affinity = npc.Affinity,
 				AffinityRequired = NpcRecruitAffinityRequirement,
 				StatusKey = statusKey,

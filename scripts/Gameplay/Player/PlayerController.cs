@@ -187,7 +187,7 @@ public partial class PlayerController : CharacterBody3D
 	[Export] public float WalkSpeed { get; set; } = 7.8f;
 	[Export] public float SprintSpeed { get; set; } = 12.8f;
 	// Stamina drains while actively sprinting and regenerates otherwise. Base pool is
-	// 20 (BuildStats.MaxStamina); the 迅捷 set widens it and speeds sprinting up.
+	// 50 (BuildStats.MaxStamina); the 迅捷 set widens it and speeds sprinting up.
 	[Export] public float SprintStaminaDrainPerSecond { get; set; } = 8.0f;
 	[Export] public float StaminaRegenPerSecond { get; set; } = 11.0f;
 	[Export] public float JumpVelocity { get; set; } = EquipmentConfig.PlayerBaseJumpVelocity;
@@ -247,6 +247,7 @@ public partial class PlayerController : CharacterBody3D
 	private readonly Dictionary<string, int> _storageItems = new();
 	private readonly HashSet<SimpleActor> _acceptedNpcQuests = new();
 	private readonly HashSet<SimpleActor> _completedNpcQuests = new();
+	private readonly Dictionary<SimpleActor, int> _npcQuestRounds = new();
 	private readonly List<ContractCompanionOffer> _contractCompanionOffers = new();
 	private readonly List<string> _blacksmithStockItemIds = new();
 	private readonly List<string> _petShopStockNameKeys = new();
@@ -325,7 +326,7 @@ public partial class PlayerController : CharacterBody3D
 	private ProgressBar _playerHealthHudBar = null!;
 	private Label _playerStaminaHudValueLabel = null!;
 	private ProgressBar _playerStaminaHudBar = null!;
-	private float _currentStamina = 20.0f;
+	private float _currentStamina = 50.0f;
 	// Once stamina bottoms out the player must regen back to ~30% before sprinting
 	// re-enables, so speed doesn't flicker one frame at a time near empty.
 	private bool _staminaExhausted;
@@ -892,8 +893,9 @@ public partial class PlayerController : CharacterBody3D
 		bool mounted = MountedCompanion is SimpleActor;
 		// On foot, sprinting needs stamina in the pool and no active exhaustion lock;
 		// mounts ride on the mount's own speed and never touch the stamina pool.
-		bool sprinting = Input.IsActionPressed("sprint") && (mounted || (!_staminaExhausted && _currentStamina > 0.0f));
-		UpdateStamina(sprinting && moving && !mounted, step);
+		bool sprintHeld = Input.IsActionPressed("sprint");
+		bool sprinting = sprintHeld && (mounted || (!_staminaExhausted && _currentStamina > 0.0f));
+		UpdateStamina(sprinting && moving && !mounted, sprintHeld && !mounted, step);
 		float targetSpeed = sprinting
 			? SprintSpeed * CurrentBuildStats.SprintSpeedMultiplier
 			: WalkSpeed;
@@ -923,8 +925,8 @@ public partial class PlayerController : CharacterBody3D
 	}
 
 	// Drains the stamina pool while actively sprinting, regenerates it otherwise, and
-	// keeps the HUD bar in sync. Clamped to the loadout's MaxStamina (base 20).
-	private void UpdateStamina(bool draining, float step)
+	// keeps the HUD bar in sync. Clamped to the loadout's MaxStamina (base 50).
+	private void UpdateStamina(bool draining, bool sprintHeld, float step)
 	{
 		float maxStamina = Mathf.Max(CurrentBuildStats.MaxStamina, 1);
 		_currentStamina = Mathf.Clamp(_currentStamina, 0.0f, maxStamina);
@@ -936,10 +938,12 @@ public partial class PlayerController : CharacterBody3D
 				_staminaExhausted = true;
 			}
 		}
-		else
+		// Releasing Shift is part of recovering from exhaustion. Keeping it held at
+		// zero no longer regenerates enough stamina to restart sprinting automatically.
+		else if (!_staminaExhausted || !sprintHeld)
 		{
 			_currentStamina = Mathf.Min(_currentStamina + StaminaRegenPerSecond * step, maxStamina);
-			if (_staminaExhausted && _currentStamina >= maxStamina * 0.30f)
+			if (_staminaExhausted && _currentStamina >= maxStamina * 0.01f)
 			{
 				_staminaExhausted = false;
 			}

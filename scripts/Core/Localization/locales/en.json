@@ -4,6 +4,7 @@
 	"ui.language": "Language",
 	"ui.settings": "Settings",
 	"ui.close": "Close",
+	"hud.stamina_caption": "STA",
 	"ui.video": "Video",
 	"ui.audio": "Audio",
 	"ui.music_volume": "Music volume",

@@ -209,7 +209,12 @@ public static class MonsterLootCatalog
 
 	public static string GetQuestItemIdForNpc(string npcDisplayName)
 	{
-		int index = PositiveModulo(StableStringHash(npcDisplayName), CommonQuestMaterialIds.Length);
+		return GetQuestItemIdForNpc(npcDisplayName, 0);
+	}
+
+	public static string GetQuestItemIdForNpc(string npcDisplayName, int questRound)
+	{
+		int index = PositiveModulo(StableStringHash(npcDisplayName) + Mathf.Max(questRound, 0), CommonQuestMaterialIds.Length);
 		return CommonQuestMaterialIds[index];
 	}
 

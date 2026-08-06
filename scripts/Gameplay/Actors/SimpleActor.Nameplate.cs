@@ -81,8 +81,11 @@ public partial class SimpleActor : CharacterBody3D
 		else if (ActorKind == "npc")
 		{
 			// Town service NPCs (merchants, refiner, gacha, ...) are non-combat, so
-			// their nameplate shows only the name — no misleading combat level.
-			_nameplate.Text = LocalizedDisplayName;
+			// their nameplate shows only the name. Recruitable quest NPCs additionally
+			// expose affinity above the name so it does not occupy quest tracking UI.
+			_nameplate.Text = ShowsRecruitQuestAffinity()
+				? $"{LocaleText.F("quest.log.affinity", Affinity, 80)}\n{LocalizedDisplayName}"
+				: LocalizedDisplayName;
 		}
 		else
 		{
@@ -124,17 +127,35 @@ public partial class SimpleActor : CharacterBody3D
 		_nameplate.Position = new Vector3(0.0f, labelY, 0.0f);
 		if (_nameplateMarker != null)
 		{
-			_nameplateMarker.Position = new Vector3(0.0f, labelY + 0.34f, 0.0f);
+			_nameplateMarker.Position = new Vector3(0.0f, labelY + (ShowsRecruitQuestAffinity() ? 0.56f : 0.34f), 0.0f);
 			float markerScale = IsBoss ? 1.65f : _isCaptured ? 1.18f : 1.0f;
 			_nameplateMarker.Scale = Vector3.One * markerScale;
 		}
 
 		if (_nameplateHalo != null)
 		{
-			_nameplateHalo.Position = new Vector3(0.0f, labelY + 0.28f, 0.0f);
+			_nameplateHalo.Position = new Vector3(0.0f, labelY + (ShowsRecruitQuestAffinity() ? 0.50f : 0.28f), 0.0f);
 			float haloScale = IsBoss ? 2.15f : _isCaptured ? 1.18f : 1.0f;
 			_nameplateHalo.Scale = Vector3.One * haloScale;
 		}
+	}
+
+	private bool ShowsRecruitQuestAffinity()
+	{
+		if (!IsNpcRecruitCandidate || MapId != "city")
+		{
+			return false;
+		}
+
+		return DisplayName is not (
+			"name.npc.blacksmith" or
+			"name.npc.item_merchant" or
+			"name.npc.pet_trainer" or
+			"name.npc.mercenary_broker" or
+			"name.npc.warehouse_keeper" or
+			"name.npc.refiner" or
+			"name.npc.core_enhancer" or
+			"name.npc.gacha");
 	}
 
 	private Color GetNameplateStatusColor()

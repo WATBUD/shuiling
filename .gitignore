@@ -12,3 +12,4 @@ launcher/bin/
 launcher/obj/
 dist/
 .tmp_export_verification/
+tmp/imagegen/

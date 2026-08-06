@@ -121,22 +121,18 @@ public partial class PartyPanel : PanelContainer
 		AddMemberButton(FormatPlayerListText(), _selected == _player, () => SelectMember(_player), null);
 
 		AddHeader(LocaleText.T("party.active"));
-		int activeIndex = 1;
 		foreach (SimpleActor actor in GetActiveCompanions())
 		{
-			AddMemberButton(FormatActorListText(activeIndex, actor), _selected == actor, () => SelectMember(actor), actor);
-			activeIndex++;
+			AddMemberButton(FormatActorListText(actor), _selected == actor, () => SelectMember(actor), actor);
 		}
 
 		List<SimpleActor> inactiveCompanions = GetStoredCompanions();
 		if (inactiveCompanions.Count > 0)
 		{
 			AddHeader(LocaleText.T("party.inactive"));
-			int inactiveIndex = 1;
 			foreach (SimpleActor actor in inactiveCompanions)
 			{
-				AddMemberButton(FormatActorListText(inactiveIndex, actor), _selected == actor, () => SelectMember(actor), actor);
-				inactiveIndex++;
+				AddMemberButton(FormatActorListText(actor), _selected == actor, () => SelectMember(actor), actor);
 			}
 		}
 
@@ -145,11 +141,9 @@ public partial class PartyPanel : PanelContainer
 		if (deadCompanions.Count > 0)
 		{
 			AddHeader(LocaleText.T("party.dead"));
-			int deadIndex = 1;
 			foreach (SimpleActor actor in deadCompanions)
 			{
-				AddMemberButton(FormatActorListText(deadIndex, actor), _selected == actor, () => SelectMember(actor), actor);
-				deadIndex++;
+				AddMemberButton(FormatActorListText(actor), _selected == actor, () => SelectMember(actor), actor);
 			}
 		}
 
@@ -271,24 +265,24 @@ public partial class PartyPanel : PanelContainer
 	{
 		if (_player == null)
 		{
-			return "[0]: - 0/0";
+			return "LV1 - 0/0";
 		}
 
 		string rebirthTag = _player.PlayerRebirthCount > 0 ? $" ✦x{_player.PlayerRebirthCount}" : string.Empty;
-		return $"[0]: {_player.LocalizedPlayerName}{rebirthTag} {_player.CurrentHealth}/{_player.EffectiveMaxHealth}";
+		return $"LV{_player.Level} {_player.LocalizedPlayerName}{rebirthTag} {_player.CurrentHealth}/{_player.EffectiveMaxHealth}";
 	}
 
-	private static string FormatActorListText(int index, SimpleActor actor)
+	private static string FormatActorListText(SimpleActor actor)
 	{
 		if (actor.IsDefeated)
 		{
 			// Recovery location remains gameplay state, but the roster presents one
 			// unified status whether the companion is still in the field or retrieved.
 			string state = LocaleText.T("party.state.dead");
-			return $"[{index}]: {actor.LocalizedDisplayName} · {state}";
+			return $"LV{actor.Level} {actor.LocalizedDisplayName} · {state}";
 		}
 
-		return $"[{index}]: {actor.LocalizedDisplayName} {actor.CurrentHealth}/{actor.EffectiveMaxHealth}";
+		return $"LV{actor.Level} {actor.LocalizedDisplayName} {actor.CurrentHealth}/{actor.EffectiveMaxHealth}";
 	}
 
 	private void AddMemberButton(string text, bool selected, System.Action onPressed, SimpleActor? actor)

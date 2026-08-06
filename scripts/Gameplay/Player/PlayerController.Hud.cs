@@ -61,7 +61,7 @@ public partial class PlayerController
 			out _playerHealthHudBar,
 			out _playerHealthHudValueLabel));
 		rows.AddChild(CreatePlayerStatusBarRow(
-			"SP",
+			LocaleText.T("hud.stamina_caption"),
 			new Color(0.36f, 0.82f, 1.0f),
 			new Color(0.06f, 0.20f, 0.34f),
 			out _playerStaminaHudBar,
@@ -159,7 +159,7 @@ public partial class PlayerController
 		row.AddThemeConstantOverride("separation", 6);
 
 		Label captionLabel = MakeHudLabel(caption, 13, new Color(0.88f, 0.91f, 0.95f));
-		captionLabel.CustomMinimumSize = new Vector2(34.0f, 0.0f);
+		captionLabel.CustomMinimumSize = new Vector2(58.0f, 0.0f);
 		captionLabel.HorizontalAlignment = HorizontalAlignment.Right;
 		captionLabel.VerticalAlignment = VerticalAlignment.Center;
 		row.AddChild(captionLabel);

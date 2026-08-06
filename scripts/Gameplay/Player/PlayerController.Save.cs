@@ -96,6 +96,14 @@ public partial class PlayerController
 			}
 		}
 
+		foreach (KeyValuePair<SimpleActor, int> entry in _npcQuestRounds)
+		{
+			if (IsInstanceValid(entry.Key) && entry.Value > 0)
+			{
+				data.NpcQuestRounds[entry.Key.DisplayName] = entry.Value;
+			}
+		}
+
 		for (int index = 0; index < _capturedCollection.Count; index++)
 		{
 			SimpleActor actor = _capturedCollection[index];
