@@ -145,7 +145,88 @@ public static class ItemIconLibrary
 
 	private static Texture2D? CreateProceduralIcon(string itemId)
 	{
-		return itemId == BuildCatalog.TownPortalScrollId ? CreateScrollTexture() : null;
+		if (itemId == BuildCatalog.TownPortalScrollId)
+		{
+			return CreateScrollTexture();
+		}
+
+		// Equipment without a hand-drawn PNG gets a slot-shaped silhouette tinted by
+		// a stable per-item colour, so every piece has a matching icon at any count.
+		if (BuildCatalog.GetItemKind(itemId) == InventoryItemKind.Equipment && !BuildCatalog.IsFreeItem(itemId))
+		{
+			return CreateEquipmentIcon(BuildCatalog.GetEquipment(itemId).Slot, AccentColorFor(itemId));
+		}
+
+		return null;
+	}
+
+	// Stable colour from the item id (FNV-1a hash → hue). Same id always maps to the
+	// same tint, so icons are consistent across sessions and never random.
+	private static Color AccentColorFor(string itemId)
+	{
+		uint hash = 2166136261u;
+		foreach (char c in itemId)
+		{
+			hash ^= c;
+			hash *= 16777619u;
+		}
+
+		return Color.FromHsv((hash % 360u) / 360.0f, 0.52f, 0.88f);
+	}
+
+	private static Texture2D CreateEquipmentIcon(EquipmentSlot slot, Color tint)
+	{
+		const int size = 64;
+		var image = Image.CreateEmpty(size, size, false, Image.Format.Rgba8);
+		image.Fill(new Color(0, 0, 0, 0));
+		Color dark = tint.Darkened(0.35f);
+		Color edge = tint.Lightened(0.30f);
+
+		switch (slot)
+		{
+			case EquipmentSlot.Helmet:
+				FillCircle(image, 32, 32, 16, tint);
+				FillRect(image, 14, 34, 50, 42, dark); // brim
+				FillRect(image, 27, 30, 37, 40, tint.Darkened(0.55f)); // visor gap
+				FillRect(image, 22, 16, 42, 20, edge); // crest highlight
+				break;
+			case EquipmentSlot.Weapon:
+				FillRect(image, 30, 44, 34, 58, dark); // hilt
+				FillRect(image, 23, 41, 41, 45, dark); // guard
+				for (int y = 8; y < 44; y++) // tapered blade
+				{
+					int half = Mathf.Max(1, 6 - (y - 8) / 8);
+					FillRect(image, 32 - half, y, 32 + half, y + 1, tint);
+					SetSafe(image, 32 - half, y, edge);
+				}
+
+				break;
+			case EquipmentSlot.Armor:
+				for (int y = 16; y < 52; y++) // chest trapezoid
+				{
+					int half = 8 + (y - 16) / 3;
+					FillRect(image, 32 - half, y, 32 + half, y + 1, y < 22 ? edge : tint);
+				}
+
+				FillCircle(image, 17, 20, 7, dark); // shoulders
+				FillCircle(image, 47, 20, 7, dark);
+				FillRect(image, 30, 16, 34, 50, dark); // seam
+				break;
+			case EquipmentSlot.Boots:
+				FillRect(image, 24, 10, 38, 48, tint); // shaft
+				FillRect(image, 24, 44, 52, 58, tint); // foot
+				FillRect(image, 22, 56, 54, 61, dark); // sole
+				FillRect(image, 26, 12, 30, 46, edge); // lace highlight
+				break;
+			default: // Accessory — ring with a gem
+				FillCircle(image, 32, 38, 16, tint);
+				FillCircle(image, 32, 38, 10, new Color(0, 0, 0, 0));
+				FillCircle(image, 32, 18, 6, edge);
+				FillCircle(image, 32, 18, 3, tint.Lightened(0.6f));
+				break;
+		}
+
+		return ImageTexture.CreateFromImage(image);
 	}
 
 	// A simple 2D parchment-scroll icon: parchment sheet, two rolled ends, ink
