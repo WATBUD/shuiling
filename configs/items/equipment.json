@@ -341,7 +341,9 @@
 			"summaryKey": "equip.summary.gen_helmet_dragon",
 			"slot": "Helmet",
 			"maxHealthBonus": 46,
-			"defenseBonus": 20
+			"defenseBonus": 20,
+			"damageElementId": "fire",
+			"elementDamageBonus": 0.12
 		},
 		{
 			"uniqueId": 79,
@@ -350,7 +352,9 @@
 			"summaryKey": "equip.summary.gen_helmet_phoenix",
 			"slot": "Helmet",
 			"maxHealthBonus": 50,
-			"defenseBonus": 22
+			"defenseBonus": 22,
+			"damageElementId": "fire",
+			"elementDamageBonus": 0.12
 		},
 		{
 			"uniqueId": 80,
@@ -359,7 +363,9 @@
 			"summaryKey": "equip.summary.gen_helmet_frost",
 			"slot": "Helmet",
 			"maxHealthBonus": 54,
-			"defenseBonus": 24
+			"defenseBonus": 24,
+			"damageElementId": "ice",
+			"elementDamageBonus": 0.12
 		},
 		{
 			"uniqueId": 81,
@@ -368,7 +374,9 @@
 			"summaryKey": "equip.summary.gen_helmet_storm",
 			"slot": "Helmet",
 			"maxHealthBonus": 58,
-			"defenseBonus": 26
+			"defenseBonus": 26,
+			"damageElementId": "lightning",
+			"elementDamageBonus": 0.12
 		},
 		{
 			"uniqueId": 82,
@@ -386,7 +394,9 @@
 			"summaryKey": "equip.summary.gen_helmet_radiant",
 			"slot": "Helmet",
 			"maxHealthBonus": 66,
-			"defenseBonus": 30
+			"defenseBonus": 30,
+			"damageElementId": "light",
+			"elementDamageBonus": 0.12
 		},
 		{
 			"uniqueId": 84,
@@ -499,7 +509,9 @@
 			"summaryKey": "equip.summary.gen_weapon_dragon_dirk",
 			"slot": "Weapon",
 			"attackBonus": 30,
-			"attackSpeed": 53
+			"attackSpeed": 53,
+			"damageElementId": "fire",
+			"elementDamageBonus": 0.15
 		},
 		{
 			"uniqueId": 96,
@@ -509,7 +521,9 @@
 			"slot": "Weapon",
 			"attackBonus": 33,
 			"attackSpeed": 54,
-			"attackRangeBonus": 0.4
+			"attackRangeBonus": 0.4,
+			"damageElementId": "fire",
+			"elementDamageBonus": 0.15
 		},
 		{
 			"uniqueId": 97,
@@ -519,7 +533,9 @@
 			"slot": "Weapon",
 			"attackBonus": 36,
 			"attackSpeed": 55,
-			"critChanceBonus": 0.06
+			"critChanceBonus": 0.06,
+			"damageElementId": "ice",
+			"elementDamageBonus": 0.15
 		},
 		{
 			"uniqueId": 98,
@@ -597,7 +613,9 @@
 			"slot": "Armor",
 			"maxHealthBonus": 59,
 			"defenseBonus": 22,
-			"moveSpeedBonus": 0.06
+			"moveSpeedBonus": 0.06,
+			"damageElementId": "fire",
+			"elementDamageBonus": 0.12
 		},
 		{
 			"uniqueId": 106,
@@ -606,7 +624,9 @@
 			"summaryKey": "equip.summary.gen_armor_phoenix",
 			"slot": "Armor",
 			"maxHealthBonus": 64,
-			"defenseBonus": 24
+			"defenseBonus": 24,
+			"damageElementId": "fire",
+			"elementDamageBonus": 0.12
 		},
 		{
 			"uniqueId": 107,
@@ -616,7 +636,9 @@
 			"slot": "Armor",
 			"maxHealthBonus": 69,
 			"defenseBonus": 26,
-			"moveSpeedBonus": 0.02
+			"moveSpeedBonus": 0.02,
+			"damageElementId": "ice",
+			"elementDamageBonus": 0.12
 		},
 		{
 			"uniqueId": 108,
@@ -626,7 +648,9 @@
 			"slot": "Armor",
 			"maxHealthBonus": 74,
 			"defenseBonus": 28,
-			"moveSpeedBonus": 0.04
+			"moveSpeedBonus": 0.04,
+			"damageElementId": "lightning",
+			"elementDamageBonus": 0.12
 		},
 		{
 			"uniqueId": 109,
@@ -645,7 +669,9 @@
 			"summaryKey": "equip.summary.gen_armor_radiant",
 			"slot": "Armor",
 			"maxHealthBonus": 84,
-			"defenseBonus": 32
+			"defenseBonus": 32,
+			"damageElementId": "light",
+			"elementDamageBonus": 0.12
 		},
 		{
 			"uniqueId": 111,
@@ -759,7 +785,9 @@
 			"summaryKey": "equip.summary.gen_boots_dragon",
 			"slot": "Boots",
 			"defenseBonus": 9,
-			"moveSpeedBonus": 0.13
+			"moveSpeedBonus": 0.13,
+			"damageElementId": "fire",
+			"elementDamageBonus": 0.12
 		},
 		{
 			"uniqueId": 123,
@@ -768,7 +796,9 @@
 			"summaryKey": "equip.summary.gen_boots_phoenix",
 			"slot": "Boots",
 			"defenseBonus": 10,
-			"moveSpeedBonus": 0.14
+			"moveSpeedBonus": 0.14,
+			"damageElementId": "fire",
+			"elementDamageBonus": 0.12
 		},
 		{
 			"uniqueId": 124,
@@ -778,7 +808,9 @@
 			"slot": "Boots",
 			"defenseBonus": 11,
 			"moveSpeedBonus": 0.15,
-			"jumpPowerBonus": 26
+			"jumpPowerBonus": 26,
+			"damageElementId": "ice",
+			"elementDamageBonus": 0.12
 		},
 		{
 			"uniqueId": 125,
@@ -787,7 +819,9 @@
 			"summaryKey": "equip.summary.gen_boots_storm",
 			"slot": "Boots",
 			"defenseBonus": 12,
-			"moveSpeedBonus": 0.16
+			"moveSpeedBonus": 0.16,
+			"damageElementId": "lightning",
+			"elementDamageBonus": 0.12
 		},
 		{
 			"uniqueId": 126,
@@ -806,7 +840,9 @@
 			"slot": "Boots",
 			"defenseBonus": 14,
 			"moveSpeedBonus": 0.18,
-			"jumpPowerBonus": 32
+			"jumpPowerBonus": 32,
+			"damageElementId": "light",
+			"elementDamageBonus": 0.12
 		},
 		{
 			"uniqueId": 128,
@@ -900,7 +936,9 @@
 			"nameKey": "equip.accessory.dragon_charm",
 			"summaryKey": "equip.summary.gen_accessory_dragon_charm",
 			"slot": "Accessory",
-			"moveSpeedBonus": 0.06
+			"moveSpeedBonus": 0.06,
+			"damageElementId": "fire",
+			"elementDamageBonus": 0.18
 		},
 		{
 			"uniqueId": 139,
@@ -908,7 +946,9 @@
 			"nameKey": "equip.accessory.phoenix_talisman",
 			"summaryKey": "equip.summary.gen_accessory_phoenix_talisman",
 			"slot": "Accessory",
-			"attackBonus": 22
+			"attackBonus": 22,
+			"damageElementId": "fire",
+			"elementDamageBonus": 0.18
 		},
 		{
 			"uniqueId": 140,
@@ -916,7 +956,9 @@
 			"nameKey": "equip.accessory.frost_pendant",
 			"summaryKey": "equip.summary.gen_accessory_frost_pendant",
 			"slot": "Accessory",
-			"critChanceBonus": 0.06
+			"critChanceBonus": 0.06,
+			"damageElementId": "ice",
+			"elementDamageBonus": 0.18
 		},
 		{
 			"uniqueId": 141,
@@ -925,7 +967,9 @@
 			"summaryKey": "equip.summary.gen_accessory_storm_ring",
 			"slot": "Accessory",
 			"defenseBonus": 25,
-			"maxHealthBonus": 40
+			"maxHealthBonus": 40,
+			"damageElementId": "lightning",
+			"elementDamageBonus": 0.18
 		},
 		{
 			"uniqueId": 142,
@@ -941,7 +985,9 @@
 			"nameKey": "equip.accessory.radiant_charm",
 			"summaryKey": "equip.summary.gen_accessory_radiant_charm",
 			"slot": "Accessory",
-			"attackBonus": 30
+			"attackBonus": 30,
+			"damageElementId": "light",
+			"elementDamageBonus": 0.18
 		},
 		{
 			"uniqueId": 144,

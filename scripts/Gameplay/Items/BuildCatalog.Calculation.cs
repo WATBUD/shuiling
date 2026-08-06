@@ -67,6 +67,7 @@ public static partial class BuildCatalog
 			stats.Attack = Mathf.RoundToInt(stats.Attack * identity.ElementAffinityDamageMultiplier);
 		}
 
+		ApplyEquipmentElementDamage(stats, loadout);
 		stats.Attack = Mathf.Max(Mathf.RoundToInt(stats.Attack * stats.DamageMultiplier), 1);
 		stats.MoveSpeedMultiplier = Mathf.Clamp(stats.MoveSpeedMultiplier, 0.55f, 2.4f);
 		stats.AttackCooldownMultiplier = Mathf.Clamp(stats.AttackCooldownMultiplier, 0.42f, 1.85f);
@@ -116,6 +117,7 @@ public static partial class BuildCatalog
 			AccumulateBehavior(stats.Behavior, gem, loadout.GetSkillGemLevel(slot));
 		}
 
+		ApplyEquipmentElementDamage(stats, loadout);
 		stats.Attack = Mathf.Max(Mathf.RoundToInt(stats.Attack * stats.DamageMultiplier), 1);
 		stats.AttackDisplayValue = stats.Attack + player.AttackAttributePoints * PlayerController.AttackPerPoint;
 		stats.DefenseDisplayValue = stats.Defense + player.DefenseAttributePoints * PlayerController.DefensePerPoint;
@@ -193,6 +195,33 @@ public static partial class BuildCatalog
 			Mathf.RoundToInt(speed),
 			EquipmentConfig.MinimumWeaponAttackSpeed,
 			EquipmentConfig.MaximumWeaponAttackSpeed);
+	}
+
+	// Elemental gear pays off only when its element matches the wielder's actual
+	// attack element (set by the skill core) — e.g. a lightning ring does nothing
+	// on an ice-shard build. Sums each matching piece's bonus (scaled by its refine
+	// stars) and boosts Attack. Call AFTER cores have set stats.DamageElementId.
+	private static void ApplyEquipmentElementDamage(BuildStats stats, CompanionBuildLoadout loadout)
+	{
+		if (string.IsNullOrEmpty(stats.DamageElementId))
+		{
+			return;
+		}
+
+		float bonus = 0.0f;
+		foreach (string id in new[] { loadout.HelmetId, loadout.WeaponId, loadout.ArmorId, loadout.BootsId, loadout.AccessoryId })
+		{
+			EquipmentDefinition equipment = GetEquipment(id);
+			if (!string.IsNullOrEmpty(equipment.DamageElementId) && equipment.DamageElementId == stats.DamageElementId)
+			{
+				bonus += equipment.ElementDamageBonus * GetEquipmentStarMultiplier(id);
+			}
+		}
+
+		if (bonus > 0.0f)
+		{
+			stats.Attack = Mathf.Max(Mathf.RoundToInt(stats.Attack * (1.0f + bonus)), 1);
+		}
 	}
 
 	private static void ApplyEquipment(BuildStats stats, EquipmentDefinition equipment, float bonusMultiplier = 1.0f)

@@ -53,6 +53,11 @@ public sealed class EquipmentDefinition
 	public float AttackCooldownReduction { get; set; }
 	public float AttackRangeBonus { get; set; }
 	public float CritChanceBonus { get; set; }
+	// Elemental gear: grants ElementDamageBonus (+fraction of Attack) ONLY when the
+	// wearer's actual attack element (set by the skill core) matches this element.
+	// Empty = non-elemental. Attack elements in play: fire / ice / lightning / light.
+	public string DamageElementId { get; set; } = string.Empty;
+	public float ElementDamageBonus { get; set; }
 }
 
 public sealed class AttributeGemDefinition
