@@ -101,13 +101,20 @@ public static class ItemIconLibrary
 
 		if (!IconFiles.TryGetValue(iconKey, out string? fileName))
 		{
-			// Consumables have no PNG asset — draw their 2D icon procedurally.
-			Texture2D? generated = CreateProceduralIcon(iconKey);
-			if (generated != null)
+			// New equipment without its own art reuses a hand-drawn icon from the
+			// same slot (weapons matched by type), so it still looks painted rather
+			// than a flat procedural blob.
+			fileName = FallbackEquipmentIconFile(iconKey);
+			if (fileName == null)
 			{
-				Cache[iconKey] = generated;
+				// Consumables etc. have no PNG asset — draw their 2D icon procedurally.
+				Texture2D? generated = CreateProceduralIcon(iconKey);
+				if (generated != null)
+				{
+					Cache[iconKey] = generated;
+				}
+				return generated;
 			}
-			return generated;
 		}
 
 		string resourcePath = Root + fileName;
@@ -141,6 +148,75 @@ public static class ItemIconLibrary
 		// Compatibility fallback for malformed or retired refined ids that are not
 		// present in the current numeric catalogue.
 		return BuildCatalog.GetBaseEquipmentId(itemId);
+	}
+
+	// Existing hand-drawn PNGs per slot, reused by new equipment that has no art.
+	private static readonly string[] HelmetIcons = { "helmet_traveler.png", "helmet_guardian.png", "helmet_mystic.png" };
+	private static readonly string[] ArmorIcons = { "armor_scout.png", "armor_plate.png", "armor_spirit.png" };
+	private static readonly string[] BootsIcons = { "boots_traveler.png", "boots_reinforced.png", "boots_windrunner.png", "boots_gravity.png" };
+	private static readonly string[] AccessoryIcons = { "accessory_swift_ring.png", "accessory_crit_charm.png", "accessory_guard.png", "accessory_focus_lens.png" };
+	private static readonly string[] WeaponIcons = { "weapon_sword.png", "weapon_short_sword.png", "weapon_dagger.png", "weapon_longbow.png", "weapon_spear.png", "weapon_warhammer.png", "weapon_scepter.png", "weapon_staff.png", "weapon_great_axe.png", "weapon_claws.png" };
+
+	// Weapon material ids are "<material>_<noun>"; map the noun to a fitting blade.
+	private static readonly Dictionary<string, string> WeaponNounIcon = new(System.StringComparer.Ordinal)
+	{
+		["blade"] = "weapon_sword.png",
+		["axe"] = "weapon_great_axe.png",
+		["bow"] = "weapon_longbow.png",
+		["spear"] = "weapon_spear.png",
+		["mace"] = "weapon_warhammer.png",
+		["glaive"] = "weapon_spear.png",
+		["rod"] = "weapon_staff.png",
+		["dirk"] = "weapon_dagger.png",
+		["saber"] = "weapon_short_sword.png",
+		["halberd"] = "weapon_spear.png",
+	};
+
+	private static string? FallbackEquipmentIconFile(string itemId)
+	{
+		if (BuildCatalog.IsFreeItem(itemId) || BuildCatalog.GetItemKind(itemId) != InventoryItemKind.Equipment)
+		{
+			return null;
+		}
+
+		uint hash = FnvHash(itemId);
+		switch (BuildCatalog.GetEquipment(itemId).Slot)
+		{
+			case EquipmentSlot.Helmet:
+				return HelmetIcons[hash % HelmetIcons.Length];
+			case EquipmentSlot.Armor:
+				return ArmorIcons[hash % ArmorIcons.Length];
+			case EquipmentSlot.Boots:
+				return BootsIcons[hash % BootsIcons.Length];
+			case EquipmentSlot.Accessory:
+				return AccessoryIcons[hash % AccessoryIcons.Length];
+			case EquipmentSlot.Weapon:
+				string[] parts = itemId.Split('.');
+				if (parts.Length >= 3)
+				{
+					string[] seg = parts[2].Split('_');
+					if (seg.Length >= 2 && WeaponNounIcon.TryGetValue(seg[1], out string? mapped))
+					{
+						return mapped;
+					}
+				}
+
+				return WeaponIcons[hash % WeaponIcons.Length];
+			default:
+				return null;
+		}
+	}
+
+	private static uint FnvHash(string value)
+	{
+		uint hash = 2166136261u;
+		foreach (char c in value)
+		{
+			hash ^= c;
+			hash *= 16777619u;
+		}
+
+		return hash;
 	}
 
 	private static Texture2D? CreateProceduralIcon(string itemId)
