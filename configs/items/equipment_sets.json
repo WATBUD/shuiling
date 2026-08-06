@@ -1,0 +1,125 @@
+{
+	"system": "equipment_sets",
+	"sets": [
+		{
+			"id": "set.iron",
+			"nameKey": "set.iron",
+			"theme": "iron",
+			"bonus": {
+				"maxHealthBonus": 30,
+				"attackBonus": 10,
+				"defenseBonus": 10,
+				"moveSpeedBonus": 0.03,
+				"critChanceBonus": 0.03
+			}
+		},
+		{
+			"id": "set.bronze",
+			"nameKey": "set.bronze",
+			"theme": "bronze",
+			"bonus": {
+				"maxHealthBonus": 42,
+				"attackBonus": 14,
+				"defenseBonus": 13,
+				"moveSpeedBonus": 0.034,
+				"critChanceBonus": 0.034
+			}
+		},
+		{
+			"id": "set.steel",
+			"nameKey": "set.steel",
+			"theme": "steel",
+			"bonus": {
+				"maxHealthBonus": 54,
+				"attackBonus": 18,
+				"defenseBonus": 16,
+				"moveSpeedBonus": 0.038,
+				"critChanceBonus": 0.038
+			}
+		},
+		{
+			"id": "set.silver",
+			"nameKey": "set.silver",
+			"theme": "silver",
+			"bonus": {
+				"maxHealthBonus": 66,
+				"attackBonus": 22,
+				"defenseBonus": 19,
+				"moveSpeedBonus": 0.042,
+				"critChanceBonus": 0.042
+			}
+		},
+		{
+			"id": "set.mithril",
+			"nameKey": "set.mithril",
+			"theme": "mithril",
+			"bonus": {
+				"maxHealthBonus": 78,
+				"attackBonus": 26,
+				"defenseBonus": 22,
+				"moveSpeedBonus": 0.046,
+				"critChanceBonus": 0.046
+			}
+		},
+		{
+			"id": "set.crystal",
+			"nameKey": "set.crystal",
+			"theme": "crystal",
+			"bonus": {
+				"maxHealthBonus": 90,
+				"attackBonus": 30,
+				"defenseBonus": 25,
+				"moveSpeedBonus": 0.05,
+				"critChanceBonus": 0.05
+			}
+		},
+		{
+			"id": "set.obsidian",
+			"nameKey": "set.obsidian",
+			"theme": "obsidian",
+			"bonus": {
+				"maxHealthBonus": 102,
+				"attackBonus": 34,
+				"defenseBonus": 28,
+				"moveSpeedBonus": 0.054,
+				"critChanceBonus": 0.054
+			}
+		},
+		{
+			"id": "set.dragon",
+			"nameKey": "set.dragon",
+			"theme": "dragon",
+			"bonus": {
+				"maxHealthBonus": 114,
+				"attackBonus": 38,
+				"defenseBonus": 31,
+				"moveSpeedBonus": 0.058,
+				"critChanceBonus": 0.058
+			}
+		},
+		{
+			"id": "set.phoenix",
+			"nameKey": "set.phoenix",
+			"theme": "phoenix",
+			"bonus": {
+				"maxHealthBonus": 126,
+				"attackBonus": 42,
+				"defenseBonus": 34,
+				"moveSpeedBonus": 0.062,
+				"critChanceBonus": 0.062
+			}
+		},
+		{
+			"id": "set.frost",
+			"nameKey": "set.frost",
+			"theme": "frost",
+			"bonus": {
+				"maxHealthBonus": 138,
+				"attackBonus": 46,
+				"defenseBonus": 37,
+				"moveSpeedBonus": 0.066,
+				"critChanceBonus": 0.066
+			}
+		}
+	]
+}

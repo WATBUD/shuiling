@@ -606,7 +606,7 @@ public static partial class BuildCatalog
 
 	public static string LocalizedEquipmentSet(CompanionBuildLoadout loadout)
 	{
-		return string.Join(" / ", new[]
+		string pieces = string.Join(" / ", new[]
 		{
 			LocaleText.T(GetEquipment(loadout.HelmetId).NameKey),
 			LocaleText.T(GetEquipment(loadout.WeaponId).NameKey),
@@ -614,5 +614,10 @@ public static partial class BuildCatalog
 			LocaleText.T(GetEquipment(loadout.BootsId).NameKey),
 			LocaleText.T(GetEquipment(loadout.AccessoryId).NameKey),
 		});
+
+		string setNameKey = GetActiveEquipmentSetNameKey(loadout);
+		return string.IsNullOrEmpty(setNameKey)
+			? pieces
+			: pieces + "\n" + LocaleText.F("set.active", LocaleText.T(setNameKey));
 	}
 }

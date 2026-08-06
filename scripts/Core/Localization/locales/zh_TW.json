@@ -1225,5 +1225,17 @@
 	"equip.accessory.royal_pendant": "皇家墜飾",
 	"equip.summary.gen_accessory_royal_pendant": "皇家墜飾，+33 防禦、+52 生命。",
 	"equip.accessory.verdant_ring": "翠玉戒指",
-	"equip.summary.gen_accessory_verdant_ring": "翠玉戒指，移速 +8%。"
+	"equip.summary.gen_accessory_verdant_ring": "翠玉戒指，移速 +8%。",
+	"set.iron": "鐵套裝",
+	"set.bronze": "青銅套裝",
+	"set.steel": "精鋼套裝",
+	"set.silver": "白銀套裝",
+	"set.mithril": "秘銀套裝",
+	"set.crystal": "水晶套裝",
+	"set.obsidian": "黑曜套裝",
+	"set.dragon": "龍鱗套裝",
+	"set.phoenix": "炎鳳套裝",
+	"set.frost": "霜寒套裝",
+	"set.active": "套裝啟用：{0}",
+	"tooltip.set_member": "套裝：{0}（集滿 5 件啟用）"
 }

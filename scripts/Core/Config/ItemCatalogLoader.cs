@@ -25,9 +25,35 @@ public sealed class MaterialItemJson
 	public float[] DropColor { get; set; } = { 0.82f, 0.92f, 1.0f, 0.95f };
 }
 
+// Equipment set (套裝) bonus applied when all five worn pieces share a theme.
+public sealed class EquipmentSetBonusJson
+{
+	public int MaxHealthBonus { get; set; }
+	public int AttackBonus { get; set; }
+	public int DefenseBonus { get; set; }
+	public float MoveSpeedBonus { get; set; }
+	public float CritChanceBonus { get; set; }
+	public float AttackRangeBonus { get; set; }
+}
+
+public sealed class EquipmentSetJson
+{
+	public string Id { get; set; } = string.Empty;
+	public string NameKey { get; set; } = string.Empty;
+	public string Theme { get; set; } = string.Empty;
+	public EquipmentSetBonusJson Bonus { get; set; } = new();
+}
+
+public sealed class EquipmentSetsDocument
+{
+	public string System { get; set; } = string.Empty;
+	public List<EquipmentSetJson> Sets { get; set; } = new();
+}
+
 public static class ItemCatalogLoader
 {
 	public const string EquipmentPath = "res://configs/items/equipment.json";
+	public const string EquipmentSetsPath = "res://configs/items/equipment_sets.json";
 	public const string CoreSkillsPath = "res://configs/items/core_skills.json";
 	public const string SupportCoresPath = "res://configs/items/support_cores.json";
 	public const string ConsumablesPath = "res://configs/items/consumables.json";
@@ -42,9 +68,32 @@ public static class ItemCatalogLoader
 	private static List<ConsumableDefinition>? _consumables;
 	private static MonsterLootDefinition[]? _materials;
 
+	private static List<EquipmentSetJson>? _equipmentSets;
+
 	public static List<EquipmentDefinition> LoadEquipment()
 	{
 		return _equipment ??= Load<EquipmentDefinition>(EquipmentPath, "equipment", item => item.UniqueId, item => item.Id);
+	}
+
+	// Sets have no numeric ids, so they skip the item uniqueId validator. Missing
+	// file is tolerated (returns empty) — sets are an optional layer.
+	public static List<EquipmentSetJson> LoadEquipmentSets()
+	{
+		if (_equipmentSets != null)
+		{
+			return _equipmentSets;
+		}
+
+		if (!FileAccess.FileExists(EquipmentSetsPath))
+		{
+			_equipmentSets = new List<EquipmentSetJson>();
+			return _equipmentSets;
+		}
+
+		using FileAccess file = FileAccess.Open(EquipmentSetsPath, FileAccess.ModeFlags.Read);
+		EquipmentSetsDocument? document = JsonSerializer.Deserialize<EquipmentSetsDocument>(file.GetAsText(), JsonOptions);
+		_equipmentSets = document?.Sets ?? new List<EquipmentSetJson>();
+		return _equipmentSets;
 	}
 
 	public static List<SkillGemDefinition> LoadCoreSkills()

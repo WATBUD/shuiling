@@ -1225,5 +1225,17 @@
 	"equip.accessory.royal_pendant": "Royal Pendant",
 	"equip.summary.gen_accessory_royal_pendant": "A royal pendant. +33 DEF, +52 HP.",
 	"equip.accessory.verdant_ring": "Verdant Ring",
-	"equip.summary.gen_accessory_verdant_ring": "A verdant ring. +8% move."
+	"equip.summary.gen_accessory_verdant_ring": "A verdant ring. +8% move.",
+	"set.iron": "Iron Set",
+	"set.bronze": "Bronze Set",
+	"set.steel": "Steel Set",
+	"set.silver": "Silver Set",
+	"set.mithril": "Mithril Set",
+	"set.crystal": "Crystal Set",
+	"set.obsidian": "Obsidian Set",
+	"set.dragon": "Dragon Set",
+	"set.phoenix": "Phoenix Set",
+	"set.frost": "Frost Set",
+	"set.active": "Set bonus active: {0}",
+	"tooltip.set_member": "Set: {0} (full 5-piece bonus)"
 }

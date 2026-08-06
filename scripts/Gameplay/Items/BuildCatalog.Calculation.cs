@@ -26,6 +26,7 @@ public static partial class BuildCatalog
 		ApplyEquipment(stats, GetEquipment(loadout.ArmorId), GetEquipmentStarMultiplier(loadout.ArmorId));
 		ApplyEquipment(stats, GetEquipment(loadout.BootsId), GetEquipmentStarMultiplier(loadout.BootsId));
 		ApplyEquipment(stats, GetEquipment(loadout.AccessoryId), GetEquipmentStarMultiplier(loadout.AccessoryId));
+		ApplyEquipmentSetBonus(stats, loadout);
 
 		// The active core owns its damage type; support cores only alter compatible
 		// behavior and stats up to the number of unlocked support slots.
@@ -97,6 +98,7 @@ public static partial class BuildCatalog
 		ApplyEquipment(stats, GetEquipment(loadout.ArmorId), GetEquipmentStarMultiplier(loadout.ArmorId));
 		ApplyEquipment(stats, GetEquipment(loadout.BootsId), GetEquipmentStarMultiplier(loadout.BootsId));
 		ApplyEquipment(stats, GetEquipment(loadout.AccessoryId), GetEquipmentStarMultiplier(loadout.AccessoryId));
+		ApplyEquipmentSetBonus(stats, loadout);
 
 		int unlocked = GetUnlockedSupportCoreCount(player.Level);
 		bool hasProjectile = HasProjectileActiveSkill(loadout);
@@ -195,6 +197,26 @@ public static partial class BuildCatalog
 			Mathf.RoundToInt(speed),
 			EquipmentConfig.MinimumWeaponAttackSpeed,
 			EquipmentConfig.MaximumWeaponAttackSpeed);
+	}
+
+	// Full-set (套裝) bonus: flat stats added when all five worn pieces share a set
+	// theme. Data lives in configs/items/equipment_sets.json. Added like equipment
+	// (before the final damage multiplier), so the set's Attack scales consistently.
+	private static void ApplyEquipmentSetBonus(BuildStats stats, CompanionBuildLoadout loadout)
+	{
+		EquipmentSetJson? set = GetActiveEquipmentSet(loadout);
+		if (set == null)
+		{
+			return;
+		}
+
+		EquipmentSetBonusJson b = set.Bonus;
+		stats.MaxHealth += b.MaxHealthBonus;
+		stats.Attack += b.AttackBonus;
+		stats.Defense += b.DefenseBonus;
+		stats.MoveSpeedMultiplier += b.MoveSpeedBonus;
+		stats.CritChance += b.CritChanceBonus;
+		stats.AttackRangeBonus += b.AttackRangeBonus;
 	}
 
 	// Elemental gear pays off only when its element matches the wielder's actual

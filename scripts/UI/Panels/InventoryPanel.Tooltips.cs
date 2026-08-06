@@ -130,6 +130,11 @@ public partial class InventoryPanel : PanelContainer
 	private static void AppendEquipmentTooltip(List<string> lines, EquipmentDefinition item, float starMultiplier = 1.0f)
 	{
 		AddSummaryLine(lines, item.SummaryKey);
+		EquipmentSetJson? set = BuildCatalog.GetSetForEquipment(item.Id);
+		if (set != null)
+		{
+			lines.Add(LocaleText.F("tooltip.set_member", LocaleText.T(set.NameKey)));
+		}
 		AddStatLine(lines, "stat.health", Mathf.RoundToInt(item.MaxHealthBonus * starMultiplier));
 		AddStatLine(lines, "stat.attack", Mathf.RoundToInt(item.AttackBonus * starMultiplier));
 		AddStatLine(lines, "stat.defense", Mathf.RoundToInt(item.DefenseBonus * starMultiplier));
