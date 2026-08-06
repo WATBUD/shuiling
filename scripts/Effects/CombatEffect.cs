@@ -11,6 +11,9 @@ public partial class CombatEffect : Node3D
 	[Export] public Color EffectColor { get; set; } = new(1.0f, 0.55f, 0.18f, 0.9f);
 	[Export] public float Lifetime { get; set; } = 0.52f;
 	[Export] public float Radius { get; set; } = 0.55f;
+	// RO-style critical hit: a dark panel with a red frame behind the number,
+	// plus a "CRITICAL!" banner riding above it.
+	[Export] public bool CritBanner { get; set; }
 
 	private readonly List<StandardMaterial3D> _materials = new();
 	private float _age;
@@ -19,6 +22,11 @@ public partial class CombatEffect : Node3D
 	private Label3D? _label;
 	private Label3D? _labelShadow;
 	private Label3D? _labelHighlight;
+	private Label3D? _critLabel;
+	private MeshInstance3D? _critPanel;
+	private MeshInstance3D? _critFrame;
+	private StandardMaterial3D? _critPanelMaterial;
+	private StandardMaterial3D? _critFrameMaterial;
 	private bool _registeredAsActive;
 
 	public static void SetDamageTextScale(float scale)
@@ -84,6 +92,37 @@ public partial class CombatEffect : Node3D
 			UpdateLayeredLabel(_labelHighlight, textPosition + new Vector3(-0.018f, 0.025f, -0.01f), popScale * 0.985f * configuredTextScale, new Color(1.0f, 1.0f, 0.88f, alpha * 0.34f));
 		}
 
+		if (CritBanner)
+		{
+			float bannerPop = t < 0.12f ? Mathf.Lerp(0.4f, 1.14f, t / 0.12f) : Mathf.Lerp(1.14f, 1.0f, Mathf.Min((t - 0.12f) / 0.18f, 1.0f));
+			float bannerRise = 0.78f + Mathf.Sin(t * Mathf.Pi) * 0.34f + t * 0.82f;
+			var bannerBase = new Vector3(0.0f, bannerRise, 0.0f);
+			if (_critFrame != null)
+			{
+				_critFrame.Position = bannerBase;
+				_critFrame.Scale = Vector3.One * bannerPop;
+			}
+			if (_critPanel != null)
+			{
+				_critPanel.Position = bannerBase + new Vector3(0.0f, 0.0f, 0.01f);
+				_critPanel.Scale = Vector3.One * bannerPop;
+			}
+			if (_critLabel != null)
+			{
+				_critLabel.Position = bannerBase + new Vector3(0.0f, 0.64f, 0.02f);
+				_critLabel.Scale = Vector3.One * bannerPop;
+				_critLabel.Modulate = new Color(1.0f, 0.92f, 0.30f, alpha);
+			}
+			if (_critFrameMaterial != null)
+			{
+				_critFrameMaterial.AlbedoColor = new Color(0.95f, 0.12f, 0.12f, 0.92f * alpha);
+			}
+			if (_critPanelMaterial != null)
+			{
+				_critPanelMaterial.AlbedoColor = new Color(0.10f, 0.02f, 0.03f, 0.82f * alpha);
+			}
+		}
+
 		if (_age >= Lifetime)
 		{
 			QueueFree();
@@ -98,6 +137,11 @@ public partial class CombatEffect : Node3D
 		AddImpactSprite();
 		AddImpactParticles();
 
+		if (CritBanner)
+		{
+			BuildCritBanner();
+		}
+
 		if (!string.IsNullOrEmpty(Text))
 		{
 			// Two layers (shadow + main) instead of three: the extra highlight
@@ -107,6 +151,63 @@ public partial class CombatEffect : Node3D
 			AddChild(_labelShadow);
 			AddChild(_label);
 		}
+	}
+
+	// RO-style critical: a dark quad framed in red sits behind the damage number,
+	// with a bright "CRITICAL!" banner floating above. All layers fade with the
+	// effect via _critPanelMaterial / _critFrameMaterial and _critLabel.Modulate.
+	private void BuildCritBanner()
+	{
+		_critFrame = new MeshInstance3D
+		{
+			Name = "CritFrame",
+			Mesh = new QuadMesh { Size = new Vector2(1.72f, 0.94f) },
+		};
+		_critFrameMaterial = CreateBannerMaterial(new Color(0.95f, 0.12f, 0.12f, 0.92f));
+		_critFrame.MaterialOverride = _critFrameMaterial;
+		AddChild(_critFrame);
+
+		_critPanel = new MeshInstance3D
+		{
+			Name = "CritPanel",
+			Mesh = new QuadMesh { Size = new Vector2(1.58f, 0.80f) },
+			Position = new Vector3(0.0f, 0.0f, 0.01f),
+		};
+		_critPanelMaterial = CreateBannerMaterial(new Color(0.10f, 0.02f, 0.03f, 0.82f));
+		_critPanel.MaterialOverride = _critPanelMaterial;
+		AddChild(_critPanel);
+
+		_critLabel = new Label3D
+		{
+			Text = "CRITICAL!",
+			Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+			FixedSize = false,
+			NoDepthTest = true,
+			TextureFilter = BaseMaterial3D.TextureFilterEnum.Linear,
+			FontSize = 40,
+			PixelSize = 0.01f,
+			OutlineSize = 14,
+			HorizontalAlignment = HorizontalAlignment.Center,
+			VerticalAlignment = VerticalAlignment.Center,
+			Width = 320.0f,
+			Position = new Vector3(0.0f, 1.42f, 0.02f),
+		};
+		_critLabel.Modulate = new Color(1.0f, 0.92f, 0.30f, 1.0f);
+		_critLabel.OutlineModulate = new Color(0.55f, 0.03f, 0.02f, 1.0f);
+		AddChild(_critLabel);
+	}
+
+	private static StandardMaterial3D CreateBannerMaterial(Color color)
+	{
+		return new StandardMaterial3D
+		{
+			AlbedoColor = color,
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled,
+			NoDepthTest = true,
+			CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+		};
 	}
 
 	private void AddImpactSprite()

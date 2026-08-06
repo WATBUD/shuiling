@@ -17,7 +17,7 @@ public partial class SimpleActor : CharacterBody3D
 		}
 	}
 
-	public int ReceiveDamage(int rawDamage, SimpleActor? attacker, PlayerController? playerAttacker = null)
+	public int ReceiveDamage(int rawDamage, SimpleActor? attacker, PlayerController? playerAttacker = null, bool isCrit = false)
 	{
 		if (IsInvulnerable)
 		{
@@ -41,7 +41,14 @@ public partial class SimpleActor : CharacterBody3D
 		if (IsTrainingDummy)
 		{
 			// 稻草人：顯示傷害數字與命中特效，但永遠不扣血、不會死亡、也不會反擊。
-			SpawnCombatEffect(mitigatedDamage, attacker?.GetAttackColor() ?? new Color(1.0f, 0.5f, 0.22f, 0.92f));
+			if (isCrit)
+			{
+				SpawnCritEffect(mitigatedDamage);
+			}
+			else
+			{
+				SpawnCombatEffect(mitigatedDamage, attacker?.GetAttackColor() ?? new Color(1.0f, 0.5f, 0.22f, 0.92f));
+			}
 			RefreshNameplate();
 			return mitigatedDamage;
 		}
@@ -72,7 +79,14 @@ public partial class SimpleActor : CharacterBody3D
 		{
 			CurrentHealth = 1;
 		}
-		SpawnCombatEffect(mitigatedDamage, attacker?.GetAttackColor() ?? new Color(1.0f, 0.5f, 0.22f, 0.92f));
+		if (isCrit)
+		{
+			SpawnCritEffect(mitigatedDamage);
+		}
+		else
+		{
+			SpawnCombatEffect(mitigatedDamage, attacker?.GetAttackColor() ?? new Color(1.0f, 0.5f, 0.22f, 0.92f));
+		}
 		// Hits build the capture stagger meter (combo finisher path).
 		AddCaptureStagger(mitigatedDamage);
 		if (IsBoss && attacker?._followTarget != null && IsInstanceValid(attacker._followTarget))
@@ -170,13 +184,14 @@ public partial class SimpleActor : CharacterBody3D
 		int roleBonus = CombatRole == "DPS" ? 4 : CombatRole == "Tank" ? 1 : CombatRole == "Ranged" ? 2 : 0;
 		int affinityBonus = Affinity >= 80 ? 2 : Affinity >= 55 ? 1 : 0;
 		int damage = Mathf.Max(stats.Attack + roleBonus + affinityBonus, 1);
-		if (_rng.Randf() < stats.CritChance)
+		bool crit = _rng.Randf() < stats.CritChance;
+		if (crit)
 		{
-			damage = Mathf.RoundToInt(damage * 1.55f);
+			damage = Mathf.RoundToInt(damage * stats.CritDamageMultiplier);
 		}
 
 		PlayAttackAction(target.GlobalPosition, false);
-		int dealtDamage = target.ReceiveDamage(damage, this);
+		int dealtDamage = target.ReceiveDamage(damage, this, isCrit: crit);
 		if (dealtDamage > 0 && _rng.Randf() < stats.ControlChance)
 		{
 			target.ApplyElementStatus(stats.DamageElementId, this);
@@ -335,12 +350,13 @@ public partial class SimpleActor : CharacterBody3D
 
 		BuildStats stats = CurrentBuildStats;
 		int damage = Mathf.Max(baseDamage, 1);
-		if (_rng.Randf() < stats.CritChance)
+		bool crit = _rng.Randf() < stats.CritChance;
+		if (crit)
 		{
-			damage = Mathf.RoundToInt(damage * 1.55f);
+			damage = Mathf.RoundToInt(damage * stats.CritDamageMultiplier);
 		}
 
-		int dealtDamage = target.ReceiveDamage(damage, this);
+		int dealtDamage = target.ReceiveDamage(damage, this, isCrit: crit);
 		if (dealtDamage > 0 && _rng.Randf() < stats.ControlChance)
 		{
 			target.ApplyElementStatus(stats.DamageElementId, this);

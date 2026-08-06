@@ -120,6 +120,18 @@
 				"moveSpeedBonus": 0.066,
 				"critChanceBonus": 0.066
 			}
+		},
+		{
+			"id": "set.shadow",
+			"nameKey": "set.shadow",
+			"theme": "shadow",
+			"bonus": {
+				"maxHealthBonus": 80,
+				"attackBonus": 40,
+				"defenseBonus": 24,
+				"critChanceBonus": 0.15,
+				"critDamageBonus": 0.5
+			}
 		}
 	]
 }

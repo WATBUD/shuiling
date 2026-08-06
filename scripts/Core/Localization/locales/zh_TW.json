@@ -1241,5 +1241,9 @@
 	"equip.summary.gen_accessory_radiant_ring": "聖光戒指，+30 攻擊。光屬性攻擊 +18%（需技能屬性相符）。",
 	"equip.accessory.royal_ring": "皇家戒指",
 	"equip.summary.gen_accessory_royal_ring": "皇家戒指，+33 防禦、+52 生命。",
-	"build.slot.accessory_n": "飾品 {0}"
+	"build.slot.accessory_n": "飾品 {0}",
+	"set.shadow": "暗影爆擊套裝",
+	"equip.weapon.shadow_fang": "暗影之牙",
+	"equip.summary.shadow_fang": "高爆擊率的暗影短刃，暗殺者的最愛。",
+	"set.crit_damage_bonus": "集滿加成：暴擊傷害+{0}%"
 }

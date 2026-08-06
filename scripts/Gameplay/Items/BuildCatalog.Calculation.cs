@@ -72,7 +72,7 @@ public static partial class BuildCatalog
 		stats.Attack = Mathf.Max(Mathf.RoundToInt(stats.Attack * stats.DamageMultiplier), 1);
 		stats.MoveSpeedMultiplier = Mathf.Clamp(stats.MoveSpeedMultiplier, 0.55f, 2.4f);
 		stats.AttackCooldownMultiplier = Mathf.Clamp(stats.AttackCooldownMultiplier, 0.42f, 1.85f);
-		stats.CritChance = Mathf.Clamp(stats.CritChance, 0.0f, 0.75f);
+		stats.CritChance = Mathf.Clamp(stats.CritChance, 0.0f, 1.0f);
 		stats.LifeStealPercent = Mathf.Clamp(stats.LifeStealPercent, 0.0f, 0.45f);
 		stats.ControlChance = Mathf.Clamp(stats.ControlChance, 0.0f, 0.75f);
 		stats.ProjectileSpeedMultiplier = Mathf.Clamp(stats.ProjectileSpeedMultiplier, 0.65f, 2.5f);
@@ -133,7 +133,7 @@ public static partial class BuildCatalog
 		stats.AttackCooldownMultiplier = 1.0f / Mathf.Max(player.AttackCooldown * allocatedAttackSpeed, 0.01f);
 		stats.MoveSpeedMultiplier = Mathf.Clamp(stats.MoveSpeedMultiplier, 0.55f, 2.4f);
 		stats.AttackCooldownMultiplier = Mathf.Clamp(stats.AttackCooldownMultiplier, 0.08f, 1.85f);
-		stats.CritChance = Mathf.Clamp(stats.CritChance, 0.0f, 0.75f);
+		stats.CritChance = Mathf.Clamp(stats.CritChance, 0.0f, 1.0f);
 		stats.LifeStealPercent = Mathf.Clamp(stats.LifeStealPercent, 0.0f, 0.45f);
 		stats.ControlChance = Mathf.Clamp(stats.ControlChance, 0.0f, 0.75f);
 		stats.ProjectileSpeedMultiplier = Mathf.Clamp(stats.ProjectileSpeedMultiplier, 0.65f, 2.5f);
@@ -216,6 +216,7 @@ public static partial class BuildCatalog
 		stats.Defense += b.DefenseBonus;
 		stats.MoveSpeedMultiplier += b.MoveSpeedBonus;
 		stats.CritChance += b.CritChanceBonus;
+		stats.CritDamageMultiplier += b.CritDamageBonus;
 		stats.AttackRangeBonus += b.AttackRangeBonus;
 	}
 

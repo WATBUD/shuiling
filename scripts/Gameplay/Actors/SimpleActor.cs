@@ -1304,6 +1304,23 @@ public partial class SimpleActor : CharacterBody3D
 		SpawnCombatEffect(damage.ToString(), color, GlobalPosition + new Vector3(0.0f, 1.1f, 0.0f), 0.52f, 0.55f);
 	}
 
+	// RO-style critical: bigger, longer-lived red number framed by a dark panel
+	// with a red border and a floating "CRITICAL!" banner.
+	private void SpawnCritEffect(int damage)
+	{
+		Node parent = GetTree().CurrentScene ?? GetParent();
+		var effect = new CombatEffect
+		{
+			Text = damage.ToString(),
+			EffectColor = new Color(1.0f, 0.22f, 0.16f, 0.96f),
+			Lifetime = 0.82f,
+			Radius = 0.82f,
+			CritBanner = true,
+		};
+		parent.AddChild(effect);
+		effect.GlobalPosition = GlobalPosition + new Vector3(0.0f, 1.1f, 0.0f);
+	}
+
 	private void SpawnCombatEffect(string text, Color color, Vector3 position, float lifetime, float radius)
 	{
 		Node parent = GetTree().CurrentScene ?? GetParent();

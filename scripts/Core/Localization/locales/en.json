@@ -1241,5 +1241,9 @@
 	"equip.summary.gen_accessory_radiant_ring": "A radiant ring. +30 ATK. +18% Light damage (needs matching skill element).",
 	"equip.accessory.royal_ring": "Royal Ring",
 	"equip.summary.gen_accessory_royal_ring": "A royal ring. +33 DEF, +52 HP.",
-	"build.slot.accessory_n": "Ring {0}"
+	"build.slot.accessory_n": "Ring {0}",
+	"set.shadow": "Shadowstrike Set",
+	"equip.weapon.shadow_fang": "Shadow Fang",
+	"equip.summary.shadow_fang": "A shadowy fang with a high critical rate — an assassins favorite.",
+	"set.crit_damage_bonus": "Full set: crit DMG+{0}%"
 }

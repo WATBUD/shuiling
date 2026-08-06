@@ -186,6 +186,9 @@ public sealed class BuildStats
 	public float DetectionRadiusBonus { get; set; }
 	public float FollowDistanceMultiplier { get; set; } = 1.0f;
 	public float CritChance { get; set; }
+	// Multiplier applied to a critical hit's damage (1.5 = base +50%). Gear/sets add
+	// to this via CritDamageBonus.
+	public float CritDamageMultiplier { get; set; } = 1.5f;
 	public float LifeStealPercent { get; set; }
 	public float KnockbackForce { get; set; }
 	public float ControlChance { get; set; }

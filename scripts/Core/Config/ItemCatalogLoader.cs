@@ -33,6 +33,7 @@ public sealed class EquipmentSetBonusJson
 	public int DefenseBonus { get; set; }
 	public float MoveSpeedBonus { get; set; }
 	public float CritChanceBonus { get; set; }
+	public float CritDamageBonus { get; set; }
 	public float AttackRangeBonus { get; set; }
 }
 

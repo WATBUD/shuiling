@@ -385,7 +385,8 @@
 			"summaryKey": "equip.summary.gen_helmet_shadow",
 			"slot": "Helmet",
 			"maxHealthBonus": 62,
-			"defenseBonus": 28
+			"defenseBonus": 28,
+			"critChanceBonus": 0.05
 		},
 		{
 			"uniqueId": 83,
@@ -538,6 +539,16 @@
 			"elementDamageBonus": 0.15
 		},
 		{
+			"uniqueId": 147,
+			"id": "equip.weapon.shadow_fang",
+			"nameKey": "equip.weapon.shadow_fang",
+			"summaryKey": "equip.summary.shadow_fang",
+			"slot": "Weapon",
+			"attackBonus": 30,
+			"attackSpeed": 74,
+			"critChanceBonus": 0.12
+		},
+		{
 			"uniqueId": 98,
 			"id": "equip.armor.iron",
 			"nameKey": "equip.armor.iron",
@@ -660,7 +671,8 @@
 			"slot": "Armor",
 			"maxHealthBonus": 79,
 			"defenseBonus": 30,
-			"moveSpeedBonus": 0.06
+			"moveSpeedBonus": 0.06,
+			"critChanceBonus": 0.05
 		},
 		{
 			"uniqueId": 110,
@@ -830,7 +842,8 @@
 			"summaryKey": "equip.summary.gen_boots_shadow",
 			"slot": "Boots",
 			"defenseBonus": 13,
-			"moveSpeedBonus": 0.17
+			"moveSpeedBonus": 0.17,
+			"critChanceBonus": 0.05
 		},
 		{
 			"uniqueId": 127,
@@ -977,7 +990,8 @@
 			"nameKey": "equip.accessory.shadow_ring",
 			"summaryKey": "equip.summary.gen_accessory_shadow_ring",
 			"slot": "Accessory",
-			"moveSpeedBonus": 0.1
+			"moveSpeedBonus": 0.1,
+			"critChanceBonus": 0.08
 		},
 		{
 			"uniqueId": 143,

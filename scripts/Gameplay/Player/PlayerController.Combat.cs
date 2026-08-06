@@ -79,7 +79,9 @@ public partial class PlayerController
 
 			// null attacker: for a client this forwards the hit to the host, which
 			// owns the monster's HP (same path companions/net use).
-			monster.ReceiveDamage(stats.Attack, null, this);
+			bool crit = GD.Randf() < stats.CritChance;
+			int hitDamage = crit ? Mathf.Max(Mathf.RoundToInt(stats.Attack * stats.CritDamageMultiplier), 1) : stats.Attack;
+			monster.ReceiveDamage(hitDamage, null, this, isCrit: crit);
 			SpawnImpactEffect(monster.GlobalPosition + Vector3.Up * 0.9f);
 			hitAny = true;
 		}
@@ -207,11 +209,12 @@ public partial class PlayerController
 		}
 		BuildStats stats = CurrentBuildStats;
 		int damage = Mathf.Max(baseDamage, 1);
-		if (GD.Randf() < stats.CritChance)
+		bool crit = GD.Randf() < stats.CritChance;
+		if (crit)
 		{
-			damage = Mathf.RoundToInt(damage * 1.55f);
+			damage = Mathf.RoundToInt(damage * stats.CritDamageMultiplier);
 		}
-		int dealt = target.ReceiveDamage(damage, null, this);
+		int dealt = target.ReceiveDamage(damage, null, this, isCrit: crit);
 		if (dealt > 0 && GD.Randf() < stats.ControlChance)
 		{
 			target.ApplyElementStatusFromPlayer(stats.DamageElementId);

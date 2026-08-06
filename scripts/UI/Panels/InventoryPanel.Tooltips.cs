@@ -142,6 +142,10 @@ public partial class InventoryPanel : PanelContainer
 				sb.DefenseBonus,
 				Mathf.RoundToInt(sb.MoveSpeedBonus * 100.0f),
 				Mathf.RoundToInt(sb.CritChanceBonus * 100.0f)));
+			if (sb.CritDamageBonus > 0.0f)
+			{
+				lines.Add(LocaleText.F("set.crit_damage_bonus", Mathf.RoundToInt(sb.CritDamageBonus * 100.0f)));
+			}
 		}
 		AddStatLine(lines, "stat.health", Mathf.RoundToInt(item.MaxHealthBonus * starMultiplier));
 		AddStatLine(lines, "stat.attack", Mathf.RoundToInt(item.AttackBonus * starMultiplier));
